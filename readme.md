@@ -12,3 +12,9 @@ node claude-usage-dashboard.js
 # Optionen:
 
 node claude-usage-dashboard.js --port=4444 --refresh=15
+
+example Dashboard
+
+![alt text](images/image.png)
+![alt text](images/image2.png)
+![alt text](images/image3.png)
