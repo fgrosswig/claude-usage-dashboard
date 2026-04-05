@@ -119,6 +119,7 @@ node claude-usage-dashboard.js
 
 ### Screenshots
 
+![alt text](images/forensic.png)
 ![alt text](images/image.png)
 ![alt text](images/image2.png)
 ![alt text](images/image3.png)

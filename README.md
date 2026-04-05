@@ -2,7 +2,7 @@
 
 ## Claude Usage Dashboard (`claude-usage-dashboard.js`)
 
-Standalone Node-Server (ohne npm-Abhängigkeiten im Skript), liest **Claude Code**-Logs unter **`~/.claude/projects/**/*.jsonl`** und zeigt Token-Nutzung, Limits (heuristisch) und Forensics in einer Web-UI. Es werden nur **`claude-*`**-Modelle gezählt (kein `<synthetic>`).
+Standalone Node-Server (ohne npm-Abhängigkeiten im Skript), liest **Claude Code**-Logs unter **`~/.claude/projects/**/_.jsonl`** und zeigt Token-Nutzung, Limits (heuristisch) und Forensics in einer Web-UI. Es werden nur **`claude-_`**-Modelle gezählt (kein `<synthetic>`).
 
 ### UI-Texte (DE/EN, dynamisch)
 
@@ -119,6 +119,7 @@ node claude-usage-dashboard.js
 
 ### Screenshots
 
+![alt text](images/forensic.png)
 ![alt text](images/image.png)
 ![alt text](images/image2.png)
 ![alt text](images/image3.png)
