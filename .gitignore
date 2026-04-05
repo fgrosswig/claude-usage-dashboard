@@ -1,0 +1,23 @@
+# Importierte / lokale Host-Logs (z. B. CLAUDE_USAGE_EXTRA_BASES)
+/HOST*/
+
+# Ad-hoc-Testskripte
+test_node*.js
+_chk.json 
+_usage_check.json
+
+# Falls später npm/yarn genutzt wird
+node_modules/
+
+# Lokale Umgebung (Secrets, Pfade)
+.env
+.env.*
+!.env.example
+
+# Betriebssystem
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Sonstiges
+*.log
