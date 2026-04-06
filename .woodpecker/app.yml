@@ -4,10 +4,8 @@ when:
   event: [push, manual]
   branch:
     include:
-      - feat/**
-      - fix/**
       - main
-      - int
+
 
 labels:
   platform: linux/amd64
