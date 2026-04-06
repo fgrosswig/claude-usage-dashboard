@@ -60,13 +60,189 @@ try {
   }
 } catch (eMp) {}
 
-function refreshReleasesCache() {
-  httpsGetJson(RELEASES_API_URL, function (err, data) {
-    if (err || !Array.isArray(data)) return;
-    releasesCache.releases = data;
-    releasesCache.fetchedAt = Date.now();
-    try { fs.writeFileSync(RELEASES_CACHE, JSON.stringify(data), 'utf8'); } catch (e) {}
+/** Nur Release-Tags anthropics/claude-code (SSRF-Schutz). */
+function isSafeGithubReleaseTagParam(s) {
+  if (!s || typeof s !== 'string') return false;
+  var t = s.trim();
+  if (t.length < 3 || t.length > 48) return false;
+  return /^[vV]?[0-9][0-9A-Za-z.\-+]{0,40}$/.test(t);
+}
+
+function persistReleasesCacheToDisk() {
+  try {
+    fs.writeFileSync(RELEASES_CACHE, JSON.stringify(releasesCache.releases), 'utf8');
+  } catch (eW) {}
+}
+
+/**
+ * Einzelrelease per API (wie curl) — für Backfill in claude-code-releases.json.
+ */
+function httpsFetchGithubReleaseByTag(tag, cb) {
+  if (!isSafeGithubReleaseTagParam(tag)) {
+    process.nextTick(function () {
+      cb(new Error('invalid tag'), null);
+    });
+    return;
+  }
+  var done = false;
+  function once(err, data) {
+    if (done) return;
+    done = true;
+    cb(err, data);
+  }
+  var tagEnc = encodeURIComponent(String(tag).trim());
+  var opts = {
+    hostname: 'api.github.com',
+    path: '/repos/anthropics/claude-code/releases/tags/' + tagEnc,
+    method: 'GET',
+    headers: {
+      'User-Agent': 'claude-usage-dashboard',
+      Accept: 'application/vnd.github+json'
+    }
+  };
+  var ghReq = https.request(opts, function (ghRes) {
+    var chunks = [];
+    ghRes.on('data', function (c) {
+      chunks.push(c);
+    });
+    ghRes.on('end', function () {
+      try {
+        var data = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        if (ghRes.statusCode !== 200 || !data || !data.tag_name) {
+          once(new Error('not found'), null);
+          return;
+        }
+        once(null, data);
+      } catch (e) {
+        once(e, null);
+      }
+    });
   });
+  ghReq.on('error', function (e) {
+    once(e, null);
+  });
+  ghReq.setTimeout(15000, function () {
+    ghReq.destroy();
+    once(new Error('timeout'), null);
+  });
+  ghReq.end();
+}
+
+/**
+ * Fehlende Tags aus den Dashboard-Tagen per HTTPS nachladen, JSON-Cache mergen + Highlights neu ziehen.
+ */
+function backfillReleaseBodiesForDashboardDays(days, cb) {
+  if (!days || !days.length) {
+    process.nextTick(cb);
+    return;
+  }
+  var tags = [];
+  var seen = Object.create(null);
+  for (var di = 0; di < days.length; di++) {
+    var vc = days[di].version_change;
+    if (!vc || !vc.github_release_links) continue;
+    for (var li = 0; li < vc.github_release_links.length; li++) {
+      var gl = vc.github_release_links[li];
+      var tg = gl.tag || 'v' + gl.version;
+      if (tg && !seen[tg]) {
+        seen[tg] = true;
+        tags.push(String(tg).trim());
+      }
+    }
+  }
+  function hasTagInCache(tag) {
+    var rels = releasesCache.releases;
+    for (var i = 0; i < rels.length; i++) {
+      if (String(rels[i].tag_name || '') === tag) return true;
+    }
+    return false;
+  }
+  var missing = [];
+  for (var m = 0; m < tags.length; m++) {
+    if (!hasTagInCache(tags[m])) missing.push(tags[m]);
+  }
+  if (!missing.length) {
+    enrichVersionChangeNotes(days);
+    process.nextTick(cb);
+    return;
+  }
+  var ix = 0;
+  function step() {
+    if (ix >= missing.length) {
+      persistReleasesCacheToDisk();
+      enrichVersionChangeNotes(days);
+      cb();
+      return;
+    }
+    var t = missing[ix++];
+    if (!isSafeGithubReleaseTagParam(t)) {
+      setImmediate(step);
+      return;
+    }
+    httpsFetchGithubReleaseByTag(t, function (err, rel) {
+      if (!err && rel && rel.tag_name) {
+        var dupe = false;
+        for (var j = 0; j < releasesCache.releases.length; j++) {
+          if (String(releasesCache.releases[j].tag_name) === String(rel.tag_name)) {
+            dupe = true;
+            break;
+          }
+        }
+        if (!dupe) releasesCache.releases.push(rel);
+      }
+      setImmediate(step);
+    });
+  }
+  step();
+}
+
+function refreshReleasesCache() {
+  var all = [];
+  var page = 1;
+  var maxPages = 5;
+  function fetchNext() {
+    var sep = RELEASES_API_URL.indexOf('?') >= 0 ? '&' : '?';
+    var url = RELEASES_API_URL + sep + 'page=' + page;
+    httpsGetJson(url, function (err, data) {
+      if (err || !Array.isArray(data) || data.length === 0) {
+        if (page === 1 && err) {
+          console.warn('[releases] GitHub API:', err.message, '(ohne User-Agent liefert api.github.com oft 403 — Cache bleibt klein.)');
+        }
+        finish();
+        return;
+      }
+      for (var i = 0; i < data.length; i++) all.push(data[i]);
+      if (data.length < 100 || page >= maxPages) {
+        finish();
+        return;
+      }
+      page++;
+      fetchNext();
+    });
+  }
+  function finish() {
+    if (!all.length) return;
+    var seen = Object.create(null);
+    var merged = [];
+    for (var a = 0; a < all.length; a++) {
+      var ta = all[a] && all[a].tag_name;
+      if (ta) seen[String(ta)] = true;
+      merged.push(all[a]);
+    }
+    var prev = releasesCache.releases;
+    for (var b = 0; b < prev.length; b++) {
+      var pb = prev[b];
+      var tb = pb && pb.tag_name;
+      if (tb && !seen[String(tb)]) {
+        seen[String(tb)] = true;
+        merged.push(pb);
+      }
+    }
+    releasesCache.releases = merged;
+    releasesCache.fetchedAt = Date.now();
+    persistReleasesCacheToDisk();
+  }
+  fetchNext();
 }
 
 /** "v2.1.87", "2.1.87", "…2.1.87…" -> "2.1.87" (GitHub-Release-Keys) */
@@ -113,11 +289,23 @@ function isoToUtcYmd(iso) {
 }
 
 function extractReleaseHighlights(body) {
+  var raw = String(body || '');
+  var slice = raw;
+  var sec = raw.match(/^##\s*what[\u2019\x27]?s changed\b/im);
+  if (sec && sec.index != null) {
+    var after = raw.indexOf('\n', sec.index + sec[0].length);
+    slice = after >= 0 ? raw.slice(after + 1) : raw.slice(sec.index + sec[0].length);
+  }
   var highlights = [];
-  var lines = String(body || '').split('\n');
-  for (var li = 0; li < lines.length && highlights.length < 5; li++) {
-    var ln = lines[li].replace(/^[\s\-*]+/, '').trim();
-    if (ln.length > 10 && ln.indexOf('#') !== 0) highlights.push(ln);
+  var lines = slice.split('\n');
+  for (var li = 0; li < lines.length && li < 140 && highlights.length < 12; li++) {
+    var ln = lines[li].replace(/^[\s>*\-•]+/, '').trim();
+    if (!ln || ln.length < 6) continue;
+    if (/^#{1,6}\s/.test(ln)) break;
+    if (/^---+(\s|$)|^\*{3,}(\s|$)/.test(ln)) continue;
+    if (/^(full changelog|see also)\b/i.test(ln)) continue;
+    if (/^assets\s*\d*\s*$/i.test(ln)) continue;
+    highlights.push(ln.slice(0, 220));
   }
   return highlights;
 }
@@ -158,6 +346,87 @@ function getReleasesMap() {
     if (nk) map[nk] = { tag: r.tag_name, date: date, highlights: extractReleaseHighlights(r.body) };
   }
   return map;
+}
+
+/** Semver-Keys aus relMap mit fromNorm < v <= toNorm (für Release-Texte übersprungener Patch-Versionen). */
+function versionsInRelMapBetween(relMap, fromNorm, toNorm) {
+  if (!relMap || !toNorm) return [];
+  var keys = Object.keys(relMap);
+  keys.sort(semverCmp);
+  var out = [];
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    if (!k) continue;
+    if (fromNorm && semverCmp(k, fromNorm) <= 0) continue;
+    if (semverCmp(k, toNorm) > 0) continue;
+    out.push(k);
+  }
+  return out;
+}
+
+function uniqSortedSemvers(vers) {
+  var o = Object.create(null);
+  for (var i = 0; i < vers.length; i++) {
+    var n = normalizeCliSemver(vers[i]);
+    if (n) o[n] = true;
+  }
+  var ks = Object.keys(o);
+  ks.sort(semverCmp);
+  return ks;
+}
+
+function githubReleaseLinkForVersion(relMap, ver) {
+  var nk = normalizeCliSemver(ver);
+  if (!nk) return { version: '', url: '', tag: '' };
+  var ent = relMap[nk];
+  var tag = ent && ent.tag ? String(ent.tag).trim() : 'v' + nk;
+  return {
+    version: nk,
+    tag: tag,
+    url: 'https://github.com/anthropics/claude-code/releases/tag/' + encodeURIComponent(tag)
+  };
+}
+
+/** Füllt Highlights aus allen Releases zwischen from und höchstem added; setzt github_release_links als Fallback. */
+function enrichVersionChangeNotes(result) {
+  var relMap = getReleasesMap();
+  for (var ei = 0; ei < result.length; ei++) {
+    var vc = result[ei].version_change;
+    if (!vc || !vc.added || !vc.added.length) continue;
+    var fromN = vc.from ? normalizeCliSemver(vc.from) : '';
+    var addedSorted = vc.added.slice().sort(semverCmp);
+    var topN = addedSorted[addedSorted.length - 1];
+    var inter = versionsInRelMapBetween(relMap, fromN, topN);
+    var mergedHi = (vc.highlights || []).slice();
+    var seenH = Object.create(null);
+    for (var mi = 0; mi < mergedHi.length; mi++) seenH[String(mergedHi[mi])] = true;
+    var prefixMulti = inter.length > 1;
+    for (var ii = 0; ii < inter.length; ii++) {
+      var iv = inter[ii];
+      var ri = relMap[iv];
+      if (!ri || !ri.highlights || !ri.highlights.length) continue;
+      for (var h = 0; h < ri.highlights.length; h++) {
+        var line = (prefixMulti ? '[' + iv + '] ' : '') + ri.highlights[h];
+        if (!seenH[line]) {
+          mergedHi.push(line);
+          seenH[line] = true;
+        }
+      }
+    }
+    if (mergedHi.length > 24) mergedHi.length = 24;
+    vc.highlights = mergedHi;
+    var linkVers = uniqSortedSemvers(inter.concat(addedSorted));
+    var links = [];
+    var seenV = Object.create(null);
+    for (var lj = 0; lj < linkVers.length; lj++) {
+      var vj = linkVers[lj];
+      if (seenV[vj]) continue;
+      seenV[vj] = true;
+      var gl = githubReleaseLinkForVersion(relMap, vj);
+      if (gl.url) links.push(gl);
+    }
+    vc.github_release_links = links;
+  }
 }
 
 function loadReleasesArrayForBuild() {
@@ -445,20 +714,70 @@ try {
   }
 } catch (e) {}
 
-function httpsGetJson(url, cb) {
-  var mod = url.indexOf('https:') === 0 ? https : http;
-  mod.get(url, function (res) {
+/**
+ * GET + JSON. Für api.github.com: User-Agent + Accept (ohne User-Agent liefert GitHub oft 403 → kein Array, leerer Release-Cache).
+ */
+function httpsGetJson(urlStr, cb) {
+  var parsed;
+  try {
+    parsed = new URL(urlStr);
+  } catch (eU) {
+    cb(eU, null);
+    return;
+  }
+  var isGithubApi = parsed.hostname === 'api.github.com';
+  var headers = Object.create(null);
+  if (isGithubApi) {
+    headers['User-Agent'] = 'claude-usage-dashboard';
+    headers['Accept'] = 'application/vnd.github+json';
+  }
+  var mod = parsed.protocol === 'https:' ? https : http;
+  var opts = {
+    hostname: parsed.hostname,
+    path: parsed.pathname + parsed.search,
+    method: 'GET',
+    headers: headers
+  };
+  if (parsed.port) opts.port = parsed.port;
+  var req = mod.request(opts, function (res) {
     if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-      return httpsGetJson(res.headers.location, cb);
+      var nextUrl;
+      try {
+        nextUrl = new URL(res.headers.location, urlStr).href;
+      } catch (eL) {
+        cb(new Error('bad redirect'), null);
+        return;
+      }
+      return httpsGetJson(nextUrl, cb);
     }
     var chunks = [];
-    res.on('data', function (c) { chunks.push(c); });
-    res.on('end', function () {
-      try { cb(null, JSON.parse(Buffer.concat(chunks).toString('utf8'))); }
-      catch (e) { cb(e, null); }
+    res.on('data', function (c) {
+      chunks.push(c);
     });
-  }).on('error', function (e) { cb(e, null); })
-    .setTimeout(10000, function () { this.destroy(); cb(new Error('timeout'), null); });
+    res.on('end', function () {
+      var raw = Buffer.concat(chunks).toString('utf8');
+      try {
+        var data = JSON.parse(raw);
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          var msg =
+            data && typeof data.message === 'string' ? data.message : 'HTTP ' + res.statusCode;
+          cb(new Error(msg), null);
+          return;
+        }
+        cb(null, data);
+      } catch (eJ) {
+        cb(eJ, null);
+      }
+    });
+  });
+  req.on('error', function (e) {
+    cb(e, null);
+  });
+  req.setTimeout(20000, function () {
+    req.destroy();
+    cb(new Error('timeout'), null);
+  });
+  req.end();
 }
 
 function httpsPostJson(postUrl, jsonBody, cb) {
@@ -1186,6 +1505,8 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
     result[vci].version_change = { added: vAdded, from: fromVer, highlights: relHighlights };
   }
 
+  enrichVersionChangeNotes(result);
+
   var peakDate = '';
   var peakTotal = 0;
   for (var pi = 0; pi < result.length; pi++) {
@@ -1556,6 +1877,27 @@ tr:hover td{background:#334155}\n\
 .day-picker-row label{color:#94a3b8;font-size:.85rem}\n\
 .day-picker-row select{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 12px;font-size:.9rem;min-width:220px}\n\
 .day-picker-hint{font-size:.75rem;color:#64748b;max-width:36rem;line-height:1.4}\n\
+.forensic-charts-stack{margin-top:8px}\n\
+.service-chart-canvas-wrap{position:relative}\n\
+.service-chart-canvas-wrap>canvas{position:relative;z-index:1}\n\
+.fs-update-overlay,.main-charts-update-overlay{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:4;overflow:visible}\n\
+.main-charts-wrap{position:relative}\n\
+.main-charts-wrap>#charts,.main-charts-wrap>#charts-host-sub{position:relative;z-index:1}\n\
+.fs-update-mark,.main-update-mark{position:absolute;margin:0;padding:0;border:none;background:transparent;cursor:pointer;pointer-events:auto;transform:translate(-50%,0);font-size:13px;line-height:1;color:#4ade80;text-shadow:0 0 8px rgba(0,0,0,.75),0 1px 2px rgba(0,0,0,.9);font-weight:700;z-index:2}\n\
+.fs-update-mark:hover,.main-update-mark:hover{color:#86efac;filter:brightness(1.15)}\n\
+.update-sl-backdrop{display:none;position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.35)}\n\
+.update-sl-backdrop.open{display:block}\n\
+.update-sl{position:fixed;top:0;right:0;width:min(420px,92vw);max-height:100vh;height:100vh;z-index:9600;background:#0f172a;border-left:1px solid #334155;box-shadow:-12px 0 40px rgba(0,0,0,.55);transform:translateX(100%);transition:transform .28s ease;overflow:hidden;display:flex;flex-direction:column}\n\
+.update-sl.open{transform:translateX(0)}\n\
+.update-sl-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid #334155;flex-shrink:0}\n\
+.update-sl-head h3{margin:0;font-size:1rem;color:#f8fafc;font-weight:600;line-height:1.35}\n\
+.update-sl-close{background:#334155;color:#e2e8f0;border:1px solid #475569;width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:1.25rem;line-height:1;flex-shrink:0}\n\
+.update-sl-close:hover{background:#475569}\n\
+.update-sl-body{padding:16px 18px 24px;overflow:auto;flex:1;font-size:.85rem;color:#cbd5e1;line-height:1.5}\n\
+.update-sl-body .upd-ver{font-size:1rem;color:#86efac;margin:0 0 12px;font-weight:600}\n\
+.update-sl-body .upd-meta{color:#94a3b8;font-size:.78rem;margin:0 0 14px;line-height:1.45}\n\
+.update-sl-body ul{margin:8px 0 0;padding-left:1.1rem}\n\
+.update-sl-body li{margin:6px 0}\n\
 </style>\n\
 </head>\n\
 <body>\n\
@@ -1596,6 +1938,7 @@ tr:hover td{background:#334155}\n\
 <div class="forensic-inner">\n\
 <p class="forensic-note-p" id="forensic-note"></p>\n\
 <div class="grid" id="forensic-cards"></div>\n\
+<div class="forensic-charts-stack" id="forensic-charts-stack">\n\
 <div class="chart-box" style="margin-top:16px;margin-bottom:0">\n\
 <h3 id="forensic-chart-h3">Forensic &amp; Hit Limit pro Tag</h3>\n\
 <p id="forensic-chart-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"><strong style="color:#ef4444">Rot (Balken)</strong> = Z\u00e4hler Hit-Limit-Zeilen in JSONL. <strong style="color:#f59e0b">Linie</strong> = Score 3=? · 2=HIT · 1=&lt;&lt;P (Peak-Vergleich, nicht Claude-UI 90%/100%).</p>\n\
@@ -1604,7 +1947,11 @@ tr:hover td{background:#334155}\n\
 <div class="chart-box" style="margin-top:16px;margin-bottom:0">\n\
 <h3 id="service-chart-h3">Service Impact</h3>\n\
 <p id="service-chart-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"></p>\n\
+<div class="service-chart-canvas-wrap" id="service-chart-canvas-wrap">\n\
+<div class="fs-update-overlay" id="fs-update-overlay" aria-hidden="true"></div>\n\
 <canvas id="c-service"></canvas>\n\
+</div>\n\
+</div>\n\
 </div>\n\
 <p id="thinking-note" style="font-size:.75rem;color:#f59e0b;margin:12px 0 4px;line-height:1.45"></p>\n\
 <button type="button" class="report-btn" id="forensic-report-btn" title="Forensic Report als Markdown generieren">\n\
@@ -1631,9 +1978,20 @@ tr:hover td{background:#334155}\n\
 <span class="day-picker-hint" id="day-picker-hint"></span>\n\
 </div>\n\
 <div class="grid" id="cards"></div>\n\
+<div class="main-charts-wrap" id="main-charts-wrap">\n\
+<div class="main-charts-update-overlay" id="main-charts-update-overlay" aria-hidden="true"></div>\n\
 <div class="charts" id="charts"></div>\n\
 <div class="charts-pair" id="charts-host-sub"></div>\n\
+</div>\n\
 <div class="chart-box" style="margin-bottom:24px"><h3 id="daily-detail-heading">Tagesdetail</h3><div style="overflow-x:auto"><table id="tbl"><thead><tr></tr></thead><tbody></tbody></table></div></div>\n\
+<div id="update-slideout-backdrop" class="update-sl-backdrop"></div>\n\
+<aside id="update-slideout" class="update-sl" aria-hidden="true">\n\
+<div class="update-sl-head">\n\
+<h3 id="update-sl-title"></h3>\n\
+<button type="button" class="update-sl-close" id="update-sl-close" aria-label="Close">&times;</button>\n\
+</div>\n\
+<div class="update-sl-body" id="update-sl-body"></div>\n\
+</aside>\n\
 <script>window.__I18N_BUNDLES=__I18N_PLACEHOLDER__;</script>\n\
 <script>\n\
 var defined_colors = {\n\
@@ -1739,6 +2097,8 @@ function applyStaticChrome() {\n\
   var lf = document.getElementById("live-files-hint");\n\
   if (lf) lf.textContent = t("liveFilesHint");\n\
   document.documentElement.lang = __lang === "de" ? "de" : "en";\n\
+  var usc = document.getElementById("update-sl-close");\n\
+  if (usc) usc.setAttribute("aria-label", t("updateSlideoutClose"));\n\
 }\n\
 \n\
 var _charts = {};\n\
@@ -1841,6 +2201,280 @@ function initMetaDetailsPanel() {\n\
     } catch (e2) {}\n\
   });\n\
 }\n\
+var USAGE_EXT_VLINE_END_OFFSET = 22;\n\
+var __usageUpdatePluginRegistered = false;\n\
+function registerUsageUpdateVLinePlugin() {\n\
+  if (__usageUpdatePluginRegistered || typeof Chart === "undefined") return;\n\
+  __usageUpdatePluginRegistered = true;\n\
+  Chart.register({\n\
+    id: "usageUpdateVerticalLines",\n\
+    beforeDatasetsDraw: function (chart) {\n\
+      var cid = chart.canvas && chart.canvas.id;\n\
+      if (cid === "c-forensic" || cid === "c2") return;\n\
+      if (cid !== "c-service" && cid !== "c1" && cid !== "c3" && cid !== "c4" && cid !== "c1-hosts") return;\n\
+      var idxs = window.__usageVersionDayIndices;\n\
+      if (!idxs || !idxs.length) return;\n\
+      var xScale = chart.scales.x;\n\
+      if (!xScale || typeof xScale.getPixelForTick !== "function") return;\n\
+      var ca = chart.chartArea;\n\
+      if (!ca) return;\n\
+      var n = chart.data.labels ? chart.data.labels.length : 0;\n\
+      if (!n) return;\n\
+      var ctx = chart.ctx;\n\
+      var yEnd = ca.top + USAGE_EXT_VLINE_END_OFFSET;\n\
+      var bot = ca.bottom;\n\
+      if (yEnd >= bot) return;\n\
+      ctx.save();\n\
+      ctx.setLineDash([3, 4]);\n\
+      ctx.strokeStyle = "rgba(74, 222, 128, 0.38)";\n\
+      ctx.lineWidth = 1;\n\
+      for (var k = 0; k < idxs.length; k++) {\n\
+        var di = idxs[k];\n\
+        if (di < 0 || di >= n) continue;\n\
+        var x = xScale.getPixelForTick(di);\n\
+        if (x == null || isNaN(x)) continue;\n\
+        ctx.beginPath();\n\
+        ctx.moveTo(x, bot);\n\
+        ctx.lineTo(x, yEnd);\n\
+        ctx.stroke();\n\
+      }\n\
+      ctx.restore();\n\
+    }\n\
+  });\n\
+}\n\
+registerUsageUpdateVLinePlugin();\n\
+function chartTickXToParentLeft(chart, hostEl, tickIndex) {\n\
+  if (!chart || !chart.scales || !chart.scales.x || !chart.canvas || !hostEl) return null;\n\
+  var xScale = chart.scales.x;\n\
+  if (typeof xScale.getPixelForTick !== "function") return null;\n\
+  var x = xScale.getPixelForTick(tickIndex);\n\
+  if (x == null || isNaN(x)) return null;\n\
+  var cw = chart.width;\n\
+  var ch = chart.height;\n\
+  if (!cw || !ch) return null;\n\
+  var canvas = chart.canvas;\n\
+  var cr = canvas.getBoundingClientRect();\n\
+  var hr = hostEl.getBoundingClientRect();\n\
+  var xCss = (x / cw) * cr.width;\n\
+  return cr.left - hr.left + xCss;\n\
+}\n\
+function chartAreaTopInParent(chart, hostEl) {\n\
+  if (!chart || !chart.canvas || !hostEl) return 0;\n\
+  var cr = chart.canvas.getBoundingClientRect();\n\
+  var hr = hostEl.getBoundingClientRect();\n\
+  var t = chart.chartArea ? chart.chartArea.top : 0;\n\
+  return cr.top - hr.top + (t / chart.height) * cr.height;\n\
+}\n\
+function chartAreaBottomInParent(chart, hostEl) {\n\
+  if (!chart || !chart.canvas || !hostEl) return 0;\n\
+  var cr = chart.canvas.getBoundingClientRect();\n\
+  var hr = hostEl.getBoundingClientRect();\n\
+  var b = chart.chartArea ? chart.chartArea.bottom : chart.height;\n\
+  return cr.top - hr.top + (b / chart.height) * cr.height;\n\
+}\n\
+/** Y-Koordinate (px von hostEl-Oberkante) für einen Canvas-Y-Wert (von Canvas-Oberkante). */\n\
+function chartYInParent(chart, hostEl, yCanvas) {\n\
+  if (!chart || !chart.canvas || !hostEl) return 0;\n\
+  var cr = chart.canvas.getBoundingClientRect();\n\
+  var hr = hostEl.getBoundingClientRect();\n\
+  var ch = chart.height;\n\
+  if (!ch || yCanvas == null || isNaN(yCanvas)) return cr.top - hr.top;\n\
+  return cr.top - hr.top + (yCanvas / ch) * cr.height;\n\
+}\n\
+function layoutFsUpdateOverlay() {\n\
+  var wrap = document.getElementById("service-chart-canvas-wrap");\n\
+  var overlay = document.getElementById("fs-update-overlay");\n\
+  if (!wrap || !overlay || !_charts.cService || !_charts.cService.chartArea) return;\n\
+  overlay.innerHTML = "";\n\
+  var idxs = window.__usageVersionDayIndices || [];\n\
+  if (!idxs.length) return;\n\
+  var n = _charts.cService.data.labels ? _charts.cService.data.labels.length : 0;\n\
+  var ch = _charts.cService;\n\
+  var triTop = chartYInParent(ch, wrap, ch.chartArea.top + 4);\n\
+  for (var q = 0; q < idxs.length; q++) {\n\
+    var di = idxs[q];\n\
+    if (di < 0 || di >= n) continue;\n\
+    var leftAbs = chartTickXToParentLeft(ch, wrap, di);\n\
+    if (leftAbs == null) continue;\n\
+    var mark = document.createElement("button");\n\
+    mark.type = "button";\n\
+    mark.className = "fs-update-mark";\n\
+    mark.textContent = "\\u25b2";\n\
+    mark.style.left = leftAbs + "px";\n\
+    mark.style.top = triTop + "px";\n\
+    mark.setAttribute("aria-label", t("updateDotAria"));\n\
+    mark.dataset.dayIndex = String(di);\n\
+    (function (idx) {\n\
+      mark.addEventListener("mouseenter", function () {\n\
+        clearTimeout(__updateDotHoverTimer);\n\
+        __updateDotHoverTimer = setTimeout(function () {\n\
+          openUpdateSlideout(idx);\n\
+        }, 400);\n\
+      });\n\
+      mark.addEventListener("mouseleave", function () {\n\
+        clearTimeout(__updateDotHoverTimer);\n\
+      });\n\
+    })(di);\n\
+    overlay.appendChild(mark);\n\
+  }\n\
+}\n\
+function layoutMainChartsUpdateOverlay() {\n\
+  var stack = document.getElementById("main-charts-wrap");\n\
+  var overlay = document.getElementById("main-charts-update-overlay");\n\
+  if (!stack || !overlay || !_charts.c1 || !_charts.c1.chartArea) return;\n\
+  overlay.innerHTML = "";\n\
+  var idxs = window.__usageVersionDayIndices || [];\n\
+  if (!idxs.length) return;\n\
+  var n = _charts.c1.data.labels ? _charts.c1.data.labels.length : 0;\n\
+  var ch = _charts.c1;\n\
+  var triTop = chartYInParent(ch, stack, ch.chartArea.top + 4);\n\
+  for (var q = 0; q < idxs.length; q++) {\n\
+    var di = idxs[q];\n\
+    if (di < 0 || di >= n) continue;\n\
+    var leftAbs = chartTickXToParentLeft(ch, stack, di);\n\
+    if (leftAbs == null) continue;\n\
+    var mark = document.createElement("button");\n\
+    mark.type = "button";\n\
+    mark.className = "main-update-mark";\n\
+    mark.textContent = "\\u25b2";\n\
+    mark.style.left = leftAbs + "px";\n\
+    mark.style.top = triTop + "px";\n\
+    mark.setAttribute("aria-label", t("updateDotAria"));\n\
+    mark.dataset.dayIndex = String(di);\n\
+    (function (idx) {\n\
+      mark.addEventListener("mouseenter", function () {\n\
+        clearTimeout(__updateDotHoverTimer);\n\
+        __updateDotHoverTimer = setTimeout(function () {\n\
+          openUpdateSlideout(idx);\n\
+        }, 400);\n\
+      });\n\
+      mark.addEventListener("mouseleave", function () {\n\
+        clearTimeout(__updateDotHoverTimer);\n\
+      });\n\
+    })(di);\n\
+    overlay.appendChild(mark);\n\
+  }\n\
+}\n\
+function layoutUpdateGuideOverlays() {\n\
+  layoutFsUpdateOverlay();\n\
+  layoutMainChartsUpdateOverlay();\n\
+}\n\
+function openUpdateSlideout(dayIndex) {\n\
+  var data = __lastUsageData;\n\
+  if (!data || !data.days || data.days[dayIndex] == null) return;\n\
+  var d = data.days[dayIndex];\n\
+  var vc = d.version_change;\n\
+  var titleEl = document.getElementById("update-sl-title");\n\
+  var bodyEl = document.getElementById("update-sl-body");\n\
+  var panel = document.getElementById("update-slideout");\n\
+  var back = document.getElementById("update-slideout-backdrop");\n\
+  if (!titleEl || !bodyEl || !panel || !back) return;\n\
+  titleEl.textContent = d.date + " — " + t("updateSlideoutHeading");\n\
+  bodyEl.textContent = "";\n\
+  if (!vc) {\n\
+    bodyEl.appendChild(document.createTextNode(t("updateSlideoutNoDetail")));\n\
+  } else {\n\
+    var pVer = document.createElement("p");\n\
+    pVer.className = "upd-ver";\n\
+    var verStr = vc.added && vc.added.length ? vc.added.join(", ") : "";\n\
+    if (vc.from) verStr = vc.from + " \\u2192 " + verStr;\n\
+    pVer.textContent = verStr;\n\
+    bodyEl.appendChild(pVer);\n\
+    var meta = document.createElement("p");\n\
+    meta.className = "upd-meta";\n\
+    var metaParts = [];\n\
+    if (vc.release_when) metaParts.push(String(vc.release_when));\n\
+    if (vc.release_utc_ymd) metaParts.push("UTC: " + vc.release_utc_ymd);\n\
+    if (vc.release_local_ymd && vc.release_local_ymd !== vc.release_utc_ymd) metaParts.push("local: " + vc.release_local_ymd);\n\
+    meta.textContent = metaParts.join(" \\u00b7 ");\n\
+    if (meta.textContent) bodyEl.appendChild(meta);\n\
+    var hl = vc.highlights || [];\n\
+    var gl = vc.github_release_links || [];\n\
+    if (hl.length) {\n\
+      var h3 = document.createElement("div");\n\
+      h3.style.fontWeight = "600";\n\
+      h3.style.color = "#94a3b8";\n\
+      h3.style.marginTop = "10px";\n\
+      h3.textContent = t("updateSlideoutHighlights");\n\
+      bodyEl.appendChild(h3);\n\
+      var ul = document.createElement("ul");\n\
+      for (var hi = 0; hi < Math.min(8, hl.length); hi++) {\n\
+        var li = document.createElement("li");\n\
+        li.textContent = String(hl[hi]).slice(0, 400);\n\
+        ul.appendChild(li);\n\
+      }\n\
+      bodyEl.appendChild(ul);\n\
+    } else if (gl.length) {\n\
+      var pNote = document.createElement("p");\n\
+      pNote.className = "upd-meta";\n\
+      pNote.style.marginTop = "10px";\n\
+      pNote.textContent = t("updateSlideoutHighlightsEmpty");\n\
+      bodyEl.appendChild(pNote);\n\
+    }\n\
+    if (gl.length) {\n\
+      var ghH = document.createElement("div");\n\
+      ghH.style.fontWeight = "600";\n\
+      ghH.style.color = "#94a3b8";\n\
+      ghH.style.marginTop = "10px";\n\
+      ghH.textContent = t("updateSlideoutGithubReleases");\n\
+      bodyEl.appendChild(ghH);\n\
+      var ulg = document.createElement("ul");\n\
+      ulg.style.marginTop = "6px";\n\
+      ulg.style.paddingLeft = "1.2em";\n\
+      for (var gi = 0; gi < gl.length; gi++) {\n\
+        var gli = document.createElement("li");\n\
+        var a = document.createElement("a");\n\
+        a.href = gl[gi].url;\n\
+        a.textContent = "v" + gl[gi].version;\n\
+        a.target = "_blank";\n\
+        a.rel = "noopener noreferrer";\n\
+        a.style.color = "#93c5fd";\n\
+        gli.appendChild(a);\n\
+        ulg.appendChild(gli);\n\
+      }\n\
+      bodyEl.appendChild(ulg);\n\
+    }\n\
+  }\n\
+  panel.classList.add("open");\n\
+  back.classList.add("open");\n\
+  panel.setAttribute("aria-hidden", "false");\n\
+}\n\
+function closeUpdateSlideout() {\n\
+  var panel = document.getElementById("update-slideout");\n\
+  var back = document.getElementById("update-slideout-backdrop");\n\
+  if (panel) {\n\
+    panel.classList.remove("open");\n\
+    panel.setAttribute("aria-hidden", "true");\n\
+  }\n\
+  if (back) back.classList.remove("open");\n\
+}\n\
+var __updateSlideoutUiBound = false;\n\
+var __updateDotHoverTimer = null;\n\
+function initUpdateSlideoutOnce() {\n\
+  if (__updateSlideoutUiBound) return;\n\
+  __updateSlideoutUiBound = true;\n\
+  document.body.addEventListener("click", function (ev) {\n\
+    var dot = ev.target.closest(".fs-update-mark, .main-update-mark");\n\
+    if (dot && dot.dataset.dayIndex != null) {\n\
+      ev.preventDefault();\n\
+      openUpdateSlideout(parseInt(dot.dataset.dayIndex, 10));\n\
+    }\n\
+  });\n\
+  var back = document.getElementById("update-slideout-backdrop");\n\
+  if (back) back.addEventListener("click", closeUpdateSlideout);\n\
+  var cls = document.getElementById("update-sl-close");\n\
+  if (cls) cls.addEventListener("click", closeUpdateSlideout);\n\
+  document.addEventListener("keydown", function (e) {\n\
+    if (e.key === "Escape") closeUpdateSlideout();\n\
+  });\n\
+}\n\
+var __layoutOvTimer = null;\n\
+window.addEventListener("resize", function () {\n\
+  clearTimeout(__layoutOvTimer);\n\
+  __layoutOvTimer = setTimeout(function () {\n\
+    layoutUpdateGuideOverlays();\n\
+  }, 160);\n\
+});\n\
 function renderDashboard(data) {\n\
   __lastUsageData = data;\n\
   updateLiveFilesPanel(data);\n\
@@ -1869,6 +2503,11 @@ function renderDashboardCore(data) {\n\
   updateMetaDetailsSummary(data);\n\
   var days = data.days;\n\
   if(!days.length){\n\
+    window.__usageVersionDayIndices = [];\n\
+    var fsO = document.getElementById("fs-update-overlay");\n\
+    var mO = document.getElementById("main-charts-update-overlay");\n\
+    if (fsO) fsO.innerHTML = "";\n\
+    if (mO) mO.innerHTML = "";\n\
     var meta0=document.getElementById("meta");\n\
     var ls0=document.getElementById("limit-source");\n\
     if(ls0) ls0.textContent = apiNote(data, "limit_source_note", "limit_source_note_en");\n\
@@ -2040,6 +2679,10 @@ function renderDashboardCore(data) {\n\
   \n\
   // --- Charts ---\n\
   var labels = days.map(function(d){return d.date.slice(5)});\n\
+  window.__usageVersionDayIndices = [];\n\
+  for (var uxi = 0; uxi < days.length; uxi++) {\n\
+    if (days[uxi].version_change) window.__usageVersionDayIndices.push(uxi);\n\
+  }\n\
   \n\
   // Create chart containers only once (Reihe 1: Token, C:O, Output/h)\n\
   if (!document.getElementById("c1")) {\n\
@@ -2418,12 +3061,11 @@ function renderDashboardCore(data) {\n\
       sCacheRead.push(sd.cache_read||0);\n\
     }\n\
     if(_charts.cService){try{_charts.cService.destroy();}catch(e){}}\n\
-    var mcSvc=[],vcSvc=[];\n\
+    var mcSvc=[];\n\
     for(var mi=0;mi<days.length;mi++){\n\
       var stackTopSvc=sClean[mi]+sAffServer[mi]+sAffClient[mi]+sOutOnly[mi];\n\
       var xCat=labels[mi];\n\
       if(days[mi].model_change)mcSvc.push({x:xCat,y:stackTopSvc+0.25});\n\
-      if(days[mi].version_change)vcSvc.push({x:xCat,y:stackTopSvc+0.5});\n\
     }\n\
     _charts.cService=new Chart(elS,{\n\
       data:{\n\
@@ -2465,12 +3107,6 @@ function renderDashboardCore(data) {\n\
             data:mcSvc,pointStyle:"rectRot",pointRadius:6,\n\
             pointBackgroundColor:"#22d3ee",pointBorderColor:"#06b6d4",pointBorderWidth:2,\n\
             yAxisID:"y",showLine:false,clip:false,parsing:{xAxisKey:"x",yAxisKey:"y"}\n\
-          },\n\
-          {\n\
-            type:"scatter",label:t("serviceDS_versionChange"),\n\
-            data:vcSvc,pointStyle:"triangle",pointRadius:8,\n\
-            pointBackgroundColor:"#4ade80",pointBorderColor:"#16a34a",pointBorderWidth:2,\n\
-            yAxisID:"y",showLine:false,clip:false,parsing:{xAxisKey:"x",yAxisKey:"y"}\n\
           }\n\
         ]\n\
       },\n\
@@ -2482,7 +3118,7 @@ function renderDashboardCore(data) {\n\
           y:{stacked:true,position:"left",beginAtZero:true,\n\
             title:{display:true,text:t("serviceAxisHours"),color:"#94a3b8"},\n\
             ticks:{color:"#94a3b8",stepSize:4,callback:function(v){return v+"h";}},\n\
-            grid:{color:"rgba(51,65,85,0.5)"},grace:"10%"},\n\
+            grid:{color:"rgba(51,65,85,0.5)"}},\n\
           yCR:{position:"right",beginAtZero:true,\n\
             title:{display:true,text:t("chartDS_cacheRead"),color:"#8b5cf6"},\n\
             ticks:{color:"#8b5cf6",callback:function(v){return fmt(v);}},\n\
@@ -2533,6 +3169,13 @@ function renderDashboardCore(data) {\n\
                   }\n\
                   var vhl=d.version_change.highlights||[];\n\
                   for(var vhi=0;vhi<Math.min(3,vhl.length);vhi++) lines.push("  \\u2022 "+vhl[vhi].slice(0,80));\n\
+                  if(!vhl.length){\n\
+                    var vgl=d.version_change.github_release_links||[];\n\
+                    if(vgl.length){\n\
+                      lines.push(t("serviceTooltipReleaseGithubHint"));\n\
+                      for(var vgj=0;vgj<Math.min(3,vgl.length);vgj++) lines.push("  "+vgl[vgj].url);\n\
+                    }\n\
+                  }\n\
                 }\n\
                 return lines;\n\
               }\n\
@@ -2542,6 +3185,12 @@ function renderDashboardCore(data) {\n\
       }\n\
     });\n\
   }\n\
+  initUpdateSlideoutOnce();\n\
+  requestAnimationFrame(function () {\n\
+    requestAnimationFrame(function () {\n\
+      layoutUpdateGuideOverlays();\n\
+    });\n\
+  });\n\
 }\n\
 \n\
 // (renderTimelineChart entfernt)\n\
@@ -2935,6 +3584,7 @@ function runScanAndBroadcast() {
     } catch (pe) {}
   }
   parseAllUsageIncremental(function (err, data) {
+    var scanOk = false;
     try {
       if (err) throw err;
       data.refresh_sec = REFRESH_SEC;
@@ -2942,6 +3592,7 @@ function runScanAndBroadcast() {
       delete data.scan_progress;
       if (data.scan_error) delete data.scan_error;
       cachedData = data;
+      scanOk = true;
     } catch (e) {
       console.error('parseAllUsageIncremental:', e);
       var msg = e && e.message ? e.message : String(e);
@@ -2953,6 +3604,12 @@ function runScanAndBroadcast() {
     } finally {
       scanInProgress = false;
       broadcastSse();
+      if (scanOk && cachedData && cachedData.days && cachedData.days.length) {
+        backfillReleaseBodiesForDashboardDays(cachedData.days, function () {
+          cachedData.generated = new Date().toISOString();
+          broadcastSse();
+        });
+      }
       if (scanQueued) {
         scanQueued = false;
         runScanAndBroadcast();
