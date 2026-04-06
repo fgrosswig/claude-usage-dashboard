@@ -3941,7 +3941,7 @@ function renderOneGauge(canvasId, chartKey, usedPct, titleId, titleText, resetEp
 function renderProxyTokenChart(data) {
   if (typeof Chart === "undefined") return;
   var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
-  if (!proxyDays.length) { chartShellSetLoading("proxy-tokens", false); return; }
+  if (!proxyDays.length) { chartShellSetLoading("c-proxy-tokens", false); return; }
 
   var labels = [];
   var cacheRead = [];
@@ -3955,7 +3955,7 @@ function renderProxyTokenChart(data) {
     output.push(d.output_tokens || 0);
   }
 
-  chartShellSetLoading("proxy-tokens", false);
+  chartShellSetLoading("c-proxy-tokens", false);
   var el = document.getElementById("c-proxy-tokens");
   if (!el) return;
 
@@ -4000,7 +4000,7 @@ function renderProxyTokenChart(data) {
 function renderProxyLatencyChart(data) {
   if (typeof Chart === "undefined") return;
   var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
-  if (!proxyDays.length) { chartShellSetLoading("proxy-latency", false); return; }
+  if (!proxyDays.length) { chartShellSetLoading("c-proxy-latency", false); return; }
 
   var labels = [];
   var avg = [];
@@ -4014,7 +4014,7 @@ function renderProxyLatencyChart(data) {
     mx.push(d.max_duration_ms || 0);
   }
 
-  chartShellSetLoading("proxy-latency", false);
+  chartShellSetLoading("c-proxy-latency", false);
   var el = document.getElementById("c-proxy-latency");
   if (!el) return;
 
@@ -4095,7 +4095,7 @@ function renderProxyHourlyHeatmap(pd) {
     bgColors.push(v === 0 ? "rgba(51,65,85,.2)" : "rgba(59,130,246," + (0.2 + intensity * 0.7).toFixed(2) + ")");
   }
 
-  chartShellSetLoading("proxy-hourly", false);
+  chartShellSetLoading("c-proxy-hourly", false);
 
   if (_proxyCharts.hourly) {
     _proxyCharts.hourly.data.datasets[0].data = values;
@@ -4151,7 +4151,7 @@ function renderProxyStatusChart(pd) {
     colors.push(colorMap[keys[i]] || "#8b5cf6");
   }
 
-  chartShellSetLoading("proxy-status", false);
+  chartShellSetLoading("c-proxy-status", false);
   if (!keys.length) return;
 
   if (_proxyCharts.status) {
@@ -4206,7 +4206,7 @@ function renderProxyModelChart(pd) {
     ci++;
   }
 
-  chartShellSetLoading("proxy-models", false);
+  chartShellSetLoading("c-proxy-models", false);
   if (!labels.length) return;
 
   if (_proxyCharts.models) {
