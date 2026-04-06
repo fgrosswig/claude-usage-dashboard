@@ -1,5 +1,7 @@
 **[Deutsch](README.md)** · English
 
+[![Woodpecker CI — main branch](https://ci.grosswig-it.de/api/badges/3/status.svg?branch=main)](https://ci.grosswig-it.de/repos/3)
+
 ## Claude Usage Dashboard (`server.js` / `start.js`)
 
 Standalone Node server (no npm dependencies in the script itself). Reads **Claude Code** logs under **`~/.claude/projects/**/*.jsonl`** and shows token usage, limits (heuristic), and forensics in a web UI. Only **`claude-*`** models are counted (no `<synthetic>`).

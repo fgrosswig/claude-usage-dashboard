@@ -1,5 +1,7 @@
 # Kubernetes / Helm
 
+[![Woodpecker CI — main](https://ci.grosswig-it.de/api/badges/3/status.svg?branch=main)](https://ci.grosswig-it.de/repos/3)
+
 Chart: `claude-usage-dashboard/` — Usage-Dashboard + Anthropic-Proxy (`node start.js both`).
 
 ## Build image
