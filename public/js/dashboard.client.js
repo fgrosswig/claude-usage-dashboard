@@ -1588,7 +1588,6 @@ function renderDashboard(data, urgent) {
   updateScanSourcesRow(data);
   updateStatePathsRow(data);
   updateStatusLamp(data);
-  renderProxyAnalysis(data);
   var days = data.days;
   var sp = data.scan_progress;
   var scanInc = data.scanning && sp && sp.total > 0 && sp.done < sp.total;
@@ -1744,6 +1743,7 @@ function syncForensicHostFilterBar(data) {
   }
 }
 function renderDashboardCore(data) {
+  renderProxyAnalysis(data);
   updateMetaDetailsSummary(data);
   var days = data.days;
   if(!days.length){
@@ -3924,7 +3924,9 @@ function renderOneGauge(canvasId, chartKey, usedPct, titleId, titleText, resetEp
     },
     options: {
       responsive: true,
+      animation: false,
       maintainAspectRatio: true,
+      animation: false,
       plugins: {
         legend: { display: false },
         title: {
@@ -3987,6 +3989,7 @@ function renderProxyTokenChart(data) {
     },
     options: {
       responsive: true,
+      animation: false,
       interaction: { mode: "index", intersect: false },
       scales: {
         x: { stacked: true, ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
@@ -4046,6 +4049,7 @@ function renderProxyLatencyChart(data) {
     },
     options: {
       responsive: true,
+      animation: false,
       interaction: { mode: "index", intersect: false },
       scales: {
         x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
@@ -4124,6 +4128,7 @@ function renderProxyHourlyHeatmap(pd) {
     },
     options: {
       responsive: true,
+      animation: false,
       scales: {
         x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
         y: { ticks: { color: "#94a3b8" }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true }
@@ -4177,7 +4182,9 @@ function renderProxyStatusChart(pd) {
     },
     options: {
       responsive: true,
+      animation: false,
       maintainAspectRatio: true,
+      animation: false,
       plugins: {
         legend: { position: "right", labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
         tooltip: {
@@ -4235,6 +4242,7 @@ function renderProxyModelChart(pd) {
     },
     options: {
       responsive: true,
+      animation: false,
       interaction: { mode: "index", intersect: false },
       scales: {
         x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
@@ -4355,6 +4363,7 @@ function renderProxyHourlyLatency(pd) {
     },
     options: {
       responsive: true,
+      animation: false,
       interaction: { mode: "index", intersect: false },
       scales: {
         x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
