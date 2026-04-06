@@ -2928,7 +2928,6 @@ function renderDashboardCore(data) {
       _charts.cForensic &&
       _charts.cForensic.data.datasets.length === 2 &&
       (chartXLabelsMatch(_charts.cForensic, labels) || chartLabelsPrefixMatch(_charts.cForensic, labels));
-    console.log("[AUDIT] forensicReuse=", forensicReuse, "labels=", labels.length, "existing=", _charts.cForensic ? _charts.cForensic.data.labels.length : 0);
     if (forensicReuse) {
       freezeChartNoAnim(_charts.cForensic);
       _charts.cForensic.data.labels = labels.slice();
@@ -2952,7 +2951,6 @@ function renderDashboardCore(data) {
           _charts.cForensic.destroy();
         } catch (e) {}
       }
-      console.log("[AUDIT] CREATING cForensic (not reusing)");
       _charts.cForensic = new Chart(elF, {
       data:{
         labels:labels,
@@ -3056,8 +3054,7 @@ function renderDashboardCore(data) {
           _charts.cForensicSignals.data.datasets[4].type === "bar" &&
           _charts.cForensicSignals.data.datasets[5].type === "line" &&
           (chartXLabelsMatch(_charts.cForensicSignals, labels) || chartLabelsPrefixMatch(_charts.cForensicSignals, labels));
-        console.log("[AUDIT] sigReuse=", sigReuse);
-    if (sigReuse) {
+        if (sigReuse) {
           freezeChartNoAnim(_charts.cForensicSignals);
           _charts.cForensicSignals.data.labels = labels.slice();
           _charts.cForensicSignals.data.datasets[0].data = sigStack.cont;
@@ -3330,7 +3327,7 @@ function renderDashboardCore(data) {
         ]
       },
       options:{
-        responsive:true,resizeDelay:280,animation:false,transitions:__chartTransitionsOff,maintainAspectRatio:true,aspectRatio:2.4,
+        responsive:false,animation:false,transitions:__chartTransitionsOff,maintainAspectRatio:true,aspectRatio:2.4,
         interaction:{mode:"index",intersect:false},
         scales:{
           x:{type:"category",stacked:true,grid:{color:"rgba(51,65,85,0.5)"}},
