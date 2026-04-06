@@ -14,4 +14,7 @@ helm lint k8/claude-usage-dashboard
 echo "== helm template (smoke) =="
 helm template k8-ci-smoke k8/claude-usage-dashboard >/dev/null
 
+echo "== kubectl kustomize k8s/overlays/dev (SCHUFA-Pfad) =="
+kubectl kustomize k8s/overlays/dev >/dev/null
+
 echo "k8-ci-verify: OK"

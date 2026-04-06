@@ -2,13 +2,15 @@
 
 [![Woodpecker CI — main](https://ci.grosswig-it.de/api/badges/3/status.svg?branch=main)](https://ci.grosswig-it.de/repos/3)
 
-Chart: `claude-usage-dashboard/` — Usage-Dashboard + Anthropic-Proxy (`node start.js both`).
+Chart: `k8/claude-usage-dashboard/` — Usage-Dashboard + Anthropic-Proxy (`node start.js both`).
+
+**Woodpecker-Deploy** entspricht **SCHUFA**: `kubectl apply -k k8s/overlays/dev`, `set image` auf **Deployment `claude-app`**. Details und Tabellen → Abschnitt **Kustomize** unten. **Helm-Chart** bleibt für manuelles Installieren; bei Template-Änderungen **`k8s/base/*.yml`** abstimmen.
 
 ## Build image
 
-**Normalfall (Cluster):** Du **committest und pushst** (z. B. **`main`**, **`feat/**`**, **`fix/**`**). **Woodpecker** startet **`.woodpecker/app.yml`**: Kaniko → Harbor, danach **`deploy`** wie **SCHUFA**: **`bitnami/kubectl`** mit `kubectl --server=$KUBE_URL --token=$KUBE_TOKEN --insecure-skip-tls-verify` (kein kubeconfig). Statt `kubectl apply -k k8s/overlays/dev` (fehlt hier): **`helm template … | kubectl apply -f -`**, dann **`kubectl set image`** auf `deployment/cud-claude-usage-dashboard` / Container **`app`**, **`rollout status`**. Kurz **Helm-Binary** wird per offiziellem Tarball nach `/tmp` geladen. Anschließend **`cleanup`** (Harbor). Tags: `:<sha8>`, `:latest`.
+**Normalfall:** Push/Manual auf **`main`**, **`int`**, **`feat/**`**, **`fix/**`** → **`.woodpecker/app.yml`** (1:1 nach [SCHUFA app.yml](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.woodpecker/app.yml)): **prepare** → **Kaniko** → **`kubectl apply -k k8s/overlays/dev`** → **`set image`** / **`rollout`** → **Sonar** (nur `main`/`int`) → **cleanup**. Doku-Gesamtbild: [SCHUFA `docs/01-deployment.md`](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/main/docs/01-deployment.md).
 
-**Pull Requests:** **`.woodpecker/pr.yml`** — `node --check` und Helm, **ohne** Kaniko/Harbor.
+**Pull Requests:** **`.woodpecker/pr.yml`** — Checks ohne Kaniko (SCHUFA hat kein separates PR-File; hier ergänzt).
 
 Lokal (optional, gleiches `Dockerfile` wie CI) vom **Repository-Root**:
 
@@ -74,22 +76,29 @@ kubectl create secret docker-registry harbor-pull -n claude `
   --docker-password=$j.secret
 ```
 
-Im Chart: `imagePullSecrets: [{ name: harbor-pull }]` (siehe `values-cluster.example.yaml`).
+Im Chart und in **`k8s/base/deployment.yml`**: Pull-Secret **`harbor-pull`** (siehe `values-cluster.example.yaml`).
+
+## Kustomize (`k8s/` — SCHUFA-Layout)
+
+| Pfad | Inhalt |
+|------|--------|
+| `k8s/base/` | `deployment.yml` (**Deployment** `claude-app`, Container **`app`**), `service.yml`, `pvc.yml`, `kustomization.yml` |
+| `k8s/overlays/dev/` | Namespace **claude**, `images.newTag: latest` — vgl. [SCHUFA overlays/dev](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/k8s/overlays/dev/kustomization.yml) |
+
+Prüfen: `kubectl kustomize k8s/overlays/dev`
 
 ## CI — Woodpecker
 
-Struktur wie **GRO/SCHUFA** (Woodpecker + Kaniko, keine Gitea Actions für das App-Image):
-
 | Datei | Rolle |
 |-------|--------|
-| [`.woodpecker/app.yml`](../.woodpecker/app.yml) | Wie SCHUFA: Checks, **`plugins/kaniko`**, **`deploy`** (Helm + `kube_*` Secrets), **`cleanup`** (Harbor API) |
-| [`.woodpecker/pr.yml`](../.woodpecker/pr.yml) | Nur **Pull Request**: Checks ohne Registry-Push |
+| [`.woodpecker/app.yml`](../.woodpecker/app.yml) | **Struktur = SCHUFA** `app.yml`: prepare, Kaniko, **kubectl apply -k k8s/overlays/dev**, set image, rollout, Sonar (`main`/`int`), cleanup |
+| [`.woodpecker/pr.yml`](../.woodpecker/pr.yml) | PR-Checks ohne Kaniko (Zusatz zu SCHUFA) |
 
-**Vorbild (MCP):** [SCHUFA `.woodpecker/app.yml` (`feat/fastify-v5`)](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.woodpecker/app.yml) — gleiches Muster: `plugins/kaniko`, `harbor.grosswig-it.de/…`, Deploy-Schritt mit `kube_*`. Doku im SCHUFA-Repo: `docs/01-deployment.md`. [Kaniko-Plugin](https://woodpecker-ci.org/plugins/kaniko).
+**Referenz:** [SCHUFA `app.yml` feat/fastify-v5](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.woodpecker/app.yml) · [SCHUFA `docs/01-deployment.md`](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/main/docs/01-deployment.md) · [Kaniko-Plugin](https://woodpecker-ci.org/plugins/kaniko).
 
 Instanz: [ci.grosswig-it.de — Repo #3](https://ci.grosswig-it.de/repos/3) · [Workflow-Syntax](https://woodpecker-ci.org/docs/usage/workflow-syntax).
 
-**Woodpecker-Secrets:** `harbor_user`, `harbor_password`, `kube_url`, `kube_token`.
+**Woodpecker-Secrets:** `harbor_user`, `harbor_password`, `kube_url`, `kube_token`, **`sonar_url`**, **`sonar_token`** (Sonar wie SCHUFA; Projekt-Key `gro-claude-usage-dashboard` in der Pipeline).
 
 **Harbor-Robot in Woodpecker (Kaniko):** Die YAML-Datei enthält **keine** Zugangsdaten. Kaniko bekommt Login ausschließlich aus **`harbor_user`** und **`harbor_password`**. Trage dort exakt die Werte aus der Robot-JSON ein (lokal z. B. `robot$claude+developer.json`, Felder **`name`** und **`secret`**):
 
@@ -105,11 +114,9 @@ In **Harbor** muss der Robot für das Projekt **`claude`** ins Repository **`cla
 
 **Base Image Connector / Docker Hub:** Das `Dockerfile` nutzt `FROM node:22-alpine` (Docker Hub). Harbor warnt vor Rate-Limits; optional Base-Image über euren Harbor-Proxy spiegeln (siehe **05-harbor.md** / „Base Image Connector“) — unabhängig vom Push-`UNAUTHORIZED`, das reine Registry-Auth betrifft.
 
-**Auslöser `app.yml`:** Push auf genannte Branches, **Tag**, **Deployment**, **manuell** — nicht PR (dafür `pr.yml`).
+**Auslöser `app.yml`:** wie SCHUFA nur **`push`** und **`manual`** auf **`feat/**`**, **`fix/**`**, **`main`**, **`int`** (kein separater Tag-/Deployment-Event — wer Tags braucht, analog SCHUFA erweitern).
 
-Ablauf: `node --check` → Helm lint/template → **build-push** (Kaniko) → **`deploy`** (`bitnami/kubectl` + `helm template|apply`, **`set image`**, **`rollout status`**, Namespace **`claude`**) → **cleanup** (Harbor **`claude`/`claude-usage-dashboard`**). **Sonar** wie in SCHUFA hier nicht eingebunden (eigenes Sonar-Projekt nötig).
-
-Lokal: `sh scripts/k8-ci-verify.sh`. `kubectl` in der Pipeline: vorerst `--insecure-skip-tls-verify` — bei Bedarf in `.woodpecker/app.yml` anpassen.
+Lokal: `sh scripts/k8-ci-verify.sh`. `kubectl` in der Pipeline: `--insecure-skip-tls-verify` wie SCHUFA.
 
 **Deploy / Registry:** **[GRO / infrastructure-docs](https://gitea.grosswig-it.de/GRO/infrastructure-docs)**, **05-harbor.md**.
 
@@ -120,8 +127,8 @@ Lokal: `sh scripts/k8-ci-verify.sh`. `kubectl` in der Pipeline: vorerst `--insec
 **Reihenfolge:**
 
 1. **Vorbereitung** — Namespace `claude` (legt Helm mit `--create-namespace` an). Bei privater Registry Pull-Secret **`harbor-pull`** anlegen (Abschnitt **Harbor** oben).
-2. **Image bauen und nach Harbor pushen** — **Git-Push** auf **`main`** / **`feat/**`** / **`fix/**`** (oder Tag-/Deploy-/manuell): Woodpecker **`.woodpecker/app.yml`** mit **Kaniko** (`build-push`). Ohne erfolgreichen Lauf → **ImagePullBackOff**.
-3. **Helm / Deploy** — bei jedem grünen Woodpecker-Lauf wie in **SCHUFA** automatisch, oder lokal: `helm upgrade --install` mit Harbor-Image und `imagePullSecrets: harbor-pull` (siehe `values-cluster.example.yaml`).
+2. **Image bauen und nach Harbor pushen** — Woodpecker **Kaniko** (`build-push`).
+3. **Deploy** — **`kubectl apply -k k8s/overlays/dev`** + **`set image`** (Woodpecker) **oder** manuell `helm upgrade` über Chart (ältere Releases hießen z. B. `cud`; Kustomize nutzt **Deployment `claude-app`**).
 
 Voraussetzung: `kubectl` zeigt auf **euren** Cluster (`kubectl config current-context`), Helm 3 installiert.
 
