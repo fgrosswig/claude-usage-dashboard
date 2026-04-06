@@ -1,0 +1,14 @@
+# PR-Checks auf Docker-Agent .220 — kein Kaniko/Harbor-Push (vgl. k8/README.md).
+when:
+  event: pull_request
+
+labels:
+  platform: linux/amd64
+  backend: docker
+
+steps:
+  - name: verify
+    image: alpine:3.20
+    commands:
+      - apk add --no-cache helm kubectl
+      - sh scripts/k8-ci-verify.sh

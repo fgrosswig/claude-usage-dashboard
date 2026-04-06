@@ -9,6 +9,7 @@ when:
 
 labels:
   platform: linux/amd64
+  backend: kubernetes
 
 steps:
   - name: prepare
@@ -20,7 +21,7 @@ steps:
         sed "s|^ARG BASE_TAG=.*|ARG BASE_TAG=$BASE_VER|" Dockerfile > Dockerfile.ci
 
   - name: build-push
-    image: plugin-kaniko
+    image: plugins/kaniko
     settings:
       repo: harbor.grosswig-it.de/claude/claude-usage-dashboard
       registry: harbor.grosswig-it.de
