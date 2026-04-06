@@ -4531,13 +4531,7 @@ function renderHealthScore(data) {
       var dc = ind.color === "red" ? "#ef4444" : ind.color === "yellow" ? "#f59e0b" : "#22c55e";
       sh += '<span class="hs-inline-badge"><span class="hs-inline-dot" style="background:' + dc + '"></span>' + escHtml(ind.label) + ' <strong>' + escHtml(ind.display) + '</strong></span>';
     }
-    var findings = computeKeyFindings(data);
-    sh += '<span class="hs-inline-sep">|</span>';
-    for (var ff = 0; ff < findings.length; ff++) {
-      var f = findings[ff];
-      var fdc = f.icon === "red" ? "#ef4444" : f.icon === "yellow" ? "#f59e0b" : "#22c55e";
-      sh += '<span class="hs-inline-badge"><span class="hs-inline-dot" style="background:' + fdc + '"></span>' + escHtml(f.title) + ' <strong>' + escHtml(f.value) + '</strong></span>';
-    }
+
     smText.innerHTML = sh;
   }
 
