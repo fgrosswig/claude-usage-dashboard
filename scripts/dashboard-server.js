@@ -2749,7 +2749,10 @@ function emptyProxyDayBucket() {
     models: {},
     status_codes: {},
     hours: {},
-    rate_limit_snapshots: []
+    rate_limit_snapshots: [],
+    cold_starts: 0,
+    cache_ratios: [],
+    per_hour_latency: {}
   };
 }
 
@@ -2805,6 +2808,24 @@ function parseProxyNdjsonFiles() {
         var ch = rec.cache_health || 'na';
         if (dd.cache_health[ch] !== undefined) dd.cache_health[ch]++;
         else dd.cache_health.na++;
+
+        // Cold-start detection: cache_read_ratio < 0.5 on a 200 request with usage
+        var crr = rec.cache_read_ratio;
+        if (typeof crr === 'number' && u && status === 200) {
+          dd.cache_ratios.push(crr);
+          if (crr < 0.5) dd.cold_starts++;
+        }
+
+        // Per-hour latency tracking for heatmap
+        if (tsEnd.length >= 13 && dur > 0 && status === 200) {
+          var lhour = parseInt(tsEnd.slice(11, 13), 10);
+          if (!isNaN(lhour) && lhour >= 0 && lhour <= 23) {
+            if (!dd.per_hour_latency[lhour]) dd.per_hour_latency[lhour] = { sum: 0, count: 0, max: 0 };
+            dd.per_hour_latency[lhour].sum += dur;
+            dd.per_hour_latency[lhour].count++;
+            if (dur > dd.per_hour_latency[lhour].max) dd.per_hour_latency[lhour].max = dur;
+          }
+        }
 
         // Model from request hints
         var model = (rec.request_hints && rec.request_hints.model) || 'unknown';

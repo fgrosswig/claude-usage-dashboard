@@ -3852,6 +3852,13 @@ function renderProxyAnalysis(data) {
   if (h3mod) h3mod.textContent = t("proxyModelTitle");
   var blurbMod = document.getElementById("proxy-model-blurb");
   if (blurbMod) blurbMod.textContent = t("proxyModelBlurb");
+  renderProxyColdStart(pd);
+  renderProxyJsonlComparison(data);
+  renderProxyHourlyLatency(pd);
+  var h3hl = document.getElementById("proxy-hourly-latency-h3");
+  if (h3hl) h3hl.textContent = t("proxyHourlyLatencyTitle");
+  var blurbHl = document.getElementById("proxy-hourly-latency-blurb");
+  if (blurbHl) blurbHl.textContent = t("proxyHourlyLatencyBlurb");
 }
 
 function destroyProxyCharts() {
@@ -4242,6 +4249,122 @@ function renderProxyModelChart(pd) {
               if (ctx.datasetIndex === 1) return ctx.dataset.label + ": " + (ctx.parsed.y >= 1000 ? (ctx.parsed.y / 1000).toFixed(1) + "s" : Math.round(ctx.parsed.y) + "ms");
               return ctx.dataset.label + ": " + ctx.parsed.y;
             }
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── P3.2 Cold-Start Detection ─────────────────────────────────────────────
+function renderProxyColdStart(pd) {
+  var el = document.getElementById("proxy-coldstart-info");
+  if (!el) return;
+  var cs = pd.cold_starts || 0;
+  var ratios = pd.cache_ratios || [];
+  if (!ratios.length) { el.textContent = ""; return; }
+  var avgRatio = 0;
+  for (var i = 0; i < ratios.length; i++) avgRatio += ratios[i];
+  avgRatio = avgRatio / ratios.length;
+  var minRatio = ratios[0];
+  for (var j = 1; j < ratios.length; j++) { if (ratios[j] < minRatio) minRatio = ratios[j]; }
+  var text = tr("proxyColdStartInfo", {
+    cold: cs,
+    total: ratios.length,
+    avg: (avgRatio * 100).toFixed(1),
+    min: (minRatio * 100).toFixed(1)
+  });
+  el.textContent = text;
+  el.style.color = cs > 0 ? "#f59e0b" : "#22c55e";
+}
+
+// ── P4.4 JSONL vs Proxy Token Comparison ──────────────────────────────────
+function renderProxyJsonlComparison(data) {
+  var el = document.getElementById("proxy-jsonl-compare");
+  if (!el) return;
+  var days = data.days || [];
+  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  if (!days.length || !proxyDays.length) {
+    el.textContent = days.length ? "" : t("proxyJsonlNoData");
+    return;
+  }
+  // Match days
+  var proxyByDate = {};
+  for (var pi = 0; pi < proxyDays.length; pi++) {
+    proxyByDate[proxyDays[pi].date] = proxyDays[pi];
+  }
+  var matches = 0;
+  var jsonlTotal = 0;
+  var proxyTotal = 0;
+  for (var di = 0; di < days.length; di++) {
+    var pd = proxyByDate[days[di].date];
+    if (!pd) continue;
+    matches++;
+    jsonlTotal += (days[di].total || 0);
+    proxyTotal += (pd.total_tokens || 0);
+  }
+  if (!matches) { el.textContent = t("proxyJsonlNoOverlap"); return; }
+  var ratio = proxyTotal > 0 ? (jsonlTotal / proxyTotal) : 0;
+  el.textContent = tr("proxyJsonlCompare", {
+    days: matches,
+    jsonl: fmt(jsonlTotal),
+    proxy: fmt(proxyTotal),
+    ratio: ratio.toFixed(2)
+  });
+  el.style.color = ratio > 1.5 ? "#ef4444" : ratio > 1.1 ? "#f59e0b" : "#22c55e";
+}
+
+// ── Per-Hour Latency Heatmap ──────────────────────────────────────────────
+function renderProxyHourlyLatency(pd) {
+  if (typeof Chart === "undefined") return;
+  var el = document.getElementById("c-proxy-hourly-latency");
+  if (!el) return;
+  var phl = pd.per_hour_latency || {};
+  var labels = [];
+  var avgData = [];
+  var maxData = [];
+  for (var h = 0; h <= 23; h++) {
+    labels.push(String(h).length < 2 ? "0" + h : String(h));
+    var hl = phl[String(h)] || phl[h];
+    if (hl && hl.count > 0) {
+      avgData.push(Math.round(hl.sum / hl.count));
+      maxData.push(hl.max);
+    } else {
+      avgData.push(0);
+      maxData.push(0);
+    }
+  }
+
+  chartShellSetLoading("c-proxy-hourly-latency", false);
+
+  if (_proxyCharts.hourlyLatency) {
+    _proxyCharts.hourlyLatency.data.datasets[0].data = avgData;
+    _proxyCharts.hourlyLatency.data.datasets[1].data = maxData;
+    _proxyCharts.hourlyLatency.update("none");
+    return;
+  }
+
+  _proxyCharts.hourlyLatency = new Chart(el.getContext("2d"), {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [
+        { label: t("proxyDSAvgLatency"), data: avgData, backgroundColor: "rgba(59,130,246,.6)", borderRadius: 2 },
+        { label: t("proxyDSMaxLatency"), data: maxData, backgroundColor: "rgba(239,68,68,.35)", borderRadius: 2 }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
+        y: { ticks: { color: "#94a3b8", callback: function(v) { return v >= 1000 ? (v/1000).toFixed(1)+"s" : v+"ms"; } }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true }
+      },
+      plugins: {
+        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) { return ctx.dataset.label + ": " + (ctx.parsed.y >= 1000 ? (ctx.parsed.y/1000).toFixed(1)+"s" : ctx.parsed.y+"ms"); }
           }
         }
       }

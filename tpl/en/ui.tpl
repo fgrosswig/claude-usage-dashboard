@@ -271,5 +271,11 @@
   "proxyInvisibleCostNote": "Invisible cost: {visible} visible tokens, {cache} cache tokens used {perPct} visible tokens per 1% quota — thinking tokens are not counted here.",
   "proxyDSRequestsPerHour": "Requests",
   "proxyDSModelRequests": "Requests",
-  "proxyDSModelLatency": "Avg latency"
+  "proxyDSModelLatency": "Avg latency",
+  "proxyColdStartInfo": "{cold} cold starts of {total} requests (avg cache ratio: {avg}%, min: {min}%)",
+  "proxyJsonlNoData": "No JSONL data — sync local logs via POST /api/claude-data-sync to compare.",
+  "proxyJsonlNoOverlap": "No overlapping days between JSONL and proxy logs.",
+  "proxyJsonlCompare": "{days} days compared: JSONL {jsonl} vs Proxy {proxy} tokens (ratio {ratio}x). >1.5x suggests JSONL duplication.",
+  "proxyHourlyLatencyTitle": "Latency per Hour (avg + max)",
+  "proxyHourlyLatencyBlurb": "Blue = average response time, red = peak latency per hour. Spikes during certain hours indicate peak-hour rate throttling by Anthropic."
 }
