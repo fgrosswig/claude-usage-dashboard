@@ -1,4 +1,4 @@
 {
-  "base_image": "v3",
-  "_note": "Änderung triggert .woodpecker/base.yml. Tags dort mitziehen (vN, latest). prepare in app.yml setzt ARG BASE_TAG für Kaniko (Dockerfile.ci)."
+  "base_image": "latest",
+  "_note": "Tag für FROM harbor.../claude/base:<tag>. In Harbor prüfen (Artifacts → Tags). CI base.yml pusht u.a. latest + v3; App nutzt standardmäßig latest."
 }
