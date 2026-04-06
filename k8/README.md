@@ -8,7 +8,7 @@ Chart: `k8/claude-usage-dashboard/` — Usage-Dashboard + Anthropic-Proxy (`node
 
 ## Build image
 
-**Reihenfolge wie SCHUFA:** Zuerst **`harbor.grosswig-it.de/claude/base`** — Workflow **`.woodpecker/base.yml`** (Push auf `Dockerfile.base`, `version.json`, `package.json`, `package-lock.json`, **Docker-Agent .220**). Danach (oder parallel bei nur App-Änderungen) **`.woodpecker/app.yml`**: **prepare** (schreibt **`Dockerfile.ci`** mit `BASE_TAG` aus **`version.json`**) → **Kaniko** (zieht das Base von Harbor, **K8s-Agent .171**) → Deploy → Cleanup. Ohne existierendes Base-Tag schlägt Kaniko fehl — erst **`base.yml`** laufen lassen oder Base manuell pushen.
+**Reihenfolge wie SCHUFA:** Zuerst **`harbor.grosswig-it.de/claude/base`** — Workflow **`.woodpecker/base.yml`** (Push auf `Dockerfile.base`, `version.json`, `package.json`, `package-lock.json`, **Docker-Agent .220**). Danach (oder parallel bei nur App-Änderungen) **`.woodpecker/app.yml`**: **prepare** (schreibt **`Dockerfile.ci`** mit `BASE_TAG` aus **`version.json`**) → **Kaniko** (zieht das Base von Harbor, **Docker-Agent .220** wie SCHUFA) → Deploy → Cleanup. Ohne existierendes Base-Tag schlägt Kaniko fehl — erst **`base.yml`** laufen lassen oder Base manuell pushen.
 
 **Erstmalig / leeres Harbor-Repo `claude/base`:** In Woodpecker den Workflow **`base`** (`.woodpecker/base.yml`) **manuell** ausführen — `when` enthält **`manual`**; Pfadfilter greifen dabei nicht. Danach existiert **`claude/base:v3`** (und **`latest`**), dann **`app.yml`** erneut starten. In Harbor Projekt **`claude`** und Robot mit **Push** auf **`base`** vorsehen.
 
@@ -96,10 +96,10 @@ Prüfen: `kubectl kustomize k8s/overlays/dev`
 | Datei | Rolle |
 |-------|--------|
 | [`.woodpecker/base.yml`](../.woodpecker/base.yml) | **Harbor `claude/base`** (`woodpeckerci/plugin-docker` über **poc**, **backend: docker** / .220) |
-| [`.woodpecker/app.yml`](../.woodpecker/app.yml) | prepare → **Dockerfile.ci**, Kaniko, **kubectl apply -k k8s/overlays/dev**, set image, rollout, cleanup (**backend: kubernetes** / .171) |
+| [`.woodpecker/app.yml`](../.woodpecker/app.yml) | prepare → **Dockerfile.ci**, Kaniko, **kubectl apply -k k8s/overlays/dev**, set image, rollout, cleanup — **wie SCHUFA** nur **`platform`** → **Docker-Agent .220** |
 | [`.woodpecker/pr.yml`](../.woodpecker/pr.yml) | PR-Checks ohne Kaniko (**backend: docker** / .220) |
 
-**Agent-Auswahl (GRO):** `.woodpecker/app.yml` nutzt **`labels.backend: kubernetes`** → Woodpecker **K8s-Agent .171** (Kaniko-Builds als Pods im Cluster). **`.woodpecker/pr.yml`** nutzt **`backend: docker`** → **Docker-Agent .220**. Base-/Hilfsimages typischerweise einmalig auf .220 bauen/spiegeln; siehe [04-woodpecker.md](https://gitea.grosswig-it.de/GRO/infrastructure-docs/src/branch/main/docs/04-woodpecker.md).
+**Agent-Auswahl (GRO):** `.woodpecker/app.yml` entspricht **[SCHUFA `app.yml`](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.woodpecker/app.yml)** — nur **`platform: linux/amd64`** (kein **`backend: kubernetes`**), damit **Kaniko** und kurze Image-Namen auf dem **Docker-Agent .220** laufen. **`backend: kubernetes`** würde **Job-Pods auf .171** erzeugen; dann Step-Images über Harbor **`poc`** nötig (Cluster ohne Docker-Hub). **`.woodpecker/pr.yml`** setzt explizit **`backend: docker`**. Base-Image weiterhin **`.woodpecker/base.yml`** auf .220. Siehe [04-woodpecker.md](https://gitea.grosswig-it.de/GRO/infrastructure-docs/src/branch/main/docs/04-woodpecker.md).
 
 **Referenz:** [SCHUFA `app.yml` feat/fastify-v5](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.woodpecker/app.yml) · [SCHUFA `docs/01-deployment.md`](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/main/docs/01-deployment.md) · [Kaniko-Plugin](https://woodpecker-ci.org/plugins/kaniko).
 
@@ -119,7 +119,7 @@ jq -r '.name, .secret' "$ROBOT_JSON"
 
 In **Harbor** muss der Robot für das Projekt **`claude`** ins Repository **`claude-usage-dashboard`** **pushen** dürfen. In der Robot-Maske **Select Permissions** → Zeile **Repository** müssen u. a. **Pull** und **Push** angehakt sein (nur *List / Read / Update* reicht nicht — dann genau der Fehler **`UNAUTHORIZED` … action: push**). Meldung **`UNAUTHORIZED`** heißt sonst oft: falsche Woodpecker-Secrets oder abgelaufener Robot.
 
-**Registry:** **Kubernetes-Pipeline** (`.woodpecker/app.yml`): Step-Images nur über Harbor-Proxy **`poc`** (`harbor.grosswig-it.de/poc/library/…`, `…/bitnami/…`, `…/woodpeckerci/…`). **`Dockerfile.base`** (Build auf **Docker .220**): **`FROM node:20-alpine`** — Pull dort über euren Docker-/Mirror-Setup, nicht als `poc/…`-Pfad im Dockerfile. Minimales Base: **`npm install`** nur **`package.json`**, ohne SCHUFA-OCR/`apk`. **App-**`Dockerfile`: **`harbor.../claude/base`**. Doku: **05-harbor.md**.
+**Registry:** **App-Pipeline** (`.woodpecker/app.yml`) läuft auf **Docker .220** wie SCHUFA — Step-Images **`alpine`**, **`plugins/kaniko`**, **`bitnami/kubectl`** zieht der **Docker-Host** (Hub/Mirror). Nur bei **`backend: kubernetes`** (optional): Step-Images über Harbor-Proxy **`poc`**. **`Dockerfile.base`**: **`FROM node:20-alpine`** auf .220. **App-**`Dockerfile`: **`harbor.../claude/base`**. Doku: **05-harbor.md**.
 
 **Auslöser `app.yml`:** wie SCHUFA nur **`push`** und **`manual`** auf **`feat/**`**, **`fix/**`**, **`main`**, **`int`** (kein separater Tag-/Deployment-Event — wer Tags braucht, analog SCHUFA erweitern).
 
@@ -134,7 +134,7 @@ Lokal: `sh scripts/k8-ci-verify.sh` (Helm/Kustomize + Smoke für **Dockerfile.ci
 **Reihenfolge:**
 
 1. **Vorbereitung** — Namespace `claude` (legt Helm mit `--create-namespace` an). Bei privater Registry Pull-Secret **`harbor-pull`** anlegen (Abschnitt **Harbor** oben).
-2. **Base-Image** — Woodpecker **`.woodpecker/base.yml`** auf **.220** nach Harbor **`claude/base`** (bei Änderung an Base-Deps oder einmalig manuell triggern). **App-Image** — **Kaniko** in **`app.yml`** auf **.171** (`build-push`).
+2. **Base-Image** — Woodpecker **`.woodpecker/base.yml`** auf **.220** nach Harbor **`claude/base`** (bei Änderung an Base-Deps oder einmalig manuell triggern). **App-Image** — **Kaniko** in **`app.yml`** auf **.220** (`build-push`, wie SCHUFA).
 3. **Deploy** — **`kubectl apply -k k8s/overlays/dev`** + **`set image`** (Woodpecker) **oder** manuell `helm upgrade` über Chart (ältere Releases hießen z. B. `cud`; Kustomize nutzt **Deployment `claude-app`**).
 
 Voraussetzung: `kubectl` zeigt auf **euren** Cluster (`kubectl config current-context`), Helm 3 installiert.

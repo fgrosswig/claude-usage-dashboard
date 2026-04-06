@@ -1,4 +1,5 @@
-# Step-Images über Harbor poc (kein Docker Hub vom Cluster aus) — vgl. k8/README.md
+# Wie GRO/SCHUFA .woodpecker/app.yml: nur platform → Docker-Agent .220 (Kaniko + kurze Image-Namen).
+# backend: kubernetes würde Job-Pods auf .171 erzeugen (Hub/poc-Pull anders als auf .220).
 when:
   event: [push, manual]
   branch:
@@ -10,11 +11,10 @@ when:
 
 labels:
   platform: linux/amd64
-  backend: kubernetes
 
 steps:
   - name: prepare
-    image: harbor.grosswig-it.de/poc/library/alpine:3.20
+    image: alpine
     commands:
       - |
         BASE_VER=$(awk -F'"' '/base_image/{print $4}' version.json)
@@ -22,7 +22,7 @@ steps:
         sed "s|^ARG BASE_TAG=.*|ARG BASE_TAG=$BASE_VER|" Dockerfile > Dockerfile.ci
 
   - name: build-push
-    image: harbor.grosswig-it.de/poc/woodpeckerci/plugin-kaniko:latest
+    image: plugins/kaniko
     settings:
       repo: harbor.grosswig-it.de/claude/claude-usage-dashboard
       registry: harbor.grosswig-it.de
@@ -39,7 +39,7 @@ steps:
         from_secret: harbor_password
 
   - name: deploy
-    image: harbor.grosswig-it.de/poc/bitnami/kubectl:1.31
+    image: bitnami/kubectl:1.31
     commands:
       - |
         set -eux
@@ -55,7 +55,7 @@ steps:
         from_secret: kube_token
 
   - name: cleanup
-    image: harbor.grosswig-it.de/poc/library/alpine:3.20
+    image: alpine
     environment:
       HARBOR_USER:
         from_secret: harbor_user
