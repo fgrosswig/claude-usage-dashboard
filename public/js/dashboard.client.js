@@ -1128,6 +1128,18 @@ function initMetaDetailsPanel() {
   });
 }
 var USAGE_EXT_VLINE_END_OFFSET = 22;
+// Global: disable ALL Chart.js animations to prevent flickering
+if (typeof Chart !== "undefined") {
+  Chart.defaults.animation = false;
+  Chart.defaults.transitions = {
+    active: { animation: { duration: 0 } },
+    resize: { animation: { duration: 0 } },
+    show: { animation: { duration: 0 } },
+    hide: { animation: { duration: 0 } }
+  };
+  Chart.defaults.responsive = true;
+  Chart.defaults.resizeDelay = 300;
+}
 var __usageUpdatePluginRegistered = false;
 function registerUsageUpdateVLinePlugin() {
   if (__usageUpdatePluginRegistered || typeof Chart === "undefined") return;
