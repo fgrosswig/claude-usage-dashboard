@@ -25,6 +25,8 @@ var walkJsonl = usageScanRoots.walkJsonl;
 var collectTaggedJsonlFiles = usageScanRoots.collectTaggedJsonlFiles;
 var collectTaggedJsonlFilesAsync = usageScanRoots.collectTaggedJsonlFilesAsync;
 var forEachJsonlLineSync = usageScanRoots.forEachJsonlLineSync;
+var getProxyLogDir = usageScanRoots.getProxyLogDir;
+var collectProxyNdjsonFiles = usageScanRoots.collectProxyNdjsonFiles;
 var serviceLog = require('./service-logger');
 var claudeDataIngest = require('./claude-data-ingest');
 
@@ -2553,6 +2555,8 @@ function runScanAndBroadcast() {
       delete data.scan_progress;
       if (data.scan_error) delete data.scan_error;
       cachedData = data;
+      refreshProxyCache();
+      if (__proxyCache.data) cachedData.proxy = __proxyCache.data;
       scanOk = true;
     } catch (e) {
       serviceLog.error('scan', 'parse failed: ' + (e && e.message ? e.message : String(e)));
@@ -2723,6 +2727,170 @@ function primeDashboardAndScheduleFirstScan() {
 
 // ── HTTP Server ─────────────────────────────────────────────────────────
 
+
+// ── Proxy NDJSON Log Parsing ──────────────────────────────────────────────
+// Separate data track: proxy logs contain API-level metrics (latency, rate limits,
+// cache health from actual Anthropic headers) that JSONL session logs do not have.
+
+var __proxyCache = { data: null, generated: null };
+
+function emptyProxyDayBucket() {
+  return {
+    requests: 0,
+    errors: 0,
+    total_duration_ms: 0,
+    min_duration_ms: Infinity,
+    max_duration_ms: 0,
+    input_tokens: 0,
+    output_tokens: 0,
+    cache_read_tokens: 0,
+    cache_creation_tokens: 0,
+    cache_health: { healthy: 0, mixed: 0, affected: 0, na: 0 },
+    models: {},
+    status_codes: {},
+    hours: {},
+    rate_limit_snapshots: []
+  };
+}
+
+function parseProxyNdjsonFiles() {
+  var files = collectProxyNdjsonFiles();
+  var daily = {};
+
+  for (var fi = 0; fi < files.length; fi++) {
+    try {
+      forEachJsonlLineSync(files[fi], function(line) {
+        if (!line.trim()) return;
+        var rec;
+        try { rec = JSON.parse(line); } catch (e) { return; }
+
+        // Skip error-only records
+        if (rec.error && !rec.ts_end) return;
+
+        var tsEnd = rec.ts_end || rec.ts_start || '';
+        if (tsEnd.length < 10) return;
+        var dayKey = tsEnd.slice(0, 10);
+
+        if (!daily[dayKey]) daily[dayKey] = emptyProxyDayBucket();
+        var dd = daily[dayKey];
+
+        dd.requests++;
+        var dur = rec.duration_ms || 0;
+        dd.total_duration_ms += dur;
+        if (dur < dd.min_duration_ms) dd.min_duration_ms = dur;
+        if (dur > dd.max_duration_ms) dd.max_duration_ms = dur;
+
+        var status = rec.upstream_status || 0;
+        dd.status_codes[status] = (dd.status_codes[status] || 0) + 1;
+        if (status >= 400) dd.errors++;
+
+        // Hour tracking
+        if (tsEnd.length >= 13) {
+          var hour = parseInt(tsEnd.slice(11, 13), 10);
+          if (!isNaN(hour) && hour >= 0 && hour <= 23) {
+            dd.hours[hour] = (dd.hours[hour] || 0) + 1;
+          }
+        }
+
+        // Usage from proxy (already extracted from Anthropic response)
+        var u = rec.usage;
+        if (u) {
+          dd.input_tokens += (u.input_tokens || 0);
+          dd.output_tokens += (u.output_tokens || 0);
+          dd.cache_read_tokens += (u.cache_read_input_tokens || 0);
+          dd.cache_creation_tokens += (u.cache_creation_input_tokens || 0);
+        }
+
+        // Cache health
+        var ch = rec.cache_health || 'na';
+        if (dd.cache_health[ch] !== undefined) dd.cache_health[ch]++;
+        else dd.cache_health.na++;
+
+        // Model from request hints
+        var model = (rec.request_hints && rec.request_hints.model) || 'unknown';
+        if (!dd.models[model]) dd.models[model] = { requests: 0, avg_duration_ms: 0, total_duration_ms: 0, output_tokens: 0 };
+        dd.models[model].requests++;
+        dd.models[model].total_duration_ms += dur;
+        if (u) dd.models[model].output_tokens += (u.output_tokens || 0);
+
+        // Rate limit snapshot (keep last per day, not all)
+        var rlh = rec.response_anthropic_headers;
+        if (rlh) {
+          var snap = {};
+          var hasRl = false;
+          for (var rk in rlh) {
+            if (rk.indexOf('anthropic-ratelimit') === 0) {
+              snap[rk] = rlh[rk];
+              hasRl = true;
+            }
+          }
+          if (hasRl) {
+            snap._ts = tsEnd;
+            // Keep only latest snapshot per day (overwrite)
+            dd.rate_limit_snapshots = [snap];
+          }
+        }
+      });
+    } catch (e) {
+      serviceLog.warn('proxy-parse', 'ndjson read failed ' + files[fi] + ': ' + (e.message || e));
+    }
+  }
+
+  // Build result array
+  var days = Object.keys(daily).sort();
+  var result = [];
+  for (var di = 0; di < days.length; di++) {
+    var key = days[di];
+    var d = daily[key];
+    // Compute model averages
+    var modelKeys = Object.keys(d.models);
+    for (var mi = 0; mi < modelKeys.length; mi++) {
+      var m = d.models[modelKeys[mi]];
+      m.avg_duration_ms = m.requests > 0 ? Math.round(m.total_duration_ms / m.requests) : 0;
+    }
+    result.push({
+      date: key,
+      requests: d.requests,
+      errors: d.errors,
+      error_rate: d.requests > 0 ? Math.round(d.errors / d.requests * 10000) / 100 : 0,
+      avg_duration_ms: d.requests > 0 ? Math.round(d.total_duration_ms / d.requests) : 0,
+      min_duration_ms: d.min_duration_ms === Infinity ? 0 : d.min_duration_ms,
+      max_duration_ms: d.max_duration_ms,
+      input_tokens: d.input_tokens,
+      output_tokens: d.output_tokens,
+      cache_read_tokens: d.cache_read_tokens,
+      cache_creation_tokens: d.cache_creation_tokens,
+      total_tokens: d.input_tokens + d.output_tokens + d.cache_read_tokens + d.cache_creation_tokens,
+      cache_read_ratio: (d.cache_read_tokens + d.cache_creation_tokens) > 0
+        ? Math.round(d.cache_read_tokens / (d.cache_read_tokens + d.cache_creation_tokens) * 10000) / 10000
+        : null,
+      cache_health: d.cache_health,
+      models: d.models,
+      status_codes: d.status_codes,
+      hours: d.hours,
+      active_hours: Object.keys(d.hours).length,
+      rate_limit: d.rate_limit_snapshots.length ? d.rate_limit_snapshots[0] : null
+    });
+  }
+
+  return {
+    proxy_days: result,
+    proxy_log_dir: getProxyLogDir(),
+    proxy_files: files.length,
+    generated: new Date().toISOString()
+  };
+}
+
+function refreshProxyCache() {
+  try {
+    __proxyCache.data = parseProxyNdjsonFiles();
+    __proxyCache.generated = new Date().toISOString();
+    serviceLog.info('proxy-parse', 'done days=' + (__proxyCache.data.proxy_days ? __proxyCache.data.proxy_days.length : 0) + ' files=' + __proxyCache.data.proxy_files);
+  } catch (e) {
+    serviceLog.error('proxy-parse', 'failed: ' + (e.message || e));
+  }
+}
+
 var server = http.createServer(function (req, res) {
   var pathname = dashboardHttp.requestPathname(req.url);
   if (
@@ -2831,6 +2999,15 @@ var server = http.createServer(function (req, res) {
     refreshMarketplaceExtensionCache();
     res.writeHead(200, corsMp);
     res.end(JSON.stringify({ ok: true, message: 'marketplace_refresh_started' }));
+  } else if (pathname === '/api/proxy-usage') {
+    if (!__proxyCache.data) refreshProxyCache();
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      Pragma: 'no-cache'
+    });
+    res.end(JSON.stringify(__proxyCache.data));
   } else if (pathname === '/api/claude-data-sync') {
     handleClaudeDataSyncRequest(req, res);
   } else {
@@ -2864,8 +3041,10 @@ server.listen(PORT, function () {
   setTimeout(refreshOutageCache, 400);
   setTimeout(maybeRefreshReleasesCacheOnStartup, 1400);
   setTimeout(refreshMarketplaceExtensionCache, 2400);
+  setTimeout(refreshProxyCache, 3000);
 });
 
 setInterval(runScanAndBroadcast, REFRESH_SEC * 1000);
+setInterval(refreshProxyCache, REFRESH_SEC * 1000);
 setInterval(refreshOutageCache, OUTAGE_REFRESH_MS);
 setInterval(refreshMarketplaceExtensionCache, 6 * 60 * 60 * 1000);

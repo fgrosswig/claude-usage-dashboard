@@ -238,5 +238,32 @@ module.exports = {
   walkJsonlYielding: walkJsonlYielding,
   collectTaggedJsonlFiles: collectTaggedJsonlFiles,
   collectTaggedJsonlFilesAsync: collectTaggedJsonlFilesAsync,
-  forEachJsonlLineSync: forEachJsonlLineSync
+  forEachJsonlLineSync: forEachJsonlLineSync,
+  getProxyLogDir: getProxyLogDir,
+  collectProxyNdjsonFiles: collectProxyNdjsonFiles
 };
+
+// ── Proxy NDJSON log discovery ────────────────────────────────────────────
+
+var PROXY_LOG_DIR_NAME = 'anthropic-proxy-logs';
+
+function getProxyLogDir() {
+  return process.env.ANTHROPIC_PROXY_LOG_DIR ||
+    path.join(HOME, '.claude', PROXY_LOG_DIR_NAME);
+}
+
+/** Collect all proxy-*.ndjson files from the proxy log directory. */
+function collectProxyNdjsonFiles() {
+  var logDir = getProxyLogDir();
+  var files = [];
+  try {
+    var entries = fs.readdirSync(logDir, { withFileTypes: true });
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i].isFile() && entries[i].name.endsWith('.ndjson')) {
+        files.push(path.join(logDir, entries[i].name));
+      }
+    }
+  } catch (e) {}
+  files.sort();
+  return files;
+}
