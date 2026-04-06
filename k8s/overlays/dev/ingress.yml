@@ -1,0 +1,31 @@
+# Öffentliche Erreichbarkeit über Traefik (Cluster: .171). Hosts an eure DNS-/TLS-Struktur anpassen.
+# Ohne Ingress bleibt der Service nur ClusterIP (nur innerhalb des Clusters / port-forward).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: claude-app
+  annotations:
+    # Bei cert-manager: cert-manager.io/cluster-issuer: <issuer-name>
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: claude-usage.grosswig-it.de
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: claude-app
+                port:
+                  number: 3333
+    - host: claude-usage-proxy.grosswig-it.de
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: claude-app
+                port:
+                  number: 8080

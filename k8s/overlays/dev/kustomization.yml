@@ -7,6 +7,7 @@ namespace: claude
 resources:
   - ../../base
   - namespace.yml
+  - ingress.yml
 
 # CI pushed tags: latest + commit SHA — Kustomize-Tag für ersten Apply (set image setzt SHA nach).
 images:

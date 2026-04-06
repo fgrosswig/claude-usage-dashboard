@@ -100,7 +100,7 @@ Im Chart und in **`k8s/base/deployment.yml`**: Pull-Secret **`harbor-pull`** (si
 | Pfad | Inhalt |
 |------|--------|
 | `k8s/base/` | `deployment.yml` (**Deployment** `claude-app`, Container **`app`**), `service.yml`, `pvc.yml`, `kustomization.yml` |
-| `k8s/overlays/dev/` | Namespace **claude**, `images.newTag: latest` — vgl. [SCHUFA overlays/dev](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/k8s/overlays/dev/kustomization.yml) |
+| `k8s/overlays/dev/` | Namespace **claude**, **Ingress** (Traefik), `images.newTag: latest` — vgl. [SCHUFA overlays/dev](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/k8s/overlays/dev/kustomization.yml) |
 
 Prüfen: `kubectl kustomize k8s/overlays/dev`
 
@@ -166,7 +166,7 @@ helm upgrade --install cud ./k8/claude-usage-dashboard --namespace claude --crea
 
 Ohne eigene Datei reicht z. B. `--set image.repository=… --set image.tag=…` (siehe `values.yaml`).
 
-4. **Erreichbarkeit** — Intern: `Service` ClusterIP auf Ports 3333 (Dashboard) und 8080 (Proxy). Von außen: `ingress.enabled: true` inkl. Host/TLS setzen, oder `service.type: NodePort` / LoadBalancer je nach Cluster.
+4. **Erreichbarkeit** — **`kubectl apply -k k8s/overlays/dev`** legt einen **Ingress** (`k8s/overlays/dev/ingress.yml`) mit **Traefik** an: standardmäßig **`claude-usage.grosswig-it.de`** → Dashboard (3333), **`claude-usage-proxy.grosswig-it.de`** → Anthropic-Proxy (8080). **Hosts in der Datei anpassen**, DNS (A/CNAME) auf Traefik zeigen lassen, TLS wie in **[06-traefik.md](https://gitea.grosswig-it.de/GRO/infrastructure-docs/src/branch/main/docs/06-traefik.md)**. Ohne Ingress bleibt der **Service** nur **ClusterIP** (nur im Cluster oder `kubectl port-forward`). Helm: `ingress.enabled: true` bzw. `service.type: NodePort` / LoadBalancer.
 
 5. **Smoke-Test** — `kubectl -n claude port-forward svc/<release>-claude-usage-dashboard 3333:3333` und Browser `http://127.0.0.1:3333/` (Service-Name aus `helm status cud` / `kubectl get svc -n claude`).
 
