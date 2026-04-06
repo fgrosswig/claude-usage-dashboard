@@ -277,5 +277,17 @@
   "proxyJsonlNoOverlap": "Keine überlappenden Tage zwischen JSONL- und Proxy-Logs.",
   "proxyJsonlCompare": "{days} Tage verglichen: JSONL {jsonl} vs Proxy {proxy} Tokens (Verhältnis {ratio}x). >1.5x deutet auf JSONL-Duplikation.",
   "proxyHourlyLatencyTitle": "Latenz pro Stunde (Avg + Max)",
-  "proxyHourlyLatencyBlurb": "Blau = durchschnittliche Antwortzeit, rot = Spitzenlatenz pro Stunde. Spitzen in bestimmten Stunden deuten auf Peak-Hour-Drosselung durch Anthropic hin."
+  "proxyHourlyLatencyBlurb": "Blau = durchschnittliche Antwortzeit, rot = Spitzenlatenz pro Stunde. Spitzen in bestimmten Stunden deuten auf Peak-Hour-Drosselung durch Anthropic hin.",
+  "healthScoreTitle": "Gesundheits-Score",
+  "healthScoreSummary": "{score}/10 — {warns} Warnungen, {crits} kritisch",
+  "healthScoreNoData": "Gesundheits-Score — warte auf Daten",
+  "healthQuota5h": "Quota 5h",
+  "healthThinkingGap": "Thinking Gap",
+  "healthCacheHealth": "Cache Health",
+  "healthErrorRate": "Fehlerrate",
+  "healthHitLimits": "Hit Limits/d",
+  "healthLatency": "Avg Latenz",
+  "healthInterrupts": "Interrupts/d",
+  "healthColdStarts": "Cold Starts",
+  "healthRetries": "Retries/d"
 }
