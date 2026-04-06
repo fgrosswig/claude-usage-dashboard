@@ -4,9 +4,9 @@ Chart: `claude-usage-dashboard/` — Usage-Dashboard + Anthropic-Proxy (`node st
 
 ## Build image
 
-**Normalfall (Cluster):** Du **committest und pushst** ins Repo (Standardbranch **`main`**). **Woodpecker** startet automatisch, **baut** das Image aus dem **Dockerfile im Repo-Root** (`docker-build`) und **pusht** es nach Harbor (`harbor-push`) — kein lokales `docker build` nötig. Tags: `:<erste-8-Zeichen-des-Commit-SHA>`, `:latest`, bei Git-Tag zusätzlich `:$TAG`. `helm-deploy` (nur Deployment/manuell) zieht `harbor.grosswig-it.de/claude/claude-usage-dashboard` mit passendem Tag.
+**Normalfall (Cluster):** Du **committest und pushst** (z. B. **`main`**, **`feat/**`**, **`fix/**`**). **Woodpecker** startet **`.woodpecker/app.yml`**, baut mit **`plugins/kaniko`** (wie **GRO/SCHUFA**) und pusht nach Harbor — **ohne** Docker-Socket, **ohne** `trusted`. Tags: `:<erste-8-Zeichen-des-Commit-SHA>`, `:latest`. **`helm-deploy`** nur bei **Deployment** oder **manuell** im Woodpecker-UI.
 
-**Pull Requests:** Pipeline baut und prüft (Helm), **ohne** Harbor-Push.
+**Pull Requests:** **`.woodpecker/pr.yml`** — `node --check` und Helm, **ohne** Kaniko/Harbor.
 
 Lokal (optional, gleiches `Dockerfile` wie CI) vom **Repository-Root**:
 
@@ -76,28 +76,35 @@ Im Chart: `imagePullSecrets: [{ name: harbor-pull }]` (siehe `values-cluster.exa
 
 ## CI — Woodpecker
 
-Pipeline: [`.woodpecker/pipeline.yaml`](../.woodpecker/pipeline.yaml) · Instanz: [ci.grosswig-it.de — Repo #3](https://ci.grosswig-it.de/repos/3) · Upstream-Doku: [woodpecker-ci.org](https://woodpecker-ci.org/docs/usage/workflow-syntax).
+Struktur wie **GRO/SCHUFA** (Woodpecker + Kaniko, keine Gitea Actions für das App-Image):
 
-**Woodpecker-Secrets** (Repository-Einstellungen): `harbor_user`, `harbor_password`, `kube_url` (API-Server-URL), `kube_token` (Bearer). Scopes wie in der UI (push, tag, deployment, manual, …).
+| Datei | Rolle |
+|-------|--------|
+| [`.woodpecker/app.yml`](../.woodpecker/app.yml) | Push `main` / `feat/**` / `fix/**`, Tag, Deployment, manuell: `node --check`, Helm, **`plugins/kaniko`** → Harbor, optional **`helm-deploy`** |
+| [`.woodpecker/pr.yml`](../.woodpecker/pr.yml) | Nur **Pull Request**: Checks ohne Registry-Push |
 
-**Trusted:** Die Pipeline nutzt den **Docker-Socket** (`volumes`). In `.woodpecker/pipeline.yaml` steht `trusted: true`. Im Woodpecker-Projekt muss zusätzlich **Trusted** aktiviert sein (Repository-Einstellungen — sonst melden Linter/Lauf: *Insufficient trust level to use volumes*).
+**Vorbild (MCP):** [SCHUFA `.woodpecker/app.yml` (`feat/fastify-v5`)](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.woodpecker/app.yml) — gleiches Muster: `plugins/kaniko`, `harbor.grosswig-it.de/…`, Deploy-Schritt mit `kube_*`. Doku im SCHUFA-Repo: `docs/01-deployment.md`. [Kaniko-Plugin](https://woodpecker-ci.org/plugins/kaniko).
 
-**Auslöser:** Jeder **Repo-Push** startet die Pipeline; **Harbor** bekommt das Image bei **Push auf `main`** (neuer Commit), außerdem bei **Tag**, **Deployment** und **manuell** — nicht bei **PRs**.
+Instanz: [ci.grosswig-it.de — Repo #3](https://ci.grosswig-it.de/repos/3) · [Workflow-Syntax](https://woodpecker-ci.org/docs/usage/workflow-syntax).
 
-Ablauf: `node --check` → `docker-build` → `helm lint`/`template` → **harbor-push** (s. o.) → `harbor.grosswig-it.de/claude/claude-usage-dashboard` mit `:<sha8>`, `:latest`, optional `:$CI_COMMIT_TAG` — bei **Deployment** oder **manuell** danach **`helm upgrade --install`** nach `claude` mit Image-Override und `imagePullSecrets: harbor-pull` (Secret **`harbor-pull`** im Namespace). Deploy-Image = Build aus demselben Lauf.
+**Woodpecker-Secrets:** `harbor_user`, `harbor_password`, `kube_url`, `kube_token`.
 
-Lokal gleiche Checks: `sh scripts/k8-ci-verify.sh`. CA für `kubectl`: Pipeline nutzt vorerst `--insecure-skip-tls-verify` — bei echtem Cluster-Zertifikat ggf. in `.woodpecker/pipeline.yaml` anpassen.
+**Auslöser `app.yml`:** Push auf genannte Branches, **Tag**, **Deployment**, **manuell** — nicht PR (dafür `pr.yml`).
 
-**Deploy / Registry:** ergänzend **[GRO / infrastructure-docs](https://gitea.grosswig-it.de/GRO/infrastructure-docs)** und **05-harbor.md**.
+Ablauf: `node --check` → Helm lint/template → **build-push** (Kaniko) → `harbor.grosswig-it.de/claude/claude-usage-dashboard` (`:latest`, `:<sha8>`) → bei **Deployment**/**manuell** **`helm upgrade --install`** mit `imagePullSecrets: harbor-pull`.
 
-**Referenz (Gitea Actions, anderes Projekt):** [SCHUFA `.gitea/workflows/deploy.yml` (Branch `feat/fastify-v5`)](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.gitea/workflows/deploy.yml) — dort (per API/MCP lesbar) ein **statisches** Deploy: Push auf `feature/story-v2` (so im YAML; Branch-Name der Datei weicht ab), Sync nach `gh-pages`, Kopie ins **nginx**-Webroot (`GIT_SSL_NO_VERIFY`, `oauth2:${{ github.token }}@gitea:3000/...`). **Kein** Docker/Harbor/Helm — anderes Zielbild als dieses Repo, aber nützlich für Gitea-Actions-Muster. **Dieses Repo:** [Woodpecker](https://woodpecker-ci.org/docs/usage/workflow-syntax) (`.woodpecker/pipeline.yaml`), keine [Gitea Actions](https://docs.gitea.com/usage/actions/overview) unter `.gitea/workflows/`.
+Lokal: `sh scripts/k8-ci-verify.sh`. `kubectl` in der Pipeline: vorerst `--insecure-skip-tls-verify` — bei Bedarf in `.woodpecker/app.yml` anpassen.
+
+**Deploy / Registry:** **[GRO / infrastructure-docs](https://gitea.grosswig-it.de/GRO/infrastructure-docs)**, **05-harbor.md**.
+
+**Hinweis:** SCHUFA nutzt zusätzlich **`.woodpecker/base.yml`** (`plugins/docker` für `Dockerfile.base`) und optional **Gitea Actions** für statische Pages — hier nur ein **Dockerfile**, daher keine `base.yml`. [Gitea Actions](https://docs.gitea.com/usage/actions/overview)-Beispiel (statisch): [SCHUFA `deploy.yml` auf `feat/fastify-v5`](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.gitea/workflows/deploy.yml).
 
 ## Deploy im Kubernetes-Cluster
 
 **Reihenfolge:**
 
 1. **Vorbereitung** — Namespace `claude` (legt Helm mit `--create-namespace` an). Bei privater Registry Pull-Secret **`harbor-pull`** anlegen (Abschnitt **Harbor** oben).
-2. **Image bauen und nach Harbor pushen** — **Git-Push** (Commit) auf **`main`** (oder manueller/Tag-/Deploy-Lauf): Woodpecker führt `docker-build` → `harbor-push` aus (nicht das Helm-Chart). Ohne erfolgreichen Lauf liegt kein Tag unter `…/claude/claude-usage-dashboard` → **ImagePullBackOff**.
+2. **Image bauen und nach Harbor pushen** — **Git-Push** auf **`main`** / **`feat/**`** / **`fix/**`** (oder Tag-/Deploy-/manuell): Woodpecker **`.woodpecker/app.yml`** mit **Kaniko** (`build-push`). Ohne erfolgreichen Lauf → **ImagePullBackOff**.
 3. **Helm** — `helm upgrade --install` mit `image.repository` / `image.tag` (zum gebauten Image passend) und `imagePullSecrets: harbor-pull` (wie Pipeline und `values-cluster.example.yaml`).
 
 Voraussetzung: `kubectl` zeigt auf **euren** Cluster (`kubectl config current-context`), Helm 3 installiert.

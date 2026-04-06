@@ -1,0 +1,69 @@
+# Wie GRO/SCHUFA — .woodpecker/app.yml (Branch feat/fastify-v5):
+# Kaniko-Plugin statt Docker-Socket → kein „trusted“, kein Volume auf docker.sock.
+# https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.woodpecker/app.yml
+#
+# Secrets: harbor_user, harbor_password, kube_url, kube_token
+
+when:
+  - event: push
+    branch:
+      include:
+        - main
+        - feat/**
+        - fix/**
+  - event: tag
+  - event: deployment
+  - event: manual
+
+labels:
+  platform: linux/amd64
+
+steps:
+  - name: node-check-dashboard-client
+    image: docker.io/node:22-alpine
+    commands:
+      - node --check public/js/dashboard.client.js
+
+  - name: helm-lint-template
+    image: docker.io/alpine/helm:3.16.3
+    commands:
+      - helm lint k8/claude-usage-dashboard
+      - helm template woodpecker-smoke k8/claude-usage-dashboard >/dev/null
+
+  - name: build-push
+    image: plugins/kaniko
+    settings:
+      repo: harbor.grosswig-it.de/claude/claude-usage-dashboard
+      registry: harbor.grosswig-it.de
+      dockerfile: Dockerfile
+      tags:
+        - latest
+        - ${CI_COMMIT_SHA:0:8}
+      username:
+        from_secret: harbor_user
+      password:
+        from_secret: harbor_password
+
+  - name: helm-deploy
+    when:
+      - event: deployment
+      - event: manual
+    image: docker.io/dtzar/helm-kubectl:3.14.4
+    environment:
+      KUBE_URL:
+        from_secret: kube_url
+      KUBE_TOKEN:
+        from_secret: kube_token
+    commands:
+      - kubectl config set-cluster ci --server="$KUBE_URL" --insecure-skip-tls-verify=true
+      - kubectl config set-credentials ci --token="$KUBE_TOKEN"
+      - kubectl config set-context ci --cluster=ci --user=ci
+      - kubectl config use-context ci
+      - |
+        TAG=$(printf '%s' "$CI_COMMIT_SHA" | cut -c1-8)
+        if [ -n "${CI_COMMIT_TAG:-}" ]; then TAG="$CI_COMMIT_TAG"; fi
+        helm upgrade --install cud ./k8/claude-usage-dashboard -n claude --create-namespace \
+          --set image.repository=harbor.grosswig-it.de/claude/claude-usage-dashboard \
+          --set image.tag="$TAG" \
+          --set image.pullPolicy=Always \
+          --set "imagePullSecrets[0].name=harbor-pull"

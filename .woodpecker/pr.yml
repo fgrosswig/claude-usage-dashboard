@@ -1,0 +1,19 @@
+# Nur PRs — gleiche Checks wie SCHUFA-Trennung, ohne Harbor/Kaniko (keine Registry-Schreibrechte nötig).
+
+when:
+  - event: pull_request
+
+labels:
+  platform: linux/amd64
+
+steps:
+  - name: node-check-dashboard-client
+    image: docker.io/node:22-alpine
+    commands:
+      - node --check public/js/dashboard.client.js
+
+  - name: helm-lint-template
+    image: docker.io/alpine/helm:3.16.3
+    commands:
+      - helm lint k8/claude-usage-dashboard
+      - helm template woodpecker-smoke k8/claude-usage-dashboard >/dev/null
