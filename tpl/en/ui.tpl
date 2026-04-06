@@ -277,5 +277,17 @@
   "proxyJsonlNoOverlap": "No overlapping days between JSONL and proxy logs.",
   "proxyJsonlCompare": "{days} days compared: JSONL {jsonl} vs Proxy {proxy} tokens (ratio {ratio}x). >1.5x suggests JSONL duplication.",
   "proxyHourlyLatencyTitle": "Latency per Hour (avg + max)",
-  "proxyHourlyLatencyBlurb": "Blue = average response time, red = peak latency per hour. Spikes during certain hours indicate peak-hour rate throttling by Anthropic."
+  "proxyHourlyLatencyBlurb": "Blue = average response time, red = peak latency per hour. Spikes during certain hours indicate peak-hour rate throttling by Anthropic.",
+  "healthScoreTitle": "Health Score",
+  "healthScoreSummary": "{score}/10 — {warns} warnings, {crits} critical",
+  "healthScoreNoData": "Health Score — waiting for data",
+  "healthQuota5h": "Quota 5h",
+  "healthThinkingGap": "Thinking Gap",
+  "healthCacheHealth": "Cache Health",
+  "healthErrorRate": "Error Rate",
+  "healthHitLimits": "Hit Limits/d",
+  "healthLatency": "Avg Latency",
+  "healthInterrupts": "Interrupts/d",
+  "healthColdStarts": "Cold Starts",
+  "healthRetries": "Retries/d"
 }

@@ -1600,6 +1600,7 @@ function renderDashboard(data, urgent) {
   updateScanSourcesRow(data);
   updateStatePathsRow(data);
   updateStatusLamp(data);
+  renderHealthScore(data);
   var days = data.days;
   var sp = data.scan_progress;
   var scanInc = data.scanning && sp && sp.total > 0 && sp.done < sp.total;
@@ -4409,6 +4410,126 @@ function renderProxyHourlyLatency(pd) {
       }
     }
   });
+}
+
+// ── Health Score Ampel ────────────────────────────────────────────────────
+var __lastHealthFingerprint = "";
+
+function healthColor(value, greenMax, yellowMax) {
+  // greenMax = upper bound for green, yellowMax = upper bound for yellow
+  if (value <= greenMax) return "green";
+  if (value <= yellowMax) return "yellow";
+  return "red";
+}
+function healthColorInverse(value, greenMin, yellowMin) {
+  // For metrics where HIGHER is better (cache health)
+  if (value >= greenMin) return "green";
+  if (value >= yellowMin) return "yellow";
+  return "red";
+}
+function healthPoints(color) { return color === "green" ? 2 : color === "yellow" ? 1 : 0; }
+
+function computeHealthIndicators(data) {
+  var days = data.days || [];
+  var proxy = data.proxy || {};
+  var pdays = proxy.proxy_days || [];
+  var pd = pdays.length > 0 ? pdays[pdays.length - 1] : null;
+  var numDays = days.length || 1;
+
+  // Averages from JSONL
+  var totalHits = 0, totalInterrupts = 0, totalRetries = 0;
+  for (var i = 0; i < days.length; i++) {
+    totalHits += (days[i].hit_limit || 0);
+    var ss = days[i].session_signals || {};
+    totalInterrupts += (ss.interrupt || 0);
+    totalRetries += (ss.retry || 0);
+  }
+  var hitsPerDay = Math.round(totalHits / numDays);
+  var interruptsPerDay = Math.round(totalInterrupts / numDays);
+  var retriesPerDay = Math.round(totalRetries / numDays);
+
+  // Thinking Gap: compare today JSONL vs proxy
+  var thinkingGap = 0;
+  if (pd && days.length) {
+    var todayJsonl = null;
+    for (var j = 0; j < days.length; j++) {
+      if (days[j].date === pd.date) { todayJsonl = days[j]; break; }
+    }
+    if (todayJsonl && (pd.total_tokens || 0) > 0) {
+      thinkingGap = (todayJsonl.total || 0) / pd.total_tokens;
+    }
+  }
+
+  // Proxy metrics (fallback to 0/defaults if no proxy)
+  var rl = pd ? (pd.rate_limit || {}) : {};
+  var q5h = parseFloat(rl["anthropic-ratelimit-unified-5h-utilization"] || 0) * 100;
+  var cacheRatio = pd ? ((pd.cache_read_ratio || 0) * 100) : 100;
+  var errorRate = pd ? (pd.error_rate || 0) : 0;
+  var avgLatMs = pd ? (pd.avg_duration_ms || 0) : 0;
+  var avgLatS = avgLatMs / 1000;
+  var coldStarts = pd ? (pd.cold_starts || 0) : 0;
+
+  return [
+    { id: "quota5h", label: t("healthQuota5h"), value: q5h, display: q5h.toFixed(0) + "%", color: healthColor(q5h, 50, 80), barPct: Math.min(100, q5h) },
+    { id: "thinkingGap", label: t("healthThinkingGap"), value: thinkingGap, display: thinkingGap > 0 ? thinkingGap.toFixed(1) + "x" : "-", color: thinkingGap <= 0 ? "green" : healthColor(thinkingGap, 2, 5), barPct: Math.min(100, thinkingGap * 10) },
+    { id: "cacheHealth", label: t("healthCacheHealth"), value: cacheRatio, display: cacheRatio.toFixed(1) + "%", color: healthColorInverse(cacheRatio, 90, 70), barPct: cacheRatio },
+    { id: "errorRate", label: t("healthErrorRate"), value: errorRate, display: errorRate.toFixed(1) + "%", color: healthColor(errorRate, 3, 10), barPct: Math.min(100, errorRate * 5) },
+    { id: "hitLimits", label: t("healthHitLimits"), value: hitsPerDay, display: String(hitsPerDay), color: healthColor(hitsPerDay, 50, 500), barPct: Math.min(100, hitsPerDay / 10) },
+    { id: "latency", label: t("healthLatency"), value: avgLatS, display: avgLatS >= 1 ? avgLatS.toFixed(1) + "s" : Math.round(avgLatMs) + "ms", color: healthColor(avgLatS, 5, 15), barPct: Math.min(100, avgLatS * 5) },
+    { id: "interrupts", label: t("healthInterrupts"), value: interruptsPerDay, display: String(interruptsPerDay), color: healthColor(interruptsPerDay, 100, 500), barPct: Math.min(100, interruptsPerDay / 10) },
+    { id: "coldStarts", label: t("healthColdStarts"), value: coldStarts, display: String(coldStarts), color: healthColor(coldStarts, 0, 5), barPct: Math.min(100, coldStarts * 10) },
+    { id: "retries", label: t("healthRetries"), value: retriesPerDay, display: String(retriesPerDay), color: healthColor(retriesPerDay, 50, 200), barPct: Math.min(100, retriesPerDay / 5) }
+  ];
+}
+
+function renderHealthScore(data) {
+  var headerEl = document.getElementById("health-header");
+  var gridEl = document.getElementById("health-grid");
+  if (!headerEl || !gridEl) return;
+
+  var fp = (data.generated || "") + "|" + ((data.proxy && data.proxy.generated) || "");
+  if (fp === __lastHealthFingerprint) return;
+  __lastHealthFingerprint = fp;
+
+  var days = data.days || [];
+  var proxy = data.proxy || {};
+  var pdays = proxy.proxy_days || [];
+  if (!days.length && !pdays.length) {
+    headerEl.innerHTML = "<span style=\"color:#94a3b8\">" + escHtml(t("healthScoreNoData")) + "</span>";
+    gridEl.innerHTML = "";
+    return;
+  }
+
+  var indicators = computeHealthIndicators(data);
+  var totalPts = 0, warns = 0, crits = 0;
+  for (var i = 0; i < indicators.length; i++) {
+    totalPts += healthPoints(indicators[i].color);
+    if (indicators[i].color === "yellow") warns++;
+    if (indicators[i].color === "red") crits++;
+  }
+  var score = Math.round(totalPts / (indicators.length * 2) * 10);
+  var scoreColor = score > 7 ? "#22c55e" : score >= 4 ? "#f59e0b" : "#ef4444";
+
+  // Header
+  var hh = "<div class=\"health-total-circle\" style=\"background:" + scoreColor + "\">" + score + "</div>";
+  hh += "<div class=\"health-total-text\">";
+  hh += "<strong>" + escHtml(t("healthScoreTitle")) + "</strong><br>";
+  hh += "<span" + (crits > 0 ? " class=\"health-crits\"" : warns > 0 ? " class=\"health-warns\"" : "") + ">";
+  hh += escHtml(tr("healthScoreSummary", { score: score, warns: warns, crits: crits }));
+  hh += "</span></div>";
+  if (headerEl.innerHTML !== hh) headerEl.innerHTML = hh;
+
+  // Grid
+  var gh = "";
+  for (var gi = 0; gi < indicators.length; gi++) {
+    var ind = indicators[gi];
+    gh += "<div class=\"health-badge health-badge--" + ind.color + "\">";
+    gh += "<div class=\"health-badge-label\">" + escHtml(ind.label) + "</div>";
+    gh += "<div class=\"health-badge-value\">" + escHtml(ind.display) + "</div>";
+    gh += "<div class=\"health-badge-bar\"><div class=\"health-badge-bar-fill health-badge-bar-fill--" + ind.color + "\" style=\"width:" + Math.round(ind.barPct) + "%\"></div></div>";
+    gh += "</div>";
+  }
+  if (gridEl.innerHTML !== gh) gridEl.innerHTML = gh;
 }
 fetchUsageJsonOnce();
 connectUsageStream();
