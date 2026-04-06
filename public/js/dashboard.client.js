@@ -1601,6 +1601,7 @@ function renderDashboard(data, urgent) {
   updateStatePathsRow(data);
   updateStatusLamp(data);
   renderHealthScore(data);
+  initFilterBar(data);
   renderKeyFindings(data);
   var days = data.days;
   var sp = data.scan_progress;
@@ -4713,6 +4714,103 @@ function renderKeyFindings(data) {
     html += "</div>";
   }
   if (el.innerHTML !== html) el.innerHTML = html;
+}
+
+// ── Filter Bar ────────────────────────────────────────────────────────────
+var __filterBarInitialized = false;
+
+function initFilterBar(data) {
+  if (__filterBarInitialized) return;
+  var days = data.days || [];
+  if (!days.length) return;
+  __filterBarInitialized = true;
+
+  // Date labels
+  var dlabel = document.getElementById('filter-date-label');
+  if (dlabel) dlabel.textContent = t('filterDateRange');
+  var slabel = document.getElementById('filter-scope-label');
+  if (slabel) slabel.textContent = t('filterScope');
+  var hlabel = document.getElementById('filter-host-label');
+  if (hlabel) hlabel.textContent = t('filterHost');
+
+  // Date range inputs
+  var startEl = document.getElementById('filter-date-start');
+  var endEl = document.getElementById('filter-date-end');
+  if (startEl && days.length) {
+    startEl.value = days[0].date;
+    startEl.min = days[0].date;
+    startEl.max = days[days.length - 1].date;
+  }
+  if (endEl && days.length) {
+    endEl.value = days[days.length - 1].date;
+    endEl.min = days[0].date;
+    endEl.max = days[days.length - 1].date;
+  }
+
+  // Scope chips (All days / 24h) — mirror existing main-charts-scope
+  var scopeChips = document.getElementById('filter-scope-chips');
+  if (scopeChips) {
+    scopeChips.innerHTML = '<button type="button" class="filter-chip active" data-scope="timeline">' + escHtml(t('mainChartsScopeTimeline')) + '</button>' +
+      '<button type="button" class="filter-chip" data-scope="hourly">' + escHtml(t('mainChartsScopeHourly')) + '</button>';
+    scopeChips.addEventListener('click', function(e) {
+      var btn = e.target.closest('.filter-chip');
+      if (!btn || !btn.dataset.scope) return;
+      scopeChips.querySelectorAll('.filter-chip').forEach(function(c) { c.classList.remove('active'); });
+      btn.classList.add('active');
+      // Sync with existing scope chips
+      var existing = document.getElementById('main-charts-scope-chips');
+      if (existing) {
+        var btns = existing.querySelectorAll('[data-scope]');
+        for (var i = 0; i < btns.length; i++) {
+          if (btns[i].dataset.scope === btn.dataset.scope) btns[i].click();
+        }
+      }
+    });
+  }
+
+  // Host chips
+  var hostChips = document.getElementById('filter-host-chips');
+  if (hostChips && days.length) {
+    var hosts = {};
+    for (var di = 0; di < days.length; di++) {
+      var dh = days[di].hosts || {};
+      for (var hk in dh) { if (Object.prototype.hasOwnProperty.call(dh, hk)) hosts[hk] = true; }
+    }
+    var hkeys = Object.keys(hosts).sort();
+    var hhtml = '<button type="button" class="filter-chip active" data-host="">' + escHtml(t('filterHostAll')) + '</button>';
+    for (var hi = 0; hi < hkeys.length; hi++) {
+      hhtml += '<button type="button" class="filter-chip" data-host="' + escHtml(hkeys[hi]) + '">' + escHtml(hkeys[hi]) + '</button>';
+    }
+    hostChips.innerHTML = hhtml;
+    hostChips.addEventListener('click', function(e) {
+      var btn = e.target.closest('.filter-chip');
+      if (!btn) return;
+      hostChips.querySelectorAll('.filter-chip').forEach(function(c) { c.classList.remove('active'); });
+      btn.classList.add('active');
+      // Sync with existing forensic host filter
+      var fChips = document.getElementById('forensic-host-filter-chips');
+      if (fChips) {
+        var fbtn = fChips.querySelector('[data-host="' + (btn.dataset.host || '') + '"]');
+        if (!fbtn && !btn.dataset.host) fbtn = fChips.querySelector('.forensic-host-chip');
+        if (fbtn) fbtn.click();
+      }
+    });
+  }
+
+  // Date change listeners
+  if (startEl) startEl.addEventListener('change', onFilterDateChange);
+  if (endEl) endEl.addEventListener('change', onFilterDateChange);
+}
+
+function onFilterDateChange() {
+  // Re-render with date filter applied
+  if (__lastUsageData) renderDashboard(__lastUsageData, true);
+}
+
+function getFilterDateRange() {
+  var s = document.getElementById('filter-date-start');
+  var e = document.getElementById('filter-date-end');
+  return { start: s ? s.value : '', end: e ? e.value : '' };
 }
 fetchUsageJsonOnce();
 connectUsageStream();
