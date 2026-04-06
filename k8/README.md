@@ -94,6 +94,8 @@ Prüfen: `kubectl kustomize k8s/overlays/dev`
 | [`.woodpecker/app.yml`](../.woodpecker/app.yml) | Wie SCHUFA (ohne Sonar): prepare, Kaniko, **kubectl apply -k k8s/overlays/dev**, set image, rollout, cleanup |
 | [`.woodpecker/pr.yml`](../.woodpecker/pr.yml) | PR-Checks ohne Kaniko (Zusatz zu SCHUFA) |
 
+**Agent-Auswahl (GRO):** `.woodpecker/app.yml` nutzt **`labels.backend: kubernetes`** → Woodpecker **K8s-Agent .171** (Kaniko-Builds als Pods im Cluster). **`.woodpecker/pr.yml`** nutzt **`backend: docker`** → **Docker-Agent .220**. Base-/Hilfsimages typischerweise einmalig auf .220 bauen/spiegeln; siehe [04-woodpecker.md](https://gitea.grosswig-it.de/GRO/infrastructure-docs/src/branch/main/docs/04-woodpecker.md).
+
 **Referenz:** [SCHUFA `app.yml` feat/fastify-v5](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.woodpecker/app.yml) · [SCHUFA `docs/01-deployment.md`](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/main/docs/01-deployment.md) · [Kaniko-Plugin](https://woodpecker-ci.org/plugins/kaniko).
 
 Instanz: [ci.grosswig-it.de — Repo #3](https://ci.grosswig-it.de/repos/3) · [Workflow-Syntax](https://woodpecker-ci.org/docs/usage/workflow-syntax).

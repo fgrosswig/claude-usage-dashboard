@@ -1,10 +1,11 @@
-# Nur PRs — gleiche Checks wie SCHUFA-Trennung, ohne Harbor/Kaniko (keine Registry-Schreibrechte nötig).
+# Nur PRs — ohne Harbor/Kaniko. Läuft auf **Docker-Agent .220** (kein Image-Pull über K8s-Job-Pods).
 
 when:
   - event: pull_request
 
 labels:
   platform: linux/amd64
+  backend: docker
 
 steps:
   - name: node-check-dashboard-client

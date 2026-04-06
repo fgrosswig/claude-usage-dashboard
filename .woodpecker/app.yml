@@ -1,8 +1,11 @@
-# Vollständig nach GRO/SCHUFA .woodpecker/app.yml (feat/fastify-v5), nur App-/Harbor-/K8s-Namen für Claude.
+# Nach GRO/SCHUFA .woodpecker/app.yml (feat/fastify-v5), nur App-/Harbor-/K8s-Namen für Claude.
 # https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.woodpecker/app.yml
 #
+# Infra (GRO): Base-Image o. Ä. einmalig auf **.220** (Docker-Agent); **Kaniko + Deploy-Steps** laufen auf **.171**
+# (Kubernetes-Agent, Namespace woodpecker). Dafür: labels.backend: kubernetes.
+#
 # Secrets: harbor_user, harbor_password, kube_url, kube_token
-# Deploy: kubectl apply -k k8s/overlays/dev (Manifeste wie SCHUFA unter k8s/base + overlays/dev)
+# Deploy: kubectl apply -k k8s/overlays/dev
 
 when:
   event: [push, manual]
@@ -15,6 +18,7 @@ when:
 
 labels:
   platform: linux/amd64
+  backend: kubernetes
 
 steps:
   # SCHUFA: sed Dockerfile.ci aus version.json — hier nur ein Dockerfile, Schritt bleibt als klarer No-Op.
