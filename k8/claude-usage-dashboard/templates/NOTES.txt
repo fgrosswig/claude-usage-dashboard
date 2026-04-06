@@ -1,0 +1,19 @@
+Deployed {{ include "cud.fullname" . }}.
+
+Reach the UI:
+{{- if .Values.ingress.enabled }}
+  https://{{ (index .Values.ingress.hosts 0).host }}/ (per Ingress TLS / host rules)
+{{- else if eq .Values.service.type "NodePort" }}
+  NodePort dashboard: {{ .Values.service.nodePortDashboard }}  proxy: {{ .Values.service.nodePortProxy }}
+{{- else }}
+  kubectl port-forward svc/{{ include "cud.fullname" . }} 3333:{{ .Values.service.portDashboard }} 8080:{{ .Values.service.portProxy }}
+{{- end }}
+
+Push JSONL from your machine into the pod volume:
+  export CLAUDE_SYNC_URL=http://127.0.0.1:3333
+  export CLAUDE_SYNC_TOKEN=<CLAUDE_USAGE_SYNC_TOKEN>
+  node scripts/claude-data-sync-client.js
+
+(Enable sync by setting CLAUDE_USAGE_SYNC_TOKEN in the pod — see values sync.tokenFromSecret.)
+
+Details: k8/README.md

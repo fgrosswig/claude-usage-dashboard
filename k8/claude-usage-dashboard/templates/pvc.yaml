@@ -1,0 +1,17 @@
+{{- if eq .Values.claudeData.mode "newPvc" }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "cud.fullname" . }}-claude-data
+  labels:
+    {{- include "cud.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    {{- toYaml .Values.claudeData.newPvc.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.claudeData.newPvc.size | quote }}
+  {{- with .Values.claudeData.newPvc.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+{{- end }}

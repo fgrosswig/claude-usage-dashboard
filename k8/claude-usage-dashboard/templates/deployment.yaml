@@ -1,0 +1,124 @@
+{{- if and (eq .Values.claudeData.mode "existingPvc") (not .Values.claudeData.existingClaim) }}
+{{- fail "claudeData.existingClaim is required when claudeData.mode is existingPvc" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cud.fullname" . }}
+  labels:
+    {{- include "cud.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "cud.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "cud.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
+      serviceAccountName: {{ include "cud.serviceAccountName" . }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: app
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: {{- toYaml .Values.command | nindent 12 }}
+          {{- with .Values.args }}
+          args: {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http-dashboard
+              containerPort: 3333
+              protocol: TCP
+            - name: http-proxy
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: HOME
+              value: /root
+            - name: ANTHROPIC_PROXY_BIND
+              value: "0.0.0.0"
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- if .Values.sync.tokenFromSecret }}
+            - name: CLAUDE_USAGE_SYNC_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.sync.tokenFromSecret.name }}
+                  key: {{ .Values.sync.tokenFromSecret.key }}
+            {{- end }}
+            {{- if .Values.extraBases }}
+            - name: CLAUDE_USAGE_EXTRA_BASES
+              value: {{- range $i, $b := .Values.extraBases }}{{ if $i }};{{ end }}{{ $b.mountPath }}{{- end }}
+            {{- end }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: claude-data
+              mountPath: /root/.claude
+            {{- range .Values.extraBases }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+              readOnly: {{ .readOnly | default false }}
+            {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: claude-data
+          {{- if eq .Values.claudeData.mode "emptyDir" }}
+          emptyDir: {}
+          {{- else if eq .Values.claudeData.mode "hostPath" }}
+          hostPath:
+            path: {{ .Values.claudeData.hostPath.path }}
+            type: {{ .Values.claudeData.hostPath.type }}
+          {{- else }}
+          persistentVolumeClaim:
+            claimName: {{ include "cud.claudePvcName" . }}
+          {{- end }}
+        {{- range .Values.extraBases }}
+        - name: {{ .name }}
+          {{- if .existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .existingClaim }}
+          {{- else if .hostPath }}
+          hostPath:
+            path: {{ .hostPath }}
+            type: Directory
+          {{- end }}
+        {{- end }}

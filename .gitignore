@@ -29,6 +29,13 @@
 !/images/
 !/images/**/*
 
+!/k8/
+!/k8/**/*
+
+!/Dockerfile
+!/.dockerignore
+!/docker-compose.yml
+
 # Lokale Secrets / Session-Token — explizit nie committen (Absicherung gegen spätere breitere !-Regeln)
 /.github_session_token
 /.env

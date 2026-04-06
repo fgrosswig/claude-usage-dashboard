@@ -1,0 +1,11 @@
+apiVersion: v2
+name: claude-usage-dashboard
+description: Claude Code usage dashboard + Anthropic monitor proxy (JSONL under ~/.claude)
+type: application
+version: 0.1.0
+appVersion: "1.0"
+keywords:
+  - claude
+  - observability
+maintainers:
+  - name: repo-owner

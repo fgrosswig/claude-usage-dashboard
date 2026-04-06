@@ -1,0 +1,125 @@
+# Default: build image from repo root (see k8/README.md).
+image:
+  repository: claude-usage-dashboard
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+nameOverride: ""
+fullnameOverride: ""
+
+imagePullSecrets: []
+
+# Push ingest: POST /api/claude-data-sync (see scripts/claude-data-sync-client.js)
+sync:
+  tokenFromSecret: null
+  # tokenFromSecret:
+  #   name: claude-usage-sync
+  #   key: token
+
+serviceAccount:
+  create: false
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+# HOME=/root → dashboard reads ~/.claude as /root/.claude
+podSecurityContext: {}
+securityContext: {}
+
+resources: {}
+# limits:
+#   cpu: 500m
+#   memory: 512Mi
+# requests:
+#   cpu: 100m
+#   memory: 256Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Dashboard HTTP + proxy (Claude client must reach proxy if used).
+service:
+  type: ClusterIP
+  portDashboard: 3333
+  portProxy: 8080
+  nodePortDashboard: null
+  nodePortProxy: null
+  # For quick LAN access without Ingress:
+  # type: NodePort
+  # nodePortDashboard: 30333
+  # nodePortProxy: 30808
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: usage-dashboard.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          port: 3333
+  tls: []
+
+# --- Claude data volume (JSONL, caches, proxy logs) at /root/.claude ---
+# newPvc       — chart creates a PVC (single-replica RWO; use a RWX StorageClass + NFS for multi-node)
+# existingPvc  — set existingClaim to a PVC you filled out-of-band (rsync/NFS client/etc.)
+# hostPath     — dev/single-node: path on the *worker node* that runs the pod (not your laptop)
+# emptyDir     — smoke tests only; data lost when pod moves or restarts
+claudeData:
+  mode: newPvc
+  existingClaim: ""
+  newPvc:
+    storageClassName: ""
+    accessModes:
+      - ReadWriteOnce
+    size: 20Gi
+  hostPath:
+    path: /var/lib/claude-usage-dashboard
+    type: DirectoryOrCreate
+
+# Extra scan roots (same as CLAUDE_USAGE_EXTRA_BASES: ;-separated paths in container).
+# Mount each PVC or hostPath below, then list mount paths here.
+extraBases: []
+# - name: host-b
+#   mountPath: /extra/HOST-B
+#   readOnly: true
+#   existingClaim: claude-import-host-b
+# Or hostPath:
+# - name: host-b
+#   mountPath: /extra/HOST-B
+#   hostPath: /mnt/imports/HOST-B
+#   readOnly: true
+
+# Optional env (see scripts/dashboard-server.js header, anthropic-proxy-cli --help).
+extraEnv: []
+# - name: CLAUDE_USAGE_SCAN_INTERVAL_SEC
+#   value: "180"
+# - name: GITHUB_TOKEN
+#   valueFrom:
+#     secretKeyRef:
+#       name: claude-dashboard-secrets
+#       key: github-token
+
+command: ["node", "start.js", "both"]
+args: []
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: http-dashboard
+  initialDelaySeconds: 25
+  periodSeconds: 30
+  timeoutSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: http-dashboard
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 3
