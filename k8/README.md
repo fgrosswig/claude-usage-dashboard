@@ -166,7 +166,13 @@ helm upgrade --install cud ./k8/claude-usage-dashboard --namespace claude --crea
 
 Ohne eigene Datei reicht z. B. `--set image.repository=… --set image.tag=…` (siehe `values.yaml`).
 
-4. **Erreichbarkeit** — **`kubectl apply -k k8s/overlays/dev`** legt einen **Ingress** (`k8s/overlays/dev/ingress.yml`) mit **Traefik** an: **`claude-usage.grosswig-it.de`** → Dashboard (`http-dashboard`), **`claude-usage-proxy.grosswig-it.de`** → Proxy (`http-proxy`). **TLS:** Secret **`claude-usage-tls`** im Namespace **`claude`** anlegen (oder `spec.tls` in der YAML streichen für nur HTTP), optional **cert-manager**-Annotation in der Ingress-Datei. DNS → Traefik, Details **[06-traefik.md](https://gitea.grosswig-it.de/GRO/infrastructure-docs/src/branch/main/docs/06-traefik.md)**. Helm-Parität: **`values-cluster.example.yaml`** (`ingress` mit zwei Hosts, `className: traefik`). Ohne Ingress: **ClusterIP** bzw. `kubectl port-forward`.
+4. **Erreichbarkeit** — **`kubectl apply -k k8s/overlays/dev`** legt einen **Ingress** (`k8s/overlays/dev/ingress.yml`) mit **Traefik** an: **`claude-usage.grosswig-it.de`** → Dashboard (`http-dashboard`), **`claude-usage-proxy.grosswig-it.de`** → Proxy (`http-proxy`). Standard **HTTP** (`web`-Entrypoint-Annotation). **TLS im Ingress:** optional `spec.tls` + Secret **`claude-usage-tls`** und Annotation **`traefik.ingress.kubernetes.io/router.entrypoints: web,websecure`** (siehe Kommentare in `ingress.yml`). DNS → Traefik, **[06-traefik.md](https://gitea.grosswig-it.de/GRO/infrastructure-docs/src/branch/main/docs/06-traefik.md)**. Helm: **`values-cluster.example.yaml`**. Ohne Ingress: **ClusterIP** / `kubectl port-forward`.
+
+   **Browser `ERR_CONNECTION_REFUSED`:** Meist **kein Listener** auf der IP, die der Hostname auflöst — nicht „Ingress fehlt in Git“. Prüfen:
+   - `kubectl apply -k k8s/overlays/dev` und `kubectl get ingress -n claude` — Spalte **ADDRESS** / **HOSTS** (leer = Traefik/IngressClass prüfen).
+   - `kubectl get ingressclass` — existiert **`traefik`**?
+   - **DNS:** `claude-usage.grosswig-it.de` muss auf die **Traefik-IP** zeigen (z. B. **AdGuard DNS-Rewrite** auf `.171` oder die **LoadBalancer-/NodePort-IP** des Traefik-`Service`, nicht auf einen Rechner ohne offenes 80/443).
+   - Vom LAN: `curl -v --resolve claude-usage.grosswig-it.de:80:<TRAEFIK-IP> http://claude-usage.grosswig-it.de/` (Port 80 muss auf Traefik offen sein).
 
 5. **Smoke-Test** — `kubectl -n claude port-forward svc/<release>-claude-usage-dashboard 3333:3333` und Browser `http://127.0.0.1:3333/` (Service-Name aus `helm status cud` / `kubectl get svc -n claude`).
 

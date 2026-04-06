@@ -36,6 +36,7 @@ ingress:
         - path: /
           pathType: Prefix
           port: 8080
+  # Ersttest ohne TLS: tls: [] — sonst Secret claude-usage-tls in ns claude anlegen
   tls:
     - secretName: claude-usage-tls
       hosts:

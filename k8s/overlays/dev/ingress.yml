@@ -1,6 +1,6 @@
-# Öffentliche Erreichbarkeit über Traefik. Hosts / TLS anpassen; DNS → Traefik (06-traefik.md).
-# Nur HTTP: gesamten spec.tls-Block entfernen. HTTPS: TLS-Secret claude-usage-tls anlegen oder cert-manager (Annotation).
-# Ohne Ingress bleibt der Service nur ClusterIP (port-forward: kubectl -n claude port-forward svc/claude-app 3333:3333).
+# Traefik-Ingress. DNS (AdGuard-Rewrite o. ä.) → IP, auf der Traefik 80/443 ausliefert (06-traefik.md).
+# Standard: nur HTTP (web). TLS: unten spec.tls einfügen + Secret claude-usage-tls ODER TLS am Traefik-Edge.
+# Ohne Ingress: nur ClusterIP — z. B. kubectl -n claude port-forward svc/claude-app 3333:3333
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -8,14 +8,13 @@ metadata:
   labels:
     app: claude-dashboard
   annotations:
-    # TLS automatisch: cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Explizit HTTP-Entrypoint (Traefik-Chart: meist "web"; sonst in Traefik-Konfig prüfen)
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    # HTTPS mit cert-manager im Cluster:
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Dann spec.tls (siehe README) + traefik router entrypoints: web,websecure
 spec:
   ingressClassName: traefik
-  tls:
-    - hosts:
-        - claude-usage.grosswig-it.de
-        - claude-usage-proxy.grosswig-it.de
-      secretName: claude-usage-tls
   rules:
     - host: claude-usage.grosswig-it.de
       http:
