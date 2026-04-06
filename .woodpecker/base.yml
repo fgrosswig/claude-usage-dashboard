@@ -4,6 +4,7 @@
 when:
   event: [push, manual]
   path:
+    - .woodpecker/base.yml
     - Dockerfile.base
     - version.json
     # Abhängigkeiten liegen im Base-Image (npm install in Dockerfile.base), nicht im App-Layer
