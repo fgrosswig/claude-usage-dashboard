@@ -160,7 +160,7 @@ tr:hover td{background:#334155}
 .chart-shell canvas{
   position:relative;z-index:1;display:block;width:100%!important;max-width:100%;height:auto!important;
 }
-.chart-shell{contain:size layout;overflow:hidden}
+.chart-shell{contain:layout style;overflow:hidden}
 .service-chart-canvas-wrap .chart-shell{min-height:260px}
 .main-charts-skel-hint{font-size:.78rem;color:#64748b;margin:0 0 10px;line-height:1.4;max-width:42rem}
 .main-charts-skeleton.main-charts-skeleton--off{display:none!important}
@@ -220,4 +220,3 @@ tr:hover td{background:#334155}
 .proxy-split-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:720px){.proxy-split-row{grid-template-columns:1fr}}
 
-.chart-shell--forensic{aspect-ratio:2.2/1;min-height:0}
