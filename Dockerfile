@@ -2,7 +2,7 @@
 # Base-Image kommt aus Harbor (**claude/base**), gebaut ausschließlich über **.woodpecker/base.yml** auf Docker-Agent .220.
 # CI: prepare schreibt Dockerfile.ci mit BASE_TAG aus version.json; Kaniko zieht das Base von Harbor.
 ARG BASE_IMAGE=harbor.grosswig-it.de/claude/base
-ARG BASE_TAG=v1
+ARG BASE_TAG=v3
 FROM ${BASE_IMAGE}:${BASE_TAG}
 
 WORKDIR /app

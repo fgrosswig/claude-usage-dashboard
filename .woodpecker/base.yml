@@ -1,10 +1,11 @@
 # Base-Image auf Docker-Agent .220 → Harbor claude/base. Muss existieren, bevor app.yml (Kaniko auf .171) baut.
+# plugins/docker-Image nur über Harbor **poc** (kein Docker Hub).
 when:
   event: push
   path:
     - Dockerfile.base
     - version.json
-    # Abhängigkeiten liegen im Base-Image (npm ci in Dockerfile.base), nicht im App-Layer
+    # Abhängigkeiten liegen im Base-Image (npm install in Dockerfile.base), nicht im App-Layer
     - package.json
     - package-lock.json
   branch:
@@ -20,13 +21,13 @@ labels:
 
 steps:
   - name: build-base
-    image: plugins/docker
+    image: harbor.grosswig-it.de/poc/woodpeckerci/plugin-docker:latest
     settings:
       repo: harbor.grosswig-it.de/claude/base
       registry: harbor.grosswig-it.de
       dockerfile: Dockerfile.base
       tags:
-        - v1
+        - v3
         - latest
       username:
         from_secret: harbor_user

@@ -1,4 +1,4 @@
 {
-  "base_image": "v1",
+  "base_image": "v3",
   "_note": "Änderung triggert .woodpecker/base.yml. Tags dort mitziehen (vN, latest). prepare in app.yml setzt ARG BASE_TAG für Kaniko (Dockerfile.ci)."
 }

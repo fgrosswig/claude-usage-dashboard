@@ -14,7 +14,7 @@ Chart: `k8/claude-usage-dashboard/` — Usage-Dashboard + Anthropic-Proxy (`node
 
 **Pull Requests:** **`.woodpecker/pr.yml`** — Checks ohne Kaniko (SCHUFA hat kein separates PR-File; hier ergänzt).
 
-Lokal: `Dockerfile` nutzt **`FROM harbor.grosswig-it.de/claude/base:<tag>`** (`version.json` → `base_image`, Standard **`v1`**). Registry-Login setzen, Base-Image vorhanden, dann vom **Repository-Root**:
+Lokal: `Dockerfile` nutzt **`FROM harbor.grosswig-it.de/claude/base:<tag>`** (`version.json` → `base_image`, Standard **`v3`**). Registry-Login setzen, Base-Image vorhanden, dann vom **Repository-Root**:
 
 ```bash
 docker build -t claude-usage-dashboard:latest .
@@ -93,7 +93,7 @@ Prüfen: `kubectl kustomize k8s/overlays/dev`
 
 | Datei | Rolle |
 |-------|--------|
-| [`.woodpecker/base.yml`](../.woodpecker/base.yml) | **Harbor `claude/base`** (`plugins/docker`, **backend: docker** / .220), getriggert durch Base-Deps |
+| [`.woodpecker/base.yml`](../.woodpecker/base.yml) | **Harbor `claude/base`** (`woodpeckerci/plugin-docker` über **poc**, **backend: docker** / .220) |
 | [`.woodpecker/app.yml`](../.woodpecker/app.yml) | prepare → **Dockerfile.ci**, Kaniko, **kubectl apply -k k8s/overlays/dev**, set image, rollout, cleanup (**backend: kubernetes** / .171) |
 | [`.woodpecker/pr.yml`](../.woodpecker/pr.yml) | PR-Checks ohne Kaniko (**backend: docker** / .220) |
 
@@ -117,7 +117,7 @@ jq -r '.name, .secret' "$ROBOT_JSON"
 
 In **Harbor** muss der Robot für das Projekt **`claude`** ins Repository **`claude-usage-dashboard`** **pushen** dürfen. In der Robot-Maske **Select Permissions** → Zeile **Repository** müssen u. a. **Pull** und **Push** angehakt sein (nur *List / Read / Update* reicht nicht — dann genau der Fehler **`UNAUTHORIZED` … action: push**). Meldung **`UNAUTHORIZED`** heißt sonst oft: falsche Woodpecker-Secrets oder abgelaufener Robot.
 
-**Docker Hub:** **`Dockerfile.base`** nutzt `FROM node:22-alpine` (erster Pull beim **base.yml**-Build auf .220). Optional Harbor-Proxy siehe **05-harbor.md** / „Base Image Connector“. Das **App-**`Dockerfile` bezieht sich nur auf **`harbor.../claude/base`**.
+**Kein Docker Hub:** Alle CI-/Base-Images ziehen über Harbor-Proxy-Projekt **`poc`** (`harbor.grosswig-it.de/poc/library/…`, `…/bitnami/…`, `…/woodpeckerci/…`). **`Dockerfile.base`** nutzt `FROM harbor.grosswig-it.de/poc/library/node:20-alpine` (wie SCHUFA: APK-Stack + `npm install` nur **`package.json`**). Das **App-**`Dockerfile` bleibt **`harbor.../claude/base`**. Proxy-Setup: **05-harbor.md** / „Base Image Connector“.
 
 **Auslöser `app.yml`:** wie SCHUFA nur **`push`** und **`manual`** auf **`feat/**`**, **`fix/**`**, **`main`**, **`int`** (kein separater Tag-/Deployment-Event — wer Tags braucht, analog SCHUFA erweitern).
 
@@ -125,7 +125,7 @@ Lokal: `sh scripts/k8-ci-verify.sh` (Helm/Kustomize + Smoke für **Dockerfile.ci
 
 **Deploy / Registry:** **[GRO / infrastructure-docs](https://gitea.grosswig-it.de/GRO/infrastructure-docs)**, **05-harbor.md**.
 
-**Hinweis:** Wie SCHUFA: **`.woodpecker/base.yml`** (`plugins/docker`, **.220**) für **`Dockerfile.base`** → Harbor **`claude/base`**. Optional **Gitea Actions** (SCHUFA-Beispiel): [deploy.yml `feat/fastify-v5`](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.gitea/workflows/deploy.yml).
+**Hinweis:** **`.woodpecker/base.yml`** auf **.220** → Harbor **`claude/base`**; Plugin-Image nur über **`poc`**, nicht Docker Hub. Optional **Gitea Actions** (SCHUFA): [deploy.yml `feat/fastify-v5`](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.gitea/workflows/deploy.yml).
 
 ## Deploy im Kubernetes-Cluster
 

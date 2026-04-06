@@ -1,9 +1,18 @@
-FROM node:22-alpine
-LABEL maintainer="falk@grosswig.de" version="1"
+# Nur Harbor (Proxy **poc**), kein direkter Docker-Hub-Pull.
+FROM harbor.grosswig-it.de/poc/library/node:20-alpine
+LABEL maintainer="falk@grosswig.de" version="3"
+
+RUN apk add --no-cache \
+    git \
+    tesseract-ocr \
+    tesseract-ocr-data-deu \
+    poppler-utils \
+    ghostscript
 
 WORKDIR /app
 
-# NPM-Produktionsabhängigkeiten nur hier — App-Dockerfile kopiert kein node_modules.
-# Änderung an package.json / package-lock.json: Woodpecker base.yml baut harbor.../claude/base neu (Docker-Agent .220).
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --no-audit --no-fund
+# NPM Production-Dependencies nur hier — App-Dockerfile kopiert kein node_modules.
+# Änderung an package.json / package-lock.json: Woodpecker base.yml baut harbor.../claude/base neu
+# (oder auf .220 manuell). Bei Bedarf version.json (base_image) hochziehen + ARG BASE_TAG in Dockerfile.
+COPY package.json ./
+RUN npm install --omit=dev --no-audit --no-fund
