@@ -216,3 +216,5 @@ tr:hover td{background:#334155}
 @media(max-width:600px){.proxy-gauge-row{grid-template-columns:1fr}.proxy-gauge-box{max-width:220px}}
 .proxy-gauge-box h3{font-size:.72rem;color:#94a3b8;text-align:center;margin-bottom:4px}
 .proxy-card-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:16px}
+.proxy-split-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:720px){.proxy-split-row{grid-template-columns:1fr}}

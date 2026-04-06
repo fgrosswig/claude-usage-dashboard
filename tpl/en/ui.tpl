@@ -263,5 +263,13 @@
   "proxyDSOutput": "Output",
   "proxyDSAvgLatency": "Avg latency (ms)",
   "proxyDSMinLatency": "Min",
-  "proxyDSMaxLatency": "Max"
+  "proxyDSMaxLatency": "Max",
+  "proxyHourlyTitle": "Requests per Hour (today)",
+  "proxyHourlyBlurb": "Bar height = requests in that hour. Intensity shows relative load. Gaps = no API activity. Clusters during peak hours may correlate with rate-limit tightening.",
+  "proxyModelTitle": "Model & Status Breakdown",
+  "proxyModelBlurb": "Left: requests per model (bars) with avg latency overlay (line). Right: HTTP status code distribution — 429 = rate limited, 5xx = server error.",
+  "proxyInvisibleCostNote": "Invisible cost: {visible} visible tokens, {cache} cache tokens used {perPct} visible tokens per 1% quota — thinking tokens are not counted here.",
+  "proxyDSRequestsPerHour": "Requests",
+  "proxyDSModelRequests": "Requests",
+  "proxyDSModelLatency": "Avg latency"
 }
