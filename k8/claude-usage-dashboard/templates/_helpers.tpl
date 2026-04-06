@@ -66,3 +66,18 @@ PVC name for main claude dir
 {{- .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Name of the Opaque Secret used for sync / GitHub / admin tokens (existing or created by this chart).
+*/}}
+{{- define "cud.appSecretName" -}}
+{{- if .Values.secrets.existingSecret }}
+{{- .Values.secrets.existingSecret }}
+{{- else if .Values.secrets.create }}
+{{- if .Values.secrets.nameOverride }}
+{{- .Values.secrets.nameOverride }}
+{{- else }}
+{{- printf "%s-app" (include "cud.fullname" .) }}
+{{- end }}
+{{- end }}
+{{- end }}

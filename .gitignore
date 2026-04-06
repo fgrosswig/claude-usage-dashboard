@@ -36,7 +36,13 @@
 !/.dockerignore
 !/docker-compose.yml
 
+!/.woodpecker/
+!/.woodpecker/**/*
+
 # Lokale Secrets / Session-Token — explizit nie committen (Absicherung gegen spätere breitere !-Regeln)
 /.github_session_token
 /.env
 /.env.*
+
+# Harbor: exportierter Robot-Account (JSON mit secret — nur lokal)
+/k8/claude-usage-dashboard/robot*.json

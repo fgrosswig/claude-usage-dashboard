@@ -64,6 +64,45 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.sync.tokenFromSecret.name }}
                   key: {{ .Values.sync.tokenFromSecret.key }}
+            {{- else if include "cud.appSecretName" . | trim }}
+            {{- $sn := include "cud.appSecretName" . | trim }}
+            - name: CLAUDE_USAGE_SYNC_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $sn }}
+                  key: {{ .Values.secrets.keys.syncToken }}
+                  optional: true
+            {{- end }}
+            {{- if include "cud.appSecretName" . | trim }}
+            {{- $sn := include "cud.appSecretName" . | trim }}
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $sn }}
+                  key: {{ .Values.secrets.keys.githubToken }}
+                  optional: true
+            - name: CLAUDE_USAGE_ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $sn }}
+                  key: {{ .Values.secrets.keys.adminToken }}
+                  optional: true
+            {{- end }}
+            {{- if .Values.config.scanIntervalSec }}
+            - name: CLAUDE_USAGE_SCAN_INTERVAL_SEC
+              value: {{ .Values.config.scanIntervalSec | quote }}
+            {{- end }}
+            {{- if .Values.config.syncMaxMb }}
+            - name: CLAUDE_USAGE_SYNC_MAX_MB
+              value: {{ .Values.config.syncMaxMb | quote }}
+            {{- end }}
+            {{- if .Values.config.logLevel }}
+            - name: CLAUDE_USAGE_LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            {{- end }}
+            {{- if .Values.config.githubReleasesFetch }}
+            - name: CLAUDE_USAGE_GITHUB_RELEASES_FETCH
+              value: {{ .Values.config.githubReleasesFetch | quote }}
             {{- end }}
             {{- if .Values.extraBases }}
             - name: CLAUDE_USAGE_EXTRA_BASES
@@ -77,8 +116,10 @@ spec:
           readinessProbe:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          {{- if .Values.resources }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - name: claude-data
               mountPath: /root/.claude

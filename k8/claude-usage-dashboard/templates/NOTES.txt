@@ -1,4 +1,4 @@
-Deployed {{ include "cud.fullname" . }}.
+Deployed {{ include "cud.fullname" . }} in namespace **{{ .Release.Namespace }}** (Ziel: **claude**).
 
 Reach the UI:
 {{- if .Values.ingress.enabled }}
@@ -6,14 +6,23 @@ Reach the UI:
 {{- else if eq .Values.service.type "NodePort" }}
   NodePort dashboard: {{ .Values.service.nodePortDashboard }}  proxy: {{ .Values.service.nodePortProxy }}
 {{- else }}
-  kubectl port-forward svc/{{ include "cud.fullname" . }} 3333:{{ .Values.service.portDashboard }} 8080:{{ .Values.service.portProxy }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "cud.fullname" . }} 3333:{{ .Values.service.portDashboard }} 8080:{{ .Values.service.portProxy }}
+{{- end }}
+
+Secrets (optional keys; fehlende Keys sind mit optional:true unkritisch):
+{{- if .Values.secrets.create }}
+  Helm hat Secret {{ include "cud.appSecretName" . }} aus values.secrets.stringData erzeugt.
+{{- else if .Values.secrets.existingSecret }}
+  App-Secret-Name: {{ .Values.secrets.existingSecret }} (Keys: {{ .Values.secrets.keys.syncToken }}, {{ .Values.secrets.keys.githubToken }}, {{ .Values.secrets.keys.adminToken }})
+{{- else if .Values.sync.tokenFromSecret }}
+  Nur Sync-Token aus Secret {{ .Values.sync.tokenFromSecret.name }} (Key {{ .Values.sync.tokenFromSecret.key }}).
+{{- else }}
+  Kein App-Secret konfiguriert — Sync/GitHub/Admin per values.secrets oder sync.tokenFromSecret setzen.
 {{- end }}
 
 Push JSONL from your machine into the pod volume:
-  export CLAUDE_SYNC_URL=http://127.0.0.1:3333
-  export CLAUDE_SYNC_TOKEN=<CLAUDE_USAGE_SYNC_TOKEN>
+  export CLAUDE_SYNC_URL=https://<dashboard-url>
+  export CLAUDE_SYNC_TOKEN=<sync-token>
   node scripts/claude-data-sync-client.js
 
-(Enable sync by setting CLAUDE_USAGE_SYNC_TOKEN in the pod — see values sync.tokenFromSecret.)
-
-Details: k8/README.md
+Details: k8/README.md · Beispiel-Values: values-cluster.example.yaml

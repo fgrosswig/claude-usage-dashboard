@@ -1,4 +1,5 @@
-# Default: build image from repo root (see k8/README.md).
+# Default-Image: nur für lokale/minikube-Tests (docker build .). Im Cluster: von Woodpecker
+# gebaut, nach Harbor gepusht; Deploy setzt repository/tag per --set (siehe k8/README.md).
 image:
   repository: claude-usage-dashboard
   tag: latest
@@ -9,6 +10,9 @@ replicaCount: 1
 nameOverride: ""
 fullnameOverride: ""
 
+# Ziel-Namespace: **claude** (Helm immer mit `-n claude` / `--namespace claude --create-namespace`;
+# Woodpecker und k8/README.md verwenden dasselbe. Kein Template-Feld — nur Konvention.)
+
 imagePullSecrets: []
 
 # Push ingest: POST /api/claude-data-sync (see scripts/claude-data-sync-client.js)
@@ -17,6 +21,33 @@ sync:
   # tokenFromSecret:
   #   name: claude-usage-sync
   #   key: token
+
+# --- Ein Secret für optionale Geheimnisse (empfohlen) ---
+# Variante A: Secret vorher anlegen:
+#   kubectl create secret generic cud-app -n claude \
+#     --from-literal=sync-token=... \
+#     --from-literal=github-token=... \
+#     --from-literal=admin-token=...
+#   Dann: secrets.existingSecret: cud-app
+# Variante B: Helm erzeugt Secret (Werte nur via separater Datei, nicht ins Git!):
+#   helm upgrade --install ... -f values.yaml -f secrets.local.yaml
+#   secrets.local.yaml: { secrets: { create: true, stringData: { sync-token: "...", ... } } }
+secrets:
+  create: false
+  nameOverride: ""
+  existingSecret: ""
+  keys:
+    syncToken: sync-token
+    githubToken: github-token
+    adminToken: admin-token
+  stringData: {}
+
+# Nicht-geheime Konfiguration (optional)
+config:
+  scanIntervalSec: ""
+  syncMaxMb: ""
+  logLevel: ""
+  githubReleasesFetch: ""
 
 serviceAccount:
   create: false
