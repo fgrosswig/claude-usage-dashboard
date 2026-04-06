@@ -3327,7 +3327,7 @@ function renderDashboardCore(data) {
         ]
       },
       options:{
-        responsive:false,animation:false,transitions:__chartTransitionsOff,maintainAspectRatio:true,aspectRatio:2.4,
+        responsive:true,animation:false,transitions:__chartTransitionsOff,maintainAspectRatio:true,aspectRatio:2.4,
         interaction:{mode:"index",intersect:false},
         scales:{
           x:{type:"category",stacked:true,grid:{color:"rgba(51,65,85,0.5)"}},
