@@ -1,8 +1,14 @@
 **[Deutsch](README.md)** · English
 
-## Claude Usage Dashboard (`claude-usage-dashboard.js`)
+## Claude Usage Dashboard (`server.js` / `start.js`)
 
 Standalone Node server (no npm dependencies in the script itself). Reads **Claude Code** logs under **`~/.claude/projects/**/*.jsonl`** and shows token usage, limits (heuristic), and forensics in a web UI. Only **`claude-*`** models are counted (no `<synthetic>`).
+
+**Layout:** **`server.js`** loads **`scripts/dashboard-server.js`**, **`scripts/dashboard-http.js`**, **`scripts/usage-scan-roots.js`**, and **`scripts/service-logger.js`** (structured logging). Use **`start.js`** for the dashboard, Anthropic proxy, or **`forensics`**. Forensics: **`scripts/token-forensics.js`**, asset tool **`scripts/extract-dashboard-assets.js`**. **`claude-usage-dashboard.js`** aliases **`server.js`**.
+
+**Server logging** (stderr, optional file): **`CLAUDE_USAGE_LOG_LEVEL`** = `error` | `warn` | `info` (default) | `debug` | `none`. Append to a file: **`CLAUDE_USAGE_LOG_FILE`**. CLI overrides: **`--log-level=…`**, **`--log-file=…`**. Topics include **`scan`/`parse`**, **`cache`**, **`outage`**, **`releases`**, **`marketplace`**, **`github`**, **`i18n`**, **`server`**.
+
+**GitHub API (releases):** Unauthenticated quota is only **~60 requests/hour per IP**. On *rate limit exceeded*, set **`GITHUB_TOKEN`** or **`GH_TOKEN`** (classic PAT is enough for public repo release metadata). **No periodic fetch:** the network is used only when **`~/.claude/claude-code-releases.json`** is missing or empty — otherwise the disk cache is used. Manual refresh: **`POST /api/github-releases-refresh`**; optionally set **`CLAUDE_USAGE_ADMIN_TOKEN`** and send request header **`Authorization: Bearer`** with that value. Force fetch at startup: **`CLAUDE_USAGE_GITHUB_RELEASES_FETCH=1`**. **Optional in the UI:** expand the meta section and enter a PAT — stored only in this tab’s **`sessionStorage`**; the browser sends **`X-GitHub-Token`** to the dashboard server (takes **precedence** over `GITHUB_TOKEN`/`GH_TOKEN` for server-side GitHub calls once synced).
 
 ### UI strings (DE/EN, editable)
 
@@ -15,16 +21,24 @@ Standalone Node server (no npm dependencies in the script itself). Reads **Claud
 ### Run
 
 ```bash
-node claude-usage-dashboard.js
+node server.js
+```
+
+Or, using the generic starter (dashboard is the default):
+
+```bash
+node start.js
 ```
 
 ### Options
 
 ```bash
-node claude-usage-dashboard.js --port=4444 --refresh=300
+node server.js --port=4444 --refresh=300
+node server.js --log-level=debug --log-file=$HOME/.claude/usage-dashboard-server.log
 ```
 
 - **`--port`**: HTTP port (default `3333`).
+- **`--log-level`**, **`--log-file`**: diagnostic logging (see **Server logging** above); same as `CLAUDE_USAGE_LOG_*` env vars.
 - **`--refresh`**: Seconds until the next **full data scan** (all JSONL) + SSE push — **minimum `60`**, default **`180`**. Shorter values re-read everything too often (charts flicker). Or set **`CLAUDE_USAGE_SCAN_INTERVAL_SEC`** (≥ 60); `--refresh` overrides it.
 
 ### Live updates
@@ -42,7 +56,7 @@ node claude-usage-dashboard.js --port=4444 --refresh=300
 ### Day cache (past days in one JSON)
 
 - File: **`~/.claude/usage-dashboard-days.json`**
-- If **cache version**, **scan roots**, and **`.jsonl` file count** match, **past days** are loaded from that file and only the **local calendar “today”** is fully re-counted from logs (faster refreshes). If the newest cached day is **before yesterday** (local), a **full scan** runs (avoids missing middle days / missing extension markers). Per-day **`hosts`** are stored from cache version **3** onward; **version 4** invalidates older caches once.
+- If **cache version**, **scan roots**, and **`.jsonl` file count** match, **past days** are loaded from that file and only the **local calendar “today”** is fully re-counted from logs (faster refreshes). **Calendar gaps with no log usage** no longer force a **full scan** — only a changed **`.jsonl` count**, **roots**, **cache version**, or **`CLAUDE_USAGE_NO_CACHE`** do. Per-day **`hosts`** are stored from cache version **3** onward; **version 4** invalidates older caches once; **version 5** adds **`session_signals`** (JSONL heuristics: continue/resume/retry/interrupt) — day cache is rebuilt once.
 - Expand the **meta** panel to see paths for the **day cache**, **releases**, **marketplace**, and **outage** JSON files.
 - Force a **full scan**: set **`CLAUDE_USAGE_NO_CACHE=1`** (or `true`), **or** delete the cache file, **or** add/remove `.jsonl` files (different count), **or** change **`CLAUDE_USAGE_EXTRA_BASES`** / scan roots (the cache stores `scan_roots_key`).
 
@@ -63,7 +77,7 @@ Example:
 
 ```bash
 export CLAUDE_USAGE_EXTRA_BASES="$HOME/.claude/imports/HOST-B"
-node claude-usage-dashboard.js
+node server.js
 ```
 
 Multiple folders:
@@ -77,7 +91,7 @@ Auto-pick `HOST-*` subfolders (parent = current directory):
 ```bash
 export CLAUDE_USAGE_EXTRA_BASES=true
 cd /path/to/parent-containing-HOST-B-and-HOST-C
-node /path/to/claude-usage-dashboard.js
+node /path/to/server.js
 ```
 
 Custom parent (Windows PowerShell):
@@ -85,7 +99,7 @@ Custom parent (Windows PowerShell):
 ```powershell
 $env:CLAUDE_USAGE_EXTRA_BASES = "true"
 $env:CLAUDE_USAGE_EXTRA_BASES_ROOT = "C:\Temp"
-node claude-usage-dashboard.js
+node server.js
 ```
 
 ### Meta line & legend (collapsible)
@@ -112,13 +126,15 @@ node claude-usage-dashboard.js
 - **Hit limit (red in charts):** counts JSONL lines matching typical rate/limit patterns — **not** a direct Anthropic API proof.
 - **Forensic** (collapsible): codes **`?`** (very high cache read), **`HIT`** (limit-like lines in logs), **`<<P`** (strict peak comparison with minimum output/calls). **Not** the same as the Claude UI “90% / 100%”.
 
-### CLI forensics (`token_forensics.js`)
+### CLI forensics (`scripts/token-forensics.js`)
 
-Standalone analysis tool with **automatic peak and limit detection** (no hardcoded dates):
+Standalone analysis tool with **automatic peak and limit detection** (no hardcoded dates). Uses the **same scan roots** as the dashboard (**`usage-scan-roots`**, including **`CLAUDE_USAGE_EXTRA_BASES`**) and **day-cache version 5**.
 
 ```bash
-node token_forensics.js
+node start.js forensics
 ```
+
+(Same as `node scripts/token-forensics.js` or `node token_forensics.js` in the repo root.)
 
 **Automatic detection:**
 
@@ -138,10 +154,40 @@ node token_forensics.js
 
 **Insights for MAX plans:** The peak/limit comparison helps estimate whether the session budget has changed or whether token weighting (input/output/cache) has shifted. The `cache:output` ratio shows working efficiency — fewer subagents = less cache overhead = longer work until the limit.
 
+### Anthropic monitor proxy (`start.js proxy` / `anthropic-proxy.js`)
+
+Implementation: **`scripts/anthropic-proxy-core.js`** and **`scripts/anthropic-proxy-cli.js`**. Optional **HTTP forward proxy** (no extra npm packages): accepts Anthropic-compatible requests and forwards them to **`https://api.anthropic.com`** (or `--upstream`). Use it to **log traffic** and **cache metrics** from API responses alongside your JSONL under `~/.claude/projects`.
+
+**Start:**
+
+```bash
+node start.js proxy --port=8080
+```
+
+(Same as `node anthropic-proxy.js --port=8080`.)
+
+**Point Claude (or compatible tooling) at the proxy:**
+
+```bash
+ANTHROPIC_BASE_URL=http://127.0.0.1:8080 claude
+```
+
+**Continuous logging:** each completed upstream response appends **one NDJSON line** to **`~/.claude/anthropic-proxy-logs/proxy-YYYY-MM-DD.ndjson`** by default (override with **`ANTHROPIC_PROXY_LOG_DIR`**). Records include **`ts_start` / `ts_end`**, **`duration_ms`**, **`path`**, **`upstream_status`**, parsed **`usage`** (including **`cache_read_input_tokens`** and **`cache_creation_input_tokens`**), **`cache_read_ratio`** (= `cache_read / (cache_read + cache_creation)` when that sum &gt; 0), and **`cache_health`**:
+
+- **`healthy`:** share of cache **reads** in (read + creation) ≥ **80%** (strong reuse of cached prompts).
+- **`affected`:** that share **&lt; 40%** when there is cache traffic (heavy **creation**, light **read** — cache churn).
+- **`mixed`**, **`na`**, or **`unknown`** as appropriate.
+
+**Rate limits & metadata:** each line also includes **`request_meta`** (e.g. `content_length`, `anthropic_version`, `anthropic_beta` from incoming request headers) and **`response_anthropic_headers`** (persisted upstream response headers such as `anthropic-ratelimit-*`, `request-id` / `x-request-id`, `cf-ray`, and other `anthropic-*`).
+
+**Subagents & tools:** the proxy sees **HTTP** (e.g. `tools` in the request JSON, `tool_use` / `tool_result` blocks in JSON responses) and adds **`request_hints`** / **`response_hints`**. **Subagent** sessions are mainly visible in **JSONL file paths** (often containing `subagent`). With **`ANTHROPIC_PROXY_ALIGN_JSONL=1`**, the proxy tries to **match** a response to a nearby JSONL line under `~/.claude/projects` (time window + token similarity) and stores the result in **`jsonl_alignment`** (including **`is_subagent_path`**).
+
+Other env vars: **`ANTHROPIC_PROXY_LOG_STDOUT=1`**, **`ANTHROPIC_PROXY_LOG_BODIES=1`** (careful: may capture secrets), **`ANTHROPIC_PROXY_JSONL_ROOTS`**, **`ANTHROPIC_PROXY_BIND`**. See **`node start.js proxy -- --help`** or **`node anthropic-proxy.js --help`**.
+
 ### API (short)
 
 - **`GET /`**: HTML dashboard.
-- **`GET /api/usage`**: JSON including `days` (each day has `hosts`), `host_labels`, `calendar_today`, `day_cache_mode`, `scanning`, `parsed_files`, `scanned_files`, `scan_sources`, `forensic_*`, etc.
+- **`GET /api/usage`**: JSON including `days` (each day has `hosts`, `session_signals`), `host_labels`, `calendar_today`, `day_cache_mode`, `scanning`, `parsed_files`, `scanned_files`, `scan_sources`, `forensic_*`, etc.
 
 ### Extension updates (service impact chart & report)
 

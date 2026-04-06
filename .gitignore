@@ -6,6 +6,11 @@ test_node*.js
 _chk.json 
 _usage_check.json
 claude-code-releases.json
+_patch*.js
+fix*.py
+fix*.js
+_insrel.*
+_fix*.*
 
 # Falls später npm/yarn genutzt wird
 node_modules/
@@ -14,6 +19,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+.github_session_token
 
 # Betriebssystem
 .DS_Store
@@ -23,3 +29,7 @@ Desktop.ini
 # Sonstiges
 *.log
 
+# K8 und Docker ignore
+k8*
+Dockerfile
+docker-compose.yml
