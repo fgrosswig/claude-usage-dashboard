@@ -133,7 +133,7 @@ Lokal: `sh scripts/k8-ci-verify.sh` (Helm/Kustomize + Smoke für **Dockerfile.ci
 
 **Reihenfolge:**
 
-1. **Vorbereitung** — Namespace `claude` (legt Helm mit `--create-namespace` an). Bei privater Registry Pull-Secret **`harbor-pull`** anlegen (Abschnitt **Harbor** oben).
+1. **Vorbereitung** — Namespace `claude` (legt Helm mit `--create-namespace` an). Bei privater Registry Pull-Secret **`harbor-pull`** anlegen (Abschnitt **Harbor** oben). Ohne dieses Secret: Pod-Event **`Failed to pull image`** / **`image can't be pulled`** — prüfen mit `kubectl describe pod -n claude -l app=claude-dashboard` (oft `401`/`no basic auth`). **`--docker-server`** muss der reine Hostname sein (z. B. **`harbor.grosswig-it.de`**, ohne `https://`).
 2. **Base-Image** — Woodpecker **`.woodpecker/base.yml`** auf **.220** nach Harbor **`claude/base`** (bei Änderung an Base-Deps oder einmalig manuell triggern). **App-Image** — **Kaniko** in **`app.yml`** auf **.220** (`build-push`, wie SCHUFA).
 3. **Deploy** — **`kubectl apply -k k8s/overlays/dev`** + **`set image`** (Woodpecker) **oder** manuell `helm upgrade` über Chart (ältere Releases hießen z. B. `cud`; Kustomize nutzt **Deployment `claude-app`**).
 
