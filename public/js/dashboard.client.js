@@ -1588,6 +1588,7 @@ function renderDashboard(data, urgent) {
   updateScanSourcesRow(data);
   updateStatePathsRow(data);
   updateStatusLamp(data);
+  renderProxyAnalysis(data);
   var days = data.days;
   var sp = data.scan_progress;
   var scanInc = data.scanning && sp && sp.total > 0 && sp.done < sp.total;
@@ -2031,8 +2032,6 @@ function renderDashboardCore(data) {
   var fch="";
   fcards.forEach(function(c){fch+="<div class=\"card "+c.cls+"\"><div class=\"label\">"+escHtml(c.label)+"</div><div class=\"value\">"+escHtml(c.value)+"</div><div class=\"sub\">"+escHtml(c.sub)+"</div></div>";});
   var fcg=document.getElementById("forensic-cards");if(fcg)fcg.innerHTML=fch;
-  // Proxy Analytics panel
-  renderProxyAnalysis(data);
   
   // --- Charts ---
   var labels = days.map(function(d){return d.date.slice(5)});
