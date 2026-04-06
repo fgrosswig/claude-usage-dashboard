@@ -2031,6 +2031,8 @@ function renderDashboardCore(data) {
   var fch="";
   fcards.forEach(function(c){fch+="<div class=\"card "+c.cls+"\"><div class=\"label\">"+escHtml(c.label)+"</div><div class=\"value\">"+escHtml(c.value)+"</div><div class=\"sub\">"+escHtml(c.sub)+"</div></div>";});
   var fcg=document.getElementById("forensic-cards");if(fcg)fcg.innerHTML=fch;
+  // Proxy Analytics panel
+  renderProxyAnalysis(data);
   
   // --- Charts ---
   var labels = days.map(function(d){return d.date.slice(5)});
@@ -3735,6 +3737,312 @@ function copyReport(){
   var rov=document.getElementById("report-modal-overlay");
   if(rov){rov.addEventListener("click",function(e){if(e.target===rov)closeReportModal();});}
 })();
+
+// ── Proxy Analytics Panel ─────────────────────────────────────────────────
+var _proxyCharts = { gauge5h: null, gauge7d: null, tokens: null, latency: null };
+
+function getProxyDay(data) {
+  if (!data || !data.proxy || !data.proxy.proxy_days) return null;
+  var pd = data.proxy.proxy_days;
+  return pd.length > 0 ? pd[pd.length - 1] : null;
+}
+
+function renderProxyAnalysis(data) {
+  var sumEl = document.getElementById("proxy-summary-line");
+  var noteEl = document.getElementById("proxy-note");
+  var cardsEl = document.getElementById("proxy-cards");
+  if (!sumEl) return;
+
+  var pd = getProxyDay(data);
+  if (!pd) {
+    sumEl.textContent = t("proxySummaryNoData");
+    if (noteEl) noteEl.textContent = "";
+    if (cardsEl) cardsEl.innerHTML = "";
+    destroyProxyCharts();
+    return;
+  }
+
+  // Summary line
+  var rl = pd.rate_limit || {};
+  var q5h = rl["anthropic-ratelimit-unified-5h-utilization"];
+  var q7d = rl["anthropic-ratelimit-unified-7d-utilization"];
+  var q5pct = q5h != null ? (parseFloat(q5h) * 100).toFixed(1) : "?";
+  var q7pct = q7d != null ? (parseFloat(q7d) * 100).toFixed(1) : "?";
+  sumEl.textContent = tr("proxySummaryLine", {
+    reqs: pd.requests || 0,
+    errs: pd.errors || 0,
+    q5h: q5pct,
+    q7d: q7pct
+  });
+  if (noteEl) noteEl.textContent = t("proxyNote");
+
+  // Cards
+  var ch = pd.cache_health || {};
+  var models = pd.models || {};
+  var opusReqs = (models["claude-opus-4-6"] || {}).requests || 0;
+  var sonnetReqs = 0;
+  var otherReqs = 0;
+  for (var mk in models) {
+    if (!Object.prototype.hasOwnProperty.call(models, mk)) continue;
+    if (mk.indexOf("opus") >= 0) continue;
+    else if (mk.indexOf("sonnet") >= 0) sonnetReqs += models[mk].requests || 0;
+    else otherReqs += models[mk].requests || 0;
+  }
+
+  var pcards = [
+    {
+      label: t("proxyCardRequests"),
+      value: String(pd.requests || 0),
+      sub: tr("proxyCardRequestsSub", { errs: pd.errors || 0, rate: (pd.error_rate || 0).toFixed(1) }),
+      cls: (pd.error_rate || 0) > 5 ? "warn" : ""
+    },
+    {
+      label: t("proxyCardLatency"),
+      value: fmt(Math.round(pd.avg_duration_ms || 0)) + "ms",
+      sub: tr("proxyCardLatencySub", { min: pd.min_duration_ms || 0, max: pd.max_duration_ms || 0 }),
+      cls: (pd.avg_duration_ms || 0) > 15000 ? "warn" : ""
+    },
+    {
+      label: t("proxyCardCacheRatio"),
+      value: ((pd.cache_read_ratio || 0) * 100).toFixed(1) + "%",
+      sub: tr("proxyCardCacheRatioSub", { healthy: ch.healthy || 0, affected: ch.affected || 0 }),
+      cls: (pd.cache_read_ratio || 0) < 0.8 ? "warn" : "ok"
+    },
+    {
+      label: t("proxyCardModels"),
+      value: String(pd.requests || 0),
+      sub: tr("proxyCardModelsSub", { opus: opusReqs, sonnet: sonnetReqs, other: otherReqs }),
+      cls: ""
+    }
+  ];
+  if (cardsEl) {
+    var ch2 = "";
+    pcards.forEach(function (c) {
+      ch2 += "<div class=\"card " + c.cls + "\"><div class=\"label\">" + escHtml(c.label) + "</div><div class=\"value\">" + escHtml(c.value) + "</div><div class=\"sub\">" + escHtml(c.sub) + "</div></div>";
+    });
+    cardsEl.innerHTML = ch2;
+  }
+
+  // i18n labels for chart headings
+  var h3rl = document.getElementById("proxy-ratelimit-h3");
+  if (h3rl) h3rl.textContent = t("proxyRatelimitTitle");
+  var blurbRl = document.getElementById("proxy-ratelimit-blurb");
+  if (blurbRl) blurbRl.textContent = t("proxyRatelimitBlurb");
+  var h3tok = document.getElementById("proxy-token-chart-h3");
+  if (h3tok) h3tok.textContent = t("proxyTokenChartTitle");
+  var blurbTok = document.getElementById("proxy-token-blurb");
+  if (blurbTok) blurbTok.textContent = t("proxyTokenBlurb");
+  var h3lat = document.getElementById("proxy-latency-chart-h3");
+  if (h3lat) h3lat.textContent = t("proxyLatencyChartTitle");
+  var blurbLat = document.getElementById("proxy-latency-blurb");
+  if (blurbLat) blurbLat.textContent = t("proxyLatencyBlurb");
+
+  renderProxyGauges(pd);
+  renderProxyTokenChart(data);
+  renderProxyLatencyChart(data);
+}
+
+function destroyProxyCharts() {
+  for (var k in _proxyCharts) {
+    if (_proxyCharts[k]) { try { _proxyCharts[k].destroy(); } catch (e) {} _proxyCharts[k] = null; }
+  }
+}
+
+function gaugeColor(pct) {
+  if (pct >= 80) return "#ef4444";
+  if (pct >= 50) return "#f59e0b";
+  return "#22c55e";
+}
+
+function renderProxyGauges(pd) {
+  if (typeof Chart === "undefined") return;
+  var rl = pd.rate_limit || {};
+
+  var q5 = parseFloat(rl["anthropic-ratelimit-unified-5h-utilization"] || 0) * 100;
+  var q7 = parseFloat(rl["anthropic-ratelimit-unified-7d-utilization"] || 0) * 100;
+
+  renderOneGauge("c-proxy-5h", "gauge5h", q5, "proxy-gauge-5h-title", t("proxyGauge5hTitle"), rl["anthropic-ratelimit-unified-5h-reset"]);
+  renderOneGauge("c-proxy-7d", "gauge7d", q7, "proxy-gauge-7d-title", t("proxyGauge7dTitle"), rl["anthropic-ratelimit-unified-7d-reset"]);
+}
+
+function renderOneGauge(canvasId, chartKey, usedPct, titleId, titleText, resetEpoch) {
+  var el = document.getElementById(canvasId);
+  if (!el) return;
+  var titleEl = document.getElementById(titleId);
+  var resetStr = "";
+  if (resetEpoch) {
+    var now = Date.now() / 1000;
+    var diff = parseInt(resetEpoch, 10) - now;
+    if (diff > 0) {
+      var rh = Math.floor(diff / 3600);
+      var rm = Math.floor((diff % 3600) / 60);
+      resetStr = tr("proxyGaugeResetIn", { h: rh, m: rm });
+    }
+  }
+  if (titleEl) titleEl.textContent = titleText + (resetStr ? " — " + resetStr : "");
+
+  var remaining = Math.max(0, 100 - usedPct);
+  var color = gaugeColor(usedPct);
+
+  if (_proxyCharts[chartKey]) {
+    _proxyCharts[chartKey].data.datasets[0].data = [usedPct, remaining];
+    _proxyCharts[chartKey].data.datasets[0].backgroundColor = [color, "rgba(51,65,85,.3)"];
+    _proxyCharts[chartKey].options.plugins.title.text = usedPct.toFixed(1) + "%";
+    _proxyCharts[chartKey].update("none");
+    return;
+  }
+
+  _proxyCharts[chartKey] = new Chart(el.getContext("2d"), {
+    type: "doughnut",
+    data: {
+      labels: [t("proxyGaugeUsed"), t("proxyGaugeRemaining")],
+      datasets: [{
+        data: [usedPct, remaining],
+        backgroundColor: [color, "rgba(51,65,85,.3)"],
+        borderWidth: 0,
+        cutout: "75%"
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        title: {
+          display: true,
+          text: usedPct.toFixed(1) + "%",
+          color: color,
+          font: { size: 28, weight: "bold" },
+          position: "bottom",
+          padding: { top: 0 }
+        },
+        tooltip: {
+          callbacks: {
+            label: function (ctx) { return ctx.label + ": " + ctx.parsed.toFixed(1) + "%"; }
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderProxyTokenChart(data) {
+  if (typeof Chart === "undefined") return;
+  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  if (!proxyDays.length) { chartShellSetLoading("proxy-tokens", false); return; }
+
+  var labels = [];
+  var cacheRead = [];
+  var cacheCreate = [];
+  var output = [];
+  for (var i = 0; i < proxyDays.length; i++) {
+    var d = proxyDays[i];
+    labels.push(d.date ? d.date.slice(5) : String(i));
+    cacheRead.push(d.cache_read_tokens || 0);
+    cacheCreate.push(d.cache_creation_tokens || 0);
+    output.push(d.output_tokens || 0);
+  }
+
+  chartShellSetLoading("proxy-tokens", false);
+  var el = document.getElementById("c-proxy-tokens");
+  if (!el) return;
+
+  if (_proxyCharts.tokens) {
+    _proxyCharts.tokens.data.labels = labels;
+    _proxyCharts.tokens.data.datasets[0].data = cacheRead;
+    _proxyCharts.tokens.data.datasets[1].data = cacheCreate;
+    _proxyCharts.tokens.data.datasets[2].data = output;
+    _proxyCharts.tokens.update("none");
+    return;
+  }
+
+  _proxyCharts.tokens = new Chart(el.getContext("2d"), {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [
+        { label: t("proxyDSCacheRead"), data: cacheRead, backgroundColor: "rgba(139,92,246,.7)", stack: "s" },
+        { label: t("proxyDSCacheCreate"), data: cacheCreate, backgroundColor: "rgba(6,182,212,.6)", stack: "s" },
+        { label: t("proxyDSOutput"), data: output, backgroundColor: "rgba(34,197,94,.7)", stack: "s" }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { stacked: true, ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
+        y: { stacked: true, ticks: { color: "#94a3b8", callback: function (v) { return fmt(v); } }, grid: { color: "rgba(51,65,85,.4)" } }
+      },
+      plugins: {
+        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: function (ctx) { return ctx.dataset.label + ": " + fmt(ctx.parsed.y); }
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderProxyLatencyChart(data) {
+  if (typeof Chart === "undefined") return;
+  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  if (!proxyDays.length) { chartShellSetLoading("proxy-latency", false); return; }
+
+  var labels = [];
+  var avg = [];
+  var mn = [];
+  var mx = [];
+  for (var i = 0; i < proxyDays.length; i++) {
+    var d = proxyDays[i];
+    labels.push(d.date ? d.date.slice(5) : String(i));
+    avg.push(d.avg_duration_ms || 0);
+    mn.push(d.min_duration_ms || 0);
+    mx.push(d.max_duration_ms || 0);
+  }
+
+  chartShellSetLoading("proxy-latency", false);
+  var el = document.getElementById("c-proxy-latency");
+  if (!el) return;
+
+  if (_proxyCharts.latency) {
+    _proxyCharts.latency.data.labels = labels;
+    _proxyCharts.latency.data.datasets[0].data = avg;
+    _proxyCharts.latency.data.datasets[1].data = mn;
+    _proxyCharts.latency.data.datasets[2].data = mx;
+    _proxyCharts.latency.update("none");
+    return;
+  }
+
+  _proxyCharts.latency = new Chart(el.getContext("2d"), {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [
+        { label: t("proxyDSAvgLatency"), data: avg, borderColor: "#3b82f6", backgroundColor: "rgba(59,130,246,.15)", fill: true, tension: .3, pointRadius: 3 },
+        { label: t("proxyDSMinLatency"), data: mn, borderColor: "#22c55e", borderDash: [4, 2], tension: .3, pointRadius: 2 },
+        { label: t("proxyDSMaxLatency"), data: mx, borderColor: "#ef4444", borderDash: [4, 2], tension: .3, pointRadius: 2 }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
+        y: { ticks: { color: "#94a3b8", callback: function (v) { return v + "ms"; } }, grid: { color: "rgba(51,65,85,.4)" } }
+      },
+      plugins: {
+        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: function (ctx) { return ctx.dataset.label + ": " + Math.round(ctx.parsed.y) + "ms"; }
+          }
+        }
+      }
+    }
+  });
+}
 fetchUsageJsonOnce();
 connectUsageStream();
 scheduleFetchExtensionTimeline(900);
