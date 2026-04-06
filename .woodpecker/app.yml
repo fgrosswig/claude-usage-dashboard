@@ -40,9 +40,13 @@ steps:
   - name: deploy
     image: bitnami/kubectl:1.31
     commands:
-      - kubectl --server=$KUBE_URL --token=$KUBE_TOKEN --insecure-skip-tls-verify apply -k k8s/overlays/dev
-      - kubectl --server=$KUBE_URL --token=$KUBE_TOKEN --insecure-skip-tls-verify set image deployment/claude-app app=harbor.grosswig-it.de/claude/claude-usage-dashboard:${CI_COMMIT_SHA:0:8} -n claude
-      - kubectl --server=$KUBE_URL --token=$KUBE_TOKEN --insecure-skip-tls-verify rollout status deployment/claude-app -n claude --timeout=120s
+      - |
+        set -eux
+        # Ohne --request-timeout kann kubectl bei API/Netz hängen (rollout --timeout begrenzt nur den Watch).
+        K="kubectl --server=$KUBE_URL --token=$KUBE_TOKEN --insecure-skip-tls-verify --request-timeout=120s"
+        $K apply -k k8s/overlays/dev
+        $K set image deployment/claude-app app=harbor.grosswig-it.de/claude/claude-usage-dashboard:${CI_COMMIT_SHA:0:8} -n claude
+        $K rollout status deployment/claude-app -n claude --timeout=3m
     environment:
       KUBE_URL:
         from_secret: kube_url

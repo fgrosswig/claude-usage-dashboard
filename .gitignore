@@ -32,6 +32,9 @@
 !/k8/
 !/k8/**/*
 
+!/k8s/
+!/k8s/**/*
+
 !/Dockerfile
 !/Dockerfile.base
 !/version.json
