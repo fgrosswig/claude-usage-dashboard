@@ -8,7 +8,7 @@ Chart: `k8/claude-usage-dashboard/` — Usage-Dashboard + Anthropic-Proxy (`node
 
 ## Build image
 
-**Normalfall:** Push/Manual auf **`main`**, **`int`**, **`feat/**`**, **`fix/**`** → **`.woodpecker/app.yml`** (1:1 nach [SCHUFA app.yml](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.woodpecker/app.yml)): **prepare** → **Kaniko** → **`kubectl apply -k k8s/overlays/dev`** → **`set image`** / **`rollout`** → **Sonar** (nur `main`/`int`) → **cleanup**. Doku-Gesamtbild: [SCHUFA `docs/01-deployment.md`](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/main/docs/01-deployment.md).
+**Normalfall:** Push/Manual auf **`main`**, **`int`**, **`feat/**`**, **`fix/**`** → **`.woodpecker/app.yml`** (nach [SCHUFA app.yml](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.woodpecker/app.yml), ohne Sonar): **prepare** → **Kaniko** → **`kubectl apply -k k8s/overlays/dev`** → **`set image`** / **`rollout`** → **cleanup**. Doku-Gesamtbild: [SCHUFA `docs/01-deployment.md`](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/main/docs/01-deployment.md).
 
 **Pull Requests:** **`.woodpecker/pr.yml`** — Checks ohne Kaniko (SCHUFA hat kein separates PR-File; hier ergänzt).
 
@@ -91,14 +91,14 @@ Prüfen: `kubectl kustomize k8s/overlays/dev`
 
 | Datei | Rolle |
 |-------|--------|
-| [`.woodpecker/app.yml`](../.woodpecker/app.yml) | **Struktur = SCHUFA** `app.yml`: prepare, Kaniko, **kubectl apply -k k8s/overlays/dev**, set image, rollout, Sonar (`main`/`int`), cleanup |
+| [`.woodpecker/app.yml`](../.woodpecker/app.yml) | Wie SCHUFA (ohne Sonar): prepare, Kaniko, **kubectl apply -k k8s/overlays/dev**, set image, rollout, cleanup |
 | [`.woodpecker/pr.yml`](../.woodpecker/pr.yml) | PR-Checks ohne Kaniko (Zusatz zu SCHUFA) |
 
 **Referenz:** [SCHUFA `app.yml` feat/fastify-v5](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.woodpecker/app.yml) · [SCHUFA `docs/01-deployment.md`](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/main/docs/01-deployment.md) · [Kaniko-Plugin](https://woodpecker-ci.org/plugins/kaniko).
 
 Instanz: [ci.grosswig-it.de — Repo #3](https://ci.grosswig-it.de/repos/3) · [Workflow-Syntax](https://woodpecker-ci.org/docs/usage/workflow-syntax).
 
-**Woodpecker-Secrets:** `harbor_user`, `harbor_password`, `kube_url`, `kube_token`, **`sonar_url`**, **`sonar_token`** (Sonar wie SCHUFA; Projekt-Key `gro-claude-usage-dashboard` in der Pipeline).
+**Woodpecker-Secrets:** `harbor_user`, `harbor_password`, `kube_url`, `kube_token`.
 
 **Harbor-Robot in Woodpecker (Kaniko):** Die YAML-Datei enthält **keine** Zugangsdaten. Kaniko bekommt Login ausschließlich aus **`harbor_user`** und **`harbor_password`**. Trage dort exakt die Werte aus der Robot-JSON ein (lokal z. B. `robot$claude+developer.json`, Felder **`name`** und **`secret`**):
 
