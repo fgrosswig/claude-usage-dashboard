@@ -6,7 +6,7 @@ Chart: `claude-usage-dashboard/` — Usage-Dashboard + Anthropic-Proxy (`node st
 
 ## Build image
 
-**Normalfall (Cluster):** Du **committest und pushst** (z. B. **`main`**, **`feat/**`**, **`fix/**`**). **Woodpecker** startet **`.woodpecker/app.yml`**, baut mit **`plugins/kaniko`** (wie **GRO/SCHUFA**) und pusht nach Harbor — **ohne** Docker-Socket, **ohne** `trusted`. Tags: `:<erste-8-Zeichen-des-Commit-SHA>`, `:latest`. **`helm-deploy`** nur bei **Deployment** oder **manuell** im Woodpecker-UI.
+**Normalfall (Cluster):** Du **committest und pushst** (z. B. **`main`**, **`feat/**`**, **`fix/**`**). **Woodpecker** startet **`.woodpecker/app.yml`**: Kaniko → Harbor, danach **`deploy`** wie bei **SCHUFA** (`KUBE_URL` / `KUBE_TOKEN` aus Secrets, kein kubeconfig-File) — hier **`helm upgrade`** mit `--kube-apiserver` / `--kube-token` / `--kube-insecure-skip-tls-verify` und **`--wait`** (Chart statt SCHUFA `kubectl apply -k` + `set image`). Anschließend **`cleanup`** (alte Harbor-Tags, `failure: ignore`). Tags: `:<sha8>`, `:latest`.
 
 **Pull Requests:** **`.woodpecker/pr.yml`** — `node --check` und Helm, **ohne** Kaniko/Harbor.
 
@@ -82,7 +82,7 @@ Struktur wie **GRO/SCHUFA** (Woodpecker + Kaniko, keine Gitea Actions für das A
 
 | Datei | Rolle |
 |-------|--------|
-| [`.woodpecker/app.yml`](../.woodpecker/app.yml) | Push `main` / `feat/**` / `fix/**`, Tag, Deployment, manuell: `node --check`, Helm, **`plugins/kaniko`** → Harbor, optional **`helm-deploy`** |
+| [`.woodpecker/app.yml`](../.woodpecker/app.yml) | Wie SCHUFA: Checks, **`plugins/kaniko`**, **`deploy`** (Helm + `kube_*` Secrets), **`cleanup`** (Harbor API) |
 | [`.woodpecker/pr.yml`](../.woodpecker/pr.yml) | Nur **Pull Request**: Checks ohne Registry-Push |
 
 **Vorbild (MCP):** [SCHUFA `.woodpecker/app.yml` (`feat/fastify-v5`)](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.woodpecker/app.yml) — gleiches Muster: `plugins/kaniko`, `harbor.grosswig-it.de/…`, Deploy-Schritt mit `kube_*`. Doku im SCHUFA-Repo: `docs/01-deployment.md`. [Kaniko-Plugin](https://woodpecker-ci.org/plugins/kaniko).
@@ -107,7 +107,7 @@ In **Harbor** muss der Robot für das Projekt **`claude`** ins Repository **`cla
 
 **Auslöser `app.yml`:** Push auf genannte Branches, **Tag**, **Deployment**, **manuell** — nicht PR (dafür `pr.yml`).
 
-Ablauf: `node --check` → Helm lint/template → **build-push** (Kaniko) → `harbor.grosswig-it.de/claude/claude-usage-dashboard` (`:latest`, `:<sha8>`) → bei **Deployment**/**manuell** **`helm upgrade --install`** mit `imagePullSecrets: harbor-pull`.
+Ablauf: `node --check` → Helm lint/template → **build-push** (Kaniko) → **`deploy`** (`helm upgrade --install` mit `kube_url`/`kube_token`, Namespace **`claude`**) → **cleanup** (Harbor-Projekt **`claude`**, Repo **`claude-usage-dashboard`**, behält u. a. `latest`). **Sonar** wie in SCHUFA hier nicht eingebunden (eigenes Sonar-Projekt nötig).
 
 Lokal: `sh scripts/k8-ci-verify.sh`. `kubectl` in der Pipeline: vorerst `--insecure-skip-tls-verify` — bei Bedarf in `.woodpecker/app.yml` anpassen.
 
@@ -121,7 +121,7 @@ Lokal: `sh scripts/k8-ci-verify.sh`. `kubectl` in der Pipeline: vorerst `--insec
 
 1. **Vorbereitung** — Namespace `claude` (legt Helm mit `--create-namespace` an). Bei privater Registry Pull-Secret **`harbor-pull`** anlegen (Abschnitt **Harbor** oben).
 2. **Image bauen und nach Harbor pushen** — **Git-Push** auf **`main`** / **`feat/**`** / **`fix/**`** (oder Tag-/Deploy-/manuell): Woodpecker **`.woodpecker/app.yml`** mit **Kaniko** (`build-push`). Ohne erfolgreichen Lauf → **ImagePullBackOff**.
-3. **Helm** — `helm upgrade --install` mit `image.repository` / `image.tag` (zum gebauten Image passend) und `imagePullSecrets: harbor-pull` (wie Pipeline und `values-cluster.example.yaml`).
+3. **Helm / Deploy** — bei jedem grünen Woodpecker-Lauf wie in **SCHUFA** automatisch, oder lokal: `helm upgrade --install` mit Harbor-Image und `imagePullSecrets: harbor-pull` (siehe `values-cluster.example.yaml`).
 
 Voraussetzung: `kubectl` zeigt auf **euren** Cluster (`kubectl config current-context`), Helm 3 installiert.
 

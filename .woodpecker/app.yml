@@ -1,8 +1,9 @@
 # Wie GRO/SCHUFA — .woodpecker/app.yml (Branch feat/fastify-v5):
-# Kaniko-Plugin statt Docker-Socket → kein „trusted“, kein Volume auf docker.sock.
+# Kaniko, Deploy mit KUBE_URL/KUBE_TOKEN (kein kubeconfig), Harbor-Cleanup.
 # https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.woodpecker/app.yml
 #
 # Secrets: harbor_user, harbor_password, kube_url, kube_token
+# Doku: SCHUFA docs/01-deployment.md · Harbor: infrastructure-docs 05-harbor.md
 
 when:
   - event: push
@@ -30,7 +31,7 @@ steps:
       - helm lint k8/claude-usage-dashboard
       - helm template woodpecker-smoke k8/claude-usage-dashboard >/dev/null
 
-  # Auth: Woodpecker-Secrets = Harbor-Robot (JSON-Felder name + secret), Push-Recht Projekt claude.
+  # Auth: Woodpecker-Secrets = Harbor-Robot (JSON name + secret), Repository Pull+Push.
   - name: build-push
     image: plugins/kaniko
     settings:
@@ -45,26 +46,44 @@ steps:
       password:
         from_secret: harbor_password
 
-  - name: helm-deploy
-    when:
-      - event: deployment
-      - event: manual
-    image: docker.io/dtzar/helm-kubectl:3.14.4
+  # Entspricht SCHUFA deploy (bitnami/kubectl + --server/--token); hier Helm-Chart → alpine/helm + --kube-*.
+  - name: deploy
+    image: docker.io/alpine/helm:3.16.3
     environment:
       KUBE_URL:
         from_secret: kube_url
       KUBE_TOKEN:
         from_secret: kube_token
     commands:
-      - kubectl config set-cluster ci --server="$KUBE_URL" --insecure-skip-tls-verify=true
-      - kubectl config set-credentials ci --token="$KUBE_TOKEN"
-      - kubectl config set-context ci --cluster=ci --user=ci
-      - kubectl config use-context ci
       - |
         TAG=$(printf '%s' "$CI_COMMIT_SHA" | cut -c1-8)
         if [ -n "${CI_COMMIT_TAG:-}" ]; then TAG="$CI_COMMIT_TAG"; fi
         helm upgrade --install cud ./k8/claude-usage-dashboard -n claude --create-namespace \
+          --kube-apiserver="$KUBE_URL" --kube-token="$KUBE_TOKEN" --kube-insecure-skip-tls-verify \
+          --wait --timeout 120s \
           --set image.repository=harbor.grosswig-it.de/claude/claude-usage-dashboard \
           --set image.tag="$TAG" \
           --set image.pullPolicy=Always \
           --set "imagePullSecrets[0].name=harbor-pull"
+
+  - name: cleanup
+    image: docker.io/alpine:3.21
+    environment:
+      HARBOR_USER:
+        from_secret: harbor_user
+      HARBOR_PASS:
+        from_secret: harbor_password
+    commands:
+      - |
+        apk add --no-cache curl jq
+        KEEP=2
+        API="https://harbor.grosswig-it.de/api/v2.0/projects/claude/repositories/claude-usage-dashboard/artifacts"
+        TAGS=$(curl -s -u "$HARBOR_USER:$HARBOR_PASS" "$API?page_size=50&sort=-push_time" | jq -r '.[].tags[]?.name // empty' 2>/dev/null | grep -v latest)
+        COUNT=0
+        echo "$TAGS" | while read TAG; do
+          COUNT=$((COUNT+1))
+          if [ $COUNT -gt $KEEP ]; then
+            curl -s -X DELETE -u "$HARBOR_USER:$HARBOR_PASS" "$API/$TAG" || true
+          fi
+        done
+    failure: ignore
