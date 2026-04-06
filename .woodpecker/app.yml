@@ -1,3 +1,4 @@
+# Step-Images über Harbor poc (kein Docker Hub vom Cluster aus) — vgl. k8/README.md
 when:
   event: [push, manual]
   branch:
@@ -13,7 +14,7 @@ labels:
 
 steps:
   - name: prepare
-    image: alpine
+    image: harbor.grosswig-it.de/poc/library/alpine:3.20
     commands:
       - |
         BASE_VER=$(awk -F'"' '/base_image/{print $4}' version.json)
@@ -21,7 +22,7 @@ steps:
         sed "s|^ARG BASE_TAG=.*|ARG BASE_TAG=$BASE_VER|" Dockerfile > Dockerfile.ci
 
   - name: build-push
-    image: plugins/kaniko
+    image: harbor.grosswig-it.de/poc/woodpeckerci/plugin-kaniko:latest
     settings:
       repo: harbor.grosswig-it.de/claude/claude-usage-dashboard
       registry: harbor.grosswig-it.de
@@ -38,7 +39,7 @@ steps:
         from_secret: harbor_password
 
   - name: deploy
-    image: bitnami/kubectl:1.31
+    image: harbor.grosswig-it.de/poc/bitnami/kubectl:1.31
     commands:
       - |
         set -eux
@@ -54,7 +55,7 @@ steps:
         from_secret: kube_token
 
   - name: cleanup
-    image: alpine
+    image: harbor.grosswig-it.de/poc/library/alpine:3.20
     environment:
       HARBOR_USER:
         from_secret: harbor_user
