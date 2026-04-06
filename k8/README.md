@@ -10,6 +10,8 @@ Chart: `k8/claude-usage-dashboard/` — Usage-Dashboard + Anthropic-Proxy (`node
 
 **Reihenfolge wie SCHUFA:** Zuerst **`harbor.grosswig-it.de/claude/base`** — Workflow **`.woodpecker/base.yml`** (Push auf `Dockerfile.base`, `version.json`, `package.json`, `package-lock.json`, **Docker-Agent .220**). Danach (oder parallel bei nur App-Änderungen) **`.woodpecker/app.yml`**: **prepare** (schreibt **`Dockerfile.ci`** mit `BASE_TAG` aus **`version.json`**) → **Kaniko** (zieht das Base von Harbor, **K8s-Agent .171**) → Deploy → Cleanup. Ohne existierendes Base-Tag schlägt Kaniko fehl — erst **`base.yml`** laufen lassen oder Base manuell pushen.
 
+**Erstmalig / leeres Harbor-Repo `claude/base`:** In Woodpecker den Workflow **`base`** (`.woodpecker/base.yml`) **manuell** ausführen — `when` enthält **`manual`**; Pfadfilter greifen dabei nicht. Danach existiert **`claude/base:v3`** (und **`latest`**), dann **`app.yml`** erneut starten. In Harbor Projekt **`claude`** und Robot mit **Push** auf **`base`** vorsehen.
+
 **Normalfall Branch-Events:** **`main`**, **`int`**, **`feat/**`**, **`fix/**`**. Doku-Gesamtbild: [SCHUFA `docs/01-deployment.md`](https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/main/docs/01-deployment.md).
 
 **Pull Requests:** **`.woodpecker/pr.yml`** — Checks ohne Kaniko (SCHUFA hat kein separates PR-File; hier ergänzt).

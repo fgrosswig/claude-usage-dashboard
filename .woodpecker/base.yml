@@ -1,7 +1,8 @@
 # Base-Image auf Docker-Agent .220 → Harbor claude/base. Muss existieren, bevor app.yml (Kaniko auf .171) baut.
+# Erstbefüllung Harbor: Workflow hier manuell in Woodpecker starten (path-Filter gilt bei manual nicht).
 # plugins/docker-Image nur über Harbor **poc** (kein Docker Hub).
 when:
-  event: push
+  event: [push, manual]
   path:
     - Dockerfile.base
     - version.json
