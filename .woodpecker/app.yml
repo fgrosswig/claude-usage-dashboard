@@ -1,8 +1,8 @@
 # Nach GRO/SCHUFA .woodpecker/app.yml (feat/fastify-v5), nur App-/Harbor-/K8s-Namen für Claude.
 # https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.woodpecker/app.yml
 #
-# Infra (GRO): Base-Image o. Ä. einmalig auf **.220** (Docker-Agent); **Kaniko + Deploy-Steps** laufen auf **.171**
-# (Kubernetes-Agent, Namespace woodpecker). Dafür: labels.backend: kubernetes.
+# Reihenfolge: **.woodpecker/base.yml** pusht `harbor.../claude/base` (.220). Diese Pipeline baut die App mit Kaniko (.171)
+# und braucht das Base-Image bereits in Harbor (siehe version.json → Dockerfile.ci).
 #
 # Secrets: harbor_user, harbor_password, kube_url, kube_token
 # Deploy: kubectl apply -k k8s/overlays/dev
@@ -21,20 +21,22 @@ labels:
   backend: kubernetes
 
 steps:
-  # SCHUFA: sed Dockerfile.ci aus version.json — hier nur ein Dockerfile, Schritt bleibt als klarer No-Op.
   - name: prepare
     image: alpine:3.21
     commands:
       - |
         test -f Dockerfile
-        echo "claude-usage-dashboard single-stage Dockerfile (kein Dockerfile.ci)"
+        test -f version.json
+        BASE_VER=$(awk -F'"' '/base_image/{print $4}' version.json)
+        echo "Base image tag: $BASE_VER"
+        sed "s|^ARG BASE_TAG=.*|ARG BASE_TAG=$BASE_VER|" Dockerfile > Dockerfile.ci
 
   - name: build-push
     image: plugins/kaniko
     settings:
       repo: harbor.grosswig-it.de/claude/claude-usage-dashboard
       registry: harbor.grosswig-it.de
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.ci
       tags:
         - latest
         - "${CI_COMMIT_SHA:0:8}"

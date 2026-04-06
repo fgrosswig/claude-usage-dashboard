@@ -33,6 +33,10 @@
 !/k8/**/*
 
 !/Dockerfile
+!/Dockerfile.base
+!/version.json
+!/package.json
+!/package-lock.json
 !/.dockerignore
 !/docker-compose.yml
 
