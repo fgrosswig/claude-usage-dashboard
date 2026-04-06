@@ -51,7 +51,20 @@ docker push <harbor-host>/claude/claude-usage-dashboard:1.0.0
 
 ### Pull-Secret aus Harbor-Robot (JSON)
 
-Harbor liefert beim Anlegen eines Robot-Accounts eine JSON-Datei (z. B. `robot$claude+developer.json`). Lege sie **nur lokal** unter `k8/claude-usage-dashboard/` ab — sie ist per **`.gitignore`** (`robot*.json`) vom Commit ausgeschlossen.
+Harbor liefert beim Anlegen eines Robot-Accounts eine JSON-Datei. **Standardablage (nur lokal, nicht im Git):**
+
+**`k8/claude-usage-dashboard/robot$claude+developer.json`**
+
+(`robot*.json` unter diesem Pfad ist per **`.gitignore`** ausgeschlossen.)
+
+**Ein Befehl — Secret `harbor-pull` im Cluster** (Repo-Root, `kubectl` + `jq`):
+
+```bash
+sh scripts/k8-harbor-pull-secret.sh
+```
+
+Andere JSON-Datei: `ROBOT_JSON=/pfad/zur/robot.json sh scripts/k8-harbor-pull-secret.sh`  
+Anderer Registry-Host: `HARBOR_HOST=harbor.grosswig-it.de` (Standard).
 
 **`docker login`** (lokal / CI), Platzhalter anpassen:
 
