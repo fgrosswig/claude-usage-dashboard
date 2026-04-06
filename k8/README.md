@@ -117,7 +117,7 @@ jq -r '.name, .secret' "$ROBOT_JSON"
 
 In **Harbor** muss der Robot für das Projekt **`claude`** ins Repository **`claude-usage-dashboard`** **pushen** dürfen. In der Robot-Maske **Select Permissions** → Zeile **Repository** müssen u. a. **Pull** und **Push** angehakt sein (nur *List / Read / Update* reicht nicht — dann genau der Fehler **`UNAUTHORIZED` … action: push**). Meldung **`UNAUTHORIZED`** heißt sonst oft: falsche Woodpecker-Secrets oder abgelaufener Robot.
 
-**Kein Docker Hub:** Alle CI-/Base-Images ziehen über Harbor-Proxy-Projekt **`poc`** (`harbor.grosswig-it.de/poc/library/…`, `…/bitnami/…`, `…/woodpeckerci/…`). **`Dockerfile.base`** nutzt `FROM harbor.grosswig-it.de/poc/library/node:20-alpine` (wie SCHUFA: APK-Stack + `npm install` nur **`package.json`**). Das **App-**`Dockerfile` bleibt **`harbor.../claude/base`**. Proxy-Setup: **05-harbor.md** / „Base Image Connector“.
+**Kein Docker Hub:** Alle CI-/Base-Images ziehen über Harbor-Proxy-Projekt **`poc`** (`harbor.grosswig-it.de/poc/library/…`, `…/bitnami/…`, `…/woodpeckerci/…`). **`Dockerfile.base`:** `node:20-alpine` über **`poc`**, nur **`npm install`** auf **`package.json`** — absichtlich **ohne** SCHUFA-Extras (OCR/PDF/`apk`), weil das Dashboard reines Node ist. Sobald ihr z. B. `git`-URLs oder Systemlibs braucht, Base erweitern. **App-**`Dockerfile`: **`harbor.../claude/base`**. Proxy: **05-harbor.md**.
 
 **Auslöser `app.yml`:** wie SCHUFA nur **`push`** und **`manual`** auf **`feat/**`**, **`fix/**`**, **`main`**, **`int`** (kein separater Tag-/Deployment-Event — wer Tags braucht, analog SCHUFA erweitern).
 

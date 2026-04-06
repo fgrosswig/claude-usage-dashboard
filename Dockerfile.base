@@ -1,13 +1,7 @@
-# Nur Harbor (Proxy **poc**), kein direkter Docker-Hub-Pull.
+# Nur Harbor (Proxy **poc**). Minimales Base: reines Node — kein SCHUFA-OCR/PDF-Stack, kein apk,
+# solange das Dashboard keine nativen Tools oder Git-URL-Dependencies braucht.
 FROM harbor.grosswig-it.de/poc/library/node:20-alpine
 LABEL maintainer="falk@grosswig.de" version="3"
-
-RUN apk add --no-cache \
-    git \
-    tesseract-ocr \
-    tesseract-ocr-data-deu \
-    poppler-utils \
-    ghostscript
 
 WORKDIR /app
 
