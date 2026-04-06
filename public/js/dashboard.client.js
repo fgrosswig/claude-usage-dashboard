@@ -3797,7 +3797,7 @@ function renderProxyAnalysis(data) {
     },
     {
       label: t("proxyCardLatency"),
-      value: fmt(Math.round(pd.avg_duration_ms || 0)) + "ms",
+      value: (pd.avg_duration_ms >= 1000 ? (pd.avg_duration_ms/1000).toFixed(1) + "s" : Math.round(pd.avg_duration_ms || 0) + "ms"),
       sub: tr("proxyCardLatencySub", { min: pd.min_duration_ms || 0, max: pd.max_duration_ms || 0 }),
       cls: (pd.avg_duration_ms || 0) > 15000 ? "warn" : ""
     },
