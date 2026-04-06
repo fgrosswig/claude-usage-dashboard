@@ -1601,6 +1601,7 @@ function renderDashboard(data, urgent) {
   updateStatePathsRow(data);
   updateStatusLamp(data);
   renderHealthScore(data);
+  renderKeyFindings(data);
   var days = data.days;
   var sp = data.scan_progress;
   var scanInc = data.scanning && sp && sp.total > 0 && sp.done < sp.total;
@@ -4530,6 +4531,173 @@ function renderHealthScore(data) {
     gh += "</div>";
   }
   if (gridEl.innerHTML !== gh) gridEl.innerHTML = gh;
+}
+
+// ── Key Findings Panel ────────────────────────────────────────────────────
+var __lastFindingsFingerprint = "";
+
+function computeKeyFindings(data) {
+  var days = data.days || [];
+  var proxy = data.proxy || {};
+  var pdays = proxy.proxy_days || [];
+  var pd = pdays.length > 0 ? pdays[pdays.length - 1] : null;
+  var numDays = days.length || 1;
+  var findings = [];
+
+  // Totals from JSONL
+  var totalOut = 0, totalCache = 0, totalAll = 0, totalCalls = 0;
+  var totalHits = 0, totalRetries = 0, totalInterrupts = 0, totalContinue = 0;
+  var peakDay = null, peakTotal = 0;
+  for (var i = 0; i < days.length; i++) {
+    var d = days[i];
+    totalOut += (d.output || 0);
+    totalCache += (d.cache_read || 0);
+    totalAll += (d.total || 0);
+    totalCalls += (d.calls || 0);
+    totalHits += (d.hit_limit || 0);
+    var ss = d.session_signals || {};
+    totalRetries += (ss.retry || 0);
+    totalInterrupts += (ss.interrupt || 0);
+    totalContinue += (ss["continue"] || 0);
+    if ((d.total || 0) > peakTotal) { peakTotal = d.total || 0; peakDay = d; }
+  }
+
+  // 1. Thinking Token Gap
+  if (pd && days.length) {
+    var todayJ = null;
+    for (var j = 0; j < days.length; j++) { if (days[j].date === pd.date) { todayJ = days[j]; break; } }
+    if (todayJ && pd.total_tokens > 0) {
+      var gap = (todayJ.total || 0) / pd.total_tokens;
+      findings.push({
+        icon: gap > 5 ? "red" : gap > 2 ? "yellow" : "green",
+        title: t("findingThinkingGap"),
+        value: gap.toFixed(1) + "x",
+        detail: tr("findingThinkingGapDetail", { jsonl: fmt(todayJ.total || 0), proxy: fmt(pd.total_tokens) })
+      });
+    }
+  }
+
+  // 2. Overhead
+  if (totalOut > 0) {
+    var overhead = Math.round(totalAll / totalOut);
+    findings.push({
+      icon: overhead > 1000 ? "red" : overhead > 500 ? "yellow" : "green",
+      title: t("findingOverhead"),
+      value: overhead + "x",
+      detail: tr("findingOverheadDetail", { total: fmt(totalAll), output: fmt(totalOut), days: numDays })
+    });
+  }
+
+  // 3. Hit Limits
+  if (totalHits > 0) {
+    var hpd = Math.round(totalHits / numDays);
+    findings.push({
+      icon: hpd > 500 ? "red" : hpd > 50 ? "yellow" : "green",
+      title: t("findingHitLimits"),
+      value: fmt(totalHits),
+      detail: tr("findingHitLimitsDetail", { total: totalHits, perDay: hpd, days: numDays })
+    });
+  }
+
+  // 4. Interrupts vs Hit Limits
+  if (totalInterrupts > 0) {
+    findings.push({
+      icon: totalInterrupts > totalHits ? "red" : "yellow",
+      title: t("findingInterrupts"),
+      value: fmt(totalInterrupts),
+      detail: tr("findingInterruptsDetail", { interrupts: totalInterrupts, hits: totalHits, ratio: totalHits > 0 ? (totalInterrupts / totalHits).toFixed(1) : "-" })
+    });
+  }
+
+  // 5. Quota (from proxy)
+  if (pd) {
+    var rl = pd.rate_limit || {};
+    var q5 = parseFloat(rl["anthropic-ratelimit-unified-5h-utilization"] || 0) * 100;
+    var q7 = parseFloat(rl["anthropic-ratelimit-unified-7d-utilization"] || 0) * 100;
+    if (q5 > 0) {
+      findings.push({
+        icon: q5 > 80 ? "red" : q5 > 50 ? "yellow" : "green",
+        title: t("findingQuota"),
+        value: q5.toFixed(0) + "% / " + q7.toFixed(0) + "%",
+        detail: tr("findingQuotaDetail", { q5: q5.toFixed(1), q7: q7.toFixed(1), reqs: pd.requests || 0, output: fmt(pd.output_tokens || 0) })
+      });
+    }
+  }
+
+  // 6. Peak Day
+  if (peakDay) {
+    findings.push({
+      icon: peakTotal > 2e9 ? "red" : peakTotal > 500e6 ? "yellow" : "green",
+      title: t("findingPeakDay"),
+      value: peakDay.date,
+      detail: tr("findingPeakDayDetail", { total: fmt(peakTotal), calls: peakDay.calls || 0, overhead: peakDay.overhead || 0 })
+    });
+  }
+
+  // 7. Retries
+  if (totalRetries > 0) {
+    var rpd = Math.round(totalRetries / numDays);
+    findings.push({
+      icon: rpd > 200 ? "red" : rpd > 50 ? "yellow" : "green",
+      title: t("findingRetries"),
+      value: fmt(totalRetries),
+      detail: tr("findingRetriesDetail", { total: totalRetries, perDay: rpd })
+    });
+  }
+
+  // 8. Cache paradox
+  if (pd && pd.cache_read_ratio > 0.9 && totalHits > 100) {
+    findings.push({
+      icon: "yellow",
+      title: t("findingCacheParadox"),
+      value: (pd.cache_read_ratio * 100).toFixed(1) + "%",
+      detail: t("findingCacheParadoxDetail")
+    });
+  }
+
+  return findings;
+}
+
+function renderKeyFindings(data) {
+  var el = document.getElementById("key-findings-grid");
+  var headerEl = document.getElementById("key-findings-header");
+  if (!el) return;
+
+  var fp = (data.generated || "") + "|" + ((data.proxy && data.proxy.generated) || "");
+  if (fp === __lastFindingsFingerprint) return;
+  __lastFindingsFingerprint = fp;
+
+  var days = data.days || [];
+  var pdays = (data.proxy && data.proxy.proxy_days) || [];
+  if (!days.length && !pdays.length) {
+    if (headerEl) headerEl.textContent = t("findingsNoData");
+    el.innerHTML = "";
+    return;
+  }
+
+  var findings = computeKeyFindings(data);
+  if (headerEl) {
+    var reds = 0, yellows = 0;
+    for (var c = 0; c < findings.length; c++) {
+      if (findings[c].icon === "red") reds++;
+      if (findings[c].icon === "yellow") yellows++;
+    }
+    headerEl.innerHTML = "<strong>" + escHtml(t("findingsTitle")) + "</strong> <span style=\"font-size:.78rem;color:#94a3b8\">" +
+      escHtml(tr("findingsSummary", { total: findings.length, reds: reds, yellows: yellows })) + "</span>";
+  }
+
+  var html = "";
+  for (var fi = 0; fi < findings.length; fi++) {
+    var f = findings[fi];
+    var dot = f.icon === "red" ? "#ef4444" : f.icon === "yellow" ? "#f59e0b" : "#22c55e";
+    html += "<div class=\"finding-card\">";
+    html += "<div class=\"finding-head\"><span class=\"finding-dot\" style=\"background:" + dot + "\"></span>";
+    html += "<span class=\"finding-title\">" + escHtml(f.title) + "</span>";
+    html += "<span class=\"finding-value\">" + escHtml(f.value) + "</span></div>";
+    html += "<div class=\"finding-detail\">" + escHtml(f.detail) + "</div>";
+    html += "</div>";
+  }
+  if (el.innerHTML !== html) el.innerHTML = html;
 }
 fetchUsageJsonOnce();
 connectUsageStream();
