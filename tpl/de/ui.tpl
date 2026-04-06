@@ -263,5 +263,13 @@
   "proxyDSOutput": "Output",
   "proxyDSAvgLatency": "Avg Latenz (ms)",
   "proxyDSMinLatency": "Min",
-  "proxyDSMaxLatency": "Max"
+  "proxyDSMaxLatency": "Max",
+  "proxyHourlyTitle": "Requests pro Stunde (heute)",
+  "proxyHourlyBlurb": "Balkenhoehe = Requests in dieser Stunde. Intensitaet zeigt relative Last. Luecken = keine API-Aktivitaet. Haeufungen in Spitzenzeiten korrelieren oft mit Rate-Limit-Drosselung.",
+  "proxyModelTitle": "Modell- & Status-Aufschluesselung",
+  "proxyModelBlurb": "Links: Requests pro Modell (Balken) mit Avg-Latenz-Overlay (Linie). Rechts: HTTP-Statuscode-Verteilung — 429 = Rate Limited, 5xx = Serverfehler.",
+  "proxyInvisibleCostNote": "Unsichtbare Kosten: {visible} sichtbare Tokens, {cache} Cache-Tokens, {perPct} sichtbare Tokens pro 1% Quota — Thinking-Tokens werden hier nicht gezaehlt.",
+  "proxyDSRequestsPerHour": "Requests",
+  "proxyDSModelRequests": "Requests",
+  "proxyDSModelLatency": "Avg Latenz"
 }
