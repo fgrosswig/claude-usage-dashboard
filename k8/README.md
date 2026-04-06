@@ -89,6 +89,20 @@ Instanz: [ci.grosswig-it.de — Repo #3](https://ci.grosswig-it.de/repos/3) · [
 
 **Woodpecker-Secrets:** `harbor_user`, `harbor_password`, `kube_url`, `kube_token`.
 
+**Harbor-Robot in Woodpecker (Kaniko):** Die YAML-Datei enthält **keine** Zugangsdaten. Kaniko bekommt Login ausschließlich aus **`harbor_user`** und **`harbor_password`**. Trage dort exakt die Werte aus der Robot-JSON ein (lokal z. B. `robot$claude+developer.json`, Felder **`name`** und **`secret`**):
+
+```bash
+ROBOT_JSON='k8/claude-usage-dashboard/robot$claude+developer.json'
+jq -r '.name, .secret' "$ROBOT_JSON"
+```
+
+- **`harbor_user`** = kompletter Robot-Name (z. B. `robot$claude+developer` — inkl. `$`, keine Leerzeichen).
+- **`harbor_password`** = Wert von **`secret`** (einmalig beim Anlegen; bei Verlust neuen Robot/Secret in Harbor erzeugen).
+
+In **Harbor** muss der Robot für das Projekt **`claude`** Rechte zum **Push** ins Repository **`claude-usage-dashboard`** haben. Meldung **`UNAUTHORIZED` … action: push** heißt fast immer: falsche Secrets in Woodpecker, abgelaufener Robot, oder Robot ohne Push-Berechtigung auf genau dieses Repo — nicht „die Pipeline hat den Robot nicht genutzt“, sondern **Woodpecker muss mit Robot-Daten gefüttert sein**.
+
+**Base Image Connector / Docker Hub:** Das `Dockerfile` nutzt `FROM node:22-alpine` (Docker Hub). Harbor warnt vor Rate-Limits; optional Base-Image über euren Harbor-Proxy spiegeln (siehe **05-harbor.md** / „Base Image Connector“) — unabhängig vom Push-`UNAUTHORIZED`, das reine Registry-Auth betrifft.
+
 **Auslöser `app.yml`:** Push auf genannte Branches, **Tag**, **Deployment**, **manuell** — nicht PR (dafür `pr.yml`).
 
 Ablauf: `node --check` → Helm lint/template → **build-push** (Kaniko) → `harbor.grosswig-it.de/claude/claude-usage-dashboard` (`:latest`, `:<sha8>`) → bei **Deployment**/**manuell** **`helm upgrade --install`** mit `imagePullSecrets: harbor-pull`.

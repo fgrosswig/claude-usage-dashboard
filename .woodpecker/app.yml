@@ -30,6 +30,7 @@ steps:
       - helm lint k8/claude-usage-dashboard
       - helm template woodpecker-smoke k8/claude-usage-dashboard >/dev/null
 
+  # Auth: Woodpecker-Secrets = Harbor-Robot (JSON-Felder name + secret), Push-Recht Projekt claude.
   - name: build-push
     image: plugins/kaniko
     settings:
