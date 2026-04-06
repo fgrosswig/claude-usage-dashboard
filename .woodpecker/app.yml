@@ -39,7 +39,8 @@ steps:
         from_secret: harbor_password
 
   - name: deploy
-    image: bitnami/kubectl:1.31
+    # Kein :1.31 — auf Docker Hub fehlt der Kurz-Tag oft (manifest unknown); wie SCHUFA ohne Tag = rolling latest
+    image: bitnami/kubectl
     commands:
       - |
         set -eux
