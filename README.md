@@ -21,11 +21,11 @@ node claude-usage-dashboard.js
 ### Optionen
 
 ```bash
-node claude-usage-dashboard.js --port=4444 --refresh=15
+node claude-usage-dashboard.js --port=4444 --refresh=300
 ```
 
 - **`--port`**: HTTP-Port (Standard `3333`).
-- **`--refresh`**: Sekunden bis zum nächsten Scan + SSE-Push (Minimum `5`, Standard `30`).
+- **`--refresh`**: Sekunden bis zum **nächsten vollen Daten-Scan** (alle JSONL) + SSE-Push — **Minimum `60`**, Standard **`180`**. Kürzere Werte verursachen ständiges Neu-Einlesen („tanzen“). Alternativ Umgebungsvariable **`CLAUDE_USAGE_SCAN_INTERVAL_SEC`** (≥ 60); `--refresh` setzt sie außer Kraft.
 
 ### Live-Updates
 
@@ -42,7 +42,8 @@ node claude-usage-dashboard.js --port=4444 --refresh=15
 ### Tages-Cache (Vortage in einer JSON)
 
 - Datei: **`~/.claude/usage-dashboard-days.json`**
-- Wenn **Cache-Version**, **Scan-Wurzeln** und **Anzahl** der `.jsonl`-Dateien passen, werden **Vortage** aus dieser Datei geladen und aus den Logs nur noch der **lokale Kalendertag „heute“** voll mitgezählt (schnellere Refreshes). Pro-Tag-**`hosts`** sind ab Cache-Version **3** enthalten.
+- Wenn **Cache-Version**, **Scan-Wurzeln** und **Anzahl** der `.jsonl`-Dateien passen, werden **Vortage** aus dieser Datei geladen und aus den Logs nur noch der **lokale Kalendertag „heute“** voll mitgezählt (schnellere Refreshes). Liegt der jüngste gecachte Tag **vor gestern** (lokal), wird ein **Vollscan** erzwungen (lückenhafte Tage / fehlende Extension-Marker). Pro-Tag-**`hosts`** sind ab Cache-Version **3** enthalten; **Version 4** invalidiert alte Caches einmalig.
+- Im aufgeklappten **Meta-Block** werden die Pfade zu **Tages-Cache**, **Releases**, **Marketplace** und **Outage-JSON** angezeigt.
 - **Vollscan** erzwingen: Umgebung **`CLAUDE_USAGE_NO_CACHE=1`** (oder `true`), **oder** Cache-Datei löschen, **oder** neue/entfernte `.jsonl` (andere Dateianzahl), **oder** andere **`CLAUDE_USAGE_EXTRA_BASES`** / andere Scan-Wurzeln (Cache enthält `scan_roots_key`).
 
 ### Weitere Rechner / importierte Logs (`CLAUDE_USAGE_EXTRA_BASES`)
@@ -141,6 +142,13 @@ node token_forensics.js
 
 - **`GET /`**: HTML-Dashboard.
 - **`GET /api/usage`**: JSON mit u. a. `days` (pro Tag `hosts`), `host_labels`, `calendar_today`, `day_cache_mode`, `scanning`, `parsed_files`, `scanned_files`, `scan_sources`, `forensic_*`.
+
+### Extension-Updates (Service-Impact-Chart & Report)
+
+- **Kalenderdatum der Marker:** Primär **VS Code Marketplace** ([Version History](https://marketplace.visualstudio.com/items?itemName=anthropic.claude-code&ssr=false#version-history)): `lastUpdated`, je Semver das **späteste** Datum über alle Plattform-Vsix (entspricht eher der „Last Updated“-Anzeige in VS Code; früher war Minimum und konnte den Marker einen UTC-Tag zu früh setzen). Das Datum wird wie die JSONL-Tage als **UTC-Kalendertag** (`YYYY-MM-DD` aus dem ISO-Zeitstempel) behandelt — gleiche Logik wie `timestamp.slice(0,10)` bei `…Z`. Cache: **`%USERPROFILE%\.claude\claude-code-marketplace-versions.json`** (nicht der Projektordner).
+- **Changelog-Zeilen:** **GitHub Releases** (bis zu 100 Einträge pro Fetch), gecacht unter **`%USERPROFILE%\.claude\claude-code-releases.json`**. **Datum** kommt aus dem Merge **Marketplace ∪ GitHub** (Marketplace setzt das Release-Datum, GitHub füllt fehlende Versionen auf, falls der Marketplace-Cache alt oder unvollständig war). Sonst JSONL-Fallback. (Cache-Dateien unter `.claude` im Profil ablegen.)
+- **Version aus JSONL:** Für den Fallback und für Modell-/Host-Auswertung werden dieselben Felder wie oben auf **`Major.Minor.Patch`** normalisiert.
+- Wenn ältere Tages-Caches noch **nicht normalisierte** Versions-Strings enthalten, einmal **Vollscan** auslösen (`CLAUDE_USAGE_NO_CACHE=1` oder Tages-Cache löschen).
 
 ### Screenshots
 

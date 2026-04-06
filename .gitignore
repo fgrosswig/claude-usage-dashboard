@@ -5,6 +5,7 @@
 test_node*.js
 _chk.json 
 _usage_check.json
+claude-code-releases.json
 
 # Falls später npm/yarn genutzt wird
 node_modules/
@@ -21,3 +22,4 @@ Desktop.ini
 
 # Sonstiges
 *.log
+

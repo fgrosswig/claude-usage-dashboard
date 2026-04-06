@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Claude Code Token Usage Dashboard — standalone, zero dependencies
-// Usage: node claude-usage-dashboard.js [--port=3333]
+// Usage: node claude-usage-dashboard.js [--port=3333] [--refresh=SEK]
+// --refresh = voller Daten-Scan + SSE (Standard 180s, Minimum 60s). Kurze Werte lesen alle JSONL unnötig oft neu ein.
 // Tages-Cache: ~/.claude/usage-dashboard-days.json (Vortage). Bei passender jsonl-Anzahl nur noch „heute“ aus JSONL.
 // Vollscan erzwingen: CLAUDE_USAGE_NO_CACHE=1  oder  Cache-Datei löschen / neue .jsonl-Datei ändert die Anzahl.
 
@@ -11,18 +12,24 @@ var path = require('path');
 var os = require('os');
 
 var PORT = 3333;
-var REFRESH_SEC = 30;
+var REFRESH_SEC = 180;
+(function () {
+  var e = process.env.CLAUDE_USAGE_SCAN_INTERVAL_SEC;
+  if (!e) return;
+  var n = parseInt(e, 10);
+  if (!isNaN(n) && n >= 60) REFRESH_SEC = n;
+})();
 process.argv.forEach(function(a) {
   var m = a.match(/--port=(\d+)/);
   if (m) PORT = parseInt(m[1]);
   var r = a.match(/--refresh=(\d+)/);
-  if (r) REFRESH_SEC = Math.max(5, parseInt(r[1]));
+  if (r) REFRESH_SEC = Math.max(60, parseInt(r[1]));
 });
 
 var HOME = process.env.USERPROFILE || process.env.HOME || os.homedir();
 var BASE = path.join(HOME, '.claude', 'projects');
 // Vor-Tage als ein JSON (unter ~/.claude); JSONL wird nur noch für den lokalen Kalendertag „heute” voll geparst.
-var USAGE_DAY_CACHE_VERSION = 3;
+var USAGE_DAY_CACHE_VERSION = 4;
 var USAGE_DAY_CACHE_FILE = path.join(HOME, '.claude', 'usage-dashboard-days.json');
 
 // ── Anthropic Outage Data (status.claude.com) ─────────────────────────────
@@ -30,7 +37,12 @@ var OUTAGE_API_URL = 'https://status.claude.com/api/v2/incidents.json';
 var OUTAGE_REFRESH_MS = 5 * 60 * 1000;
 var OUTAGE_DISK_CACHE = path.join(HOME, '.claude', 'usage-dashboard-outages.json');
 var RELEASES_CACHE = path.join(HOME, '.claude', 'claude-code-releases.json');
-var RELEASES_API_URL = 'https://api.github.com/repos/anthropics/claude-code/releases?per_page=30';
+var RELEASES_API_URL = 'https://api.github.com/repos/anthropics/claude-code/releases?per_page=100';
+// VS Code Marketplace (offizielle Extension-Version History) — API-Flag 0x1 = alle Versionen; 0x200 würde auf „nur letzte“ kürzen.
+var MARKETPLACE_CACHE = path.join(HOME, '.claude', 'claude-code-marketplace-versions.json');
+var MARKETPLACE_QUERY_URL = 'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery';
+var MARKETPLACE_EXTENSION_ID = 'anthropic.claude-code';
+var MARKETPLACE_QUERY_FLAGS = 0x1;
 
 // Releases laden (Disk-Cache oder frisch fetchen)
 var releasesCache = { releases: [], fetchedAt: 0 };
@@ -38,6 +50,15 @@ try {
   var diskRel = JSON.parse(fs.readFileSync(RELEASES_CACHE, 'utf8'));
   if (Array.isArray(diskRel)) releasesCache.releases = diskRel;
 } catch (e) {}
+
+var marketplaceVersionsCache = { items: [], fetchedAt: 0 };
+try {
+  var diskMp = JSON.parse(fs.readFileSync(MARKETPLACE_CACHE, 'utf8'));
+  if (diskMp && Array.isArray(diskMp.versions)) {
+    marketplaceVersionsCache.items = diskMp.versions;
+    marketplaceVersionsCache.fetchedAt = diskMp.fetchedAt || 0;
+  }
+} catch (eMp) {}
 
 function refreshReleasesCache() {
   httpsGetJson(RELEASES_API_URL, function (err, data) {
@@ -48,25 +69,370 @@ function refreshReleasesCache() {
   });
 }
 
-/** Liefert Map: version-string -> { tag, date, highlights (erste 3 Zeilen aus body) } */
+/** "v2.1.87", "2.1.87", "…2.1.87…" -> "2.1.87" (GitHub-Release-Keys) */
+function normalizeCliSemver(s) {
+  if (s == null || s === '') return '';
+  var m = String(s).match(/\d+\.\d+\.\d+/);
+  return m ? m[0] : '';
+}
+
+function semverCmp(a, b) {
+  var pa = String(a).split('.');
+  var pb = String(b).split('.');
+  for (var i = 0; i < 3; i++) {
+    var na = parseInt(pa[i], 10) || 0;
+    var nb = parseInt(pb[i], 10) || 0;
+    if (na < nb) return -1;
+    if (na > nb) return 1;
+  }
+  return 0;
+}
+
+function pad2Cal(n) {
+  var x = typeof n === 'number' ? n : parseInt(n, 10);
+  return x < 10 ? '0' + x : String(x);
+}
+
+/** Kalendertag in lokaler Zeitzone (u. a. Anzeige). */
+function isoToLocalYmd(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.getFullYear() + '-' + pad2Cal(d.getMonth() + 1) + '-' + pad2Cal(d.getDate());
+}
+
+/**
+ * UTC-Datum YYYY-MM-DD — gleiche Semantik wie JSONL `timestamp.slice(0, 10)` bei ISO mit Z.
+ * Extension-Marker müssen damit gebucht werden, sonst fehlen sie in US-Zeitzonen (Local vs. UTC).
+ */
+function isoToUtcYmd(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0, 10);
+}
+
+function extractReleaseHighlights(body) {
+  var highlights = [];
+  var lines = String(body || '').split('\n');
+  for (var li = 0; li < lines.length && highlights.length < 5; li++) {
+    var ln = lines[li].replace(/^[\s\-*]+/, '').trim();
+    if (ln.length > 10 && ln.indexOf('#') !== 0) highlights.push(ln);
+  }
+  return highlights;
+}
+
+/** CLI-/Extension-Version aus JSONL-Zeile (Root oder message). */
+function extractCliVersion(rec) {
+  if (!rec || typeof rec !== 'object') return '';
+  var msg = rec.message;
+  var cand =
+    rec.version ||
+    rec.cli_version ||
+    rec.claude_code_version ||
+    rec.extension_version ||
+    (msg &&
+      (msg.cli_version ||
+        msg.extension_version ||
+        msg.client_version ||
+        msg.claude_code_version ||
+        msg.version)) ||
+    '';
+  return normalizeCliSemver(cand);
+}
+
+/** Liefert Map: normalisierte Version "2.1.87" -> { tag, date, highlights } */
 function getReleasesMap() {
+  if (!releasesCache.releases || releasesCache.releases.length === 0) {
+    try {
+      var diskR = JSON.parse(fs.readFileSync(RELEASES_CACHE, 'utf8'));
+      if (Array.isArray(diskR)) releasesCache.releases = diskR;
+    } catch (eRel) {}
+  }
   var map = {};
   var rels = releasesCache.releases;
   for (var i = 0; i < rels.length; i++) {
     var r = rels[i];
-    var ver = (r.tag_name || '').replace(/^v/, '');
-    var date = (r.published_at || '').slice(0, 10);
-    var body = r.body || '';
-    // Erste 5 Change-Zeilen extrahieren
-    var lines = body.split('\n');
-    var highlights = [];
-    for (var li = 0; li < lines.length && highlights.length < 5; li++) {
-      var ln = lines[li].replace(/^[\s\-*]+/, '').trim();
-      if (ln.length > 10 && ln.indexOf('#') !== 0) highlights.push(ln);
-    }
-    if (ver) map[ver] = { tag: r.tag_name, date: date, highlights: highlights };
+    var nk = normalizeCliSemver(r.tag_name || r.name || '');
+    var date = isoToUtcYmd(r.published_at || '');
+    if (nk) map[nk] = { tag: r.tag_name, date: date, highlights: extractReleaseHighlights(r.body) };
   }
   return map;
+}
+
+function loadReleasesArrayForBuild() {
+  var rels = releasesCache.releases;
+  if (!rels || !rels.length) {
+    try {
+      var diskR = JSON.parse(fs.readFileSync(RELEASES_CACHE, 'utf8'));
+      if (Array.isArray(diskR)) rels = diskR;
+    } catch (eDisk) {}
+  }
+  return Array.isArray(rels) ? rels : [];
+}
+
+function buildByDateFromVersionTimelineItems(items) {
+  if (!items || !items.length) return null;
+  items = items.slice().sort(function (a, b) {
+    if (a.t !== b.t) return a.t - b.t;
+    return semverCmp(a.ver, b.ver);
+  });
+  var groups = [];
+  for (var k = 0; k < items.length; k++) {
+    var dk = isoToUtcYmd(items[k].when);
+    if (!dk) continue;
+    if (!groups.length) groups.push([items[k]]);
+    else {
+      var lastGrp = groups[groups.length - 1];
+      var lastDk = isoToUtcYmd(lastGrp[0].when);
+      if (lastDk === dk) lastGrp.push(items[k]);
+      else groups.push([items[k]]);
+    }
+  }
+  if (!groups.length) return null;
+  var byDate = Object.create(null);
+  for (var g = 0; g < groups.length; g++) {
+    var grp = groups[g];
+    var dk = isoToUtcYmd(grp[0].when);
+    var prevVer = g > 0 ? groups[g - 1][groups[g - 1].length - 1].ver : null;
+    var added = [];
+    var hi = [];
+    for (var u = 0; u < grp.length; u++) {
+      added.push(grp[u].ver);
+      hi = hi.concat(grp[u].highlights || []);
+    }
+    added.sort(semverCmp);
+    byDate[dk] = {
+      added: added,
+      from: prevVer,
+      highlights: hi,
+      booking_when: grp[0].when
+    };
+  }
+  expandVersionByDateLocalAliases(byDate);
+  return byDate;
+}
+
+/** Wenn UTC-Tag und lokaler Tag (Server) auseinanderfallen: gleichen Marker auch unter lokalem YMD buchen, falls frei — sonst wirkt ein 3.4.-Release „hinter“ 1.4. nur auf 4.4.-Balken oder fehlt. */
+function expandVersionByDateLocalAliases(byDate) {
+  var initial = Object.keys(byDate);
+  for (var i = 0; i < initial.length; i++) {
+    var dk = initial[i];
+    var ch = byDate[dk];
+    var w = ch && ch.booking_when;
+    if (!w) continue;
+    var utcDk = isoToUtcYmd(w);
+    var locDk = isoToLocalYmd(w);
+    if (!locDk || locDk === utcDk) continue;
+    if (!byDate[locDk] || byDate[locDk] === ch) {
+      byDate[locDk] = ch;
+    }
+  }
+}
+
+function applyVersionChangeByDateMap(result, byDate) {
+  if (!byDate) return false;
+  var kc = 0;
+  for (var kk in byDate) {
+    if (Object.prototype.hasOwnProperty.call(byDate, kk)) kc++;
+  }
+  if (!kc) return false;
+  for (var ri = 0; ri < result.length; ri++) {
+    result[ri].version_change = null;
+  }
+  for (var ri2 = 0; ri2 < result.length; ri2++) {
+    var ch = byDate[result[ri2].date];
+    if (ch) {
+      var bw = ch.booking_when || '';
+      result[ri2].version_change = {
+        added: ch.added,
+        from: ch.from,
+        highlights: ch.highlights,
+        release_when: bw,
+        release_utc_ymd: bw ? isoToUtcYmd(bw) : '',
+        release_local_ymd: bw ? isoToLocalYmd(bw) : ''
+      };
+    }
+  }
+  return true;
+}
+
+function buildGitHubVersionTimelineItems() {
+  var rels = loadReleasesArrayForBuild();
+  var items = [];
+  for (var i = 0; i < rels.length; i++) {
+    var r = rels[i];
+    var ver = normalizeCliSemver(r.tag_name || r.name || '');
+    if (!ver || !r.published_at) continue;
+    var t = new Date(r.published_at).getTime();
+    if (isNaN(t)) continue;
+    items.push({
+      ver: ver,
+      t: t,
+      when: r.published_at,
+      highlights: extractReleaseHighlights(r.body)
+    });
+  }
+  return items;
+}
+
+/**
+ * Pro Semver **spätestes** lastUpdated über alle Plattform-Vsix.
+ * Früher: Minimum — ein früher Build konnte den Marker auf den Vortag (UTC) legen, während VS Code
+ * „Last Updated“ zum letzten Upload passt (z. B. 2.1.92 → eher 4.4. statt 3.4.).
+ */
+function dedupeMarketplaceVersionsByVersion(rawVers) {
+  var by = Object.create(null);
+  for (var i = 0; i < rawVers.length; i++) {
+    var v = rawVers[i];
+    var ver = normalizeCliSemver(v.version || '');
+    if (!ver || !v.lastUpdated) continue;
+    var t = new Date(v.lastUpdated).getTime();
+    if (isNaN(t)) continue;
+    if (!by[ver] || t > by[ver].t) {
+      by[ver] = { ver: ver, lastUpdated: v.lastUpdated, t: t };
+    }
+  }
+  var keys = Object.keys(by).sort(semverCmp);
+  var out = [];
+  for (var j = 0; j < keys.length; j++) {
+    out.push({ ver: keys[j], lastUpdated: by[keys[j]].lastUpdated });
+  }
+  return out;
+}
+
+function loadMarketplaceVersionsForBuild() {
+  var arr = marketplaceVersionsCache.items;
+  if (!arr || !arr.length) {
+    try {
+      var disk = JSON.parse(fs.readFileSync(MARKETPLACE_CACHE, 'utf8'));
+      if (disk && Array.isArray(disk.versions)) {
+        marketplaceVersionsCache.items = disk.versions;
+        arr = disk.versions;
+      }
+    } catch (eDisk) {}
+  }
+  return Array.isArray(arr) ? arr : [];
+}
+
+/** Einmal pro Scan: verhindert Marker-Sprünge (z. B. 3.4. sichtbar, nach Scan weg), wenn parallel refreshMarketplace den Cache ersetzt. */
+function snapshotMarketplaceRowsForScan() {
+  var cur = marketplaceVersionsCache.items;
+  if (cur && cur.length) return cur.slice();
+  try {
+    var disk = JSON.parse(fs.readFileSync(MARKETPLACE_CACHE, 'utf8'));
+    if (disk && Array.isArray(disk.versions)) return disk.versions.slice();
+  } catch (e) {}
+  return undefined;
+}
+
+/**
+ * Snapshot (Scan-Start) mit aktuellem Marketplace-Stand zusammenführen — pro Semver der neueste lastUpdated.
+ * Ohne das: erster Scan startet sofort, refreshMarketplace läuft async → eingefrorene Zeilen ohne neue Releases;
+ * Extension-Marker fehlen dann für Tage ab z. B. 1.4.
+ */
+function readMarketplaceVersionsDisk() {
+  try {
+    var disk = JSON.parse(fs.readFileSync(MARKETPLACE_CACHE, 'utf8'));
+    if (disk && Array.isArray(disk.versions) && disk.versions.length) return disk.versions;
+  } catch (e) {}
+  return null;
+}
+
+function mergeMarketplaceRowsPreferNewer(frozenMpRows) {
+  var live = loadMarketplaceVersionsForBuild();
+  var diskRows = readMarketplaceVersionsDisk();
+  var rowsList = [];
+  if (frozenMpRows != null && frozenMpRows.length) rowsList.push(frozenMpRows);
+  if (live && live.length) rowsList.push(live);
+  if (diskRows && diskRows.length) rowsList.push(diskRows);
+  if (rowsList.length === 0) return [];
+  if (rowsList.length === 1) return rowsList[0].slice();
+  var byVer = Object.create(null);
+  for (var rli = 0; rli < rowsList.length; rli++) {
+    var rows = rowsList[rli];
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var ver = row.ver || normalizeCliSemver(row.version || '');
+      if (!ver || !row.lastUpdated) continue;
+      var t = new Date(row.lastUpdated).getTime();
+      if (isNaN(t)) continue;
+      var ex = byVer[ver];
+      if (!ex || t > ex.t) byVer[ver] = { row: row, t: t };
+    }
+  }
+  var keys = Object.keys(byVer).sort(semverCmp);
+  var out = [];
+  for (var j = 0; j < keys.length; j++) out.push(byVer[keys[j]].row);
+  return out;
+}
+
+function buildMarketplaceVersionTimelineItems() {
+  var rows = loadMarketplaceVersionsForBuild();
+  var relMap = getReleasesMap();
+  var items = [];
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var ver = row.ver || normalizeCliSemver(row.version || '');
+    if (!ver || !row.lastUpdated) continue;
+    var t = new Date(row.lastUpdated).getTime();
+    if (isNaN(t)) continue;
+    var hi = [];
+    var rm = relMap[ver];
+    if (rm && rm.highlights) hi = hi.concat(rm.highlights);
+    items.push({ ver: ver, t: t, when: row.lastUpdated, highlights: hi });
+  }
+  return items;
+}
+
+/**
+ * GitHub + Marketplace zusammenführen: Datum bevorzugt Marketplace (offiziell), fehlende Versionen
+ * kommen von GitHub — verhindert „Abbruch“ nach z. B. 27.3., wenn der Marketplace-Cache alt/kurz war.
+ */
+function buildMergedExtensionTimelineItems(frozenMpRows) {
+  var relMap = getReleasesMap();
+  var byVer = Object.create(null);
+  var ghItems = buildGitHubVersionTimelineItems();
+  for (var gi = 0; gi < ghItems.length; gi++) {
+    var g = ghItems[gi];
+    var ghHi = g.highlights && g.highlights.length ? g.highlights.slice() : [];
+    byVer[g.ver] = { ver: g.ver, t: g.t, when: g.when, highlights: ghHi };
+  }
+  var frozenArg = arguments.length >= 1 ? frozenMpRows : undefined;
+  var rows =
+    frozenArg !== undefined
+      ? mergeMarketplaceRowsPreferNewer(frozenArg)
+      : loadMarketplaceVersionsForBuild();
+  for (var ri = 0; ri < rows.length; ri++) {
+    var row = rows[ri];
+    var ver = row.ver || normalizeCliSemver(row.version || '');
+    if (!ver || !row.lastUpdated) continue;
+    var t = new Date(row.lastUpdated).getTime();
+    if (isNaN(t)) continue;
+    var hi = [];
+    var rm = relMap[ver];
+    if (rm && rm.highlights) hi = hi.concat(rm.highlights);
+    var prev = byVer[ver];
+    if ((!hi || !hi.length) && prev && prev.highlights && prev.highlights.length) {
+      hi = prev.highlights.slice();
+    }
+    byVer[ver] = { ver: ver, t: t, when: row.lastUpdated, highlights: hi };
+  }
+  var out = [];
+  for (var vk in byVer) {
+    if (Object.prototype.hasOwnProperty.call(byVer, vk)) out.push(byVer[vk]);
+  }
+  return out;
+}
+
+/**
+ * Extension-Marker: Merge Marketplace + GitHub; JSONL-Fallback im Aufrufer.
+ * Marketplace-API: https://marketplace.visualstudio.com/items?itemName=anthropic.claude-code (Version History).
+ */
+function applyExtensionVersionMarkers(result, frozenMpRows) {
+  var items = buildMergedExtensionTimelineItems(frozenMpRows);
+  var byDate = buildByDateFromVersionTimelineItems(items);
+  return !!(byDate && applyVersionChangeByDateMap(result, byDate));
 }
 var outageCache = { incidents: [], fetchedAt: 0, error: null };
 
@@ -93,6 +459,86 @@ function httpsGetJson(url, cb) {
     });
   }).on('error', function (e) { cb(e, null); })
     .setTimeout(10000, function () { this.destroy(); cb(new Error('timeout'), null); });
+}
+
+function httpsPostJson(postUrl, jsonBody, cb) {
+  var parsed;
+  try {
+    parsed = new URL(postUrl);
+  } catch (e) {
+    cb(e, null);
+    return;
+  }
+  var body = JSON.stringify(jsonBody);
+  var opts = {
+    hostname: parsed.hostname,
+    port: parsed.port ? Number(parsed.port) : 443,
+    path: parsed.pathname + parsed.search,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      Accept: 'application/json;api-version=7.2-preview.1',
+      'Content-Length': Buffer.byteLength(body, 'utf8')
+    }
+  };
+  var req = https.request(opts, function (res) {
+    var chunks = [];
+    res.on('data', function (c) {
+      chunks.push(c);
+    });
+    res.on('end', function () {
+      try {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          cb(new Error('HTTP ' + res.statusCode), null);
+          return;
+        }
+        cb(null, JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      } catch (e) {
+        cb(e, null);
+      }
+    });
+  });
+  req.on('error', function (e) {
+    cb(e, null);
+  });
+  req.setTimeout(15000, function () {
+    req.destroy();
+    cb(new Error('timeout'), null);
+  });
+  req.write(body);
+  req.end();
+}
+
+function refreshMarketplaceExtensionCache() {
+  var payload = {
+    filters: [{ criteria: [{ filterType: 7, value: MARKETPLACE_EXTENSION_ID }], pageNumber: 1, pageSize: 1 }],
+    flags: MARKETPLACE_QUERY_FLAGS
+  };
+  httpsPostJson(MARKETPLACE_QUERY_URL, payload, function (err, data) {
+    if (err || !data || !data.results || !data.results[0] || !data.results[0].extensions || !data.results[0].extensions[0]) {
+      return;
+    }
+    var ext = data.results[0].extensions[0];
+    var vers = ext.versions;
+    if (!Array.isArray(vers)) return;
+    var deduped = dedupeMarketplaceVersionsByVersion(vers);
+    marketplaceVersionsCache.items = deduped;
+    marketplaceVersionsCache.fetchedAt = Date.now();
+    try {
+      var dir = path.dirname(MARKETPLACE_CACHE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        MARKETPLACE_CACHE,
+        JSON.stringify({ versions: deduped, fetchedAt: marketplaceVersionsCache.fetchedAt }),
+        'utf8'
+      );
+    } catch (we) {}
+    if (!marketplaceRefreshFollowupScanDone && deduped.length) {
+      marketplaceRefreshFollowupScanDone = true;
+      if (scanInProgress) scanQueued = true;
+      else runScanAndBroadcast();
+    }
+  });
 }
 
 function refreshOutageCache() {
@@ -246,12 +692,18 @@ function getScanRoots() {
   return roots;
 }
 
+/** Stabiler Schlüssel: aufgelöste Pfade, sortiert (Reihenfolge der Wurzeln darf sonst den Cache brechen). */
 function scanRootsCacheKey(roots) {
-  return roots
-    .map(function (r) {
-      return r.path;
-    })
-    .join('|');
+  var paths = [];
+  for (var ri = 0; ri < roots.length; ri++) {
+    try {
+      paths.push(path.resolve(roots[ri].path));
+    } catch (e) {
+      paths.push(String(roots[ri].path));
+    }
+  }
+  paths.sort();
+  return paths.join('|');
 }
 
 function collectTaggedJsonlFiles() {
@@ -418,6 +870,21 @@ function localCalendarTodayStr() {
   return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
 }
 
+function localYesterdayStr() {
+  var d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+}
+
+function buildDashboardStatePaths() {
+  return {
+    day_cache: displayPathForUi(USAGE_DAY_CACHE_FILE),
+    releases: displayPathForUi(RELEASES_CACHE),
+    marketplace: displayPathForUi(MARKETPLACE_CACHE),
+    outage: displayPathForUi(OUTAGE_DISK_CACHE)
+  };
+}
+
 function emptyHostSlice() {
   return {
     input: 0,
@@ -475,6 +942,14 @@ function rowToDailyEntry(row) {
       hosts[hk[i]] = hostSliceFromRow(row.hosts[hk[i]]);
     }
   }
+  var versNorm = {};
+  var versIn = row.versions && typeof row.versions === 'object' ? row.versions : {};
+  var vkeys = Object.keys(versIn);
+  for (var vi = 0; vi < vkeys.length; vi++) {
+    var nk = normalizeCliSemver(vkeys[vi]);
+    if (!nk) continue;
+    versNorm[nk] = (versNorm[nk] || 0) + (versIn[vkeys[vi]] || 0);
+  }
   return {
     input: row.input || 0,
     output: row.output || 0,
@@ -486,6 +961,7 @@ function rowToDailyEntry(row) {
     sub_output: row.sub_output || 0,
     hours: row.hours && typeof row.hours === 'object' ? row.hours : {},
     models: row.models && typeof row.models === 'object' ? row.models : {},
+    versions: versNorm,
     hit_limit: row.hit_limit || 0,
     hosts: hosts
   };
@@ -587,8 +1063,8 @@ function processJsonlFile(fileRef, daily, onlyDate) {
       dd.models[model].calls++;
       dd.models[model].output += outTok;
       dd.models[model].cache_read += crTok;
-      var ver = rec.version || '';
-      if (ver) dd.versions[ver] = (dd.versions[ver] || 0) + 1;
+      var cliVer = extractCliVersion(rec);
+      if (cliVer) dd.versions[cliVer] = (dd.versions[cliVer] || 0) + 1;
     }
   } catch (e) {}
 }
@@ -616,7 +1092,7 @@ function hostSliceToApi(h) {
   };
 }
 
-function buildUsageResult(daily, fileCount, filePaths, roots) {
+function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
   var days = Object.keys(daily).sort();
   var result = [];
   for (var di = 0; di < days.length; di++) {
@@ -684,24 +1160,30 @@ function buildUsageResult(daily, fileCount, filePaths, roots) {
     }
   }
 
-  // Version-Change-Detection (Claude Code Extension)
+  // Extension-Updates: Marketplace/GitHub nach Kalendertag; JSONL füllt Lücken (z. B. nach 27.3. wenn
+  // VSIX-Datum ≠ erster Log-Tag der neuen Version — sonst fehlen Marker trotz sichtbarer Version in den Logs).
+  var mpFrozen = buildOpts && buildOpts.marketplaceRows;
+  applyExtensionVersionMarkers(result, mpFrozen);
+  var relMapJsonl = getReleasesMap();
   for (var vci = 0; vci < result.length; vci++) {
-    var curVers = Object.keys(result[vci].versions || {}).sort();
+    if (result[vci].version_change) continue;
+    var curVers = Object.keys(result[vci].versions || {}).sort(semverCmp);
     if (vci === 0) continue;
-    var prevVers = Object.keys(result[vci - 1].versions || {}).sort();
+    var prevVers = Object.keys(result[vci - 1].versions || {}).sort(semverCmp);
     var vAdded = [];
     for (var cvi = 0; cvi < curVers.length; cvi++) {
       if (prevVers.indexOf(curVers[cvi]) < 0) vAdded.push(curVers[cvi]);
     }
-    if (vAdded.length > 0) {
-      var relMap = getReleasesMap();
-      var relHighlights = [];
-      for (var rhi = 0; rhi < vAdded.length; rhi++) {
-        var ri = relMap[vAdded[rhi]];
-        if (ri && ri.highlights) relHighlights = relHighlights.concat(ri.highlights);
-      }
-      result[vci].version_change = { added: vAdded, from: prevVers.length > 0 ? prevVers[prevVers.length - 1] : null, highlights: relHighlights };
+    if (vAdded.length === 0) continue;
+    vAdded.sort(semverCmp);
+    var relHighlights = [];
+    for (var rhi = 0; rhi < vAdded.length; rhi++) {
+      var vk = normalizeCliSemver(vAdded[rhi]);
+      var ri = vk ? relMapJsonl[vk] : null;
+      if (ri && ri.highlights) relHighlights = relHighlights.concat(ri.highlights);
     }
+    var fromVer = prevVers.length > 0 ? prevVers[prevVers.length - 1] : null;
+    result[vci].version_change = { added: vAdded, from: fromVer, highlights: relHighlights };
   }
 
   var peakDate = '';
@@ -783,7 +1265,8 @@ function buildUsageResult(daily, fileCount, filePaths, roots) {
     forensic_note_en:
       'Forensic: ? = cache \u2265500M; HIT = limit-like lines in JSONL; <<P = far below peak with high output (not Claude UI \u201c90%\u201d/100%). Impl@90% = total/0.9 is illustrative only. All heuristic.',
     outage_status: outageCache.fetchedAt > 0 ? 'ok' : (outageCache.error ? 'error' : 'pending'),
-    outage_fetched: outageCache.fetchedAt ? new Date(outageCache.fetchedAt).toISOString() : null
+    outage_fetched: outageCache.fetchedAt ? new Date(outageCache.fetchedAt).toISOString() : null,
+    state_paths: buildDashboardStatePaths()
   };
 }
 
@@ -808,21 +1291,33 @@ function parseAllUsageIncremental(done, onProgress) {
   }
   var tagged = coll.tagged;
   var roots = coll.roots;
+  var frozenMpRows = snapshotMarketplaceRowsForScan();
   var rootsKey = scanRootsCacheKey(roots);
   var noDayCache =
     process.env.CLAUDE_USAGE_NO_CACHE === '1' || process.env.CLAUDE_USAGE_NO_CACHE === 'true';
   var todayStr = localCalendarTodayStr();
   var cache = !noDayCache ? readUsageDayCache() : null;
   var useTodayOnly = false;
+  // Exakte Treffer: sonst Vollscan (neue/entfernte .jsonl oder andere Wurzeln).
   if (
     cache &&
     cache.version === USAGE_DAY_CACHE_VERSION &&
-    cache.jsonl_file_count <= tagged.length &&
+    cache.jsonl_file_count === tagged.length &&
     cache.scan_roots_key === rootsKey &&
     Array.isArray(cache.days) &&
     cache.days.length > 0
   ) {
     useTodayOnly = true;
+    var maxCached = '';
+    for (var cjx = 0; cjx < cache.days.length; cjx++) {
+      var djx = cache.days[cjx].date;
+      if (djx === todayStr) continue;
+      if (!maxCached || djx > maxCached) maxCached = djx;
+    }
+    var yStr = localYesterdayStr();
+    if (maxCached && maxCached < yStr) {
+      useTodayOnly = false;
+    }
   }
 
   var daily = {};
@@ -844,7 +1339,8 @@ function parseAllUsageIncremental(done, onProgress) {
         roots: roots,
         fi: 0,
         useTodayOnly: useTodayOnly,
-        todayStr: todayStr
+        todayStr: todayStr,
+        marketplaceRows: frozenMpRows
       });
     } catch (eProg0) {}
   }
@@ -863,14 +1359,17 @@ function parseAllUsageIncremental(done, onProgress) {
             roots: roots,
             fi: fi,
             useTodayOnly: useTodayOnly,
-            todayStr: todayStr
+            todayStr: todayStr,
+            marketplaceRows: frozenMpRows
           });
         } catch (eProg1) {}
       }
       setImmediate(tick);
     } else {
       try {
-        var result = buildUsageResult(daily, tagged.length, tagged, roots);
+        var result = buildUsageResult(daily, tagged.length, tagged, roots, {
+          marketplaceRows: frozenMpRows
+        });
         result.calendar_today = todayStr;
         result.day_cache_mode = useTodayOnly ? 'heute-jsonl+vortage-cache' : 'vollstaendiger-jsonl-scan';
         result.day_cache_mode_en = useTodayOnly
@@ -1089,6 +1588,7 @@ tr:hover td{background:#334155}\n\
 <div class="subtitle" id="meta"></div>\n\
 <div class="subtitle" id="limit-source" style="margin-top:4px;line-height:1.45"></div>\n\
 <div class="subtitle" id="scan-sources" style="margin-top:2px;color:#64748b;line-height:1.45;display:none"></div>\n\
+<div class="subtitle" id="state-cache-paths" style="margin-top:8px;padding-top:8px;border-top:1px solid #334155;color:#64748b;line-height:1.5;font-size:.62rem;white-space:pre-line;word-break:break-all"></div>\n\
 </div>\n\
 </details>\n\
 <details class="forensic-details" id="forensic-collapse">\n\
@@ -1243,6 +1743,29 @@ function applyStaticChrome() {\n\
 \n\
 var _charts = {};\n\
 var __lastUsageData = null;\n\
+function updateStatePathsRow(data) {\n\
+  var el = document.getElementById("state-cache-paths");\n\
+  if (!el) return;\n\
+  var sp = data && data.state_paths;\n\
+  if (!sp) {\n\
+    el.textContent = "";\n\
+    return;\n\
+  }\n\
+  el.textContent =\n\
+    t("statePathsTitle") +\n\
+    "\\n" +\n\
+    t("statePathDay") +\n\
+    sp.day_cache +\n\
+    "\\n" +\n\
+    t("statePathReleases") +\n\
+    sp.releases +\n\
+    "\\n" +\n\
+    t("statePathMarketplace") +\n\
+    sp.marketplace +\n\
+    "\\n" +\n\
+    t("statePathOutage") +\n\
+    sp.outage;\n\
+}\n\
 function updateScanSourcesRow(data) {\n\
   var el = document.getElementById("scan-sources");\n\
   if (!el) return;\n\
@@ -1292,7 +1815,7 @@ function updateMetaDetailsSummary(data) {\n\
   if (!sumEl) return;\n\
   var sp = data && data.scan_progress;\n\
   if (sp && sp.total > 0 && data.scanning && sp.done < sp.total) {\n\
-    sumEl.textContent = tr("metaDetailsScanProgress", { done: sp.done, total: sp.total, sec: data.refresh_sec || 30 });\n\
+    sumEl.textContent = tr("metaDetailsScanProgress", { done: sp.done, total: sp.total, sec: data.refresh_sec || 180 });\n\
     return;\n\
   }\n\
   var days = data && data.days;\n\
@@ -1303,7 +1826,7 @@ function updateMetaDetailsSummary(data) {\n\
     else sumEl.textContent = tr("metaSummaryNoUsage", { files: data.parsed_files || 0 });\n\
     return;\n\
   }\n\
-  sumEl.textContent = tr("metaDetailsSummaryLine", { files: data.parsed_files || 0, sec: data.refresh_sec || 30 });\n\
+  sumEl.textContent = tr("metaDetailsSummaryLine", { files: data.parsed_files || 0, sec: data.refresh_sec || 180 });\n\
 }\n\
 function initMetaDetailsPanel() {\n\
   var det = document.getElementById("meta-details");\n\
@@ -1322,6 +1845,7 @@ function renderDashboard(data) {\n\
   __lastUsageData = data;\n\
   updateLiveFilesPanel(data);\n\
   updateScanSourcesRow(data);\n\
+  updateStatePathsRow(data);\n\
   var days = data.days;\n\
   var sp = data.scan_progress;\n\
   var scanInc = data.scanning && sp && sp.total > 0 && sp.done < sp.total;\n\
@@ -1331,7 +1855,7 @@ function renderDashboard(data) {\n\
     window.__dashRenderDebounce = setTimeout(function () {\n\
       window.__dashRenderDebounce = null;\n\
       renderDashboardCore(__lastUsageData);\n\
-    }, 420);\n\
+    }, 2200);\n\
     return;\n\
   }\n\
   if (window.__dashRenderDebounce) {\n\
@@ -1351,10 +1875,10 @@ function renderDashboardCore(data) {\n\
     if(data.scanning){\n\
       var dps=document.getElementById("day-picker-row");if(dps)dps.style.display="none";\n\
       var sp0 = data.scan_progress;\n\
-      if (sp0 && sp0.total > 0) meta0.textContent = tr("metaScanningExpanded", { done: sp0.done, total: sp0.total, sec: data.refresh_sec || 30 });\n\
+      if (sp0 && sp0.total > 0) meta0.textContent = tr("metaScanningExpanded", { done: sp0.done, total: sp0.total, sec: data.refresh_sec || 180 });\n\
       else meta0.textContent=t("metaScanning");\n\
       var sumS=document.getElementById("forensic-summary-line");if(sumS)sumS.textContent=t("metaForensicScanning");\n\
-      var fnS=document.getElementById("forensic-note");if(fnS)fnS.textContent=tr("metaForensicNoteFirst",{sec:data.refresh_sec||30});\n\
+      var fnS=document.getElementById("forensic-note");if(fnS)fnS.textContent=tr("metaForensicNoteFirst",{sec:data.refresh_sec||180});\n\
       document.getElementById("cards").innerHTML="";\n\
       var fcS=document.getElementById("forensic-cards");if(fcS)fcS.innerHTML="";\n\
       if(_charts.cForensic){try{_charts.cForensic.destroy();}catch(e){}_charts.cForensic=null;}\n\
@@ -1383,9 +1907,9 @@ function renderDashboardCore(data) {\n\
           done: spM.done,\n\
           total: spM.total,\n\
           time: new Date(data.generated).toLocaleString(),\n\
-          sec: data.refresh_sec || 30\n\
+          sec: data.refresh_sec || 180\n\
         })\n\
-      : tr("metaParsed", { files: data.parsed_files, time: new Date(data.generated).toLocaleString(), sec: data.refresh_sec || 30 });\n\
+      : tr("metaParsed", { files: data.parsed_files, time: new Date(data.generated).toLocaleString(), sec: data.refresh_sec || 180 });\n\
   var dcm = apiNote(data,"day_cache_mode","day_cache_mode_en");\n\
   if (dcm) metaLine += " | " + dcm;\n\
   metaLine += " " + t("metaChartsHint");\n\
@@ -1567,7 +2091,7 @@ function renderDashboardCore(data) {\n\
       {label:t("chartDS_output"),data:days.map(function(d){return d.output}),backgroundColor:"rgba(59,130,246,0.9)",stack:"s"},\n\
       {label:t("chartDS_cacheCreate"),data:days.map(function(d){return d.cache_creation}),backgroundColor:"rgba(6,182,212,0.5)",stack:"s"}\n\
     ]},\n\
-    options:{responsive:true,scales:{y:{stacked:true,ticks:{callback:function(v){return fmt(v)}}},x:{stacked:true}},plugins:{tooltip:{callbacks:{label:function(c){return c.dataset.label+": "+fmt(c.raw);},footer:function(items){if(!items.length)return"";var di=items[0].dataIndex;return tr("chartTooltipCoDay",{ratio:String(days[di].cache_output_ratio)});}}}}}\n\
+    options:{responsive:true,animation:false,scales:{y:{stacked:true,ticks:{callback:function(v){return fmt(v)}}},x:{stacked:true}},plugins:{tooltip:{callbacks:{label:function(c){return c.dataset.label+": "+fmt(c.raw);},footer:function(items){if(!items.length)return"";var di=items[0].dataIndex;return tr("chartTooltipCoDay",{ratio:String(days[di].cache_output_ratio)});}}}}}\n\
   });\n\
   \n\
   var hostBarColors = ["rgba(59,130,246,0.88)","rgba(167,139,250,0.88)","rgba(52,211,153,0.88)","rgba(251,191,36,0.88)","rgba(249,115,22,0.88)","rgba(236,72,153,0.88)"];\n\
@@ -1598,7 +2122,7 @@ function renderDashboardCore(data) {\n\
       var lb0 = hLabs[hli];\n\
       dsH.push({label: lb0,data: days.map(function(d){ var x = d.hosts && d.hosts[lb0]; return x ? (x.total || 0) : 0;}),backgroundColor: hostBarColors[hli % hostBarColors.length],stack: "h"});\n\
     }\n\
-    _charts.c1hosts = new Chart(document.getElementById("c1-hosts"),{type:"bar",data:{labels:labels,datasets:dsH},options:{responsive:true,scales:{x:{stacked:true,grid:{color:"rgba(51,65,85,0.5)"}},y:{stacked:true,ticks:{callback:function(v){return fmt(v);}},grid:{color:"rgba(51,65,85,0.5)"}}},plugins:{legend:{labels:{color:"#cbd5e1"}},tooltip:{callbacks:{label:function(c){return c.dataset.label+": "+fmt(c.parsed.y);},footer:function(tipItems){if(!tipItems.length)return"";var di=tipItems[0].dataIndex;var segs=[];for(var ci=0;ci<tipItems.length;ci++){var L=tipItems[ci].dataset.label;var hh=days[di].hosts&&days[di].hosts[L];if(hh)segs.push(tr("chartTooltipCoHostLine",{host:L,ratio:String(hh.cache_output_ratio)}));}var s=0;for(var fi=0;fi<tipItems.length;fi++)s+=tipItems[fi].parsed.y||0;return(segs.length?segs.join(" · ")+" | ":"")+t("hostStackFooter")+fmt(s);}}}}}});\n\
+    _charts.c1hosts = new Chart(document.getElementById("c1-hosts"),{type:"bar",data:{labels:labels,datasets:dsH},options:{responsive:true,animation:false,scales:{x:{stacked:true,grid:{color:"rgba(51,65,85,0.5)"}},y:{stacked:true,ticks:{callback:function(v){return fmt(v);}},grid:{color:"rgba(51,65,85,0.5)"}}},plugins:{legend:{labels:{color:"#cbd5e1"}},tooltip:{callbacks:{label:function(c){return c.dataset.label+": "+fmt(c.parsed.y);},footer:function(tipItems){if(!tipItems.length)return"";var di=tipItems[0].dataIndex;var segs=[];for(var ci=0;ci<tipItems.length;ci++){var L=tipItems[ci].dataset.label;var hh=days[di].hosts&&days[di].hosts[L];if(hh)segs.push(tr("chartTooltipCoHostLine",{host:L,ratio:String(hh.cache_output_ratio)}));}var s=0;for(var fi=0;fi<tipItems.length;fi++)s+=tipItems[fi].parsed.y||0;return(segs.length?segs.join(" · ")+" | ":"")+t("hostStackFooter")+fmt(s);}}}}}});\n\
   } else {\n\
     var chw2 = document.getElementById("chart-host-wrap");\n\
     if (chw2) chw2.style.display = "none";\n\
@@ -1612,7 +2136,7 @@ function renderDashboardCore(data) {\n\
       label:t("chartLineCacheOut"),data:days.map(function(d){return d.cache_output_ratio}),\n\
       borderColor:"#f59e0b",backgroundColor:"rgba(245,158,11,0.1)",fill:true,tension:0.3\n\
     }]},\n\
-    options:{responsive:true,scales:{y:{beginAtZero:true}},plugins:{tooltip:{callbacks:{label:function(c){return c.raw+"x";},footer:function(items){if(!items.length)return"";var di=items[0].dataIndex;var d=days[di];return tr("chartTooltipOutCacheDay",{out:fmt(d.output),cache:fmt(d.cache_read)});}}}}}\n\
+    options:{responsive:true,animation:false,scales:{y:{beginAtZero:true}},plugins:{tooltip:{callbacks:{label:function(c){return c.raw+"x";},footer:function(items){if(!items.length)return"";var di=items[0].dataIndex;var d=days[di];return tr("chartTooltipOutCacheDay",{out:fmt(d.output),cache:fmt(d.cache_read)});}}}}}\n\
   });\n\
   \n\
   if (_charts.c3) { _charts.c3.destroy(); }\n\
@@ -1628,7 +2152,7 @@ function renderDashboardCore(data) {\n\
       label:t("chartOutPerHLabel"),data:days.map(function(d){return d.output_per_hour}),\n\
       backgroundColor:"rgba(34,197,94,0.7)"\n\
     }]},\n\
-    options:{responsive:true,scales:{y:{ticks:{callback:function(v){return fmt(v)}}}},plugins:{tooltip:{callbacks:{label:function(c){return fmt(c.raw)+"/h"}}}}}\n\
+    options:{responsive:true,animation:false,scales:{y:{ticks:{callback:function(v){return fmt(v)}}}},plugins:{tooltip:{callbacks:{label:function(c){return fmt(c.raw)+"/h"}}}}}\n\
   });\n\
   \n\
   var c4El = document.getElementById("c4");\n\
@@ -1653,6 +2177,7 @@ function renderDashboardCore(data) {\n\
     c4Data = { labels: labels, datasets: ds4 };\n\
     c4Opts = {\n\
       responsive: true,\n\
+      animation: false,\n\
       scales: {\n\
         x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" } },\n\
         y: { max: 100, stacked: true, ticks: { callback: function (v) { return v + "%"; } }, grid: { color: "rgba(51,65,85,0.5)" } }\n\
@@ -1686,7 +2211,7 @@ function renderDashboardCore(data) {\n\
         }\n\
       ]\n\
     };\n\
-    c4Opts = { responsive: true, scales: { y: { max: 100, ticks: { callback: function (v) { return v + "%"; } } } }, plugins: { tooltip: { callbacks: { label: function (c) { return c.raw + "%"; } } } } };\n\
+    c4Opts = { responsive: true, animation: false, scales: { y: { max: 100, ticks: { callback: function (v) { return v + "%"; } } } }, plugins: { tooltip: { callbacks: { label: function (c) { return c.raw + "%"; } } } } };\n\
   }\n\
   _charts.c4 = new Chart(c4El, { type: "bar", data: c4Data, options: c4Opts });\n\
   \n\
@@ -1818,6 +2343,7 @@ function renderDashboardCore(data) {\n\
       },\n\
       options:{\n\
         responsive:true,\n\
+        animation:false,\n\
         maintainAspectRatio:true,\n\
         aspectRatio:2.4,\n\
         interaction:{mode:"index",intersect:false},\n\
@@ -1894,8 +2420,10 @@ function renderDashboardCore(data) {\n\
     if(_charts.cService){try{_charts.cService.destroy();}catch(e){}}\n\
     var mcSvc=[],vcSvc=[];\n\
     for(var mi=0;mi<days.length;mi++){\n\
-      if(days[mi].model_change)mcSvc.push({x:mi,y:0});\n\
-      if(days[mi].version_change)vcSvc.push({x:mi,y:0.5});\n\
+      var stackTopSvc=sClean[mi]+sAffServer[mi]+sAffClient[mi]+sOutOnly[mi];\n\
+      var xCat=labels[mi];\n\
+      if(days[mi].model_change)mcSvc.push({x:xCat,y:stackTopSvc+0.25});\n\
+      if(days[mi].version_change)vcSvc.push({x:xCat,y:stackTopSvc+0.5});\n\
     }\n\
     _charts.cService=new Chart(elS,{\n\
       data:{\n\
@@ -1936,25 +2464,25 @@ function renderDashboardCore(data) {\n\
             type:"scatter",label:t("forensicDS_modelChange"),\n\
             data:mcSvc,pointStyle:"rectRot",pointRadius:6,\n\
             pointBackgroundColor:"#22d3ee",pointBorderColor:"#06b6d4",pointBorderWidth:2,\n\
-            yAxisID:"y",showLine:false\n\
+            yAxisID:"y",showLine:false,clip:false,parsing:{xAxisKey:"x",yAxisKey:"y"}\n\
           },\n\
           {\n\
             type:"scatter",label:t("serviceDS_versionChange"),\n\
-            data:vcSvc,pointStyle:"triangle",pointRadius:7,\n\
+            data:vcSvc,pointStyle:"triangle",pointRadius:8,\n\
             pointBackgroundColor:"#4ade80",pointBorderColor:"#16a34a",pointBorderWidth:2,\n\
-            yAxisID:"y",showLine:false\n\
+            yAxisID:"y",showLine:false,clip:false,parsing:{xAxisKey:"x",yAxisKey:"y"}\n\
           }\n\
         ]\n\
       },\n\
       options:{\n\
-        responsive:true,maintainAspectRatio:true,aspectRatio:2.4,\n\
+        responsive:true,animation:false,maintainAspectRatio:true,aspectRatio:2.4,\n\
         interaction:{mode:"index",intersect:false},\n\
         scales:{\n\
-          x:{stacked:true,grid:{color:"rgba(51,65,85,0.5)"}},\n\
+          x:{type:"category",stacked:true,grid:{color:"rgba(51,65,85,0.5)"}},\n\
           y:{stacked:true,position:"left",beginAtZero:true,\n\
             title:{display:true,text:t("serviceAxisHours"),color:"#94a3b8"},\n\
             ticks:{color:"#94a3b8",stepSize:4,callback:function(v){return v+"h";}},\n\
-            grid:{color:"rgba(51,65,85,0.5)"}},\n\
+            grid:{color:"rgba(51,65,85,0.5)"},grace:"10%"},\n\
           yCR:{position:"right",beginAtZero:true,\n\
             title:{display:true,text:t("chartDS_cacheRead"),color:"#8b5cf6"},\n\
             ticks:{color:"#8b5cf6",callback:function(v){return fmt(v);}},\n\
@@ -1964,10 +2492,18 @@ function renderDashboardCore(data) {\n\
           legend:{labels:{color:"#cbd5e1"}},\n\
           tooltip:{\n\
             callbacks:{\n\
-              title:function(items){return items.length?days[items[0].dataIndex].date:"";},\n\
+              title:function(items){\n\
+                if(!items.length)return"";\n\
+                var rawT=items[0].raw;\n\
+                var diT=items[0].dataIndex;\n\
+                if(rawT&&typeof rawT==="object"&&typeof rawT.x==="string"){var ixT=labels.indexOf(rawT.x);if(ixT>=0)diT=ixT;}\n\
+                return days[diT]?days[diT].date:"";\n\
+              },\n\
               afterBody:function(items){\n\
                 if(!items.length)return"";\n\
+                var rawB=items[0].raw;\n\
                 var di=items[0].dataIndex;\n\
+                if(rawB&&typeof rawB==="object"&&typeof rawB.x==="string"){var ixB=labels.indexOf(rawB.x);if(ixB>=0)di=ixB;}\n\
                 var d=days[di];\n\
                 var lines=[];\n\
                 lines.push(t("serviceDS_cleanWork")+": "+sClean[di]+"h");\n\
@@ -1989,6 +2525,12 @@ function renderDashboardCore(data) {\n\
                   if(d.version_change.from)vl+=d.version_change.from+" \\u2192 ";\n\
                   vl+=d.version_change.added.join(", ");\n\
                   lines.push(vl);\n\
+                  var rw=d.version_change.release_when;\n\
+                  if(rw){\n\
+                    lines.push(t("serviceTooltipReleaseClock")+String(rw));\n\
+                    if(d.version_change.release_utc_ymd)lines.push(t("serviceTooltipReleaseUtc")+d.version_change.release_utc_ymd);\n\
+                    if(d.version_change.release_local_ymd&&d.version_change.release_local_ymd!==d.version_change.release_utc_ymd)lines.push(t("serviceTooltipReleaseLocal")+d.version_change.release_local_ymd);\n\
+                  }\n\
                   var vhl=d.version_change.highlights||[];\n\
                   for(var vhi=0;vhi<Math.min(3,vhl.length);vhi++) lines.push("  \\u2022 "+vhl[vhi].slice(0,80));\n\
                 }\n\
@@ -2339,7 +2881,8 @@ function makeStubCachedData() {
     day_cache_mode_en: '',
     scanned_files: [],
     scan_sources: [],
-    host_labels: ['local']
+    host_labels: ['local'],
+    state_paths: buildDashboardStatePaths()
   };
 }
 
@@ -2347,6 +2890,7 @@ var cachedData = makeStubCachedData();
 var sseClients = [];
 var scanInProgress = false;
 var scanQueued = false;
+var marketplaceRefreshFollowupScanDone = false;
 
 function broadcastSse() {
   if (!cachedData) return;
@@ -2374,7 +2918,9 @@ function runScanAndBroadcast() {
     if (mid && state.fi > SCAN_FILES_PER_TICK && now - lastPartialEmitMs < 480) return;
     lastPartialEmitMs = now;
     try {
-      var partial = buildUsageResult(state.daily, state.tagged.length, state.tagged, state.roots);
+      var partial = buildUsageResult(state.daily, state.tagged.length, state.tagged, state.roots, {
+        marketplaceRows: state.marketplaceRows
+      });
       partial.calendar_today = state.todayStr;
       partial.day_cache_mode = state.useTodayOnly ? 'heute-jsonl+vortage-cache' : 'vollstaendiger-jsonl-scan';
       partial.day_cache_mode_en = state.useTodayOnly
@@ -2419,7 +2965,12 @@ function runScanAndBroadcast() {
 
 var server = http.createServer(function (req, res) {
   if (req.url === '/api/usage') {
-    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      Pragma: 'no-cache'
+    });
     res.end(JSON.stringify(cachedData));
   } else if (req.url === '/api/i18n-bundles') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
@@ -2446,13 +2997,16 @@ var server = http.createServer(function (req, res) {
 
 server.listen(PORT, function () {
   console.log('Claude Code Usage Dashboard running at http://localhost:' + PORT);
-  console.log('Auto-refresh every ' + REFRESH_SEC + 's (--refresh=N to change)');
+  console.log('Voller Scan alle ' + REFRESH_SEC + 's (--refresh=N, min 60; oder CLAUDE_USAGE_SCAN_INTERVAL_SEC)');
   console.log('Erster Scan läuft inkrementell (SSE-Updates, Zwischenstände); Seite sofort nutzbar.');
   console.log('Press Ctrl+C to stop.');
   refreshOutageCache();
   refreshReleasesCache();
+  refreshMarketplaceExtensionCache();
   runScanAndBroadcast();
 });
 
 setInterval(runScanAndBroadcast, REFRESH_SEC * 1000);
 setInterval(refreshOutageCache, OUTAGE_REFRESH_MS);
+setInterval(refreshReleasesCache, 6 * 60 * 60 * 1000);
+setInterval(refreshMarketplaceExtensionCache, 6 * 60 * 60 * 1000);
