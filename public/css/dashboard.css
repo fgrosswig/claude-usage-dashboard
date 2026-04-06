@@ -158,9 +158,8 @@ tr:hover td{background:#334155}
   pointer-events:none;
 }
 .chart-shell canvas{
-  position:relative;z-index:1;display:block;width:100%!important;max-width:100%;height:auto!important;
+  position:relative;z-index:1;display:block;max-width:100%;
 }
-.chart-shell{contain:layout style;overflow:hidden}
 .service-chart-canvas-wrap .chart-shell{min-height:260px}
 .main-charts-skel-hint{font-size:.78rem;color:#64748b;margin:0 0 10px;line-height:1.4;max-width:42rem}
 .main-charts-skeleton.main-charts-skeleton--off{display:none!important}
