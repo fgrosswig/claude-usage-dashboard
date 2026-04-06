@@ -252,3 +252,13 @@ tr:hover td{background:#334155}
 .finding-title{font-size:.72rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.3px}
 .finding-value{margin-left:auto;font-size:.9rem;font-weight:600;color:#e2e8f0}
 .finding-detail{font-size:.68rem;color:#64748b;line-height:1.4}
+
+/* ── Health Collapse ─────────────────────────────────────── */
+.health-collapse{margin-bottom:14px;border:1px solid #334155;border-radius:10px;background:#1e293b;overflow:hidden}
+.health-collapse-summary{cursor:pointer;padding:12px 18px;display:flex;align-items:center;gap:12px;font-size:.85rem;color:#cbd5e1;list-style-position:outside;user-select:none}
+.health-collapse-summary:hover{color:#f8fafc}
+.health-collapse[open] .health-collapse-summary{border-bottom:1px solid #334155}
+.health-collapse-inner{padding:0}
+.health-collapse-inner .health-score{border:none;border-radius:0;margin-bottom:0;border-bottom:1px solid #334155}
+.health-collapse-inner .key-findings{border:none;border-radius:0;margin-bottom:0}
+.health-total-circle-sm{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;color:#fff;flex-shrink:0}

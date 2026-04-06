@@ -4520,6 +4520,12 @@ function renderHealthScore(data) {
   hh += "</span></div>";
   if (headerEl.innerHTML !== hh) headerEl.innerHTML = hh;
 
+  // Update collapsed summary line
+  var smCircle = document.getElementById("health-circle-sm");
+  var smText = document.getElementById("health-summary-text");
+  if (smCircle) { smCircle.style.background = scoreColor; smCircle.textContent = score; }
+  if (smText) smText.textContent = t("healthScoreTitle") + " " + score + "/10 — " + tr("healthScoreSummary", { score: score, warns: warns, crits: crits });
+
   // Grid
   var gh = "";
   for (var gi = 0; gi < indicators.length; gi++) {
