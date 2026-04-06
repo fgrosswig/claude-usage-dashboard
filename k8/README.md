@@ -99,7 +99,7 @@ jq -r '.name, .secret' "$ROBOT_JSON"
 - **`harbor_user`** = kompletter Robot-Name (z. B. `robot$claude+developer` — inkl. `$`, keine Leerzeichen).
 - **`harbor_password`** = Wert von **`secret`** (einmalig beim Anlegen; bei Verlust neuen Robot/Secret in Harbor erzeugen).
 
-In **Harbor** muss der Robot für das Projekt **`claude`** Rechte zum **Push** ins Repository **`claude-usage-dashboard`** haben. Meldung **`UNAUTHORIZED` … action: push** heißt fast immer: falsche Secrets in Woodpecker, abgelaufener Robot, oder Robot ohne Push-Berechtigung auf genau dieses Repo — nicht „die Pipeline hat den Robot nicht genutzt“, sondern **Woodpecker muss mit Robot-Daten gefüttert sein**.
+In **Harbor** muss der Robot für das Projekt **`claude`** ins Repository **`claude-usage-dashboard`** **pushen** dürfen. In der Robot-Maske **Select Permissions** → Zeile **Repository** müssen u. a. **Pull** und **Push** angehakt sein (nur *List / Read / Update* reicht nicht — dann genau der Fehler **`UNAUTHORIZED` … action: push**). Meldung **`UNAUTHORIZED`** heißt sonst oft: falsche Woodpecker-Secrets oder abgelaufener Robot.
 
 **Base Image Connector / Docker Hub:** Das `Dockerfile` nutzt `FROM node:22-alpine` (Docker Hub). Harbor warnt vor Rate-Limits; optional Base-Image über euren Harbor-Proxy spiegeln (siehe **05-harbor.md** / „Base Image Connector“) — unabhängig vom Push-`UNAUTHORIZED`, das reine Registry-Auth betrifft.
 
