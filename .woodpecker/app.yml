@@ -1,10 +1,9 @@
 # Wie GRO/SCHUFA .woodpecker/app.yml: nur platform → Docker-Agent .220 (Kaniko + kurze Image-Namen).
 # backend: kubernetes würde Job-Pods auf .171 erzeugen (Hub/poc-Pull anders als auf .220).
 when:
-  event: [push, manual]
-  branch:
-    include:
-      - main
+  - event: push
+    branch: main
+  - event: manual
 
 
 labels:
