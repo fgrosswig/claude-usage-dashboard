@@ -86,8 +86,9 @@ service:
 
 ingress:
   enabled: false
-  className: ""
+  className: traefik
   annotations: {}
+  # Cluster-Beispiel mit Proxy-Host: siehe values-cluster.example.yaml (zweiter host, port 8080)
   hosts:
     - host: usage-dashboard.example.com
       paths:

@@ -23,17 +23,24 @@ claudeData:
 
 ingress:
   enabled: true
-  className: nginx
+  className: traefik
+  # Wie k8s/overlays/dev/ingress.yml: Dashboard + Anthropic-Proxy getrennt (DNS + TLS-Secret anlegen)
   hosts:
-    - host: usage-dashboard.example.com
+    - host: claude-usage.grosswig-it.de
       paths:
         - path: /
           pathType: Prefix
           port: 3333
+    - host: claude-usage-proxy.grosswig-it.de
+      paths:
+        - path: /
+          pathType: Prefix
+          port: 8080
   tls:
-    - secretName: usage-dashboard-tls
+    - secretName: claude-usage-tls
       hosts:
-        - usage-dashboard.example.com
+        - claude-usage.grosswig-it.de
+        - claude-usage-proxy.grosswig-it.de
 
 config:
   scanIntervalSec: "180"
