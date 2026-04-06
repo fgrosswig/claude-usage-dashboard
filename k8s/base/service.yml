@@ -9,9 +9,11 @@ spec:
     - name: http-dashboard
       port: 3333
       targetPort: http-dashboard
+      nodePort: 31333
       protocol: TCP
     - name: http-proxy
       port: 8080
       targetPort: http-proxy
+      nodePort: 31808
       protocol: TCP
-  type: ClusterIP
+  type: NodePort
