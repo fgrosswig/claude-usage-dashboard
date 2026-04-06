@@ -1,35 +1,35 @@
-# Importierte / lokale Host-Logs (z. B. CLAUDE_USAGE_EXTRA_BASES)
-/HOST*/
+# Whitelist: standardmäßig nichts versionieren — nur unten explizit freigegebene Pfade.
+# (Kein „Blacklist“-Sammelsurium; lokale Artefakte landen nicht im Index, solange sie nicht whitelisted sind.)
 
-# Ad-hoc-Testskripte
-test_node*.js
-_chk.json 
-_usage_check.json
-claude-code-releases.json
-_patch*.js
-fix*.py
-fix*.js
-_insrel.*
-_fix*.*
+# Alles ignorieren …
+*
 
-# Falls später npm/yarn genutzt wird
-node_modules/
+# … Verzeichnisse wieder sichtbar (sonst keine Rekursion in Unterordner)
+!**/
 
-# Lokale Umgebung (Secrets, Pfade)
-.env
-.env.*
-!.env.example
-.github_session_token
+# Repo-Wurzel
+!/.gitignore
+!/README.md
+!/README.en.md
+!/server.js
+!/start.js
+!/anthropic-proxy.js
+!/claude-usage-dashboard.js
+!/token_forensics.js
 
-# Betriebssystem
-.DS_Store
-Thumbs.db
-Desktop.ini
+!/public/
+!/public/**/*
 
-# Sonstiges
-*.log
+!/scripts/
+!/scripts/**/*
 
-# K8 und Docker ignore
-k8*
-Dockerfile
-docker-compose.yml
+!/tpl/
+!/tpl/**/*
+
+!/images/
+!/images/**/*
+
+# Lokale Secrets / Session-Token — explizit nie committen (Absicherung gegen spätere breitere !-Regeln)
+/.github_session_token
+/.env
+/.env.*

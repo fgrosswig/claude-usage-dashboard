@@ -4,7 +4,7 @@
 
 Standalone Node server (no npm dependencies in the script itself). Reads **Claude Code** logs under **`~/.claude/projects/**/*.jsonl`** and shows token usage, limits (heuristic), and forensics in a web UI. Only **`claude-*`** models are counted (no `<synthetic>`).
 
-**Layout:** **`server.js`** loads **`scripts/dashboard-server.js`**, **`scripts/dashboard-http.js`**, **`scripts/usage-scan-roots.js`**, and **`scripts/service-logger.js`** (structured logging). Use **`start.js`** for the dashboard, Anthropic proxy, or **`forensics`**. Forensics: **`scripts/token-forensics.js`**, asset tool **`scripts/extract-dashboard-assets.js`**. **`claude-usage-dashboard.js`** aliases **`server.js`**.
+**Layout:** **`server.js`** loads **`scripts/dashboard-server.js`**, **`scripts/dashboard-http.js`**, **`scripts/usage-scan-roots.js`**, and **`scripts/service-logger.js`** (structured logging). **Web UI:** **`tpl/dashboard.html`**, styles **`public/css/dashboard.css`**, browser logic **`public/js/dashboard.client.js`** (Chart.js from a CDN in the template). Embedding/extraction helper: **`scripts/extract-dashboard-assets.js`**. Use **`start.js`** for **`dashboard`**, **`both`**, **`proxy`**, or **`forensics`**. CLI forensics: **`scripts/token-forensics.js`**. **`claude-usage-dashboard.js`** aliases **`server.js`**.
 
 **Server logging** (stderr, optional file): **`CLAUDE_USAGE_LOG_LEVEL`** = `error` | `warn` | `info` (default) | `debug` | `none`. Append to a file: **`CLAUDE_USAGE_LOG_FILE`**. CLI overrides: **`--log-level=…`**, **`--log-file=…`**. Topics include **`scan`/`parse`**, **`cache`**, **`outage`**, **`releases`**, **`marketplace`**, **`github`**, **`i18n`**, **`server`**.
 
@@ -28,6 +28,12 @@ Or, using the generic starter (dashboard is the default):
 
 ```bash
 node start.js
+```
+
+**Dashboard + Anthropic proxy in one terminal** (dashboard default port **3333**, proxy **8080** or **`ANTHROPIC_PROXY_PORT`**):
+
+```bash
+node start.js both
 ```
 
 ### Options
@@ -57,6 +63,7 @@ node server.js --log-level=debug --log-file=$HOME/.claude/usage-dashboard-server
 
 - File: **`~/.claude/usage-dashboard-days.json`**
 - If **cache version**, **scan roots**, and **`.jsonl` file count** match, **past days** are loaded from that file and only the **local calendar “today”** is fully re-counted from logs (faster refreshes). **Calendar gaps with no log usage** no longer force a **full scan** — only a changed **`.jsonl` count**, **roots**, **cache version**, or **`CLAUDE_USAGE_NO_CACHE`** do. Per-day **`hosts`** are stored from cache version **3** onward; **version 4** invalidates older caches once; **version 5** adds **`session_signals`** (JSONL heuristics: continue/resume/retry/interrupt) — day cache is rebuilt once.
+- Optional **`CLAUDE_USAGE_SKIP_IDENTICAL_SCAN=1`**: if relevant **JSONL mtimes** are unchanged, a repeated **full** scan may be skipped (fingerprint); handy for frequent refresh with no new logs.
 - Expand the **meta** panel to see paths for the **day cache**, **releases**, **marketplace**, and **outage** JSON files.
 - Force a **full scan**: set **`CLAUDE_USAGE_NO_CACHE=1`** (or `true`), **or** delete the cache file, **or** add/remove `.jsonl` files (different count), **or** change **`CLAUDE_USAGE_EXTRA_BASES`** / scan roots (the cache stores `scan_roots_key`).
 
@@ -118,13 +125,14 @@ node server.js
 
 ### Repository & `.gitignore`
 
-- The repo ignores e.g. **`/HOST*/`** (local log imports), **`test_node*.js`**, **`node_modules/`**, **`.env` / `.env.*`** (with an optional **`.env.example`** exception). See **`.gitignore`** to avoid committing imports or secrets by mistake.
+- The repo ignores e.g. **`/HOST*/`** (local log imports), **`test_node*.js`**, **`node_modules/`**, **`.env` / `.env.*`** (with an optional **`.env.example`** exception). Depending on checkout, **`k8*`**, **`Dockerfile`**, and **`docker-compose.yml`** may also be ignored (keep Kubernetes/Docker artifacts local until validated). See **`.gitignore`** to avoid committing imports or secrets by mistake.
 
 ### Limits & forensic (heuristic only)
 
 - **Data source** in the UI: generic **`~/.claude/projects`** (no absolute paths with usernames in the UI/API).
 - **Hit limit (red in charts):** counts JSONL lines matching typical rate/limit patterns — **not** a direct Anthropic API proof.
 - **Forensic** (collapsible): codes **`?`** (very high cache read), **`HIT`** (limit-like lines in logs), **`<<P`** (strict peak comparison with minimum output/calls). **Not** the same as the Claude UI “90% / 100%”.
+- **Forensic session signals** (separate chart): per calendar day, **stacked bars** — bottom to top continue, resume, retry, interrupt, then **outage hours** on **top** (scaled bar height; tooltip shows real hours; top placement avoids the slice sitting under a large interrupt band). **Purple line** = **cache read** (separate right scale) — same-day heuristic only, not proof of causation.
 
 ### CLI forensics (`scripts/token-forensics.js`)
 
@@ -187,7 +195,16 @@ Other env vars: **`ANTHROPIC_PROXY_LOG_STDOUT=1`**, **`ANTHROPIC_PROXY_LOG_BODIE
 ### API (short)
 
 - **`GET /`**: HTML dashboard.
-- **`GET /api/usage`**: JSON including `days` (each day has `hosts`, `session_signals`), `host_labels`, `calendar_today`, `day_cache_mode`, `scanning`, `parsed_files`, `scanned_files`, `scan_sources`, `forensic_*`, etc.
+- **`GET /api/usage`**: JSON including `days` (each day has `hosts`, `session_signals`, **`outage_hours`**, **`cache_read`**, …), `host_labels`, `calendar_today`, `day_cache_mode`, `scanning`, `parsed_files`, `scanned_files`, `scan_sources`, `forensic_*`, etc.
+
+### Loading data into the dashboard (remote / container)
+
+When the server **cannot** read `~/.claude/projects` directly, you can push logs over **HTTP**:
+
+- **`POST /api/claude-data-sync`**: request body = **gzip-compressed tar**. Header **`Authorization: Bearer <CLAUDE_USAGE_SYNC_TOKEN>`** (token must be set on the server).
+- On extract, only paths under **`projects/**`** and **`anthropic-proxy-logs/**`** are merged into the configured data directory (see **`scripts/claude-data-ingest.js`**).
+- Max upload size: **`CLAUDE_USAGE_SYNC_MAX_MB`** (default **512**).
+- Helper client: **`scripts/claude-data-sync-client.js`** (build tar, gzip, POST).
 
 ### Extension updates (service impact chart & report)
 
