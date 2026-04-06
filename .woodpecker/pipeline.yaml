@@ -11,9 +11,14 @@
 #
 # Repository-Secrets (Woodpecker UI): harbor_user, harbor_password, kube_url, kube_token
 # Agent: Docker-Socket für Build + Push (siehe k8/README.md).
+#
+# trusted: nötig für Host-Volumes (docker.sock). Zusätzlich Repo in Woodpecker als „Trusted“
+# aktivieren (Projekteinstellungen), sonst Linter/Fehler: Insufficient trust level to use volumes.
 
 when:
   - event: [push, pull_request, tag, deployment, manual]
+
+trusted: true
 
 steps:
   - name: node-check-dashboard-client

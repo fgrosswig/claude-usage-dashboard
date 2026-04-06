@@ -80,6 +80,8 @@ Pipeline: [`.woodpecker/pipeline.yaml`](../.woodpecker/pipeline.yaml) · Instanz
 
 **Woodpecker-Secrets** (Repository-Einstellungen): `harbor_user`, `harbor_password`, `kube_url` (API-Server-URL), `kube_token` (Bearer). Scopes wie in der UI (push, tag, deployment, manual, …).
 
+**Trusted:** Die Pipeline nutzt den **Docker-Socket** (`volumes`). In `.woodpecker/pipeline.yaml` steht `trusted: true`. Im Woodpecker-Projekt muss zusätzlich **Trusted** aktiviert sein (Repository-Einstellungen — sonst melden Linter/Lauf: *Insufficient trust level to use volumes*).
+
 **Auslöser:** Jeder **Repo-Push** startet die Pipeline; **Harbor** bekommt das Image bei **Push auf `main`** (neuer Commit), außerdem bei **Tag**, **Deployment** und **manuell** — nicht bei **PRs**.
 
 Ablauf: `node --check` → `docker-build` → `helm lint`/`template` → **harbor-push** (s. o.) → `harbor.grosswig-it.de/claude/claude-usage-dashboard` mit `:<sha8>`, `:latest`, optional `:$CI_COMMIT_TAG` — bei **Deployment** oder **manuell** danach **`helm upgrade --install`** nach `claude` mit Image-Override und `imagePullSecrets: harbor-pull` (Secret **`harbor-pull`** im Namespace). Deploy-Image = Build aus demselben Lauf.
