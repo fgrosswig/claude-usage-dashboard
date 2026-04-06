@@ -1,12 +1,3 @@
-# Nach GRO/SCHUFA .woodpecker/app.yml (feat/fastify-v5), nur App-/Harbor-/K8s-Namen für Claude.
-# https://gitea.grosswig-it.de/GRO/SCHUFA/src/branch/feat/fastify-v5/.woodpecker/app.yml
-#
-# Reihenfolge: **.woodpecker/base.yml** pusht `harbor.../claude/base` (.220). Diese Pipeline baut die App mit Kaniko (.171)
-# und braucht das Base-Image bereits in Harbor (siehe version.json → Dockerfile.ci).
-#
-# Secrets: harbor_user, harbor_password, kube_url, kube_token
-# Deploy: kubectl apply -k k8s/overlays/dev
-
 when:
   event: [push, manual]
   branch:
@@ -18,28 +9,25 @@ when:
 
 labels:
   platform: linux/amd64
-  backend: kubernetes
 
 steps:
   - name: prepare
-    image: alpine:3.21
+    image: alpine
     commands:
       - |
-        test -f Dockerfile
-        test -f version.json
         BASE_VER=$(awk -F'"' '/base_image/{print $4}' version.json)
         echo "Base image tag: $BASE_VER"
         sed "s|^ARG BASE_TAG=.*|ARG BASE_TAG=$BASE_VER|" Dockerfile > Dockerfile.ci
 
   - name: build-push
-    image: plugins/kaniko
+    image: plugin-kaniko
     settings:
       repo: harbor.grosswig-it.de/claude/claude-usage-dashboard
       registry: harbor.grosswig-it.de
       dockerfile: Dockerfile.ci
       tags:
         - latest
-        - "${CI_COMMIT_SHA:0:8}"
+        - '${CI_COMMIT_SHA:0:8}'
       build_args:
         - CI_COMMIT_SHORT_SHA=${CI_COMMIT_SHA:0:8}
         - CI_COMMIT_REF_NAME=${CI_COMMIT_BRANCH}
@@ -61,7 +49,7 @@ steps:
         from_secret: kube_token
 
   - name: cleanup
-    image: alpine:3.21
+    image: alpine
     environment:
       HARBOR_USER:
         from_secret: harbor_user
