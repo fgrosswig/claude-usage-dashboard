@@ -6,7 +6,7 @@ Chart: `claude-usage-dashboard/` — Usage-Dashboard + Anthropic-Proxy (`node st
 
 ## Build image
 
-**Normalfall (Cluster):** Du **committest und pushst** (z. B. **`main`**, **`feat/**`**, **`fix/**`**). **Woodpecker** startet **`.woodpecker/app.yml`**: Kaniko → Harbor, danach **`deploy`** wie bei **SCHUFA** (`KUBE_URL` / `KUBE_TOKEN` aus Secrets, kein kubeconfig-File) — hier **`helm upgrade`** mit `--kube-apiserver` / `--kube-token` / `--kube-insecure-skip-tls-verify` und **`--wait`** (Chart statt SCHUFA `kubectl apply -k` + `set image`). Anschließend **`cleanup`** (alte Harbor-Tags, `failure: ignore`). Tags: `:<sha8>`, `:latest`.
+**Normalfall (Cluster):** Du **committest und pushst** (z. B. **`main`**, **`feat/**`**, **`fix/**`**). **Woodpecker** startet **`.woodpecker/app.yml`**: Kaniko → Harbor, danach **`deploy`** wie **SCHUFA**: **`bitnami/kubectl`** mit `kubectl --server=$KUBE_URL --token=$KUBE_TOKEN --insecure-skip-tls-verify` (kein kubeconfig). Statt `kubectl apply -k k8s/overlays/dev` (fehlt hier): **`helm template … | kubectl apply -f -`**, dann **`kubectl set image`** auf `deployment/cud-claude-usage-dashboard` / Container **`app`**, **`rollout status`**. Kurz **Helm-Binary** wird per offiziellem Tarball nach `/tmp` geladen. Anschließend **`cleanup`** (Harbor). Tags: `:<sha8>`, `:latest`.
 
 **Pull Requests:** **`.woodpecker/pr.yml`** — `node --check` und Helm, **ohne** Kaniko/Harbor.
 
@@ -107,7 +107,7 @@ In **Harbor** muss der Robot für das Projekt **`claude`** ins Repository **`cla
 
 **Auslöser `app.yml`:** Push auf genannte Branches, **Tag**, **Deployment**, **manuell** — nicht PR (dafür `pr.yml`).
 
-Ablauf: `node --check` → Helm lint/template → **build-push** (Kaniko) → **`deploy`** (`helm upgrade --install` mit `kube_url`/`kube_token`, Namespace **`claude`**) → **cleanup** (Harbor-Projekt **`claude`**, Repo **`claude-usage-dashboard`**, behält u. a. `latest`). **Sonar** wie in SCHUFA hier nicht eingebunden (eigenes Sonar-Projekt nötig).
+Ablauf: `node --check` → Helm lint/template → **build-push** (Kaniko) → **`deploy`** (`bitnami/kubectl` + `helm template|apply`, **`set image`**, **`rollout status`**, Namespace **`claude`**) → **cleanup** (Harbor **`claude`/`claude-usage-dashboard`**). **Sonar** wie in SCHUFA hier nicht eingebunden (eigenes Sonar-Projekt nötig).
 
 Lokal: `sh scripts/k8-ci-verify.sh`. `kubectl` in der Pipeline: vorerst `--insecure-skip-tls-verify` — bei Bedarf in `.woodpecker/app.yml` anpassen.
 

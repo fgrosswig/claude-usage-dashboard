@@ -46,25 +46,34 @@ steps:
       password:
         from_secret: harbor_password
 
-  # Entspricht SCHUFA deploy (bitnami/kubectl + --server/--token); hier Helm-Chart → alpine/helm + --kube-*.
+  # Wie SCHUFA: bitnami/kubectl + --server/--token/--insecure-skip-tls-verify (kein kubeconfig).
+  # Kein k8s/overlays/dev im Repo → Manifeste per helm template | kubectl apply; set image + rollout wie SCHUFA.
   - name: deploy
-    image: docker.io/alpine/helm:3.16.3
+    image: docker.io/bitnami/kubectl:1.31
     environment:
       KUBE_URL:
         from_secret: kube_url
       KUBE_TOKEN:
         from_secret: kube_token
     commands:
+      - kubectl --server=$KUBE_URL --token=$KUBE_TOKEN --insecure-skip-tls-verify create namespace claude --dry-run=client -o yaml | kubectl --server=$KUBE_URL --token=$KUBE_TOKEN --insecure-skip-tls-verify apply -f -
       - |
+        set -e
         TAG=$(printf '%s' "$CI_COMMIT_SHA" | cut -c1-8)
         if [ -n "${CI_COMMIT_TAG:-}" ]; then TAG="$CI_COMMIT_TAG"; fi
-        helm upgrade --install cud ./k8/claude-usage-dashboard -n claude --create-namespace \
-          --kube-apiserver="$KUBE_URL" --kube-token="$KUBE_TOKEN" --kube-insecure-skip-tls-verify \
-          --wait --timeout 120s \
+        curl -fsSL "https://get.helm.sh/helm-v3.16.3-linux-amd64.tar.gz" | tar xz -C /tmp
+        export PATH="/tmp/linux-amd64:$PATH"
+        helm template cud ./k8/claude-usage-dashboard -n claude \
           --set image.repository=harbor.grosswig-it.de/claude/claude-usage-dashboard \
           --set image.tag="$TAG" \
           --set image.pullPolicy=Always \
-          --set "imagePullSecrets[0].name=harbor-pull"
+          --set "imagePullSecrets[0].name=harbor-pull" \
+          | kubectl --server=$KUBE_URL --token=$KUBE_TOKEN --insecure-skip-tls-verify apply -f -
+      - |
+        TAG=$(printf '%s' "$CI_COMMIT_SHA" | cut -c1-8)
+        if [ -n "${CI_COMMIT_TAG:-}" ]; then TAG="$CI_COMMIT_TAG"; fi
+        kubectl --server=$KUBE_URL --token=$KUBE_TOKEN --insecure-skip-tls-verify set image deployment/cud-claude-usage-dashboard app=harbor.grosswig-it.de/claude/claude-usage-dashboard:${TAG} -n claude
+      - kubectl --server=$KUBE_URL --token=$KUBE_TOKEN --insecure-skip-tls-verify rollout status deployment/cud-claude-usage-dashboard -n claude --timeout=120s
 
   - name: cleanup
     image: docker.io/alpine:3.21
