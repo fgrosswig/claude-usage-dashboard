@@ -267,3 +267,9 @@ tr:hover td{background:#334155}
 .hs-inline-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .hs-inline-sep{color:#475569;margin:0 6px;font-size:.8rem}
 .health-collapse-summary{flex-wrap:wrap;gap:6px 12px}
+
+/* meta-details in top-bar */
+.top-bar .meta-details{margin-bottom:0;border:none;background:transparent;border-radius:0;overflow:visible;flex:1;min-width:0}
+.top-bar .meta-details-summary{padding:2px 6px;font-size:.62rem}
+.top-bar .meta-details[open] .meta-details-summary{border-bottom:none;padding-bottom:2px}
+.top-bar .meta-details-inner{position:absolute;right:0;top:100%;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:10px;z-index:200;min-width:320px;max-width:500px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
