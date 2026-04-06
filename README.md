@@ -110,7 +110,32 @@ node claude-usage-dashboard.js
 - **Datenquelle** in der UI: generisch **`~/.claude/projects`** (keine absoluten Pfade mit Benutzernamen in der Anzeige/API).
 - **Hit Limit (rot in Charts):** Zählt JSONL-Zeilen mit typischen Rate-/Limit-Mustern — **kein** direkter Anthropic-API-Nachweis.
 - **Forensic** (einklappbar): Codes **`?`** (sehr hoher Cache-Read), **`HIT`** (Limit-Zeilen in Logs), **`<<P`** (strenger Peak-Vergleich mit Mindest-Output/Calls). **Nicht** gleichbedeutend mit der Claude-UI „90 % / 100 %“.
-- Detaillierte **CLI-Forensik** weiterhin in **`token_forensics.js`** (separat ausführen).
+
+### CLI-Forensik (`token_forensics.js`)
+
+Separates Analyse-Tool mit **automatischer Peak- und Limit-Erkennung** (keine hardcodierten Daten):
+
+```bash
+node token_forensics.js
+```
+
+**Automatische Erkennung:**
+
+- **Peak-Tag:** Tag mit dem höchsten Gesamtverbrauch (Input + Output + Cache Read + Cache Create).
+- **Limit-Tage:** Tage mit ≥ 50 `rate_limit`/`429`/`session limit`-Zeilen in JSONL **oder** Cache-Read ≥ 500M.
+- **Fazit-Vergleich:** Für den Budget-Vergleich wird der letzte Limit-Tag mit signifikanter Aktivität gewählt (≥ 50 Calls, ≥ 2 aktive Stunden), um aussagekräftige Ergebnisse zu liefern.
+
+**7 Abschnitte:**
+
+1. **Tagesübersicht** — Cache:Output-Ratio, aktive Stunden, automatisches Limit-Label pro Tag.
+2. **Effizienz-Kollaps** — Overhead (Tokens pro Output-Token), Output/h, Subagent-Anteil.
+3. **Subagent-Analyse** — Cache-Multiplikator: Subagent-Cache als Anteil am Gesamt-Cache.
+4. **Budget-Schätzung** — Impliziertes Cap (`total/0.9`) pro Limit-Tag, Trend (↑↓→), Median-Bereich über alle aussagekräftigen Limit-Tage, Verhältnis zum Peak. Zeigt, wo das Token-Budget ungefähr liegt und ob es sich verändert hat.
+5. **Stündliche Analyse** — Stundengenaue Aufschlüsselung des letzten aussagekräftigen Limit-Tags (oder heute).
+6. **Fazit** — Vergleich Peak-Tag vs. Limit-Tag: impliziertes Budget, effektive Budget-Reduktion, geschätzte Minuten bis Limit.
+7. **Visuell** — ASCII-Balkendiagramm mit Peak- und Limit-Markierungen.
+
+**Rückschlüsse für MAX-Pläne:** Über den Peak/Limit-Vergleich lässt sich abschätzen, ob sich das Session-Budget verändert hat oder ob die Token-Gewichtung (Input/Output/Cache) angepasst wurde. Die `Cache:Output`-Ratio zeigt, wie effizient gearbeitet wird — weniger Subagents = weniger Cache-Overhead = längere Arbeit bis zum Limit.
 
 ### API (Kurz)
 

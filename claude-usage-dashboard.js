@@ -5,6 +5,7 @@
 // Vollscan erzwingen: CLAUDE_USAGE_NO_CACHE=1  oder  Cache-Datei löschen / neue .jsonl-Datei ändert die Anzahl.
 
 var http = require('http');
+var https = require('https');
 var fs = require('fs');
 var path = require('path');
 var os = require('os');
@@ -20,9 +21,159 @@ process.argv.forEach(function(a) {
 
 var HOME = process.env.USERPROFILE || process.env.HOME || os.homedir();
 var BASE = path.join(HOME, '.claude', 'projects');
-// Vor-Tage als ein JSON (unter ~/.claude); JSONL wird nur noch für den lokalen Kalendertag „heute“ voll geparst.
+// Vor-Tage als ein JSON (unter ~/.claude); JSONL wird nur noch für den lokalen Kalendertag „heute” voll geparst.
 var USAGE_DAY_CACHE_VERSION = 3;
 var USAGE_DAY_CACHE_FILE = path.join(HOME, '.claude', 'usage-dashboard-days.json');
+
+// ── Anthropic Outage Data (status.claude.com) ─────────────────────────────
+var OUTAGE_API_URL = 'https://status.claude.com/api/v2/incidents.json';
+var OUTAGE_REFRESH_MS = 5 * 60 * 1000;
+var OUTAGE_DISK_CACHE = path.join(HOME, '.claude', 'usage-dashboard-outages.json');
+var RELEASES_CACHE = path.join(HOME, '.claude', 'claude-code-releases.json');
+var RELEASES_API_URL = 'https://api.github.com/repos/anthropics/claude-code/releases?per_page=30';
+
+// Releases laden (Disk-Cache oder frisch fetchen)
+var releasesCache = { releases: [], fetchedAt: 0 };
+try {
+  var diskRel = JSON.parse(fs.readFileSync(RELEASES_CACHE, 'utf8'));
+  if (Array.isArray(diskRel)) releasesCache.releases = diskRel;
+} catch (e) {}
+
+function refreshReleasesCache() {
+  httpsGetJson(RELEASES_API_URL, function (err, data) {
+    if (err || !Array.isArray(data)) return;
+    releasesCache.releases = data;
+    releasesCache.fetchedAt = Date.now();
+    try { fs.writeFileSync(RELEASES_CACHE, JSON.stringify(data), 'utf8'); } catch (e) {}
+  });
+}
+
+/** Liefert Map: version-string -> { tag, date, highlights (erste 3 Zeilen aus body) } */
+function getReleasesMap() {
+  var map = {};
+  var rels = releasesCache.releases;
+  for (var i = 0; i < rels.length; i++) {
+    var r = rels[i];
+    var ver = (r.tag_name || '').replace(/^v/, '');
+    var date = (r.published_at || '').slice(0, 10);
+    var body = r.body || '';
+    // Erste 5 Change-Zeilen extrahieren
+    var lines = body.split('\n');
+    var highlights = [];
+    for (var li = 0; li < lines.length && highlights.length < 5; li++) {
+      var ln = lines[li].replace(/^[\s\-*]+/, '').trim();
+      if (ln.length > 10 && ln.indexOf('#') !== 0) highlights.push(ln);
+    }
+    if (ver) map[ver] = { tag: r.tag_name, date: date, highlights: highlights };
+  }
+  return map;
+}
+var outageCache = { incidents: [], fetchedAt: 0, error: null };
+
+// Disk-Cache laden (sofort verfuegbar, kein Netzwerk noetig)
+try {
+  var diskOutage = JSON.parse(fs.readFileSync(OUTAGE_DISK_CACHE, 'utf8'));
+  if (Array.isArray(diskOutage.incidents)) {
+    outageCache.incidents = diskOutage.incidents;
+    outageCache.fetchedAt = diskOutage.fetchedAt || 0;
+  }
+} catch (e) {}
+
+function httpsGetJson(url, cb) {
+  var mod = url.indexOf('https:') === 0 ? https : http;
+  mod.get(url, function (res) {
+    if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+      return httpsGetJson(res.headers.location, cb);
+    }
+    var chunks = [];
+    res.on('data', function (c) { chunks.push(c); });
+    res.on('end', function () {
+      try { cb(null, JSON.parse(Buffer.concat(chunks).toString('utf8'))); }
+      catch (e) { cb(e, null); }
+    });
+  }).on('error', function (e) { cb(e, null); })
+    .setTimeout(10000, function () { this.destroy(); cb(new Error('timeout'), null); });
+}
+
+function refreshOutageCache() {
+  httpsGetJson(OUTAGE_API_URL, function (err, data) {
+    if (err) {
+      outageCache.error = err.message || String(err);
+      console.error('outage-fetch: ' + outageCache.error);
+      return;
+    }
+    if (data && Array.isArray(data.incidents)) {
+      outageCache.incidents = data.incidents;
+      outageCache.fetchedAt = Date.now();
+      outageCache.error = null;
+      // Disk-Cache schreiben
+      try {
+        var dir = path.dirname(OUTAGE_DISK_CACHE);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(OUTAGE_DISK_CACHE, JSON.stringify({ incidents: data.incidents, fetchedAt: outageCache.fetchedAt }), 'utf8');
+      } catch (we) {}
+    }
+  });
+}
+
+/** Klassifiziert Incident: "server" (API/Model-Fehler → Retries) vs "client" (Desktop/UI-Bug → kein Token-Impact). */
+function classifyIncident(name) {
+  var n = (name || '').toLowerCase();
+  if (n.indexOf('desktop') >= 0) return 'client';
+  if (n.indexOf('dispatch') >= 0) return 'client';
+  if (n.indexOf('cowork') >= 0) return 'client';
+  if (n.indexOf('connector') >= 0) return 'client';
+  return 'server';
+}
+
+/** Berechnet pro Kalender-Tag die Ausfallstunden + Incident-Liste + Floating-Bar-Spannen. */
+function getOutageDaysMap() {
+  var map = {};
+  var incs = outageCache.incidents;
+  for (var i = 0; i < incs.length; i++) {
+    var inc = incs[i];
+    if (!inc.created_at) continue;
+    var start = new Date(inc.created_at);
+    var end = inc.resolved_at ? new Date(inc.resolved_at) : new Date();
+    if (isNaN(start.getTime())) continue;
+    if (isNaN(end.getTime()) || end <= start) end = new Date(start.getTime() + 3600000);
+
+    // Ueber Mitternacht: pro Kalender-Tag aufteilen
+    var cur = new Date(start);
+    while (cur < end) {
+      var dayStr = cur.toISOString().slice(0, 10);
+      var dayStart = new Date(dayStr + 'T00:00:00Z');
+      var dayEnd = new Date(dayStart.getTime() + 86400000);
+      var segStart = cur > dayStart ? cur : dayStart;
+      var segEnd = end < dayEnd ? end : dayEnd;
+      var hours = (segEnd - segStart) / 3600000;
+      var startH = (segStart - dayStart) / 3600000;
+      var endH = (segEnd - dayStart) / 3600000;
+
+      if (!map[dayStr]) map[dayStr] = { outage_hours: 0, server_hours: 0, client_hours: 0, incidents: [], spans: [] };
+      var incKind = classifyIncident(inc.name);
+      map[dayStr].outage_hours += hours;
+      if (incKind === 'server') map[dayStr].server_hours += hours;
+      else map[dayStr].client_hours += hours;
+      map[dayStr].spans.push({ from: Math.round(startH * 100) / 100, to: Math.round(endH * 100) / 100, name: inc.name || '', impact: inc.impact || 'none', kind: classifyIncident(inc.name) });
+      // Incident-Name nur einmal pro Tag
+      var found = false;
+      for (var fi = 0; fi < map[dayStr].incidents.length; fi++) {
+        if (map[dayStr].incidents[fi].name === inc.name) { found = true; break; }
+      }
+      if (!found) map[dayStr].incidents.push({ name: inc.name || '', impact: inc.impact || 'none', kind: classifyIncident(inc.name), created_at: inc.created_at, resolved_at: inc.resolved_at || null });
+      cur = dayEnd;
+    }
+  }
+  // Stunden auf 1 Dezimale runden
+  var keys = Object.keys(map);
+  for (var k = 0; k < keys.length; k++) {
+    map[keys[k]].outage_hours = Math.round(map[keys[k]].outage_hours * 10) / 10;
+    map[keys[k]].server_hours = Math.round(map[keys[k]].server_hours * 10) / 10;
+    map[keys[k]].client_hours = Math.round(map[keys[k]].client_hours * 10) / 10;
+  }
+  return map;
+}
 
 // Session-/Rate-Limits werden von Anthropic (Claude API) bzw. Claude Code erzwungen;
 // in den JSONL-Logs stehen primär erfolgreiche usage-Zeilen. Treffer für "Hit Limit"
@@ -294,6 +445,7 @@ function emptyDailyBucket() {
     sub_output: 0,
     hours: {},
     models: {},
+    versions: {},
     hit_limit: 0,
     hosts: {}
   };
@@ -435,6 +587,8 @@ function processJsonlFile(fileRef, daily, onlyDate) {
       dd.models[model].calls++;
       dd.models[model].output += outTok;
       dd.models[model].cache_read += crTok;
+      var ver = rec.version || '';
+      if (ver) dd.versions[ver] = (dd.versions[ver] || 0) + 1;
     }
   } catch (e) {}
 }
@@ -495,13 +649,59 @@ function buildUsageResult(daily, fileCount, filePaths, roots) {
       total_per_hour: activeH > 0 ? Math.round(total / activeH) : 0,
       hit_limit: r.hit_limit || 0,
       models: r.models,
+      versions: r.versions || {},
       hours: r.hours,
       hosts: hostsApi,
       forensic_code: '\u2014',
       forensic_hint: '',
       forensic_implied_cap_90: 0,
-      forensic_vs_peak: 0
+      forensic_vs_peak: 0,
+      outage_hours: 0,
+      outage_incidents: [],
+      outage_spans: [],
+      outage_likely: false,
+      model_change: null,
+      version_change: null
     });
+  }
+
+  // Model-Change-Detection
+  for (var mci = 0; mci < result.length; mci++) {
+    var curModels = Object.keys(result[mci].models || {}).sort();
+    if (mci === 0) { result[mci].model_set = curModels; continue; }
+    var prevModels = Object.keys(result[mci - 1].models || {}).sort();
+    result[mci].model_set = curModels;
+    var added = [];
+    var removed = [];
+    for (var cmi = 0; cmi < curModels.length; cmi++) {
+      if (prevModels.indexOf(curModels[cmi]) < 0) added.push(curModels[cmi]);
+    }
+    for (var pmi = 0; pmi < prevModels.length; pmi++) {
+      if (curModels.indexOf(prevModels[pmi]) < 0) removed.push(prevModels[pmi]);
+    }
+    if (added.length > 0 || removed.length > 0) {
+      result[mci].model_change = { added: added, removed: removed };
+    }
+  }
+
+  // Version-Change-Detection (Claude Code Extension)
+  for (var vci = 0; vci < result.length; vci++) {
+    var curVers = Object.keys(result[vci].versions || {}).sort();
+    if (vci === 0) continue;
+    var prevVers = Object.keys(result[vci - 1].versions || {}).sort();
+    var vAdded = [];
+    for (var cvi = 0; cvi < curVers.length; cvi++) {
+      if (prevVers.indexOf(curVers[cvi]) < 0) vAdded.push(curVers[cvi]);
+    }
+    if (vAdded.length > 0) {
+      var relMap = getReleasesMap();
+      var relHighlights = [];
+      for (var rhi = 0; rhi < vAdded.length; rhi++) {
+        var ri = relMap[vAdded[rhi]];
+        if (ri && ri.highlights) relHighlights = relHighlights.concat(ri.highlights);
+      }
+      result[vci].version_change = { added: vAdded, from: prevVers.length > 0 ? prevVers[prevVers.length - 1] : null, highlights: relHighlights };
+    }
   }
 
   var peakDate = '';
@@ -512,6 +712,8 @@ function buildUsageResult(daily, fileCount, filePaths, roots) {
       peakDate = result[pi].date;
     }
   }
+  // Forensic + Outage pro Tag
+  var outageDays = getOutageDaysMap();
   for (var qi = 0; qi < result.length; qi++) {
     var row = result[qi];
     var rr = daily[row.date];
@@ -521,6 +723,15 @@ function buildUsageResult(daily, fileCount, filePaths, roots) {
     row.forensic_hint = f.forensic_hint;
     row.forensic_implied_cap_90 = f.forensic_implied_cap_90;
     row.forensic_vs_peak = f.forensic_vs_peak;
+    var od = outageDays[row.date];
+    if (od) {
+      row.outage_hours = od.outage_hours;
+      row.outage_server_hours = od.server_hours;
+      row.outage_client_hours = od.client_hours;
+      row.outage_incidents = od.incidents;
+      row.outage_spans = od.spans;
+      row.outage_likely = (row.hit_limit || 0) > 0;
+    }
   }
 
   var scanned = [];
@@ -570,7 +781,9 @@ function buildUsageResult(daily, fileCount, filePaths, roots) {
     forensic_note:
       'Forensic: ? = Cache\u2265500M; HIT = Limit-Zeilen in JSONL; <<P = stark unter Peak bei hohem Output (nicht \u201e90%\u201c/100% der UI). Impl@90% = total/0.9 nur Rechenbeispiel. Alles heuristisch.',
     forensic_note_en:
-      'Forensic: ? = cache \u2265500M; HIT = limit-like lines in JSONL; <<P = far below peak with high output (not Claude UI \u201c90%\u201d/100%). Impl@90% = total/0.9 is illustrative only. All heuristic.'
+      'Forensic: ? = cache \u2265500M; HIT = limit-like lines in JSONL; <<P = far below peak with high output (not Claude UI \u201c90%\u201d/100%). Impl@90% = total/0.9 is illustrative only. All heuristic.',
+    outage_status: outageCache.fetchedAt > 0 ? 'ok' : (outageCache.error ? 'error' : 'pending'),
+    outage_fetched: outageCache.fetchedAt ? new Date(outageCache.fetchedAt).toISOString() : null
   };
 }
 
@@ -604,7 +817,7 @@ function parseAllUsageIncremental(done, onProgress) {
   if (
     cache &&
     cache.version === USAGE_DAY_CACHE_VERSION &&
-    cache.jsonl_file_count === tagged.length &&
+    cache.jsonl_file_count <= tagged.length &&
     cache.scan_roots_key === rootsKey &&
     Array.isArray(cache.days) &&
     cache.days.length > 0
@@ -826,6 +1039,20 @@ tr:hover td{background:#334155}\n\
 .lang-switch .lang-btn{background:#1e293b;color:#e2e8f0;border:1px solid #475569;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:.72rem;line-height:1.2}\n\
 .lang-switch .lang-btn:hover{background:#334155}\n\
 .lang-switch .lang-btn.active{background:#3b82f6;border-color:#2563eb;color:#fff}\n\
+.report-btn{background:#334155;color:#e2e8f0;border:1px solid #475569;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:.8rem;margin-top:12px;display:inline-flex;align-items:center;gap:6px}\n\
+.report-btn:hover{background:#475569;border-color:#64748b}\n\
+.report-modal-overlay{display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);align-items:center;justify-content:center}\n\
+.report-modal-overlay.open{display:flex}\n\
+.report-modal{background:#0f172a;border:1px solid #334155;border-radius:12px;width:min(90vw,840px);max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.6)}\n\
+.report-modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #334155}\n\
+.report-modal-head h3{font-size:1rem;color:#f8fafc;margin:0}\n\
+.report-modal-actions{display:flex;gap:8px}\n\
+.report-modal-actions button{background:#334155;color:#e2e8f0;border:1px solid #475569;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:.78rem}\n\
+.report-modal-actions button:hover{background:#475569}\n\
+.report-modal-actions button.primary{background:#3b82f6;border-color:#2563eb;color:#fff}\n\
+.report-modal-actions button.primary:hover{background:#2563eb}\n\
+.report-modal-body{flex:1;overflow:auto;padding:16px 18px}\n\
+.report-modal-body pre{white-space:pre-wrap;word-break:break-word;font-size:.78rem;color:#cbd5e1;line-height:1.55;margin:0;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}\n\
 .day-picker-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}\n\
 .day-picker-row label{color:#94a3b8;font-size:.85rem}\n\
 .day-picker-row select{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 12px;font-size:.9rem;min-width:220px}\n\
@@ -843,6 +1070,7 @@ tr:hover td{background:#334155}\n\
 <div class="live-pop" id="live-pop" tabindex="-1">\n\
 <div class="refresh" id="live-trigger" tabindex="0" role="button" aria-expanded="false" aria-haspopup="true" aria-controls="live-files-panel" title="">\n\
 <span id="live-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:6px;animation:pulse 2s infinite;vertical-align:middle"></span><span id="live-label">Live</span>\n\
+<span id="anthropic-status" title="Anthropic Status" style="display:inline-flex;align-items:center;gap:4px;margin-left:10px;font-size:.72rem;color:#94a3b8;cursor:help"><span id="anthropic-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#475569"></span><span id="anthropic-label">Status</span></span>\n\
 </div>\n\
 <div class="live-files-panel" id="live-files-panel" role="region" aria-label="Gescannte JSONL-Dateien">\n\
 <div class="live-files-head" id="live-files-head">Gescannte JSONL</div>\n\
@@ -873,8 +1101,30 @@ tr:hover td{background:#334155}\n\
 <p id="forensic-chart-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"><strong style="color:#ef4444">Rot (Balken)</strong> = Z\u00e4hler Hit-Limit-Zeilen in JSONL. <strong style="color:#f59e0b">Linie</strong> = Score 3=? · 2=HIT · 1=&lt;&lt;P (Peak-Vergleich, nicht Claude-UI 90%/100%).</p>\n\
 <canvas id="c-forensic"></canvas>\n\
 </div>\n\
+<div class="chart-box" style="margin-top:16px;margin-bottom:0">\n\
+<h3 id="service-chart-h3">Service Impact</h3>\n\
+<p id="service-chart-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"></p>\n\
+<canvas id="c-service"></canvas>\n\
+</div>\n\
+<p id="thinking-note" style="font-size:.75rem;color:#f59e0b;margin:12px 0 4px;line-height:1.45"></p>\n\
+<button type="button" class="report-btn" id="forensic-report-btn" title="Forensic Report als Markdown generieren">\n\
+<span id="report-btn-label">Forensic Report</span>\n\
+</button>\n\
 </div>\n\
 </details>\n\
+<div class="report-modal-overlay" id="report-modal-overlay">\n\
+<div class="report-modal">\n\
+<div class="report-modal-head">\n\
+<h3 id="report-modal-title">Forensic Report</h3>\n\
+<div class="report-modal-actions">\n\
+<button type="button" id="report-copy-btn">Copy</button>\n\
+<button type="button" class="primary" id="report-download-btn">Download .md</button>\n\
+<button type="button" id="report-close-btn">\u2715</button>\n\
+</div>\n\
+</div>\n\
+<div class="report-modal-body"><pre id="report-content"></pre></div>\n\
+</div>\n\
+</div>\n\
 <div class="day-picker-row" id="day-picker-row">\n\
 <label id="lbl-day-picker" for="day-picker">Karten &amp; Tabelle (Tag w\u00e4hlen)</label>\n\
 <select id="day-picker" aria-label=""></select>\n\
@@ -975,9 +1225,17 @@ function applyStaticChrome() {\n\
   var lfp = document.getElementById("live-files-panel");\n\
   if (lfp) lfp.setAttribute("aria-label", t("liveFilesAria"));\n\
   var fh = document.getElementById("forensic-chart-h3");\n\
-  if (fh) fh.textContent = t("forensicChartTitle");\n\
+  if (fh) fh.textContent = t("unifiedChartTitle");\n\
   var fb = document.getElementById("forensic-chart-blurb");\n\
   if (fb) fb.innerHTML = t("forensicChartBlurbHtml");\n\
+  var rbl = document.getElementById("report-btn-label");\n\
+  if (rbl) rbl.textContent = t("reportBtn");\n\
+  var sh3 = document.getElementById("service-chart-h3");\n\
+  if (sh3) sh3.textContent = t("serviceChartTitle");\n\
+  var sbl = document.getElementById("service-chart-blurb");\n\
+  if (sbl) sbl.innerHTML = t("serviceBlurb");\n\
+  var tn = document.getElementById("thinking-note");\n\
+  if (tn) tn.textContent = t("thinkingNote");\n\
   var lf = document.getElementById("live-files-hint");\n\
   if (lf) lf.textContent = t("liveFilesHint");\n\
   document.documentElement.lang = __lang === "de" ? "de" : "en";\n\
@@ -1081,6 +1339,7 @@ function renderDashboard(data) {\n\
     window.__dashRenderDebounce = null;\n\
   }\n\
   renderDashboardCore(data);\n\
+  updateStatusLamp(data);\n\
 }\n\
 function renderDashboardCore(data) {\n\
   updateMetaDetailsSummary(data);\n\
@@ -1519,6 +1778,7 @@ function renderDashboardCore(data) {\n\
     }\n\
   }\n\
   \n\
+  // ─── Forensic Chart (Original: Hit-Limit Bars + Score Line) ───\n\
   function forensicScoreDay(d){\n\
     var c=d.forensic_code||"\u2014";\n\
     if(c==="?")return 3;\n\
@@ -1572,8 +1832,7 @@ function renderDashboardCore(data) {\n\
           },\n\
           y1:{\n\
             position:"right",\n\
-            min:0,\n\
-            max:3.5,\n\
+            min:0,max:3.5,\n\
             title:{display:true,text:t("forensicAxisForensic"),color:"#fbbf24"},\n\
             ticks:{stepSize:1,color:"#94a3b8"},\n\
             grid:{drawOnChartArea:false}\n\
@@ -1600,6 +1859,422 @@ function renderDashboardCore(data) {\n\
       }\n\
     });\n\
   }\n\
+\n\
+  // ─── Service Impact Chart (Arbeitszeit vs Ausfall + Cache-Read-Kosten) ───\n\
+  var elS=document.getElementById("c-service");\n\
+  if(elS){\n\
+    // Berechne pro Tag: saubere Arbeitsstunden, betroffene Stunden, Ausfall ausserhalb Arbeit\n\
+    var sClean=[],sAffServer=[],sAffClient=[],sOutOnly=[],sCacheRead=[];\n\
+    for(var si=0;si<days.length;si++){\n\
+      var sd=days[si];\n\
+      var wHrs=Object.keys(sd.hours||{}).map(function(h){return parseInt(h);});\n\
+      var spans=sd.outage_spans||[];\n\
+      var affSrv=0,affCli=0,outTotal=0;\n\
+      for(var wi=0;wi<wHrs.length;wi++){\n\
+        var wh=wHrs[wi];\n\
+        var hitSrv=false,hitCli=false;\n\
+        for(var oi=0;oi<spans.length;oi++){\n\
+          if(wh>=Math.floor(spans[oi].from)&&wh<Math.ceil(spans[oi].to)){\n\
+            if(spans[oi].kind==="server")hitSrv=true;\n\
+            else hitCli=true;\n\
+          }\n\
+        }\n\
+        if(hitSrv)affSrv++;\n\
+        else if(hitCli)affCli++;\n\
+      }\n\
+      for(var oi=0;oi<spans.length;oi++) outTotal+=spans[oi].to-spans[oi].from;\n\
+      var cleanWork=wHrs.length-affSrv-affCli;\n\
+      var outOnly=Math.max(0,Math.round((outTotal-affSrv-affCli)*10)/10);\n\
+      sClean.push(cleanWork);\n\
+      sAffServer.push(affSrv);\n\
+      sAffClient.push(affCli);\n\
+      sOutOnly.push(outOnly);\n\
+      sCacheRead.push(sd.cache_read||0);\n\
+    }\n\
+    if(_charts.cService){try{_charts.cService.destroy();}catch(e){}}\n\
+    var mcSvc=[],vcSvc=[];\n\
+    for(var mi=0;mi<days.length;mi++){\n\
+      if(days[mi].model_change)mcSvc.push({x:mi,y:0});\n\
+      if(days[mi].version_change)vcSvc.push({x:mi,y:0.5});\n\
+    }\n\
+    _charts.cService=new Chart(elS,{\n\
+      data:{\n\
+        labels:labels,\n\
+        datasets:[\n\
+          {\n\
+            type:"bar",label:t("serviceDS_cleanWork"),\n\
+            data:sClean,\n\
+            backgroundColor:"rgba(59,130,246,0.7)",borderColor:"rgba(59,130,246,0.9)",borderWidth:1,\n\
+            stack:"hours",yAxisID:"y"\n\
+          },\n\
+          {\n\
+            type:"bar",label:t("serviceDS_affectedServer"),\n\
+            data:sAffServer,\n\
+            backgroundColor:"rgba(239,68,68,0.7)",borderColor:"rgba(239,68,68,0.9)",borderWidth:1,\n\
+            stack:"hours",yAxisID:"y"\n\
+          },\n\
+          {\n\
+            type:"bar",label:t("serviceDS_affectedClient"),\n\
+            data:sAffClient,\n\
+            backgroundColor:"rgba(251,191,36,0.6)",borderColor:"rgba(251,191,36,0.9)",borderWidth:1,\n\
+            stack:"hours",yAxisID:"y"\n\
+          },\n\
+          {\n\
+            type:"bar",label:t("serviceDS_outageOnly"),\n\
+            data:sOutOnly,\n\
+            backgroundColor:"rgba(107,114,128,0.35)",borderColor:"rgba(107,114,128,0.5)",borderWidth:1,\n\
+            stack:"hours",yAxisID:"y"\n\
+          },\n\
+          {\n\
+            type:"line",label:t("chartDS_cacheRead"),\n\
+            data:sCacheRead,\n\
+            borderColor:"rgba(139,92,246,0.8)",backgroundColor:"rgba(139,92,246,0.08)",\n\
+            pointBackgroundColor:"#8b5cf6",pointRadius:3,tension:0.25,borderWidth:2,\n\
+            yAxisID:"yCR",fill:true\n\
+          },\n\
+          {\n\
+            type:"scatter",label:t("forensicDS_modelChange"),\n\
+            data:mcSvc,pointStyle:"rectRot",pointRadius:6,\n\
+            pointBackgroundColor:"#22d3ee",pointBorderColor:"#06b6d4",pointBorderWidth:2,\n\
+            yAxisID:"y",showLine:false\n\
+          },\n\
+          {\n\
+            type:"scatter",label:t("serviceDS_versionChange"),\n\
+            data:vcSvc,pointStyle:"triangle",pointRadius:7,\n\
+            pointBackgroundColor:"#4ade80",pointBorderColor:"#16a34a",pointBorderWidth:2,\n\
+            yAxisID:"y",showLine:false\n\
+          }\n\
+        ]\n\
+      },\n\
+      options:{\n\
+        responsive:true,maintainAspectRatio:true,aspectRatio:2.4,\n\
+        interaction:{mode:"index",intersect:false},\n\
+        scales:{\n\
+          x:{stacked:true,grid:{color:"rgba(51,65,85,0.5)"}},\n\
+          y:{stacked:true,position:"left",beginAtZero:true,\n\
+            title:{display:true,text:t("serviceAxisHours"),color:"#94a3b8"},\n\
+            ticks:{color:"#94a3b8",stepSize:4,callback:function(v){return v+"h";}},\n\
+            grid:{color:"rgba(51,65,85,0.5)"}},\n\
+          yCR:{position:"right",beginAtZero:true,\n\
+            title:{display:true,text:t("chartDS_cacheRead"),color:"#8b5cf6"},\n\
+            ticks:{color:"#8b5cf6",callback:function(v){return fmt(v);}},\n\
+            grid:{drawOnChartArea:false}}\n\
+        },\n\
+        plugins:{\n\
+          legend:{labels:{color:"#cbd5e1"}},\n\
+          tooltip:{\n\
+            callbacks:{\n\
+              title:function(items){return items.length?days[items[0].dataIndex].date:"";},\n\
+              afterBody:function(items){\n\
+                if(!items.length)return"";\n\
+                var di=items[0].dataIndex;\n\
+                var d=days[di];\n\
+                var lines=[];\n\
+                lines.push(t("serviceDS_cleanWork")+": "+sClean[di]+"h");\n\
+                if(sAffServer[di]>0)lines.push(t("serviceDS_affectedServer")+": "+sAffServer[di]+"h");\n\
+                if(sAffClient[di]>0)lines.push(t("serviceDS_affectedClient")+": "+sAffClient[di]+"h");\n\
+                if(sOutOnly[di]>0)lines.push(t("serviceDS_outageOnly")+": "+sOutOnly[di].toFixed(1)+"h");\n\
+                lines.push("Cache Read: "+fmt(d.cache_read||0)+" (C:O "+(d.cache_output_ratio||0)+"x)");\n\
+                if((d.outage_hours||0)>0){\n\
+                  lines.push("");\n\
+                  var oIncs=d.outage_incidents||[];\n\
+                  for(var oi=0;oi<oIncs.length;oi++)lines.push("["+oIncs[oi].impact.toUpperCase()+"] "+oIncs[oi].name);\n\
+                }\n\
+                if(d.model_change){\n\
+                  if(d.model_change.added&&d.model_change.added.length)lines.push(t("tooltipModelAdded")+d.model_change.added.join(", "));\n\
+                  if(d.model_change.removed&&d.model_change.removed.length)lines.push(t("tooltipModelRemoved")+d.model_change.removed.join(", "));\n\
+                }\n\
+                if(d.version_change){\n\
+                  var vl=t("tooltipVersionUpdate");\n\
+                  if(d.version_change.from)vl+=d.version_change.from+" \\u2192 ";\n\
+                  vl+=d.version_change.added.join(", ");\n\
+                  lines.push(vl);\n\
+                  var vhl=d.version_change.highlights||[];\n\
+                  for(var vhi=0;vhi<Math.min(3,vhl.length);vhi++) lines.push("  \\u2022 "+vhl[vhi].slice(0,80));\n\
+                }\n\
+                return lines;\n\
+              }\n\
+            }\n\
+          }\n\
+        }\n\
+      }\n\
+    });\n\
+  }\n\
+}\n\
+\n\
+// (renderTimelineChart entfernt)\n\
+// ─── Anthropic Status Lamp ───\n\
+function updateStatusLamp(data) {\n\
+  var dot = document.getElementById("anthropic-dot");\n\
+  var label = document.getElementById("anthropic-label");\n\
+  if (!dot || !label) return;\n\
+  var st = data.outage_status || "pending";\n\
+  if (st === "error" || st === "pending") {\n\
+    dot.style.background = "#475569";\n\
+    label.textContent = t("statusPending");\n\
+    dot.parentElement.title = t("statusPendingTip");\n\
+    return;\n\
+  }\n\
+  // Prüfe aktuellste Incidents: gibt es unresolved oder recent?\n\
+  var days = data.days || [];\n\
+  var today = data.calendar_today || new Date().toISOString().slice(0,10);\n\
+  var todayData = null;\n\
+  for (var i = days.length - 1; i >= 0; i--) { if (days[i].date === today) { todayData = days[i]; break; } }\n\
+  var hasActiveOutage = false;\n\
+  var hasRecentIncident = false;\n\
+  if (todayData && todayData.outage_incidents) {\n\
+    for (var ii = 0; ii < todayData.outage_incidents.length; ii++) {\n\
+      var inc = todayData.outage_incidents[ii];\n\
+      if (!inc.resolved_at) { hasActiveOutage = true; break; }\n\
+      hasRecentIncident = true;\n\
+    }\n\
+  }\n\
+  if (hasActiveOutage) {\n\
+    dot.style.background = "#ef4444";\n\
+    label.textContent = t("statusOutage");\n\
+    dot.parentElement.title = t("statusOutageTip");\n\
+  } else if (hasRecentIncident) {\n\
+    dot.style.background = "#f59e0b";\n\
+    label.textContent = t("statusIncident");\n\
+    dot.parentElement.title = t("statusIncidentTip");\n\
+  } else {\n\
+    dot.style.background = "#22c55e";\n\
+    label.textContent = t("statusOk");\n\
+    dot.parentElement.title = t("statusOkTip");\n\
+  }\n\
+}\n\
+\n\
+// ─── Forensic Report Generator ───\n\
+function generateForensicReportMd(data) {\n\
+  var days = data.days || [];\n\
+  if (!days.length) return t("reportNoData");\n\
+  var isDE = __lang === "de";\n\
+  var CACHE_THRESH = 500000000;\n\
+  var HIT_MIN = 50;\n\
+  var md = [];\n\
+  var now = new Date().toISOString().replace("T"," ").slice(0,19);\n\
+\n\
+  // helper\n\
+  function pad(s,w){s=String(s);while(s.length<w)s=" "+s;return s;}\n\
+  function dayTotal(d){return (d.input||0)+(d.output||0)+(d.cache_read||0)+(d.cache_creation||0);}\n\
+\n\
+  // Detect peak + limit days\n\
+  var peakDay=null,peakVal=0;\n\
+  for(var i=0;i<days.length;i++){var tt=dayTotal(days[i]);if(tt>peakVal){peakVal=tt;peakDay=days[i];}}\n\
+  var limitDays=[];\n\
+  for(var i=0;i<days.length;i++){var d=days[i];var fl=[];if((d.hit_limit||0)>=HIT_MIN)fl.push("HIT("+(d.hit_limit)+")");if((d.cache_read||0)>=CACHE_THRESH)fl.push("CACHE\\u2265500M");if(fl.length)limitDays.push({d:d,flags:fl});}\n\
+\n\
+  md.push("# Forensic Report \\u2014 Claude Code Token Usage");\n\
+  md.push("");\n\
+  md.push((isDE?"Erstellt: ":"Generated: ")+now);\n\
+  md.push((isDE?"Peak-Tag: ":"Peak day: ")+(peakDay?peakDay.date+" ("+fmt(peakVal)+")":"\\u2014"));\n\
+  md.push((isDE?"Limit-Tage: ":"Limit days: ")+limitDays.length);\n\
+  md.push("");\n\
+\n\
+  // 1. Daily overview\n\
+  md.push("## 1. "+(isDE?"Tages\\u00fcbersicht":"Daily Overview"));\n\
+  md.push("");\n\
+  md.push("| "+(isDE?"Datum":"Date")+" | Output | Cache Read | C:O | Calls | "+(isDE?"Std.":"Hours")+" | Limit |");\n\
+  md.push("|------------|----------|------------|--------|-------|-------|--------|");\n\
+  for(var i=0;i<days.length;i++){var d=days[i];var cr=d.output>0?Math.round(d.cache_read/d.output):0;var lim="\\u2014";if((d.hit_limit||0)>=HIT_MIN)lim="HIT("+(d.hit_limit)+")";if((d.cache_read||0)>=CACHE_THRESH)lim+=(lim!=="\\u2014"?", ":"")+"CACHE\\u2265500M";md.push("| "+d.date+" | "+fmt(d.output)+" | "+fmt(d.cache_read)+" | "+cr+"x | "+d.calls+" | "+(d.active_hours||0)+" | "+lim+" |");}\n\
+  md.push("");\n\
+\n\
+  // 2. Efficiency\n\
+  md.push("## 2. "+(isDE?"Effizienz":"Efficiency"));\n\
+  md.push("");\n\
+  md.push("| "+(isDE?"Datum":"Date")+" | Overhead | Output/h | Total/h | Subagent% |");\n\
+  md.push("|------------|----------|----------|---------|-----------|");\n\
+  for(var i=0;i<days.length;i++){var d=days[i];var tot=dayTotal(d);var ah=Math.max(1,d.active_hours||1);var oh=d.output>0?(tot/d.output).toFixed(0)+"x":"\\u2014";var sp=(d.sub_pct||0)+"%";md.push("| "+d.date+" | "+oh+" | "+fmt(Math.round(d.output/ah))+" | "+fmt(Math.round(tot/ah))+" | "+sp+" |");}\n\
+  md.push("");\n\
+\n\
+  // 3. Subagent\n\
+  md.push("## 3. "+(isDE?"Subagent-Analyse":"Subagent Analysis"));\n\
+  md.push("");\n\
+  md.push("| "+(isDE?"Datum":"Date")+" | "+(isDE?"Aufrufe":"Calls")+" | Sub | Sub-Cache | Sub-Cache% |");\n\
+  md.push("|------------|--------|------|-----------|------------|");\n\
+  for(var i=0;i<days.length;i++){var d=days[i];var sc=d.sub_cache||0;var scp=(d.sub_cache_pct||0)+"%";md.push("| "+d.date+" | "+d.calls+" | "+(d.sub_calls||0)+" | "+fmt(sc)+" | "+scp+" |");}\n\
+  md.push("");\n\
+\n\
+  // 4. Budget estimate\n\
+  if(limitDays.length>0 && peakDay){\n\
+    md.push("## 4. "+(isDE?"Budget-Sch\\u00e4tzung":"Budget Estimate"));\n\
+    md.push("");\n\
+    md.push((isDE?"Impl@90% = Total / 0.9 (gesch\\u00e4tztes Budget wenn ~90% erreicht).":"Impl@90% = total / 0.9 (estimated budget if ~90% was reached)."));\n\
+    md.push("");\n\
+    md.push("| "+(isDE?"Datum":"Date")+" | Total | Impl@90% | vs Peak | "+(isDE?"Std.":"Hours")+" | "+(isDE?"Signal":"Signal")+" |");\n\
+    md.push("|------------|---------|----------|---------|-------|--------|");\n\
+    var prevI=0;\n\
+    for(var li=0;li<limitDays.length;li++){var ld=limitDays[li];var tot=dayTotal(ld.d);var impl=Math.round(tot/0.9);var vsp=peakVal>0?(peakVal/impl).toFixed(1)+"x":"\\u2014";var trend="";if(prevI>0){var ch=Math.round(((impl-prevI)/prevI)*100);if(ch>5)trend=" \\u2191"+ch+"%";else if(ch<-5)trend=" \\u2193"+Math.abs(ch)+"%";else trend=" \\u2192";}prevI=impl;md.push("| "+ld.d.date+" | "+fmt(tot)+" | "+fmt(impl)+" | "+vsp+" | "+(ld.d.active_hours||0)+" | "+ld.flags.join(", ")+trend+" |");}\n\
+\n\
+    // Median\n\
+    var ivs=[];\n\
+    for(var li=0;li<limitDays.length;li++){var ld=limitDays[li];if(ld.d.calls>=50&&(ld.d.active_hours||0)>=2)ivs.push(Math.round(dayTotal(ld.d)/0.9));}\n\
+    if(ivs.length>=2){\n\
+      ivs.sort(function(a,b){return a-b;});\n\
+      var med=ivs[Math.floor(ivs.length/2)];\n\
+      md.push("");\n\
+      md.push((isDE?"**Zusammenfassung** (":"**Summary** (")+ivs.length+(isDE?" aussagekr\\u00e4ftige Limit-Tage):":" meaningful limit days):"));\n\
+      md.push("- Median Impl@90%: ~"+fmt(med));\n\
+      md.push("- "+(isDE?"Bereich: ":"Range: ")+fmt(ivs[0])+" .. "+fmt(ivs[ivs.length-1]));\n\
+      md.push("- Peak: "+fmt(peakVal)+" ("+peakDay.date+")");\n\
+      if(med>0)md.push("- Peak / Median: "+(peakVal/med).toFixed(1)+"x");\n\
+    }\n\
+    md.push("");\n\
+  }\n\
+\n\
+  // 5. Peak vs Limit comparison\n\
+  if(peakDay && limitDays.length>0){\n\
+    var bestLim=null;\n\
+    for(var li=limitDays.length-1;li>=0;li--){var ld=limitDays[li];if(ld.d.calls>=50&&(ld.d.active_hours||0)>=2){bestLim=ld;break;}}\n\
+    if(!bestLim)bestLim=limitDays[limitDays.length-1];\n\
+    if(bestLim && bestLim.d.date!==peakDay.date){\n\
+      md.push("## "+(isDE?"Fazit: Peak vs. Limit-Tag":"Conclusion: Peak vs. Limit Day"));\n\
+      md.push("");\n\
+      var tP=dayTotal(peakDay),tL=dayTotal(bestLim.d);\n\
+      md.push("| | "+peakDay.date+" (Peak) | "+bestLim.d.date+" (Limit) |");\n\
+      md.push("|---|---|---|");\n\
+      md.push("| Output | "+fmt(peakDay.output)+" | "+fmt(bestLim.d.output)+" |");\n\
+      md.push("| Cache Read | "+fmt(peakDay.cache_read)+" | "+fmt(bestLim.d.cache_read)+" |");\n\
+      md.push("| Total | "+fmt(tP)+" | "+fmt(tL)+" |");\n\
+      md.push("| "+(isDE?"Stunden":"Hours")+" | "+(peakDay.active_hours||0)+" | "+(bestLim.d.active_hours||0)+" |");\n\
+      md.push("| Calls | "+peakDay.calls+" | "+bestLim.d.calls+" |");\n\
+      var crP=peakDay.output>0?Math.round(peakDay.cache_read/peakDay.output):0;\n\
+      var crL=bestLim.d.output>0?Math.round(bestLim.d.cache_read/bestLim.d.output):0;\n\
+      md.push("| C:O Ratio | "+crP+"x | "+crL+"x |");\n\
+      md.push("");\n\
+      var impl=Math.round(tL/0.9);\n\
+      var drop=impl>0?Math.round(tP/impl):0;\n\
+      if(drop>1){\n\
+        md.push("**"+(isDE?"Effektive Budget-Reduktion: ~":"Effective budget reduction: ~")+drop+"x**");\n\
+        md.push("");\n\
+      }\n\
+    }\n\
+  }\n\
+\n\
+  // ─── Service Impact: Work vs Outage mit ASCII-Bars ───\n\
+  var hasAnyOutage=false;\n\
+  for(var oi=0;oi<days.length;oi++){if((days[oi].outage_hours||0)>0){hasAnyOutage=true;break;}}\n\
+  if(hasAnyOutage){\n\
+    md.push("## "+(isDE?"Service Impact: Arbeitszeit vs. Ausfall":"Service Impact: Work vs. Outage"));\n\
+    md.push("");\n\
+    md.push((isDE?"Legende: ":"Legend: ")+"\\u2588 = "+(isDE?"saubere Arbeit":"clean work")+" | \\u2593 = "+(isDE?"Arbeit bei Ausfall":"work during outage")+" | \\u2591 = "+(isDE?"Ausfall (keine Arbeit)":"outage (no work)"));\n\
+    md.push("");\n\
+    // Berechne max Stunden fuer Skalierung\n\
+    var maxH=0;\n\
+    var svcRows=[];\n\
+    for(var si=0;si<days.length;si++){\n\
+      var sd=days[si];\n\
+      var wHrs=Object.keys(sd.hours||{}).map(function(h){return parseInt(h);});\n\
+      var spans=sd.outage_spans||[];\n\
+      var affected=0;\n\
+      for(var wi=0;wi<wHrs.length;wi++){\n\
+        for(var oj=0;oj<spans.length;oj++){\n\
+          if(wHrs[wi]>=Math.floor(spans[oj].from)&&wHrs[wi]<Math.ceil(spans[oj].to)){affected++;break;}\n\
+        }\n\
+      }\n\
+      var outTotal=0;\n\
+      for(var oj=0;oj<spans.length;oj++) outTotal+=spans[oj].to-spans[oj].from;\n\
+      var clean=wHrs.length-affected;\n\
+      var outOnly=Math.max(0,Math.round((outTotal-affected)*10)/10);\n\
+      var totalH=clean+affected+outOnly;\n\
+      if(totalH>maxH)maxH=totalH;\n\
+      svcRows.push({date:sd.date,clean:clean,affected:affected,outOnly:outOnly,cr:sd.cache_read||0,co:sd.cache_output_ratio||0,outageH:sd.outage_hours||0,mc:sd.model_change});\n\
+    }\n\
+    var barW=40;\n\
+    md.push("```");\n\
+    for(var si=0;si<svcRows.length;si++){\n\
+      var r=svcRows[si];\n\
+      var totalH=r.clean+r.affected+r.outOnly;\n\
+      if(totalH===0&&r.outageH===0) continue;\n\
+      var scale=maxH>0?barW/maxH:1;\n\
+      var bClean=Math.round(r.clean*scale);\n\
+      var bAff=Math.round(r.affected*scale);\n\
+      var bOut=Math.round(r.outOnly*scale);\n\
+      var bar="";\n\
+      for(var b=0;b<bClean;b++) bar+="\\u2588";\n\
+      for(var b=0;b<bAff;b++) bar+="\\u2593";\n\
+      for(var b=0;b<bOut;b++) bar+="\\u2591";\n\
+      var label=r.date.slice(5)+" "+bar+" ";\n\
+      if(r.affected>0) label+=r.clean+"h+"+(isDE?r.affected+"h Ausfall":r.affected+"h outage");\n\
+      else label+=r.clean+"h";\n\
+      if(r.outOnly>0) label+=" (+"+r.outOnly.toFixed(0)+"h "+(isDE?"nur Ausfall":"outage only")+")";\n\
+      if(r.cr>0) label+=" | C:"+fmt(r.cr)+" ("+r.co+"x)";\n\
+      if(r.mc){\n\
+        if(r.mc.added&&r.mc.added.length) label+=" \\u25c7+"+r.mc.added.join(",");\n\
+        if(r.mc.removed&&r.mc.removed.length) label+=" \\u25c7-"+r.mc.removed.join(",");\n\
+      }\n\
+      md.push(label);\n\
+    }\n\
+    md.push("```");\n\
+    md.push("");\n\
+    // Zusammenfassung\n\
+    var totClean=0,totAff=0,totOutOnly=0;\n\
+    for(var si=0;si<svcRows.length;si++){totClean+=svcRows[si].clean;totAff+=svcRows[si].affected;totOutOnly+=svcRows[si].outOnly;}\n\
+    md.push((isDE?"**Gesamt:** ":"**Total:** ")+totClean+"h "+(isDE?"saubere Arbeit":"clean work")+" | "+totAff+"h "+(isDE?"Arbeit bei Ausfall":"work during outage")+" | "+Math.round(totOutOnly)+"h "+(isDE?"Ausfall ohne Arbeit":"outage without work"));\n\
+    if(totAff>0&&(totClean+totAff)>0){\n\
+      var pctAff=Math.round(totAff/(totClean+totAff)*100);\n\
+      md.push((isDE?"**Betroffene Arbeitszeit: ":"**Affected work time: ")+pctAff+"%**");\n\
+    }\n\
+    md.push("");\n\
+  }\n\
+\n\
+  // ─── Extension-Versionen & Releases ───\n\
+  var hasVerChange=false;\n\
+  for(var vi=0;vi<days.length;vi++){if(days[vi].version_change){hasVerChange=true;break;}}\n\
+  if(hasVerChange){\n\
+    md.push("## "+(isDE?"Extension-Updates (Claude Code)":"Extension Updates (Claude Code)"));\n\
+    md.push("");\n\
+    md.push("| "+(isDE?"Datum":"Date")+" | Version | Highlights |");\n\
+    md.push("|------------|---------|------------|");\n\
+    for(var vi=0;vi<days.length;vi++){\n\
+      var vc=days[vi].version_change;\n\
+      if(!vc)continue;\n\
+      var ver=vc.added.join(", ");\n\
+      if(vc.from)ver=vc.from+" \\u2192 "+ver;\n\
+      var hl=(vc.highlights||[]).slice(0,3).join("; ");\n\
+      if(hl.length>120)hl=hl.slice(0,117)+"...";\n\
+      md.push("| "+days[vi].date+" | "+ver+" | "+hl+" |");\n\
+    }\n\
+    md.push("");\n\
+  }\n\
+\n\
+  // ─── Thinking-Token Hinweis ───\n\
+  md.push("> "+(isDE?"\\u26a0 **Hinweis:** Thinking-Tokens (internes Reasoning) erscheinen nicht in der API-Antwort und werden nicht gez\\u00e4hlt. Sie belasten wahrscheinlich das Session-Budget.":"\\u26a0 **Note:** Thinking tokens (internal reasoning) do not appear in the API response and are not counted here. They likely count against the session budget."));\n\
+  md.push("");\n\
+\n\
+  md.push("---");\n\
+  md.push((isDE?"*Alle Werte heuristisch \\u2014 kein offizieller API-Nachweis. Generiert vom Claude Usage Dashboard.*":"*All values are heuristic \\u2014 not official API proof. Generated by Claude Usage Dashboard.*"));\n\
+  md.push("");\n\
+  return md.join("\\n");\n\
+}\n\
+\n\
+function openReportModal(){\n\
+  if(!__lastUsageData||!__lastUsageData.days||!__lastUsageData.days.length)return;\n\
+  var md=generateForensicReportMd(__lastUsageData);\n\
+  document.getElementById("report-content").textContent=md;\n\
+  document.getElementById("report-modal-title").textContent=t("reportTitle");\n\
+  document.getElementById("report-copy-btn").textContent=t("reportCopy");\n\
+  document.getElementById("report-download-btn").textContent=t("reportDownload");\n\
+  document.getElementById("report-modal-overlay").classList.add("open");\n\
+}\n\
+function closeReportModal(){\n\
+  document.getElementById("report-modal-overlay").classList.remove("open");\n\
+}\n\
+function downloadReport(){\n\
+  var text=document.getElementById("report-content").textContent;\n\
+  var blob=new Blob([text],{type:"text/markdown;charset=utf-8"});\n\
+  var url=URL.createObjectURL(blob);\n\
+  var a=document.createElement("a");\n\
+  a.href=url;a.download="forensic-report-"+new Date().toISOString().slice(0,10)+".md";\n\
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);\n\
+}\n\
+function copyReport(){\n\
+  var text=document.getElementById("report-content").textContent;\n\
+  navigator.clipboard.writeText(text).then(function(){\n\
+    var btn=document.getElementById("report-copy-btn");\n\
+    var orig=btn.textContent;btn.textContent=t("reportCopied");\n\
+    setTimeout(function(){btn.textContent=orig;},1500);\n\
+  });\n\
 }\n\
 \n\
 // Sofort aktuellen Cache holen (nicht nur auf erstes SSE warten)\n\
@@ -1617,6 +2292,16 @@ function renderDashboardCore(data) {\n\
     document.addEventListener("click",function(){lp.classList.remove("live-files-open");});\n\
     lp.addEventListener("click",function(e){e.stopPropagation();});\n\
   }\n\
+  var rbtn=document.getElementById("forensic-report-btn");\n\
+  if(rbtn){rbtn.addEventListener("click",openReportModal);}\n\
+  var rcl=document.getElementById("report-close-btn");\n\
+  if(rcl){rcl.addEventListener("click",closeReportModal);}\n\
+  var rdl=document.getElementById("report-download-btn");\n\
+  if(rdl){rdl.addEventListener("click",downloadReport);}\n\
+  var rcp=document.getElementById("report-copy-btn");\n\
+  if(rcp){rcp.addEventListener("click",copyReport);}\n\
+  var rov=document.getElementById("report-modal-overlay");\n\
+  if(rov){rov.addEventListener("click",function(e){if(e.target===rov)closeReportModal();});}\n\
 })();\n\
 fetch("/api/usage").then(function(r){return r.json();}).then(function(d){try{renderDashboard(d);}catch(e){console.error(e);}}).catch(function(){});\n\
 \n\
@@ -1764,7 +2449,10 @@ server.listen(PORT, function () {
   console.log('Auto-refresh every ' + REFRESH_SEC + 's (--refresh=N to change)');
   console.log('Erster Scan läuft inkrementell (SSE-Updates, Zwischenstände); Seite sofort nutzbar.');
   console.log('Press Ctrl+C to stop.');
+  refreshOutageCache();
+  refreshReleasesCache();
   runScanAndBroadcast();
 });
 
 setInterval(runScanAndBroadcast, REFRESH_SEC * 1000);
+setInterval(refreshOutageCache, OUTAGE_REFRESH_MS);

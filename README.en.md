@@ -110,7 +110,32 @@ node claude-usage-dashboard.js
 - **Data source** in the UI: generic **`~/.claude/projects`** (no absolute paths with usernames in the UI/API).
 - **Hit limit (red in charts):** counts JSONL lines matching typical rate/limit patterns — **not** a direct Anthropic API proof.
 - **Forensic** (collapsible): codes **`?`** (very high cache read), **`HIT`** (limit-like lines in logs), **`<<P`** (strict peak comparison with minimum output/calls). **Not** the same as the Claude UI “90% / 100%”.
-- Deeper **CLI forensics** remain in **`token_forensics.js`** (run separately).
+
+### CLI forensics (`token_forensics.js`)
+
+Standalone analysis tool with **automatic peak and limit detection** (no hardcoded dates):
+
+```bash
+node token_forensics.js
+```
+
+**Automatic detection:**
+
+- **Peak day:** Day with the highest total consumption (input + output + cache read + cache create).
+- **Limit days:** Days with ≥ 50 `rate_limit`/`429`/`session limit` lines in JSONL **or** cache read ≥ 500M.
+- **Comparison:** For the budget comparison, the most recent limit day with significant activity is chosen (≥ 50 calls, ≥ 2 active hours) to ensure meaningful results.
+
+**7 sections:**
+
+1. **Daily overview** — Cache:output ratio, active hours, automatic limit label per day.
+2. **Efficiency collapse** — Overhead (tokens per output token), output/h, subagent share.
+3. **Subagent analysis** — Cache multiplier: subagent cache as a share of total cache.
+4. **Budget estimate** — Implied cap (`total/0.9`) per limit day, trend arrows (↑↓→), median range across meaningful limit days, ratio to peak. Shows where the token budget approximately lies and whether it has shifted.
+5. **Hourly breakdown** — Hour-by-hour detail for the most recent meaningful limit day (or today).
+6. **Conclusion** — Peak day vs. limit day comparison: implied budget, effective budget reduction, estimated minutes until limit.
+7. **Visual** — ASCII bar chart with peak and limit markers.
+
+**Insights for MAX plans:** The peak/limit comparison helps estimate whether the session budget has changed or whether token weighting (input/output/cache) has shifted. The `cache:output` ratio shows working efficiency — fewer subagents = less cache overhead = longer work until the limit.
 
 ### API (short)
 
