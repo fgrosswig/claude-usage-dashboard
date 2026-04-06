@@ -4520,6 +4520,27 @@ function renderHealthScore(data) {
   hh += "</span></div>";
   if (headerEl.innerHTML !== hh) headerEl.innerHTML = hh;
 
+  // Update collapsed summary: score circle + inline indicator dots + findings count
+  var smCircle = document.getElementById("health-circle-sm");
+  var smText = document.getElementById("health-summary-text");
+  if (smCircle) { smCircle.style.background = scoreColor; smCircle.textContent = score; }
+  if (smText) {
+    var sh = "";
+    for (var si = 0; si < indicators.length; si++) {
+      var ind = indicators[si];
+      var dc = ind.color === "red" ? "#ef4444" : ind.color === "yellow" ? "#f59e0b" : "#22c55e";
+      sh += '<span class="hs-inline-badge"><span class="hs-inline-dot" style="background:' + dc + '"></span>' + escHtml(ind.label) + ' <strong>' + escHtml(ind.display) + '</strong></span>';
+    }
+    var findings = computeKeyFindings(data);
+    sh += '<span class="hs-inline-sep">|</span>';
+    for (var ff = 0; ff < findings.length; ff++) {
+      var f = findings[ff];
+      var fdc = f.icon === "red" ? "#ef4444" : f.icon === "yellow" ? "#f59e0b" : "#22c55e";
+      sh += '<span class="hs-inline-badge"><span class="hs-inline-dot" style="background:' + fdc + '"></span>' + escHtml(f.title) + ' <strong>' + escHtml(f.value) + '</strong></span>';
+    }
+    smText.innerHTML = sh;
+  }
+
   // Grid
   var gh = "";
   for (var gi = 0; gi < indicators.length; gi++) {

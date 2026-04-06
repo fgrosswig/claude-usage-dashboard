@@ -308,5 +308,6 @@
   "findingRetries": "API-Retries",
   "findingRetriesDetail": "{total} Retries ({perDay}/Tag). API-Fehler erzwingen wiederholte Aufrufe.",
   "findingCacheParadox": "Cache-Paradox",
-  "findingCacheParadoxDetail": "Hohe Cache-Ratio maskiert Context-Degradation. Cache bleibt hoch trotz Silent Compaction."
+  "findingCacheParadoxDetail": "Hohe Cache-Ratio maskiert Context-Degradation. Cache bleibt hoch trotz Silent Compaction.",
+  "healthCollapseSummary": "Gesundheit {score}/10 — {warns} Warnungen, {crits} kritisch · {findings} Befunde"
 }
