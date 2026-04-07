@@ -18,6 +18,16 @@ steps:
         echo "Base image tag: $BASE_VER"
         sed "s|^ARG BASE_TAG=.*|ARG BASE_TAG=$BASE_VER|" Dockerfile > Dockerfile.ci
 
+  - name: sonar-scan
+    image: sonarsource/sonar-scanner-cli
+    commands:
+      - sonar-scanner -Dsonar.host.url=$SONAR_URL -Dsonar.token=$SONAR_TOKEN
+    environment:
+      SONAR_URL:
+        from_secret: sonar_url
+      SONAR_TOKEN:
+        from_secret: sonar_token
+
   - name: build-push
     image: plugins/kaniko
     settings:
@@ -27,6 +37,7 @@ steps:
       tags:
         - latest
         - '${CI_COMMIT_SHA:0:8}'
+        - '${CI_COMMIT_TAG}'
       build_args:
         - CI_COMMIT_SHORT_SHA=${CI_COMMIT_SHA:0:8}
         - CI_COMMIT_REF_NAME=${CI_COMMIT_BRANCH}

@@ -141,6 +141,9 @@ jobs:
             -H "Authorization: token ${GITEA_TOKEN}" || echo "[]")
           TAG=$(echo "$RELEASE_JSON" | python3 -c "import json,sys; r=json.load(sys.stdin); print(r[0]['tag_name'] if r else '')")
           [ -z "$TAG" ] && { echo "No Gitea release found, skip"; exit 0; }
+          # Skip pre-releases (rc, beta, alpha) — only mirror final releases to GitHub
+          IS_PRE=$(echo "$RELEASE_JSON" | python3 -c "import json,sys; r=json.load(sys.stdin); print('true' if r and r[0].get('prerelease') else 'false')")
+          [ "$IS_PRE" = "true" ] && { echo "Pre-release ${TAG}, skip GitHub mirror"; exit 0; }
           # Check if GitHub already has this tag/release
           HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer ${GH_MIRROR_TOKEN}" \
