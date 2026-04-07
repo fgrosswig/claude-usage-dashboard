@@ -5039,9 +5039,13 @@ function renderIncidentHistory(data) {
         {
           label: t("incidentDSOutageHours"),
           data: outageHours,
-          backgroundColor: colors,
+          backgroundColor: "rgba(0,0,0,0)",
+          borderColor: colors,
+          borderWidth: 1,
           yAxisID: "y",
-          borderRadius: 3
+          borderRadius: 2,
+          barPercentage: 0.35,
+          categoryPercentage: 0.6
         },
         {
           label: t("incidentDSHitLimits"),
@@ -5096,7 +5100,7 @@ function updateAnthropicPopup(data) {
     labels.push(d.date.slice(5));
     var oh = d.outage_hours || 0;
     outageH.push(oh);
-    outageColors.push(oh > 2 ? "rgba(239,68,68,.55)" : oh > 0 ? "rgba(245,158,11,.45)" : "rgba(51,65,85,.2)");
+    outageColors.push(oh > 2 ? "rgba(239,68,68,.08)" : oh > 0 ? "rgba(245,158,11,.08)" : "rgba(51,65,85,.05)");
     incidentCounts.push((d.outage_incidents || []).length);
   }
 
@@ -5115,7 +5119,7 @@ function updateAnthropicPopup(data) {
     data: {
       labels: labels,
       datasets: [
-        { label: t("incidentDSOutageHours"), data: outageH, backgroundColor: outageColors, yAxisID: "y", borderRadius: 2, barPercentage: 0.35, categoryPercentage: 0.6 },
+        { label: t("incidentDSOutageHours"), data: outageH, backgroundColor: outageColors, borderColor: outageColors.map(function(c) { return c.replace(/,[\d.]+\)/, ",0.8)"); }), borderWidth: 1, yAxisID: "y", borderRadius: 2, barPercentage: 0.35, categoryPercentage: 0.6 },
         { label: "Incidents", data: incidentCounts, type: "scatter", borderColor: "rgba(239,68,68,.8)", backgroundColor: "rgba(239,68,68,.15)", pointRadius: function(ctx) { return ctx.parsed.y > 0 ? 4 : 0; }, pointBorderWidth: 2, pointStyle: "circle", yAxisID: "y1" }
       ]
     },
