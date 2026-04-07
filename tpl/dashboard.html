@@ -20,9 +20,12 @@
 <span id="live-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:6px;animation:pulse 2s infinite;vertical-align:middle"></span><span id="live-label">Live</span>
 </div>
 <div class="live-files-panel" id="live-files-panel" role="region" aria-label="Gescannte JSONL-Dateien">
+<div class="live-release-row" id="live-release-row"></div>
+<div class="live-panel-section">
 <div class="live-files-head" id="live-files-head">Gescannte JSONL</div>
 <ul id="live-files-list"></ul>
 <div class="live-files-hint" id="live-files-hint"></div>
+</div>
 <div class="live-panel-section" id="live-outage-section" style="display:none">
 <div class="live-files-head live-panel-subhead" id="live-outage-head"></div>
 <ul class="live-panel-list" id="live-outage-list"></ul>
@@ -32,10 +35,6 @@
 <div class="live-files-head live-panel-subhead" id="live-ext-head"></div>
 <ul class="live-panel-list" id="live-ext-list"></ul>
 <p class="live-panel-empty" id="live-ext-empty" style="display:none"></p>
-</div>
-<div class="live-panel-section" id="live-release-section">
-<div class="live-files-head live-panel-subhead">Release</div>
-<div class="live-release-info" id="live-release-info"></div>
 </div>
 </div>
 </div>
@@ -286,6 +285,15 @@
 <button type="button" class="anthropic-modal-close" id="anthropic-modal-close">&times;</button>
 </div>
 <div class="anthropic-modal-body" id="anthropic-modal-body"></div>
+</div>
+</div>
+<div class="anthropic-modal-overlay" id="release-modal-overlay">
+<div class="anthropic-modal" style="max-width:700px">
+<div class="anthropic-modal-header">
+<span class="anthropic-modal-title">Release History</span>
+<button type="button" class="anthropic-modal-close" id="release-modal-close">&times;</button>
+</div>
+<div class="anthropic-modal-body" id="release-modal-body" style="padding:16px 20px"></div>
 </div>
 </div>
 <script>window.__I18N_BUNDLES=__I18N_PLACEHOLDER__;</script>
