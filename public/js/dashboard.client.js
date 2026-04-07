@@ -5138,21 +5138,6 @@ function updateAnthropicPopup(data) {
   });
 }
 
-
-// Anthropic badge click toggle
-(function() {
-  var badge = document.getElementById("anthropic-badge");
-  if (badge) {
-    badge.style.cursor = "pointer";
-    badge.addEventListener("click", function(e) {
-      e.stopPropagation();
-      badge.classList.toggle("popup-open");
-    });
-    document.addEventListener("click", function() {
-      badge.classList.remove("popup-open");
-    });
-  }
-})();
 fetchUsageJsonOnce();
 connectUsageStream();
 scheduleFetchExtensionTimeline(900);
