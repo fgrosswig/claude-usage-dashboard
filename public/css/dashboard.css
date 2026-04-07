@@ -318,7 +318,7 @@ tr:hover td{background:#334155}
 
 /* Anthropic badge hover popup */
 .top-bar-badge{position:relative}
-.anthropic-popup{display:none;position:absolute;right:0;top:100%;margin-top:6px;background:#1e293b;border:1px solid #475569;border-radius:8px;padding:10px 12px;z-index:200;min-width:500px;max-width:750px;box-shadow:0 8px 24px rgba(0,0,0,.5);max-height:80vh;overflow:hidden}
+.anthropic-popup{display:none;position:absolute;left:0;top:100%;margin-top:6px;background:#1e293b;border:1px solid #475569;border-radius:8px;padding:12px 14px;z-index:9500;min-width:500px;max-width:700px;box-shadow:0 12px 40px rgba(0,0,0,.7);max-height:80vh;overflow-y:auto}
 .top-bar-badge.popup-open .anthropic-popup{display:block}
 .anthropic-popup-head{font-size:.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
 .anthropic-popup-list{list-style:none;padding:0;margin:0;font-size:.68rem;color:#e2e8f0;line-height:1.5}
