@@ -302,3 +302,7 @@ tr:hover td{background:#334155}
 
 #health-summary-text{display:flex;flex-wrap:wrap;gap:2px 0;align-items:center;min-width:0}
 
+
+#filter-host-select{min-width:100px;max-width:200px;background:#0f172a;border:1px solid #475569;color:#e2e8f0;border-radius:6px;font-size:.78rem;padding:2px}
+#filter-host-select option{padding:4px 8px}
+#filter-host-select option:checked{background:#3b82f6;color:#fff}

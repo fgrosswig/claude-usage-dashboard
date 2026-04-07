@@ -1612,11 +1612,14 @@ function getFilteredDays(days) {
 }
 
 function getFilterHost() {
-  var chips = document.getElementById("filter-host-chips");
-  if (!chips) return "";
-  var active = chips.querySelector(".filter-chip.active");
-  if (!active) return "";
-  return active.dataset.host || "";
+  var sel = document.getElementById("filter-host-select");
+  if (!sel) return "";
+  var opts = sel.selectedOptions;
+  if (!opts || !opts.length) return "";
+  var vals = [];
+  for (var i = 0; i < opts.length; i++) vals.push(opts[i].value);
+  if (vals.indexOf("") >= 0) return "";
+  return vals.join(",");
 }
 
 function renderDashboard(data, urgent) {
