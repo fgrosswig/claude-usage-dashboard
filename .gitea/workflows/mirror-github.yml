@@ -1,0 +1,59 @@
+# Öffentlicher Spiegel: nur main, flacher Snapshot. Forge-Repo bleibt unverändert.
+# 1) MIRROR_EXCLUDE_PATHS: interne CI-Verzeichnisse raus (nie auf GitHub).
+# 2) strip_public_tree: interne Hosts in Textdateien → Platzhalter / Zeilen mit Forge-Domain entfernen.
+
+name: Mirror to GitHub
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  MIRROR_EXCLUDE_PATHS: .woodpecker .gitea
+
+jobs:
+  mirror-main:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+      - name: Publish snapshot to GitHub (main only, strip internal refs)
+        env:
+          GH_MIRROR_TOKEN: ${{ secrets.gh_pat_token }}
+          MIRROR_DEST_BRANCH: main
+        run: |
+          set -eux
+          git config user.email "public-mirror@users.noreply.local"
+          git config user.name "public-mirror"
+          git remote add github "https://x-access-token:${GH_MIRROR_TOKEN}@github.com/fgrosswig/claude-usage-dashboard.git"
+          SHORT="$(git rev-parse --short HEAD)"
+          for p in ${MIRROR_EXCLUDE_PATHS}; do
+            [ -z "${p}" ] && continue
+            rm -rf "${p}"
+          done
+          git checkout --orphan public-publish
+          find . -type f ! -path './.git/*' \( \
+              -name '*.md' -o -name '*.yml' -o -name '*.yaml' -o -name '*.sh' -o -name '*.tpl' \
+              -o -name 'Dockerfile' -o -name 'Dockerfile.*' -o -name 'docker-compose*.yml' \
+            \) -print0 | while IFS= read -r -d '' f; do
+              sed -i \
+                -e 's/harbor\.grosswig-it\.de/registry.example.com/g' \
+                -e 's/gitea\.grosswig-it\.de/git.example.com/g' \
+                -e 's/ci\.grosswig-it\.de/ci.example.com/g' \
+                "$f" || true
+            done
+          find . -type f ! -path './.git/*' -name '*.md' -print0 | while IFS= read -r -d '' f; do
+              sed -i '/Woodpecker CI/d;/grosswig-it\.de/d' "$f" || true
+            done
+          git add -A
+          if git diff --cached --quiet; then
+            echo "nothing to publish"
+            exit 1
+          fi
+          git commit -m "chore(publish): public snapshot (internal ${SHORT})"
+          git push -f github "HEAD:${MIRROR_DEST_BRANCH}"

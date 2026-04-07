@@ -1,0 +1,69 @@
+name: Docker
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  build-and-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build base image (Dockerfile.base)
+        run: docker build -f Dockerfile.base -t claude-base:ci .
+
+      - name: Build application image
+        run: |
+          docker build \
+            --build-arg BASE_IMAGE=claude-base \
+            --build-arg BASE_TAG=ci \
+            -t claude-usage:ci \
+            .
+
+      - name: Screenshot assets (images/) in repository
+        run: |
+          test -d images
+          n="$(find images -maxdepth 1 -type f -name '*.png' 2>/dev/null | wc -l)"
+          test "${n:-0}" -ge 1
+
+      - name: Screenshots baked into image (/app/images)
+        run: |
+          docker run --rm claude-usage:ci sh -c 'test -d /app/images && ls -1 /app/images/*.png >/dev/null'
+
+      - name: Smoke (node start.js both)
+        run: |
+          docker run -d --name cud-smoke -p 3333:3333 -p 8080:8080 \
+            -e ANTHROPIC_PROXY_BIND=0.0.0.0 \
+            --tmpfs /root/.claude:rw,size=256m \
+            claude-usage:ci
+          ok=0
+          for i in $(seq 1 30); do
+            if curl -sf --max-time 3 http://127.0.0.1:3333/ -o /dev/null; then
+              ok=1
+              break
+            fi
+            sleep 2
+          done
+          docker logs cud-smoke 2>&1 | tail -n 80 || true
+          docker rm -f cud-smoke
+          test "$ok" = 1
+
+      - name: Compose merge smoke (optional)
+        env:
+          CLAUDE_USAGE_IMAGE: claude-usage:ci
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml build claude-usage
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d claude-usage
+          ok=0
+          for i in $(seq 1 30); do
+            if curl -sf --max-time 3 http://127.0.0.1:3333/ -o /dev/null; then
+              ok=1
+              break
+            fi
+            sleep 2
+          done
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --no-color 2>&1 | tail -n 80 || true
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml down
+          test "$ok" = 1
