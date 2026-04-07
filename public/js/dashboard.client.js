@@ -4539,9 +4539,10 @@ function renderHealthScore(data) {
 
     smText.innerHTML = sh;
   }
-  renderHealthHistory(data);
+  renderUptimeChart(data);
   renderIncidentHistory(data);
   renderOutageTimeline(data);
+  renderAvailabilityKpis(data);
 
   // Grid
   var gh = "";
@@ -4897,71 +4898,122 @@ function buildHealthScoreHistory(data) {
   return scores;
 }
 
-function renderHealthHistory(data) {
+// ── Uptime Chart (24h stacked by component status) ───────────────────────
+function renderUptimeChart(data) {
   if (typeof Chart === "undefined") return;
-  var el = document.getElementById("c-health-history");
+  var el = document.getElementById("c-uptime-chart");
   if (!el) return;
-  var titleEl = document.getElementById("health-history-title");
-  if (titleEl) titleEl.textContent = t("healthHistoryLabel");
+  var titleEl = document.getElementById("uptime-chart-title");
+  if (titleEl) titleEl.textContent = t("uptimeChartTitle");
 
-  var scores = buildHealthScoreHistory(data);
-  if (scores.length < 2) { return; }
+  // Apply month filter (same as outage timeline)
+  var srcDays = _outageTimelineMonthFilter ? (data.days || []) : getFilteredDays(data.days || []);
+  var filtDays = [];
+  for (var fi = 0; fi < srcDays.length; fi++) {
+    if (_outageTimelineMonthFilter && srcDays[fi].date && srcDays[fi].date.slice(0, 7) !== _outageTimelineMonthFilter) continue;
+    filtDays.push(srcDays[fi]);
+  }
+  if (filtDays.length < 1) filtDays = getFilteredDays(data.days || []);
 
-  var days = getFilteredDays(data.days || []);
-  var labels = [];
-  var colors = [];
-  for (var i = 0; i < days.length && i < scores.length; i++) {
-    labels.push(days[i].date.slice(5));
-    colors.push(scores[i] > 7 ? "#22c55e" : scores[i] >= 4 ? "#f59e0b" : "#ef4444");
+  // Pad month with empty days
+  var dayMap = {};
+  for (var dm = 0; dm < filtDays.length; dm++) dayMap[filtDays[dm].date] = filtDays[dm];
+  var days = [];
+  if (_outageTimelineMonthFilter) {
+    var parts = _outageTimelineMonthFilter.split("-");
+    var yr = parseInt(parts[0], 10), mo = parseInt(parts[1], 10);
+    var dim = new Date(yr, mo, 0).getDate();
+    for (var pd = 1; pd <= dim; pd++) {
+      var dk = yr + "-" + String(mo).padStart(2, "0") + "-" + String(pd).padStart(2, "0");
+      days.push(dayMap[dk] || { date: dk, outage_spans: [], _empty: true });
+    }
+  } else {
+    days = filtDays;
+  }
+  if (days.length < 2) return;
+
+  var labels = [], opData = [], degData = [], partData = [], outData = [], greyData = [];
+
+  for (var di = 0; di < days.length; di++) {
+    var d = days[di];
+    labels.push(d.date.slice(5));
+    if (d._empty) {
+      opData.push(0); degData.push(0); partData.push(0); outData.push(0); greyData.push(24);
+      continue;
+    }
+    var spans = d.outage_spans || [];
+
+    // Total hours by comp_status (unfiltered)
+    var totalByStatus = { major_outage: 0, partial_outage: 0, degraded_performance: 0 };
+    for (var sa = 0; sa < spans.length; sa++) {
+      var aCs = spans[sa].comp_status || "degraded_performance";
+      var aDur = (spans[sa].to || 0) - (spans[sa].from || 0);
+      if (aDur < 0) aDur = 0;
+      if (totalByStatus[aCs] !== undefined) totalByStatus[aCs] += aDur;
+      else totalByStatus.degraded_performance += aDur;
+    }
+
+    var totalInc = totalByStatus.major_outage + totalByStatus.partial_outage + totalByStatus.degraded_performance;
+    if (totalInc > 24) {
+      var sc = 24 / totalInc;
+      totalByStatus.major_outage *= sc; totalByStatus.partial_outage *= sc; totalByStatus.degraded_performance *= sc;
+      totalInc = 24;
+    }
+
+    // Apply status exclude filter
+    var visOut = _outageStatusExclude["major_outage"] ? 0 : totalByStatus.major_outage;
+    var visPart = _outageStatusExclude["partial_outage"] ? 0 : totalByStatus.partial_outage;
+    var visDeg = _outageStatusExclude["degraded_performance"] ? 0 : totalByStatus.degraded_performance;
+    var visInc = visOut + visPart + visDeg;
+    var opH = 24 - totalInc;
+    var visOp = _outageStatusExclude["operational"] ? 0 : opH;
+    var greyH = (totalByStatus.major_outage - visOut) + (totalByStatus.partial_outage - visPart) + (totalByStatus.degraded_performance - visDeg) + (opH - visOp);
+    if (greyH < 0) greyH = 0;
+
+    opData.push(Math.round(visOp * 10) / 10);
+    degData.push(Math.round(visDeg * 10) / 10);
+    partData.push(Math.round(visPart * 10) / 10);
+    outData.push(Math.round(visOut * 10) / 10);
+    greyData.push(Math.round(greyH * 10) / 10);
   }
 
-  if (_proxyCharts.healthHistory) {
-    freezeChartNoAnim(_proxyCharts.healthHistory);
-    _proxyCharts.healthHistory.data.labels = labels;
-    _proxyCharts.healthHistory.data.datasets[0].data = scores;
-    _proxyCharts.healthHistory.data.datasets[0].pointBackgroundColor = colors;
-    _proxyCharts.healthHistory.update("none");
-    return;
+  if (_proxyCharts.uptimeChart) {
+    _proxyCharts.uptimeChart.destroy();
+    _proxyCharts.uptimeChart = null;
   }
 
-  _proxyCharts.healthHistory = new Chart(el.getContext("2d"), {
-    type: "line",
+  _proxyCharts.uptimeChart = new Chart(el.getContext("2d"), {
+    type: "bar",
     data: {
       labels: labels,
-      datasets: [{
-        label: t("healthHistoryLabel"),
-        data: scores,
-        borderColor: "#3b82f6",
-        backgroundColor: "rgba(59,130,246,.08)",
-        fill: true,
-        tension: 0.3,
-        pointRadius: 5,
-        pointBackgroundColor: colors,
-        pointBorderColor: colors
-      }]
+      datasets: [
+        { label: t("uptimeOperational"), data: opData, backgroundColor: "rgba(34,197,94,.3)", borderColor: "rgba(34,197,94,.5)", borderWidth: 1, stack: "s" },
+        { label: t("uptimeDegraded"), data: degData, backgroundColor: "rgba(245,158,11,.3)", borderColor: "rgba(245,158,11,.6)", borderWidth: 1, stack: "s" },
+        { label: t("uptimePartial"), data: partData, backgroundColor: "rgba(249,115,22,.35)", borderColor: "rgba(249,115,22,.7)", borderWidth: 1, stack: "s" },
+        { label: t("uptimeOutage"), data: outData, backgroundColor: "rgba(239,68,68,.4)", borderColor: "rgba(239,68,68,.7)", borderWidth: 1, stack: "s" },
+        { label: "", data: greyData, backgroundColor: "rgba(51,65,85,.45)", borderColor: "rgba(51,65,85,.55)", borderWidth: 1, stack: "s", hidden: false }
+      ]
     },
     options: {
       responsive: true,
       animation: false,
       transitions: __chartTransitionsOff,
+      interaction: { mode: "index", intersect: false },
       scales: {
-        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { min: 0, max: 10, ticks: { color: "#94a3b8", stepSize: 2 }, grid: { color: "rgba(51,65,85,.4)" } }
+        x: { stacked: true, ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.3)" } },
+        y: { stacked: true, max: 24, ticks: { color: "#94a3b8", stepSize: 6, callback: function(v) { return v + "h"; } }, grid: { color: "rgba(51,65,85,.3)" } }
       },
       plugins: {
-        legend: { display: false },
+        legend: { labels: { color: "#e2e8f0", boxWidth: 10, font: { size: 10 } } },
         tooltip: {
           callbacks: {
-            label: function(ctx) {
-              var s = ctx.parsed.y;
-              var status = s > 7 ? "OK" : s >= 4 ? t("healthHistoryWarn") : t("healthHistoryCrit");
-              return t("healthScoreTitle") + ": " + s + "/10 (" + status + ")";
-            }
+            label: function(ctx) { return ctx.dataset.label + ": " + ctx.parsed.y + "h"; }
           }
         }
       }
     }
   });
+
 }
 
 // ── Incident History Chart ────────────────────────────────────────────────
@@ -4975,30 +5027,45 @@ function renderIncidentHistory(data) {
   var titleOT = document.getElementById("outage-timeline-title");
   if (titleOT) titleOT.textContent = t("outageTimelineTitle");
 
-  var days = getFilteredDays(data.days || []);
+  // Apply same month filter as other charts
+  var srcDays = _outageTimelineMonthFilter ? (data.days || []) : getFilteredDays(data.days || []);
+  var days = [];
+  for (var fi = 0; fi < srcDays.length; fi++) {
+    if (_outageTimelineMonthFilter && srcDays[fi].date && srcDays[fi].date.slice(0, 7) !== _outageTimelineMonthFilter) continue;
+    days.push(srcDays[fi]);
+  }
+  if (days.length < 1) days = getFilteredDays(data.days || []);
   if (days.length < 2) return;
 
   var labels = [];
-  var outageHours = [];
+  var critH = [], majorH = [], minorH = [], greyH = [];
   var hitLimits = [];
-  var colors = [];
+
   for (var i = 0; i < days.length; i++) {
     var d = days[i];
     labels.push(d.date.slice(5));
-    var oh = d.outage_hours || 0;
-    outageHours.push(oh);
     hitLimits.push(d.hit_limit || 0);
-    colors.push(oh > 2 ? "#ef4444" : oh > 0 ? "#f59e0b" : "#22c55e");
+
+    var spans = d.outage_spans || [];
+    var bySev = { critical: 0, major: 0, minor: 0 };
+    var excludedH = 0;
+    for (var si = 0; si < spans.length; si++) {
+      var imp = spans[si].impact || "none";
+      if (imp === "none") continue; // none = uptime, skip
+      var dur = (spans[si].to || 0) - (spans[si].from || 0);
+      if (dur < 0) dur = 0;
+      if (_outageImpactExclude[imp]) { excludedH += dur; continue; }
+      if (bySev[imp] !== undefined) bySev[imp] += dur;
+    }
+    critH.push(Math.round(bySev.critical * 10) / 10);
+    majorH.push(Math.round(bySev.major * 10) / 10);
+    minorH.push(Math.round(bySev.minor * 10) / 10);
+    greyH.push(Math.round(excludedH * 10) / 10);
   }
 
   if (_proxyCharts.incidentHistory) {
-    freezeChartNoAnim(_proxyCharts.incidentHistory);
-    _proxyCharts.incidentHistory.data.labels = labels;
-    _proxyCharts.incidentHistory.data.datasets[0].data = outageHours;
-    _proxyCharts.incidentHistory.data.datasets[0].backgroundColor = colors;
-    _proxyCharts.incidentHistory.data.datasets[1].data = hitLimits;
-    _proxyCharts.incidentHistory.update("none");
-    return;
+    _proxyCharts.incidentHistory.destroy();
+    _proxyCharts.incidentHistory = null;
   }
 
   _proxyCharts.incidentHistory = new Chart(el.getContext("2d"), {
@@ -5006,28 +5073,11 @@ function renderIncidentHistory(data) {
     data: {
       labels: labels,
       datasets: [
-        {
-          label: t("incidentDSOutageHours"),
-          data: outageHours,
-          backgroundColor: "rgba(0,0,0,0)",
-          borderColor: colors,
-          borderWidth: 1,
-          yAxisID: "y",
-          borderRadius: 2,
-          barPercentage: 0.35,
-          categoryPercentage: 0.6
-        },
-        {
-          label: t("incidentDSHitLimits"),
-          data: hitLimits,
-          type: "line",
-          borderColor: "#f59e0b",
-          backgroundColor: "rgba(245,158,11,.1)",
-          yAxisID: "y1",
-          tension: 0.3,
-          pointRadius: 3,
-          fill: true
-        }
+        { label: "critical", data: critH, backgroundColor: "rgba(239,68,68,.4)", borderColor: "rgba(239,68,68,.7)", borderWidth: 1, yAxisID: "y", stack: "inc" },
+        { label: "major", data: majorH, backgroundColor: "rgba(249,115,22,.35)", borderColor: "rgba(249,115,22,.6)", borderWidth: 1, yAxisID: "y", stack: "inc" },
+        { label: "minor", data: minorH, backgroundColor: "rgba(245,158,11,.3)", borderColor: "rgba(245,158,11,.6)", borderWidth: 1, yAxisID: "y", stack: "inc" },
+        { label: "", data: greyH, backgroundColor: "rgba(51,65,85,.45)", borderColor: "rgba(51,65,85,.55)", borderWidth: 1, yAxisID: "y", stack: "inc", hidden: false },
+        { label: t("incidentDSHitLimits"), data: hitLimits, type: "line", borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.1)", yAxisID: "y1", tension: 0.3, pointRadius: 3, fill: true }
       ]
     },
     options: {
@@ -5036,12 +5086,17 @@ function renderIncidentHistory(data) {
       transitions: __chartTransitionsOff,
       interaction: { mode: "index", intersect: false },
       scales: {
-        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { position: "left", ticks: { color: "#94a3b8" }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, title: { display: true, text: t("incidentAxisOutage"), color: "#94a3b8", font: { size: 10 } } },
+        x: { stacked: true, ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
+        y: { stacked: true, position: "left", ticks: { color: "#94a3b8" }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, title: { display: true, text: t("incidentAxisOutage"), color: "#94a3b8", font: { size: 10 } } },
         y1: { position: "right", ticks: { color: "#f59e0b" }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: t("incidentAxisHitLimits"), color: "#f59e0b", font: { size: 10 } } }
       },
       plugins: {
-        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } }
+        legend: { labels: { color: "#e2e8f0", boxWidth: 10, font: { size: 10 }, filter: function(item) { return item.text !== ""; } } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) { if (!ctx.dataset.label) return null; return ctx.dataset.label + ": " + ctx.parsed.y + (ctx.dataset.yAxisID === "y1" ? "" : "h"); }
+          }
+        }
       }
     }
   });
@@ -5110,73 +5165,132 @@ function updateAnthropicPopup(data) {
 
 
 // ── Outage Timeline (24h stacked per day) ─────────────────────────────────
-function renderOutageTimeline(data) {
+var _outageTimelineMonthFilter = null;   // null = all, "2026-03" = single month
+var _outageImpactExclude = {};            // { "critical": true, "minor": true } = hidden
+var _outageStatusExclude = {};            // { "major_outage": true } = hidden (uptime chart)
+function renderOutageTimeline(data, monthFilter) {
   if (typeof Chart === "undefined") return;
   var el = document.getElementById("c-outage-timeline");
   if (!el) return;
+  if (monthFilter !== undefined) _outageTimelineMonthFilter = monthFilter;
 
-  var days = getFilteredDays(data.days || []);
-  if (days.length < 2) return;
+  var srcDays = _outageTimelineMonthFilter ? (data.days || []) : getFilteredDays(data.days || []);
+  var days = [];
+  for (var fi = 0; fi < srcDays.length; fi++) {
+    if (_outageTimelineMonthFilter && srcDays[fi].date && srcDays[fi].date.slice(0, 7) !== _outageTimelineMonthFilter) continue;
+    days.push(srcDays[fi]);
+  }
+  if (days.length < 1) days = getFilteredDays(data.days || []);
+  if (days.length < 2 && !_outageTimelineMonthFilter) return;
+
+  // When filtering by month, pad to full month with empty (future) days
+  var dayMap = {};
+  for (var dm = 0; dm < days.length; dm++) dayMap[days[dm].date] = days[dm];
+
+  var paddedDays = [];
+  if (_outageTimelineMonthFilter) {
+    var parts = _outageTimelineMonthFilter.split("-");
+    var yr = parseInt(parts[0], 10);
+    var mo = parseInt(parts[1], 10);
+    var daysInMonth = new Date(yr, mo, 0).getDate();
+    for (var pd = 1; pd <= daysInMonth; pd++) {
+      var dk = yr + "-" + String(mo).padStart(2, "0") + "-" + String(pd).padStart(2, "0");
+      paddedDays.push(dayMap[dk] || { date: dk, outage_spans: [], _empty: true });
+    }
+  } else {
+    paddedDays = days;
+  }
+  if (paddedDays.length < 2) return;
 
   var labels = [];
-  var greenData = [];
-  var redData = [];
-  var yellowData = [];
+  var critData = [], majorData = [], minorData = [], noneData = [], greyData = [];
 
-  for (var di = 0; di < days.length; di++) {
-    var d = days[di];
+  for (var di = 0; di < paddedDays.length; di++) {
+    var d = paddedDays[di];
     labels.push(d.date.slice(5));
+    if (d._empty) {
+      critData.push(0); majorData.push(0); minorData.push(0); noneData.push(0); greyData.push(24);
+      continue;
+    }
     var spans = d.outage_spans || [];
-    var serverH = 0, clientH = 0;
+
+    // Hours per severity
+    var bySev = { critical: 0, major: 0, minor: 0, none: 0 };
     for (var si = 0; si < spans.length; si++) {
       var dur = (spans[si].to || 0) - (spans[si].from || 0);
       if (dur < 0) dur = 0;
-      if (spans[si].kind === "server") serverH += dur;
-      else clientH += dur;
+      var imp = spans[si].impact || "none";
+      if (bySev[imp] !== undefined) bySev[imp] += dur;
+      else bySev.none += dur;
     }
-    if (serverH > 24) serverH = 24;
-    if (clientH > 24 - serverH) clientH = 24 - serverH;
-    var okH = 24 - serverH - clientH;
-    if (okH < 0) okH = 0;
-    greenData.push(Math.round(okH * 10) / 10);
-    redData.push(Math.round(serverH * 10) / 10);
-    yellowData.push(Math.round(clientH * 10) / 10);
+
+    // Cap total to 24h
+    var totalInc = bySev.critical + bySev.major + bySev.minor + bySev.none;
+    if (totalInc > 24) {
+      var scale = 24 / totalInc;
+      bySev.critical *= scale; bySev.major *= scale; bySev.minor *= scale; bySev.none *= scale;
+      totalInc = 24;
+    }
+
+    // Uptime = 24h - all incident hours
+    var uptimeH = 24 - totalInc;
+    if (uptimeH < 0) uptimeH = 0;
+
+    // none severity = uptime (no impact = service was fine)
+    bySev.none += uptimeH;
+
+    // Apply exclude filter: excluded severity → grey
+    var greyH = 0;
+    var visCrit = bySev.critical, visMajor = bySev.major, visMinor = bySev.minor, visNone = bySev.none;
+    if (_outageImpactExclude["critical"]) { greyH += visCrit; visCrit = 0; }
+    if (_outageImpactExclude["major"]) { greyH += visMajor; visMajor = 0; }
+    if (_outageImpactExclude["minor"]) { greyH += visMinor; visMinor = 0; }
+    if (_outageImpactExclude["none"]) { greyH += visNone; visNone = 0; }
+
+    critData.push(Math.round(visCrit * 10) / 10);
+    majorData.push(Math.round(visMajor * 10) / 10);
+    minorData.push(Math.round(visMinor * 10) / 10);
+    noneData.push(Math.round(visNone * 10) / 10);
+    greyData.push(Math.round(greyH * 10) / 10);
   }
 
   if (_proxyCharts.outageTimeline) {
-    freezeChartNoAnim(_proxyCharts.outageTimeline);
-    _proxyCharts.outageTimeline.data.labels = labels;
-    _proxyCharts.outageTimeline.data.datasets[0].data = greenData;
-    _proxyCharts.outageTimeline.data.datasets[1].data = redData;
-    _proxyCharts.outageTimeline.data.datasets[2].data = yellowData;
-    _proxyCharts.outageTimeline.update("none");
-    return;
+    _proxyCharts.outageTimeline.destroy();
+    _proxyCharts.outageTimeline = null;
   }
+
+  // Always stacked bar — thin bars for many days
+  var barOpts = paddedDays.length > 31 ? { barPercentage: 0.95, categoryPercentage: 0.95 } : {};
+  var xTickOpts = paddedDays.length > 31
+    ? { color: "#94a3b8", font: { size: 9 }, maxRotation: 45, autoSkip: true, maxTicksLimit: 25 }
+    : { color: "#94a3b8", font: { size: 10 } };
+
+  var datasets = [
+    Object.assign({ label: "none", data: noneData, backgroundColor: "rgba(34,197,94,.25)", borderColor: "rgba(34,197,94,.5)", borderWidth: 1, stack: "s" }, barOpts),
+    Object.assign({ label: "critical", data: critData, backgroundColor: "rgba(239,68,68,.35)", borderColor: "rgba(239,68,68,.7)", borderWidth: 1, stack: "s" }, barOpts),
+    Object.assign({ label: "major", data: majorData, backgroundColor: "rgba(249,115,22,.3)", borderColor: "rgba(249,115,22,.6)", borderWidth: 1, stack: "s" }, barOpts),
+    Object.assign({ label: "minor", data: minorData, backgroundColor: "rgba(245,158,11,.25)", borderColor: "rgba(245,158,11,.6)", borderWidth: 1, stack: "s" }, barOpts),
+    Object.assign({ label: "", data: greyData, backgroundColor: "rgba(51,65,85,.45)", borderColor: "rgba(51,65,85,.55)", borderWidth: 1, stack: "s", hidden: false }, barOpts)
+  ];
+  var scaleOpts = {
+    x: { stacked: true, ticks: xTickOpts, grid: { color: "rgba(51,65,85,.3)" } },
+    y: { stacked: true, max: 24, ticks: { color: "#94a3b8", stepSize: 6, callback: function(v) { return v + "h"; } }, grid: { color: "rgba(51,65,85,.3)" } }
+  };
 
   _proxyCharts.outageTimeline = new Chart(el.getContext("2d"), {
     type: "bar",
-    data: {
-      labels: labels,
-      datasets: [
-        { label: t("outageTimelineOk"), data: greenData, backgroundColor: "rgba(34,197,94,.25)", borderColor: "rgba(34,197,94,.5)", borderWidth: 1, stack: "s" },
-        { label: t("outageTimelineServer"), data: redData, backgroundColor: "rgba(239,68,68,.3)", borderColor: "rgba(239,68,68,.7)", borderWidth: 1, stack: "s" },
-        { label: t("outageTimelineClient"), data: yellowData, backgroundColor: "rgba(245,158,11,.25)", borderColor: "rgba(245,158,11,.6)", borderWidth: 1, stack: "s" }
-      ]
-    },
+    data: { labels: labels, datasets: datasets },
     options: {
       responsive: true,
       animation: false,
       transitions: __chartTransitionsOff,
       interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { stacked: true, ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.3)" } },
-        y: { stacked: true, max: 24, ticks: { color: "#94a3b8", stepSize: 6, callback: function(v) { return v + "h"; } }, grid: { color: "rgba(51,65,85,.3)" } }
-      },
+      scales: scaleOpts,
       plugins: {
-        legend: { labels: { color: "#e2e8f0", boxWidth: 10, font: { size: 10 } } },
+        legend: { labels: { color: "#e2e8f0", boxWidth: 10, font: { size: 10 }, filter: function(item) { return item.text !== ""; } } },
         tooltip: {
           callbacks: {
-            label: function(ctx) { return ctx.dataset.label + ": " + ctx.parsed.y + "h"; }
+            label: function(ctx) { if (!ctx.dataset.label) return null; return ctx.dataset.label + ": " + ctx.parsed.y + "h"; }
           }
         }
       }
@@ -5184,6 +5298,329 @@ function renderOutageTimeline(data) {
   });
 }
 
+
+// ── Availability KPIs (Anthropic popup fold-out) ─────────────────────────
+var _lastAvailKpiData = null;
+function renderAvailabilityKpis(data) {
+  _lastAvailKpiData = data;
+  var panel = document.getElementById("avail-kpi-panel");
+  var summary = document.getElementById("avail-kpi-summary");
+  if (!panel || !summary) return;
+  summary.textContent = t("availKpiSummary");
+
+  var allDays = data.days || [];
+  if (allDays.length < 2) { panel.innerHTML = ""; return; }
+
+  // ── Collect per-day degradation + per-incident impact counts ──
+  // Degradation = critical + major + minor hours (NOT "none")
+  var totalDegradationH = 0;
+  var byMonth = {};       // { "2026-03": { count, hours, days } }
+  var byImpact = {};      // { "critical": { count, hours } }
+  var seenIncidents = {};  // dedup by name+date
+
+  for (var i = 0; i < allDays.length; i++) {
+    var d = allDays[i];
+    var spans = d.outage_spans || [];
+    var dayDegH = 0;
+    for (var si = 0; si < spans.length; si++) {
+      var dur = (spans[si].to || 0) - (spans[si].from || 0);
+      if (dur < 0) dur = 0;
+      var imp = spans[si].impact || "none";
+      // Only critical/major/minor count as degradation
+      if (imp !== "none") dayDegH += dur;
+      if (!byImpact[imp]) byImpact[imp] = { count: 0, hours: 0 };
+      byImpact[imp].hours += dur;
+    }
+    if (dayDegH > 24) dayDegH = 24;
+    totalDegradationH += dayDegH;
+
+    var mk = d.date ? d.date.slice(0, 7) : "";
+    if (mk) {
+      if (!byMonth[mk]) byMonth[mk] = { count: 0, hours: 0, days: 0 };
+      byMonth[mk].hours += dayDegH;
+      byMonth[mk].days++;
+    }
+
+    var incidents = d.outage_incidents || [];
+    for (var ii = 0; ii < incidents.length; ii++) {
+      var inc = incidents[ii];
+      var ikey = (inc.name || "") + "|" + d.date;
+      if (seenIncidents[ikey]) continue;
+      seenIncidents[ikey] = true;
+      var incImp = inc.impact || "none";
+      if (!byImpact[incImp]) byImpact[incImp] = { count: 0, hours: 0 };
+      byImpact[incImp].count++;
+      if (mk) byMonth[mk].count++;
+    }
+  }
+
+  var totalDays = allDays.length;
+  var totalH = totalDays * 24;
+  var uptimePct = totalH > 0 ? ((totalH - totalDegradationH) / totalH * 100) : 100;
+  var firstDate = allDays[0].date || "";
+  var lastDate = allDays[allDays.length - 1].date || "";
+
+  // ── Color class ──
+  var colorCls = uptimePct >= 99 ? "avail-green" : uptimePct >= 95 ? "avail-yellow" : "avail-red";
+
+  // ── Build HTML ──
+  var h = "";
+
+  // Total badge
+  h += "<div class=\"avail-kpi-total\">";
+  h += "<span class=\"avail-kpi-total-value " + colorCls + "\">" + uptimePct.toFixed(1) + "%</span>";
+  h += "<span class=\"avail-kpi-total-meta\">" + escHtml(t("availKpiPeriod")) + ": " + escHtml(firstDate) + " \u2013 " + escHtml(lastDate);
+  h += "<br>" + escHtml(t("availKpiDowntime")) + ": " + Math.round(totalDegradationH * 10) / 10 + "h / " + totalDays + "d</span>";
+  h += "</div>";
+
+  // Monthly table
+  var monthKeys = Object.keys(byMonth).sort();
+  if (monthKeys.length > 0) {
+    var now = new Date();
+    var curMonth = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+
+    // Precompute month data
+    var totalIncidents = 0;
+    var cols = []; // { key, label, count, hours, pct, trendHtml, isCurrent, isActive }
+    for (var ti = 0; ti < monthKeys.length; ti++) totalIncidents += byMonth[monthKeys[ti]].count;
+
+    // "Gesamt" column
+    var isAllActive = !_outageTimelineMonthFilter;
+    cols.push({ key: "__all__", label: t("availKpiTotal"), count: totalIncidents, hours: totalDegradationH, pct: uptimePct, trendHtml: "", isCurrent: false, isActive: isAllActive, bold: true });
+
+    for (var mi = 0; mi < monthKeys.length; mi++) {
+      var mk2 = monthKeys[mi];
+      var m = byMonth[mk2];
+      var mTotalH = m.days * 24;
+      var mPct = mTotalH > 0 ? ((mTotalH - m.hours) / mTotalH * 100) : 100;
+      var isCurrent = mk2 === curMonth;
+      var isActive = mk2 === _outageTimelineMonthFilter;
+      var trendHtml = "";
+      if (mi > 0) {
+        var prev = byMonth[monthKeys[mi - 1]];
+        var prevTotalH = prev.days * 24;
+        var prevPct = prevTotalH > 0 ? ((prevTotalH - prev.hours) / prevTotalH * 100) : 100;
+        var delta = mPct - prevPct;
+        if (Math.abs(delta) >= 0.1) {
+          var trendCls = delta > 0 ? "trend-up" : "trend-down";
+          var arrow = delta > 0 ? "\u2191" : "\u2193";
+          trendHtml = "<span class=\"avail-kpi-trend " + trendCls + "\">" + arrow + Math.abs(delta).toFixed(1) + "%</span>";
+        }
+      }
+      var mlabel = mk2.slice(2);  // "26-03" instead of "2026-03"
+      if (isCurrent) mlabel += " *";
+      cols.push({ key: mk2, label: mlabel, count: m.count, hours: m.hours, pct: mPct, trendHtml: trendHtml, isCurrent: isCurrent, isActive: isActive, bold: false, empty: false });
+    }
+
+    // Pad +12 future months from current month
+    var padStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    for (var fp = 0; fp < 12; fp++) {
+      var fy = padStart.getFullYear();
+      var fm = padStart.getMonth() + 1;
+      var fk = fy + "-" + String(fm).padStart(2, "0");
+      if (!byMonth[fk]) {
+        var fl = fk.slice(2);
+        cols.push({ key: fk, label: fl, count: null, hours: null, pct: null, trendHtml: "", isCurrent: false, isActive: false, bold: false, empty: true });
+      }
+      padStart.setMonth(padStart.getMonth() + 1);
+    }
+
+    var inModal = document.getElementById("anthropic-modal-overlay");
+    var isWide = inModal && inModal.classList.contains("is-open");
+
+    h += "<div class=\"avail-kpi-section-head\">" + escHtml(t("availKpiMonth")) + "</div>";
+
+    if (isWide) {
+      // ── Modal: transposed — months as columns, metrics as rows ──
+      h += "<table class=\"avail-kpi-table avail-kpi-table-cols\"><thead><tr><th></th>";
+      for (var ci = 0; ci < cols.length; ci++) {
+        var c = cols[ci];
+        var thCls = [];
+        if (c.isActive) thCls.push("avail-kpi-col-active");
+        if (c.isCurrent) thCls.push("avail-kpi-col-current");
+        h += "<th class=\"num" + (thCls.length ? " " + thCls.join(" ") : "") + "\" data-month=\"" + escHtml(c.key) + "\"" + (c.empty ? "" : " style=\"cursor:pointer\"") + ">";
+        h += (c.bold ? "<strong>" : "") + escHtml(c.label) + (c.bold ? "</strong>" : "");
+        if (c.isActive) h += " \u25bc";
+        h += "</th>";
+      }
+      h += "</tr></thead><tbody>";
+      // Incidents row
+      h += "<tr><td>" + escHtml(t("availKpiIncidents")) + "</td>";
+      for (var ci2 = 0; ci2 < cols.length; ci2++) {
+        h += "<td class=\"num" + (cols[ci2].empty ? " avail-kpi-empty" : "") + "\">" + (cols[ci2].empty ? "\u2013" : cols[ci2].count) + "</td>";
+      }
+      h += "</tr>";
+      // Downtime row
+      h += "<tr><td>" + escHtml(t("availKpiDowntime")) + "</td>";
+      for (var ci3 = 0; ci3 < cols.length; ci3++) {
+        h += "<td class=\"num" + (cols[ci3].empty ? " avail-kpi-empty" : "") + "\">" + (cols[ci3].empty ? "\u2013" : (Math.round(cols[ci3].hours * 10) / 10) + "h") + "</td>";
+      }
+      h += "</tr>";
+      // Availability row
+      h += "<tr><td>" + escHtml(t("availKpiAvail")) + "</td>";
+      for (var ci4 = 0; ci4 < cols.length; ci4++) {
+        var cp = cols[ci4];
+        if (cp.empty) {
+          h += "<td class=\"num avail-kpi-empty\">\u2013</td>";
+        } else {
+          var pctCls = cp.pct >= 99 ? "avail-green" : cp.pct >= 95 ? "avail-yellow" : "avail-red";
+          h += "<td class=\"num\"><span class=\"" + pctCls + "\">" + (cp.bold ? "<strong>" : "") + cp.pct.toFixed(1) + "%" + (cp.bold ? "</strong>" : "") + "</span>";
+          if (cp.trendHtml) h += " " + cp.trendHtml;
+          h += "</td>";
+        }
+      }
+      h += "</tr>";
+      h += "</tbody></table>";
+    } else {
+      // ── Popup: classic rows — months as rows, metrics as columns ──
+      h += "<table class=\"avail-kpi-table\"><thead><tr>";
+      h += "<th>" + escHtml(t("availKpiMonth")) + "</th>";
+      h += "<th class=\"num\">" + escHtml(t("availKpiIncidents")) + "</th>";
+      h += "<th class=\"num\">" + escHtml(t("availKpiDowntime")) + "</th>";
+      h += "<th class=\"num\">" + escHtml(t("availKpiAvail")) + "</th>";
+      h += "</tr></thead><tbody>";
+      // Only data cols (no future empty months in popup)
+      for (var ri = 0; ri < cols.length; ri++) {
+        var rc = cols[ri];
+        if (rc.empty) continue;
+        var rCls = [];
+        if (rc.isActive) rCls.push("avail-kpi-month-active");
+        if (rc.isCurrent) rCls.push("avail-kpi-month-current");
+        h += "<tr" + (rCls.length ? " class=\"" + rCls.join(" ") + "\"" : "") + " data-month=\"" + escHtml(rc.key) + "\" style=\"cursor:pointer\">";
+        h += "<td>" + (rc.bold ? "<strong>" + escHtml(rc.label) + "</strong>" : escHtml(rc.label));
+        if (rc.isCurrent) h += " <em>" + escHtml(t("availKpiCurrent")) + "</em>";
+        if (rc.isActive) h += " \u25c0";
+        h += "</td>";
+        h += "<td class=\"num\">" + rc.count + "</td>";
+        h += "<td class=\"num\">" + (Math.round(rc.hours * 10) / 10) + "h</td>";
+        var rpCls = rc.pct >= 99 ? "avail-green" : rc.pct >= 95 ? "avail-yellow" : "avail-red";
+        h += "<td class=\"num\"><span class=\"" + rpCls + "\">" + (rc.bold ? "<strong>" : "") + rc.pct.toFixed(1) + "%" + (rc.bold ? "</strong>" : "") + "</span>";
+        if (rc.trendHtml) h += " " + rc.trendHtml;
+        h += "</td></tr>";
+      }
+      h += "</tbody></table>";
+    }
+  }
+
+  // Impact breakdown
+  var impactOrder = ["critical", "major", "minor", "none"];
+  var hasImpact = false;
+  for (var ci = 0; ci < impactOrder.length; ci++) {
+    if (byImpact[impactOrder[ci]]) { hasImpact = true; break; }
+  }
+  if (hasImpact) {
+    h += "<div class=\"avail-kpi-section-head\">" + escHtml(t("availKpiImpact")) + "</div>";
+    h += "<div class=\"avail-kpi-impact-row\">";
+    for (var bi = 0; bi < impactOrder.length; bi++) {
+      var ik = impactOrder[bi];
+      var iv = byImpact[ik];
+      if (!iv) continue;
+      var impExcluded = !!_outageImpactExclude[ik];
+      h += "<span class=\"avail-kpi-impact-badge impact-" + ik + (impExcluded ? " impact-excluded" : "") + "\" data-impact=\"" + ik + "\" style=\"cursor:pointer\">";
+      h += escHtml(ik) + ": " + iv.count + " / " + (Math.round(iv.hours * 10) / 10) + "h";
+      h += "</span>";
+    }
+    h += "</div>";
+  }
+
+  // Uptime status filter (for Service-Uptime chart)
+  var statusOrder = [
+    { key: "operational", label: t("uptimeOperational"), cls: "kind-ok" },
+    { key: "degraded_performance", label: t("uptimeDegraded"), cls: "impact-minor" },
+    { key: "partial_outage", label: t("uptimePartial"), cls: "impact-major" },
+    { key: "major_outage", label: t("uptimeOutage"), cls: "impact-critical" }
+  ];
+  h += "<div class=\"avail-kpi-section-head\">Service Status</div>";
+  h += "<div class=\"avail-kpi-impact-row\">";
+  for (var sti = 0; sti < statusOrder.length; sti++) {
+    var st = statusOrder[sti];
+    var stExcl = !!_outageStatusExclude[st.key];
+    h += "<span class=\"avail-kpi-impact-badge " + st.cls + (stExcl ? " impact-excluded" : "") + "\" data-status=\"" + st.key + "\" style=\"cursor:pointer\">";
+    h += st.label;
+    h += "</span>";
+  }
+  h += "</div>";
+
+  panel.innerHTML = h;
+
+  // Bind month-column click → filter outage timeline chart
+  var rows = panel.querySelectorAll("[data-month]");
+  for (var ri = 0; ri < rows.length; ri++) {
+    rows[ri].addEventListener("click", function() {
+      var mk = this.getAttribute("data-month");
+      var newFilter;
+      if (mk === "__all__") {
+        newFilter = null;
+      } else {
+        newFilter = (_outageTimelineMonthFilter === mk) ? null : mk;
+      }
+      _outageTimelineMonthFilter = newFilter;
+      renderUptimeChart(data);
+      renderIncidentHistory(data);
+      renderOutageTimeline(data);
+      renderAvailabilityKpis(data);
+      var otDet = document.getElementById("outage-timeline-details");
+      if (otDet && !otDet.open) otDet.setAttribute("open", "");
+    });
+  }
+
+  // Bind impact-badge click → toggle exclude from all charts
+  var badges = panel.querySelectorAll("[data-impact]");
+  for (var bi2 = 0; bi2 < badges.length; bi2++) {
+    badges[bi2].addEventListener("click", function() {
+      var imp = this.getAttribute("data-impact");
+      if (_outageImpactExclude[imp]) { delete _outageImpactExclude[imp]; } else { _outageImpactExclude[imp] = true; }
+      renderUptimeChart(data);
+      renderIncidentHistory(data);
+      renderOutageTimeline(data);
+      renderAvailabilityKpis(data);
+      var otDet = document.getElementById("outage-timeline-details");
+      if (otDet && !otDet.open) otDet.setAttribute("open", "");
+    });
+  }
+
+  // Bind status-badge click → toggle exclude for uptime chart
+  var stBadges = panel.querySelectorAll("[data-status]");
+  for (var sb = 0; sb < stBadges.length; sb++) {
+    stBadges[sb].addEventListener("click", function() {
+      var sk = this.getAttribute("data-status");
+      if (_outageStatusExclude[sk]) { delete _outageStatusExclude[sk]; } else { _outageStatusExclude[sk] = true; }
+      renderUptimeChart(data);
+      renderAvailabilityKpis(data);
+    });
+  }
+}
+
+// ── Auto-collapse charts when Kennzahlen opens (and vice versa) ──────────
+(function() {
+  var kpiDet = document.getElementById("avail-kpi-details");
+  var chartIds = ["uptime-chart-details", "incident-history-details"];
+  var keepOpen = "outage-timeline-details";
+  if (!kpiDet) return;
+  function isInModal() {
+    var overlay = document.getElementById("anthropic-modal-overlay");
+    return overlay && overlay.classList.contains("is-open");
+  }
+  kpiDet.addEventListener("toggle", function() {
+    if (isInModal()) return;
+    if (kpiDet.open) {
+      for (var i = 0; i < chartIds.length; i++) {
+        var el = document.getElementById(chartIds[i]);
+        if (el) el.removeAttribute("open");
+      }
+    }
+  });
+  // Re-open charts when Kennzahlen closes
+  kpiDet.addEventListener("toggle", function() {
+    if (isInModal()) return;
+    if (!kpiDet.open) {
+      for (var i = 0; i < chartIds.length; i++) {
+        var el = document.getElementById(chartIds[i]);
+        if (el) el.setAttribute("open", "");
+      }
+    }
+  });
+})();
 
 // Anthropic badge click toggle popup
 (function() {
@@ -5200,6 +5637,99 @@ function renderOutageTimeline(data) {
     var popup = document.getElementById("anthropic-popup");
     if (popup) popup.addEventListener("click", function(e) { e.stopPropagation(); });
   }
+})();
+
+// ── Anthropic popup → fullscreen modal ───────────────────────────────────
+(function() {
+  var expandBtn = document.getElementById("anthropic-popup-expand");
+  var overlay = document.getElementById("anthropic-modal-overlay");
+  var modalBody = document.getElementById("anthropic-modal-body");
+  var closeBtn = document.getElementById("anthropic-modal-close");
+  var popup = document.getElementById("anthropic-popup");
+  var badge = document.getElementById("anthropic-badge");
+  if (!expandBtn || !overlay || !modalBody || !popup) return;
+
+  var chartDetailIds = ["uptime-chart-details", "incident-history-details", "outage-timeline-details"];
+
+  function forceChartsOpen() {
+    for (var i = 0; i < chartDetailIds.length; i++) {
+      var el = document.getElementById(chartDetailIds[i]);
+      if (el) { el.setAttribute("open", ""); el.classList.add("no-collapse"); }
+    }
+  }
+
+  function restoreChartsCollapse() {
+    for (var i = 0; i < chartDetailIds.length; i++) {
+      var el = document.getElementById(chartDetailIds[i]);
+      if (el) el.classList.remove("no-collapse");
+    }
+  }
+
+  function openModal() {
+    // Move popup content into modal
+    while (popup.firstChild) modalBody.appendChild(popup.firstChild);
+    // Hide expand button inside modal (not needed)
+    var expInModal = modalBody.querySelector(".anthropic-popup-expand");
+    if (expInModal) expInModal.style.display = "none";
+    // Force all charts open and disable collapsing
+    forceChartsOpen();
+    // Move Kennzahlen above charts in modal + force open
+    var kpiEl = modalBody.querySelector("#avail-kpi-details");
+    var chartsRow = modalBody.querySelector(".health-charts-row");
+    if (kpiEl && chartsRow && chartsRow.parentNode) {
+      chartsRow.parentNode.insertBefore(kpiEl, chartsRow);
+      kpiEl.setAttribute("open", "");
+    }
+    // Close the dropdown popup
+    if (badge) badge.classList.remove("popup-open");
+    overlay.classList.add("is-open");
+    document.body.style.overflow = "hidden";
+    // Re-render KPIs in modal layout (columns) + resize charts
+    if (_lastAvailKpiData) renderAvailabilityKpis(_lastAvailKpiData);
+    if (_proxyCharts.uptimeChart) _proxyCharts.uptimeChart.resize();
+    if (_proxyCharts.anthropicIncidents) _proxyCharts.anthropicIncidents.resize();
+    if (_proxyCharts.outageTimeline) _proxyCharts.outageTimeline.resize();
+  }
+
+  function closeModal() {
+    // Move Kennzahlen back below charts
+    var kpiEl = modalBody.querySelector("#avail-kpi-details");
+    var chartsRow = modalBody.querySelector(".health-charts-row");
+    if (kpiEl && chartsRow && chartsRow.parentNode) {
+      chartsRow.parentNode.insertBefore(kpiEl, chartsRow.nextSibling);
+    }
+    // Restore collapse behavior
+    restoreChartsCollapse();
+    // Move content back into popup
+    while (modalBody.firstChild) popup.appendChild(modalBody.firstChild);
+    // Restore expand button
+    var expInPopup = popup.querySelector(".anthropic-popup-expand");
+    if (expInPopup) expInPopup.style.display = "";
+    overlay.classList.remove("is-open");
+    document.body.style.overflow = "";
+    // Re-render KPIs in popup layout (rows) + resize charts
+    if (_lastAvailKpiData) renderAvailabilityKpis(_lastAvailKpiData);
+    if (_proxyCharts.uptimeChart) _proxyCharts.uptimeChart.resize();
+    if (_proxyCharts.anthropicIncidents) _proxyCharts.anthropicIncidents.resize();
+    if (_proxyCharts.outageTimeline) _proxyCharts.outageTimeline.resize();
+  }
+
+  expandBtn.addEventListener("click", function(e) {
+    e.stopPropagation();
+    openModal();
+  });
+
+  if (closeBtn) closeBtn.addEventListener("click", function() { closeModal(); });
+
+  // Close on overlay background click
+  overlay.addEventListener("click", function(e) {
+    if (e.target === overlay) closeModal();
+  });
+
+  // Close on Escape
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape" && overlay.classList.contains("is-open")) closeModal();
+  });
 })();
 fetchUsageJsonOnce();
 connectUsageStream();

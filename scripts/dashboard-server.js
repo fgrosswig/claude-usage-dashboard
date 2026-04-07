@@ -1160,13 +1160,34 @@ function refreshOutageCache() {
 }
 
 /** Klassifiziert Incident: "server" (API/Model-Fehler → Retries) vs "client" (Desktop/UI-Bug → kein Token-Impact). */
-function classifyIncident(name) {
+function classifyIncident(name, impact) {
+  if (impact === 'none') return 'client';
   var n = (name || '').toLowerCase();
   if (n.indexOf('desktop') >= 0) return 'client';
   if (n.indexOf('dispatch') >= 0) return 'client';
   if (n.indexOf('cowork') >= 0) return 'client';
   if (n.indexOf('connector') >= 0) return 'client';
   return 'server';
+}
+
+/** Worst component status from incident_updates: major_outage > partial_outage > degraded_performance > operational */
+var _statusRank = { major_outage: 3, partial_outage: 2, degraded_performance: 1, operational: 0 };
+var _impactToStatus = { critical: 'major_outage', major: 'partial_outage', minor: 'degraded_performance', none: 'operational' };
+function worstComponentStatus(inc) {
+  var worst = 'operational';
+  var hasComps = false;
+  var updates = inc.incident_updates || [];
+  for (var u = 0; u < updates.length; u++) {
+    var comps = updates[u].affected_components || [];
+    for (var c = 0; c < comps.length; c++) {
+      hasComps = true;
+      var s = comps[c].new_status || comps[c].old_status || 'operational';
+      if ((_statusRank[s] || 0) > (_statusRank[worst] || 0)) worst = s;
+    }
+  }
+  // Fallback: no component data → derive from impact severity
+  if (!hasComps) worst = _impactToStatus[inc.impact || 'none'] || 'degraded_performance';
+  return worst;
 }
 
 /** Berechnet pro Kalender-Tag die Ausfallstunden + Incident-Liste + Floating-Bar-Spannen. */
@@ -1194,17 +1215,19 @@ function getOutageDaysMap() {
       var endH = (segEnd - dayStart) / 3600000;
 
       if (!map[dayStr]) map[dayStr] = { outage_hours: 0, server_hours: 0, client_hours: 0, incidents: [], spans: [] };
-      var incKind = classifyIncident(inc.name);
+      var incImpact = inc.impact || 'none';
+      var incKind = classifyIncident(inc.name, incImpact);
+      var incCompStatus = worstComponentStatus(inc);
       map[dayStr].outage_hours += hours;
       if (incKind === 'server') map[dayStr].server_hours += hours;
       else map[dayStr].client_hours += hours;
-      map[dayStr].spans.push({ from: Math.round(startH * 100) / 100, to: Math.round(endH * 100) / 100, name: inc.name || '', impact: inc.impact || 'none', kind: classifyIncident(inc.name) });
+      map[dayStr].spans.push({ from: Math.round(startH * 100) / 100, to: Math.round(endH * 100) / 100, name: inc.name || '', impact: incImpact, kind: incKind, comp_status: incCompStatus });
       // Incident-Name nur einmal pro Tag
       var found = false;
       for (var fi = 0; fi < map[dayStr].incidents.length; fi++) {
         if (map[dayStr].incidents[fi].name === inc.name) { found = true; break; }
       }
-      if (!found) map[dayStr].incidents.push({ name: inc.name || '', impact: inc.impact || 'none', kind: classifyIncident(inc.name), created_at: inc.created_at, resolved_at: inc.resolved_at || null });
+      if (!found) map[dayStr].incidents.push({ name: inc.name || '', impact: incImpact, kind: incKind, created_at: inc.created_at, resolved_at: inc.resolved_at || null });
       cur = dayEnd;
     }
   }
@@ -3003,6 +3026,19 @@ function devFetchRemoteUsage(cb) {
         }
         remote.dev_source = __devSource;
         remote.generated = new Date().toISOString();
+        // Re-enrich outage spans with comp_status from local outage cache
+        var localOutage = getOutageDaysMap();
+        var remoteDays = remote.days || [];
+        for (var rd = 0; rd < remoteDays.length; rd++) {
+          var lo = localOutage[remoteDays[rd].date];
+          if (lo) {
+            remoteDays[rd].outage_spans = lo.spans;
+            remoteDays[rd].outage_hours = lo.outage_hours;
+            remoteDays[rd].outage_server_hours = lo.server_hours;
+            remoteDays[rd].outage_client_hours = lo.client_hours;
+            remoteDays[rd].outage_incidents = lo.incidents;
+          }
+        }
         cachedData = remote;
         serviceLog.info('dev', 'remote data fetched: ' + (remote.days || []).length + ' days, proxy_days=' + (remote.proxy && remote.proxy.proxy_days ? remote.proxy.proxy_days.length : 0));
         broadcastSse();

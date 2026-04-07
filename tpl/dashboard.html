@@ -37,11 +37,15 @@
 </div>
 
 <div class="top-bar-badge" id="anthropic-badge"><span id="anthropic-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#475569;margin-right:6px"></span><span id="anthropic-label">Anthropic</span><div class="anthropic-popup" id="anthropic-popup">
+<button type="button" class="anthropic-popup-expand" id="anthropic-popup-expand" title="Maximize">&#x26F6;</button>
 <div class="health-charts-row">
-<div class="health-chart-sm"><h4 id="health-history-title"></h4><canvas id="c-health-history" height="180"></canvas></div>
-<div class="health-chart-sm"><h4 id="incident-history-title"></h4><canvas id="c-incident-history" height="180"></canvas></div>
-<div class="health-chart-sm"><h4 id="outage-timeline-title"></h4><canvas id="c-outage-timeline" height="180"></canvas></div>
-</div>
+<details class="health-chart-sm" id="uptime-chart-details" open><summary class="health-chart-summary"><span id="uptime-chart-title"></span></summary><canvas id="c-uptime-chart" height="180"></canvas></details>
+<details class="health-chart-sm" id="incident-history-details" open><summary class="health-chart-summary"><span id="incident-history-title"></span></summary><canvas id="c-incident-history" height="180"></canvas></details>
+<details class="health-chart-sm" id="outage-timeline-details" open><summary class="health-chart-summary"><span id="outage-timeline-title"></span></summary><canvas id="c-outage-timeline" height="180"></canvas></details></div>
+<details class="avail-kpi-details" id="avail-kpi-details">
+<summary class="avail-kpi-summary" id="avail-kpi-summary"></summary>
+<div class="avail-kpi-panel" id="avail-kpi-panel"></div>
+</details>
 <p id="anthropic-status-line" style="font-size:.72rem;margin-top:6px;color:#94a3b8"></p>
 <div id="anthropic-ext-section" style="margin-top:4px"><h4 style="font-size:.68rem;color:#64748b;margin-bottom:2px" id="anthropic-ext-head"></h4><ul class="anthropic-popup-list" id="anthropic-ext-list" style="font-size:.65rem;color:#64748b"></ul></div>
 </div></div>
@@ -271,6 +275,15 @@
 </div>
 <div class="update-sl-body" id="update-sl-body"></div>
 </aside>
+<div class="anthropic-modal-overlay" id="anthropic-modal-overlay">
+<div class="anthropic-modal" id="anthropic-modal">
+<div class="anthropic-modal-header">
+<span class="anthropic-modal-title">Anthropic Service Status</span>
+<button type="button" class="anthropic-modal-close" id="anthropic-modal-close">&times;</button>
+</div>
+<div class="anthropic-modal-body" id="anthropic-modal-body"></div>
+</div>
+</div>
 <script>window.__I18N_BUNDLES=__I18N_PLACEHOLDER__;</script>
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script defer src="/assets/dashboard.client.js"></script>
