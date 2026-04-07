@@ -5219,17 +5219,20 @@ function renderOutageTimeline(data) {
 }
 
 
-// Anthropic badge click → open health section and scroll to incidents
+// Anthropic badge click toggle popup
 (function() {
   var badge = document.getElementById("anthropic-badge");
   if (badge) {
     badge.style.cursor = "pointer";
-    badge.addEventListener("click", function() {
-      var hc = document.getElementById("health-collapse");
-      if (hc && !hc.open) hc.open = true;
-      var target = document.getElementById("incident-history-title");
-      if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+    badge.addEventListener("click", function(e) {
+      e.stopPropagation();
+      badge.classList.toggle("popup-open");
     });
+    document.addEventListener("click", function() {
+      badge.classList.remove("popup-open");
+    });
+    var popup = document.getElementById("anthropic-popup");
+    if (popup) popup.addEventListener("click", function(e) { e.stopPropagation(); });
   }
 })();
 fetchUsageJsonOnce();
