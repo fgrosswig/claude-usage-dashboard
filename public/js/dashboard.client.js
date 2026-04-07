@@ -5074,44 +5074,61 @@ function renderIncidentHistory(data) {
 
 
 function updateAnthropicPopup(data) {
-  var oHead = document.getElementById("anthropic-popup-outage-head");
-  var oList = document.getElementById("anthropic-popup-outage-list");
-  var eHead = document.getElementById("anthropic-popup-ext-head");
-  var eList = document.getElementById("anthropic-popup-ext-list");
-  if (!oHead) return;
+  if (typeof Chart === "undefined") return;
+  var el = document.getElementById("c-anthropic-incidents");
+  if (!el) return;
 
-  var days = data.days || [];
-
-  // Collect outages from all days
-  oHead.textContent = t("liveOutageHead");
-  var ohtml = "";
-  for (var di = 0; di < days.length; di++) {
-    var incs = days[di].outage_incidents || [];
-    for (var ii = 0; ii < incs.length; ii++) {
-      var o = incs[ii];
-      var imp = (o.impact || "none").toUpperCase();
-      var kind = o.kind ? " (" + o.kind + ")" : "";
-      ohtml += "<li>" + escHtml(days[di].date) + " · [" + escHtml(imp) + "] " + escHtml(o.name || "") + escHtml(kind) + "</li>";
-    }
-  }
-  if (!ohtml) ohtml = '<li style="color:#64748b">' + escHtml(t("liveOutageEmpty")) + '</li>';
-  if (oList) oList.innerHTML = ohtml;
-
-  // Collect extension version changes from days
-  eHead.textContent = t("liveExtHead");
-  var ehtml = "";
-  for (var ei = 0; ei < days.length; ei++) {
-    var vc = days[ei].version_change;
-    if (vc) {
-      ehtml += "<li>" + escHtml(days[ei].date) + ": " + escHtml(vc.from || "?") + " → " + escHtml(vc.to || "?") + "</li>";
-    }
-  }
-  if (!ehtml) ehtml = '<li style="color:#64748b">' + escHtml(t("liveExtEmpty")) + '</li>';
-  if (eList) eList.innerHTML = ehtml;
-
-  // Update badge label
   var label = document.getElementById("anthropic-label");
   if (label) label.textContent = "Anthropic";
+
+  var days = getFilteredDays(data.days || []);
+  if (days.length < 2) return;
+
+  var labels = [];
+  var outageH = [];
+  var outageColors = [];
+  var incidentCounts = [];
+  for (var i = 0; i < days.length; i++) {
+    var d = days[i];
+    labels.push(d.date.slice(5));
+    var oh = d.outage_hours || 0;
+    outageH.push(oh);
+    outageColors.push(oh > 2 ? "#ef4444" : oh > 0 ? "#f59e0b" : "rgba(34,197,94,.3)");
+    incidentCounts.push((d.outage_incidents || []).length);
+  }
+
+  if (_proxyCharts.anthropicIncidents) {
+    freezeChartNoAnim(_proxyCharts.anthropicIncidents);
+    _proxyCharts.anthropicIncidents.data.labels = labels;
+    _proxyCharts.anthropicIncidents.data.datasets[0].data = outageH;
+    _proxyCharts.anthropicIncidents.data.datasets[0].backgroundColor = outageColors;
+    _proxyCharts.anthropicIncidents.data.datasets[1].data = incidentCounts;
+    _proxyCharts.anthropicIncidents.update("none");
+    return;
+  }
+
+  _proxyCharts.anthropicIncidents = new Chart(el.getContext("2d"), {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [
+        { label: t("incidentDSOutageHours"), data: outageH, backgroundColor: outageColors, yAxisID: "y", borderRadius: 3 },
+        { label: "Incidents", data: incidentCounts, type: "scatter", borderColor: "#ef4444", backgroundColor: "#ef4444", pointRadius: function(ctx) { return ctx.parsed.y > 0 ? 6 : 0; }, pointStyle: "circle", yAxisID: "y1" }
+      ]
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      transitions: __chartTransitionsOff,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { ticks: { color: "#94a3b8", font: { size: 9 } }, grid: { color: "rgba(51,65,85,.4)" } },
+        y: { position: "left", ticks: { color: "#94a3b8" }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, title: { display: true, text: "Outage (h)", color: "#94a3b8", font: { size: 9 } } },
+        y1: { position: "right", ticks: { color: "#ef4444" }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: "Incidents", color: "#ef4444", font: { size: 9 } } }
+      },
+      plugins: { legend: { labels: { color: "#e2e8f0", boxWidth: 10, font: { size: 10 } } } }
+    }
+  });
 }
 
 
