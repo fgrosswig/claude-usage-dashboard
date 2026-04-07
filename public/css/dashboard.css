@@ -255,7 +255,7 @@ tr:hover td{background:#334155}
 
 /* ── Health Collapse ─────────────────────────────────────── */
 .health-collapse{margin-bottom:14px;border:1px solid #334155;border-radius:10px;background:#1e293b;overflow:hidden}
-.health-collapse-summary{cursor:pointer;padding:12px 18px;display:flex;align-items:center;gap:12px;font-size:.85rem;color:#cbd5e1;list-style-position:outside;user-select:none}
+
 .health-collapse-summary:hover{color:#f8fafc}
 .health-collapse[open] .health-collapse-summary{border-bottom:1px solid #334155}
 .health-collapse-inner{padding:0}
@@ -266,7 +266,7 @@ tr:hover td{background:#334155}
 .hs-inline-badge strong{color:#e2e8f0;font-weight:600}
 .hs-inline-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .hs-inline-sep{color:#475569;margin:0 6px;font-size:.8rem}
-.health-collapse-summary{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px 14px}
+.health-collapse-summary{cursor:pointer;padding:12px 18px;display:flex;align-items:center;gap:12px;font-size:.85rem;color:#cbd5e1;list-style-position:outside;user-select:none}
 
 /* meta-details in top-bar */
 .top-bar .meta-details{margin-bottom:0;border:none;background:transparent;border-radius:0;overflow:visible;flex:none;min-width:0}
@@ -300,7 +300,7 @@ tr:hover td{background:#334155}
 
 
 
-#health-summary-text{display:flex;flex-wrap:wrap;gap:2px 0;align-items:center;min-width:0}
+#health-summary-text{display:inline;line-height:1.8}
 
 
 #filter-host-select{min-width:100px;max-width:200px;background:#0f172a;border:1px solid #475569;color:#e2e8f0;border-radius:6px;font-size:.78rem;padding:2px}
