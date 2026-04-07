@@ -4,12 +4,13 @@
 # - Aufbereitung nur unter /tmp/…-Snapshot: Gitea-Arbeitskopie bleibt unberührt (kein reset).
 # - Danach: interne Hosts/Domains in Textdateien → Platzhalter (nur im Snapshot, nicht im Gitea-Repo).
 #
-# Secret GH_PAT_TOKEN (Repo- oder Org-Secret in Gitea):
-# - GitHub PAT dieses Benutzers muss **Schreibzugriff** auf fgrosswig/claude-usage-dashboard haben.
+# Secret GH_PAT_TOKEN — in Gitea als Repo-Secret **oder** Org-Secret (Name exakt GH_PAT_TOKEN):
+# - Org-Secret: unter Organisation → Secrets anlegen; für dieses Repo **Zugriff erlauben** (wie in Gitea für Actions vorgesehen).
+# - Im Workflow weiterhin secrets.GH_PAT_TOKEN — Gitea setzt Repo- und Org-Secrets zusammen, sofern das Repo berechtigt ist.
+# - GitHub PAT muss **Schreibzugriff** auf fgrosswig/claude-usage-dashboard haben.
 # - Classic PAT: Scope **repo** (voll). Fine-grained: Repo auswählen, **Contents: Read and write**.
-# - Bei Org/SSO: Token dort **autorisieren**. Abgelaufenes/falsches Secret → oft 401/403.
+# - GitHub Org/SSO: PAT dort **autorisieren**. Abgelaufenes/falsches Secret → oft 401/403.
 # - Kein Force-Push: Arbeitsbaum = aktuelle github/main + ein normaler Snapshot-Commit (Branch-Schutz-kompatibel).
-# - PAT: Classic **repo** oder Fine-grained **Contents: Read and write**; SSO ggf. authorize.
 
 name: Mirror to GitHub
 
