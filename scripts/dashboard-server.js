@@ -2890,7 +2890,8 @@ function parseProxyNdjsonFiles() {
       status_codes: d.status_codes,
       hours: d.hours,
       active_hours: Object.keys(d.hours).length,
-      rate_limit: d.rate_limit_snapshots.length ? d.rate_limit_snapshots[0] : null
+      rate_limit: d.rate_limit_snapshots.length ? d.rate_limit_snapshots[0] : null,
+      per_hour_latency: d.per_hour_latency
     });
   }
 
