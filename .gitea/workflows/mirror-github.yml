@@ -83,6 +83,16 @@ jobs:
           done
           # Vollständige Bereinigung nur im Snapshot (siehe scripts/scrub-for-public.sh).
           sh "${EXPORT_DIR}/scripts/scrub-for-public.sh" "${EXPORT_DIR}"
+          # Harte Prüfung: interner Forge-Host darf nach Scrub nicht in typischen Texten vorkommen.
+          if grep -rE 'gitea\.grosswig-it\.de' "${EXPORT_DIR}" \
+              --include='*.md' --include='*.yml' --include='*.yaml' --include='*.json' \
+              2>/dev/null | grep -Fv 'scrub-for-public.sh' | grep -q .; then
+            echo "mirror: scrub leak — gitea.grosswig-it.de still in export (fix scrub / sed on runner)"
+            grep -rE 'gitea\.grosswig-it\.de' "${EXPORT_DIR}" \
+              --include='*.md' --include='*.yml' --include='*.yaml' --include='*.json' \
+              2>/dev/null | grep -Fv 'scrub-for-public.sh' || true
+            exit 1
+          fi
           git fetch github "refs/heads/${MIRROR_DEST_BRANCH}:refs/remotes/github/${MIRROR_DEST_BRANCH}" 2>/dev/null \
             || git fetch github || true
           if git rev-parse --verify "github/${MIRROR_DEST_BRANCH}" >/dev/null 2>&1; then
