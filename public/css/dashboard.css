@@ -279,14 +279,14 @@ tr:hover td{background:#334155}
 
 
 /* ── Filter Bar ──────────────────────────────────────────── */
-.filter-bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;margin-bottom:14px;padding:10px 14px;background:#1e293b;border:1px solid #334155;border-radius:8px}
+.filter-bar{display:flex;flex-wrap:wrap;align-items:center;gap:14px 24px;margin-bottom:14px;padding:14px 18px;background:#1e293b;border:1px solid #334155;border-radius:10px}
 .filter-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.filter-label{font-size:.68rem;color:#94a3b8;white-space:nowrap;margin-right:2px}
-.filter-input{background:#0f172a;border:1px solid #475569;color:#e2e8f0;padding:4px 8px;border-radius:5px;font-size:.68rem;max-width:130px}
+.filter-label{font-size:.78rem;color:#94a3b8;white-space:nowrap;margin-right:4px;font-weight:600}
+.filter-input{background:#0f172a;border:1px solid #475569;color:#e2e8f0;padding:6px 10px;border-radius:6px;font-size:.78rem;max-width:150px}
 .filter-input:focus{border-color:#3b82f6;outline:none}
 .filter-sep{color:#475569;font-size:.75rem}
 .filter-chips{display:flex;flex-wrap:wrap;gap:4px}
-.filter-chip{background:#0f172a;border:1px solid #475569;color:#94a3b8;padding:3px 10px;border-radius:14px;font-size:.65rem;cursor:pointer;user-select:none;transition:all .15s}
+.filter-chip{background:#0f172a;border:1px solid #475569;color:#94a3b8;padding:6px 14px;border-radius:16px;font-size:.78rem;cursor:pointer;user-select:none;transition:all .15s}
 .filter-chip:hover{border-color:#64748b;color:#cbd5e1}
 .filter-chip.active{background:#3b82f6;border-color:#3b82f6;color:#fff}
 .top-bar-title{font-size:1rem;font-weight:600;color:#f8fafc;margin:0;flex:1;white-space:nowrap}
