@@ -4733,18 +4733,16 @@ function initFilterBar(data) {
   var hlabel = document.getElementById('filter-host-label');
   if (hlabel) hlabel.textContent = t('filterHost');
 
-  // Date range inputs
+  // Date range selects
   var startEl = document.getElementById('filter-date-start');
   var endEl = document.getElementById('filter-date-end');
-  if (startEl && days.length) {
+  if (startEl && endEl && days.length) {
+    var opts = '';
+    for (var di = 0; di < days.length; di++) opts += '<option value="' + escHtml(days[di].date) + '">' + escHtml(days[di].date) + '</option>';
+    startEl.innerHTML = opts;
+    endEl.innerHTML = opts;
     startEl.value = days[0].date;
-    startEl.min = days[0].date;
-    startEl.max = days[days.length - 1].date;
-  }
-  if (endEl && days.length) {
     endEl.value = days[days.length - 1].date;
-    endEl.min = days[0].date;
-    endEl.max = days[days.length - 1].date;
   }
 
   // Scope chips (All days / 24h) — mirror existing main-charts-scope
