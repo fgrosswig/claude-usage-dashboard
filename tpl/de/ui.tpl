@@ -316,5 +316,10 @@
   "filterHostAll": "Gesamt",
   "healthHistoryLabel": "Gesundheits-Score",
   "healthHistoryWarn": "Warnung",
-  "healthHistoryCrit": "Kritisch"
+  "healthHistoryCrit": "Kritisch",
+  "incidentHistoryLabel": "Incidents & Hit Limits (pro Tag)",
+  "incidentDSOutageHours": "Ausfall (Stunden)",
+  "incidentDSHitLimits": "Hit Limits",
+  "incidentAxisOutage": "Ausfall (h)",
+  "incidentAxisHitLimits": "Hit Limits"
 }
