@@ -70,6 +70,26 @@
 </details>
 </div>
 </header>
+<div class="filter-bar" id="filter-bar">
+<div class="filter-group">
+<label class="filter-label" id="filter-date-label"></label>
+<input type="date" id="filter-date-start" class="filter-input">
+<span class="filter-sep">–</span>
+<input type="date" id="filter-date-end" class="filter-input">
+</div>
+<div class="filter-group">
+<label class="filter-label" id="filter-day-label"></label>
+<select id="filter-day-picker" class="filter-input filter-day-select"></select>
+</div>
+<div class="filter-group">
+<label class="filter-label" id="filter-scope-label"></label>
+<div class="filter-chips" id="filter-scope-chips" role="group"></div>
+</div>
+<div class="filter-group">
+<label class="filter-label" id="filter-host-label"></label>
+<div class="filter-chips" id="filter-host-chips" role="group"></div>
+</div>
+</div>
 <details class="health-collapse" id="health-collapse">
 <summary class="health-collapse-summary" id="health-collapse-summary">
 <div class="health-total-circle-sm" id="health-circle-sm"></div>
@@ -159,26 +179,7 @@
 <div class="report-modal-body"><pre id="report-content"></pre></div>
 </div>
 </div>
-<div class="filter-bar" id="filter-bar">
-<div class="filter-group">
-<label class="filter-label" id="filter-date-label"></label>
-<input type="date" id="filter-date-start" class="filter-input">
-<span class="filter-sep">–</span>
-<input type="date" id="filter-date-end" class="filter-input">
-</div>
-<div class="filter-group">
-<label class="filter-label" id="filter-day-label"></label>
-<select id="filter-day-picker" class="filter-input filter-day-select"></select>
-</div>
-<div class="filter-group">
-<label class="filter-label" id="filter-scope-label"></label>
-<div class="filter-chips" id="filter-scope-chips" role="group"></div>
-</div>
-<div class="filter-group">
-<label class="filter-label" id="filter-host-label"></label>
-<div class="filter-chips" id="filter-host-chips" role="group"></div>
-</div>
-</div>
+
 <div class="day-picker-row" id="day-picker-row" style="display:none">
 <label id="lbl-day-picker" for="day-picker">Karten &amp; Tabelle (Tag wählen)</label>
 <select id="day-picker" aria-label=""></select>
