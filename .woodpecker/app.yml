@@ -46,7 +46,7 @@ steps:
         $K apply -k k8s/overlays/dev
         if ! $K get secret harbor-pull -n claude >/dev/null 2>&1; then
           echo "ERROR: Secret harbor-pull fehlt in Namespace claude — ohne ihn kann der Node kein privates Harbor-Image ziehen."
-          echo "Siehe k8/README.md (Pull-Secret aus Harbor-Robot). Beispiel: kubectl create secret docker-registry harbor-pull -n claude --docker-server=harbor.grosswig-it.de ..."
+          echo "Siehe k8s/README.md (Pull-Secret aus Harbor-Robot). Beispiel: kubectl create secret docker-registry harbor-pull -n claude --docker-server=harbor.grosswig-it.de ..."
           exit 1
         fi
         $K set image deployment/claude-app app=harbor.grosswig-it.de/claude/claude-usage-dashboard:${CI_COMMIT_SHA:0:8} -n claude
