@@ -1,110 +1,74 @@
 **[English](README.en.md)** · Deutsch
 
-[![Woodpecker CI — Branch main](https://ci.grosswig-it.de/api/badges/3/status.svg?branch=main)](https://ci.grosswig-it.de/repos/3)
+## Claude Usage Dashboard
 
-## Claude Usage Dashboard (`server.js` / `start.js`)
+### Zusammenfassung
 
-Standalone Node-Server fuer **Claude Code** Token-Nutzungs-Analyse, Anomalie-Erkennung und Proxy-Monitoring. Liest **`~/.claude/projects/**/*.jsonl`** und zeigt Token-Nutzung, Limits (heuristisch) und Forensik in einer Web-UI. Nur **`claude-*`**-Modelle werden gezaehlt (kein `<synthetic>`).
+**Anthropic- und Claude-Code-Monitoring:** Ein **selbst gehostetes Web-Dashboard** und optional ein **transparenter HTTP-Proxy** zur **Anthropic-API** — um **Tokenfluss**, heuristische Limits, **Forensik** und Proxy-Metriken darzustellen. **Motivation:** In der Praxis entstehen bei **Anthropic-Nutzung** (Claude Code, Max-/Session-Fenster u. a.) oft **schnelle „Usage-Drains“**; die offizielle Anzeige erklärt nicht immer, **warum** der Zähler so schnell leerläuft. Datenquellen: **`~/.claude/projects/**/*.jsonl`** und — mit Proxy — **NDJSON** pro Request (Latenz, Cache, u. a. **rate-limit-relevante Header**). Gezählt werden nur **`claude-*`**-Modelle (kein `<synthetic>`). Betrieb **lokal** oder in **Docker/Kubernetes** — kein zentraler SaaS.
 
-**Live:** [https://claude-usage.grosswig-it.de/](https://claude-usage.grosswig-it.de/)
+### Referenz und Kontext
 
-### Features
+- **Gemessene Hintergrundarbeit (Proxy-Idee):** **[Claude Code Hidden Problem Analysis](https://github.com/ArkNill/claude-code-hidden-problem-analysis)** von **ArkNill** — dokumentierte Analyse zu Cache-Bugs, **5h/7d-Quota** und Proxy-erfassten Headern (u. a. **cc-relay**-ähnliche Messung). **Dieses Projekt übernimmt die Proxy-/NDJSON-Idee** in Dashboard und Pipeline; die **Befundtiefe** steht in **seinem** Repo.
+- **GitHub-Issue-Diskussion (Claude Code):** **[anthropics/claude-code#38335](https://github.com/anthropics/claude-code/issues/38335)** — u. a. zu **abnorm schnell** ausgereizten Max-/Session-Fenstern (Stand Diskussion: u. a. März 2026). **fgrosswig** ist dort mit **Forensik/Messungen** eingestiegen; **alle dort verlinkten Kommentare, Issues und Unter-Diskussionen** gehören zum **gleichen Themenspektrum** (Usage, Regression, Community-Messwerte) und sind **Lese-Referenzen** — ein vollständiges URL-Inventar würde das Feld hier sprengen.
 
-#### Health Score Ampel
-- **14 Indikatoren** mit Gruen/Gelb/Rot Schwellwerten: Quota 5h, Thinking Gap, Cache Health, Error Rate, Hit Limits, Latenz, Interrupts, Cold Starts, Retries, False 429 (B3), Truncations (B5), Context Resets (B4), Tokens/1% Quota, Anomale Stops
-- **Score 0-10** mit farbcodiertem Trend-Chart ueber alle Tage
-- **Kernbefunde** — 8 auto-berechnete Findings (Thinking Token Gap, Overhead, Cache-Paradox etc.)
-- **ArkNill Bug Detection** — automatische Erkennung der 7 bekannten Claude Code Bugs (B1-B8)
-- Collapsible Section: Ampel-Badges im zugeklappten Zustand
+Technik, UI, Umgebungsvariablen und API: **[Dokumentation](docs/README.md)**.
 
-#### Proxy Analytics (Anthropic Monitor Proxy)
-- Transparenter HTTPS-Proxy fuer die Anthropic API mit NDJSON-Logging
-- **6 Stat-Cards** (Requests, Latenz, Cache Ratio, Models, 5h-Quota, 7d-Quota mit Farbcodierung)
-- **Token Cost Attribution** (Stacked Bar: Cache Read / Creation / Output)
-- **Latenz-Chart** (Avg + Min Trend, Outlier-bereinigt)
-- **Modell-Verteilung** (Requests + Latenz pro Modell, dual-axis)
-- **Hourly Heatmap** (Requests pro Stunde, Intensitaets-Faerbung)
-- **Cold-Start Erkennung** (Requests mit <50% Cache-Ratio)
-- **SSE stop_reason Extraktion** (end_turn, tool_use, max_tokens aus Streaming-Responses)
-- **JSONL vs Proxy Vergleich** (Thinking Token Duplication Ratio)
+### Dokumentation
 
-#### Anthropic Status & Incidents
-- **Incident-Chart** (Outage-Stunden + Incident-Punkte pro Tag)
-- **Hit Limits Trend** (Korrelation Ausfaelle vs Rate-Limits)
-- **Extension-Updates** Timeline (Claude Code Versionen)
-- Live Anthropic Status Badge in der Top-Bar
+Die **vollständige** Beschreibung liegt in **[docs/](docs/README.md)** mit Unterseiten (Architektur, UI, Proxy, Forensik, Umgebungsvariablen, API).
 
-#### Token Stats (collapsible)
-- **Stat-Cards** mit Tag-Output, Cache Read, Total, Hit Limits, Overhead, Peak, Gesamt, Session-Signale
-- **4 Main-Charts** (Token-Verbrauch, Cache:Output, Output/Stunde, Subagent-Cache)
-- Collapsible Section mit Summary-Zeile
+- **Deutsch:** [docs/de/README.md](docs/de/README.md)  
+- **English:** [docs/en/README.md](docs/en/README.md)
 
-#### Forensic Analyse
-- Hit-Limit Erkennung aus JSONL-Logs
-- Session-Signale (continue/resume/retry/interrupt/truncated)
-- Service Impact Chart (Arbeitszeit vs Ausfall) — nebeneinander mit Session-Signale
-- Cache Read Korrelation
-- Forensic Report (Markdown-Export)
-- HiDPI Chart-Rendering (devicePixelRatio)
-
-#### Multi-Host Support
-- Mehrere Maschinen als separate Quellen (HOST-B, HOST-C, HOST-D etc.)
-- Host-Filter (Chips bei <=5 Hosts, Multi-Select ab 6+)
-- Auto-Discovery via `CLAUDE_USAGE_EXTRA_BASES=auto`
-- JSONL-Sync von Remote-Maschinen (`POST /api/claude-data-sync`)
-
-#### Filter & Navigation
-- **Datumsbereich-Filter** (Start/End als Select-Dropdowns)
-- **Host-Filter** (filtert alle Charts)
-- **Scope-Umschalter** (Alle Tage / 24h)
-- **Tag-Picker** (Karten & Tabelle)
-- Top-Bar mit Live, Anthropic, Meta Badges
-
-### Architektur
-
-```
-start.js (both)
-  ├── scripts/dashboard-server.js    # HTTP + SSE + Parsing
-  ├── scripts/anthropic-proxy-cli.js # Transparenter Proxy → NDJSON
-  ├── scripts/usage-scan-roots.js    # JSONL + NDJSON Discovery
-  ├── scripts/service-logger.js      # Strukturierte Logs
-  ├── tpl/dashboard.html             # HTML Template
-  ├── tpl/de/ui.tpl + tpl/en/ui.tpl  # i18n (JSON)
-  ├── public/js/dashboard.client.js  # Browser-Logik (Chart.js)
-  └── public/css/dashboard.css       # Styles (Dark Theme)
-```
-
-### UI-Texte (DE/EN, dynamisch)
-
-- Alle Beschriftungen liegen als **JSON** unter **`tpl/de/ui.tpl`** und **`tpl/en/ui.tpl`** (Dateiendung `.tpl`, Inhalt gueltiges JSON).
-- **`/`** nutzt einen **In-Memory-Cache** (invalidiert sich bei **mtime**-Aenderung): kein Einlesen/String-Replace pro Request. Texte aendern → Datei speichern → **Seite neu laden**.
-- **`GET /api/i18n-bundles`** liefert dieselben Bundles (ebenfalls aus dem Cache).
-- Schluessel sind flache String-IDs (z.B. `chartDailyToken`); Platzhalter wie `{n}` oder `{files}` werden im Client ersetzt.
-
-### Start
+### Schnellstart
 
 ```bash
-node server.js
+node server.js              # Dashboard :3333
+node start.js both          # Dashboard + Proxy :8080
+node start.js forensics     # CLI-Auswertung
 ```
 
-Oder mit dem generischen Starter (Dashboard ist der Default):
+Optionen, Logging, Cache, Multi-Host und Sync: jeweils in der **[Dokumentation](docs/de/README.md)**.
+
+### Docker
+
+Zwei Images: **`Dockerfile.base`** (npm-Deps) → **`Dockerfile`** (App inkl. **`images/`**-Screenshots unter `/app/images`). Lokal z. B. `docker build -f Dockerfile.base -t claude-base:local .` dann **`BASE_IMAGE=claude-base BASE_TAG=local docker compose build`**. **`docker compose up`** = **`node start.js both`** (3333 / 8080); weitere Modi: Kopfzeilen in **`docker-compose.yml`**. CI: **`docker-compose.ci.yml`**, **`.github/workflows/docker.yml`**.
+
+### Gitea und GitHub (Routine nach Merge auf `main`)
+
+Arbeit läuft primär auf **Gitea** (Branch z. B. **`feat/proxy-logs`** → PR → **`main`**). **GitHub** dient als öffentlicher Spiegel; dort heißt der Branch aktuell meist **`feat/proxy-analytics`** → PR → **`main`** ([Repo](https://github.com/fgrosswig/claude-usage-dashboard)).
+
+**Einmalig — zweiten Remote:**
 
 ```bash
-node start.js
+git remote add github https://github.com/fgrosswig/claude-usage-dashboard.git   # Name frei wählbar
+git fetch github
 ```
 
-**Dashboard + Anthropic-Proxy in einem Terminal** (Dashboard Port **3333**, Proxy **8080** bzw. **`ANTHROPIC_PROXY_PORT`**):
+**A) Nach Merge auf Gitea-`main` — GitHub-`main` nachziehen**
 
 ```bash
-node start.js both
+git checkout main
+git pull origin main                    # origin = Gitea
+git push github main                   # github-Remote: main aktualisieren
 ```
 
-### Optionen
+**B) Feature für GitHub-PR hochladen (Branch-Namen abgleichen)**
+
+Vom gleichen Stand wie der Gitea-Feature-Branch, aber unter dem GitHub-Branch-Namen pushen (damit der offene PR dort aktualisiert wird):
 
 ```bash
-node server.js --port=4444 --refresh=300
-node server.js --log-level=debug --log-file=$HOME/.claude/usage-dashboard-server.log
+git checkout feat/proxy-logs
+git pull origin feat/proxy-logs
+git push github feat/proxy-logs:feat/proxy-analytics
 ```
+
+Auf GitHub: PR **„feat/proxy-analytics“ → `main`** anlegen oder den bestehenden PR prüfen (zeigt neuen Push).  
+Optional lokal: **`gh pr create`** / **`gh pr sync`** mit installiertem [GitHub CLI](https://cli.github.com/), falls du nicht nur im Web arbeitest.
+
+**Automatischer Spiegel:** Nach Merge auf Gitea-`main` pusht **`.gitea/workflows/mirror-github.yml`** einen bereinigten Snapshot nach **GitHub `main`** (intern bleibt alles unverändert; Domains und `.woodpecker`/`.gitea` erscheinen nicht öffentlich). Die `git push github`-Beispiele oben nur bei Bedarf (z. B. ohne Workflow oder für einen separaten GitHub-Feature-Branch).
+
+### Server- und CLI-Optionen
 
 - **`--port`**: HTTP-Port (Standard `3333`).
 - **`--log-level`**, **`--log-file`**: Diagnose-Logging (siehe **Server-Logging** unten); identisch mit `CLAUDE_USAGE_LOG_*` Umgebungsvariablen.
@@ -340,7 +304,8 @@ DEV_PROXY_SOURCE=https://claude-usage.grosswig-it.de DEV_MODE=full node start.js
 
 ### Screenshots
 
-![alt text](images/forensic.png)
-![alt text](images/image.png)
-![alt text](images/image2.png)
-![alt text](images/image3.png)
+**Token-Übersicht** (Dashboard) und **Proxy-Analytics** — weiteres in [docs/de/08-screenshots.md](docs/de/08-screenshots.md).
+
+![Token-Übersicht / Haupt-Charts](images/main_overview_statistics.png)
+
+![Anthropic-Monitor-Proxy / Proxy-Analytics](images/proxy_statistics.png)

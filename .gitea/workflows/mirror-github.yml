@@ -1,5 +1,7 @@
-# Gitea → GitHub: nur branch main — flacher Snapshot (keine Gitea-Commit-Historie).
-# Interne Pfade (Woodpecker, Gitea-Workflows) fallen raus. .github/ bleibt drin — öffentliche GitHub Actions CI.
+# Gitea (intern) → GitHub (öffentlich): nur branch main, flacher Snapshot — Forge-Repo bleibt unverändert.
+# - MIRROR_EXCLUDE_PATHS: .woodpecker / .gitea bleiben nur intern (nicht auf GitHub).
+# - .github/ wird gespiegelt (öffentliche GitHub Actions CI).
+# - Danach: interne Hosts/Domains in Textdateien → Platzhalter (nur im Snapshot, nicht im Gitea-Repo).
 
 name: Mirror to GitHub
 
@@ -21,14 +23,14 @@ jobs:
         with:
           fetch-depth: 0
           ref: main
-      - name: Publish snapshot to GitHub (main only)
+      - name: Publish snapshot to GitHub (main only, strip internal refs)
         env:
           GH_MIRROR_TOKEN: ${{ secrets.gh_pat_token }}
           MIRROR_DEST_BRANCH: main
         run: |
           set -eux
-          git config user.email "gitea-publish@users.noreply.local"
-          git config user.name "gitea-publish"
+          git config user.email "public-mirror@users.noreply.local"
+          git config user.name "public-mirror"
           git remote add github "https://x-access-token:${GH_MIRROR_TOKEN}@github.com/fgrosswig/claude-usage-dashboard.git"
           SHORT="$(git rev-parse --short HEAD)"
           for p in ${MIRROR_EXCLUDE_PATHS}; do
@@ -36,6 +38,19 @@ jobs:
             rm -rf "${p}"
           done
           git checkout --orphan public-publish
+          find . -type f ! -path './.git/*' \( \
+              -name '*.md' -o -name '*.yml' -o -name '*.yaml' -o -name '*.sh' -o -name '*.tpl' \
+              -o -name 'Dockerfile' -o -name 'Dockerfile.*' -o -name 'docker-compose*.yml' \
+            \) -print0 | while IFS= read -r -d '' f; do
+              sed -i \
+                -e 's/harbor\.grosswig-it\.de/registry.example.com/g' \
+                -e 's/gitea\.grosswig-it\.de/git.example.com/g' \
+                -e 's/ci\.grosswig-it\.de/ci.example.com/g' \
+                "$f" || true
+            done
+          find . -type f ! -path './.git/*' -name '*.md' -print0 | while IFS= read -r -d '' f; do
+              sed -i '/Woodpecker CI/d;/grosswig-it\.de/d' "$f" || true
+            done
           git add -A
           if git diff --cached --quiet; then
             echo "nothing to publish"

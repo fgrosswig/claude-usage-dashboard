@@ -29,6 +29,9 @@
 !/images/
 !/images/**/*
 
+!/docs/
+!/docs/**/*
+
 !/k8/
 !/k8/**/*
 
@@ -42,6 +45,14 @@
 !/package-lock.json
 !/.dockerignore
 !/docker-compose.yml
+!/docker-compose.ci.yml
+
+!/.github/
+!/.github/**/*
+
+!/.gitea/
+!/.gitea/workflows/
+!/.gitea/workflows/**/*
 
 !/.woodpecker/
 !/.woodpecker/**/*
