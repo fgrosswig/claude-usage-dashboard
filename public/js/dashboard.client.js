@@ -1797,6 +1797,12 @@ function syncForensicHostFilterBar(data) {
   }
 }
 function renderDashboardCore(data) {
+  // Update dev overlay with last sync info
+  var devSync = document.getElementById("dev-last-sync");
+  if (devSync && data.generated) {
+    var ts = new Date(data.generated);
+    devSync.textContent = "Last: " + ts.toLocaleTimeString() + (data.dev_source ? " · " + (data.days || []).length + "d" : "");
+  }
   renderProxyAnalysis(data);
   updateMetaDetailsSummary(data);
   var days = getFilteredDays(data.days);
@@ -4408,15 +4414,22 @@ function computeHealthIndicators(data) {
   var interruptsPerDay = Math.round(totalInterrupts / numDays);
   var retriesPerDay = Math.round(totalRetries / numDays);
 
-  // Thinking Gap: compare today JSONL vs proxy
+  // Thinking Gap: compare JSONL vs proxy for matching day
   var thinkingGap = 0;
   if (pd && days.length) {
-    var todayJsonl = null;
-    for (var j = 0; j < days.length; j++) {
-      if (days[j].date === pd.date) { todayJsonl = days[j]; break; }
-    }
-    if (todayJsonl && (pd.total_tokens || 0) > 0) {
-      thinkingGap = (todayJsonl.total || 0) / pd.total_tokens;
+    // Try matching proxy days from newest to oldest until we find one with JSONL data
+    var pdAll = (data.proxy && data.proxy.proxy_days) || [];
+    for (var tgi = pdAll.length - 1; tgi >= 0; tgi--) {
+      var tgPd = pdAll[tgi];
+      if (!(tgPd.total_tokens > 0)) continue;
+      var tgJsonl = null;
+      for (var tgj = 0; tgj < days.length; tgj++) {
+        if (days[tgj].date === tgPd.date && (days[tgj].total || 0) > 0) { tgJsonl = days[tgj]; break; }
+      }
+      if (tgJsonl) {
+        thinkingGap = tgJsonl.total / tgPd.total_tokens;
+        break;
+      }
     }
   }
 
@@ -5174,7 +5187,7 @@ scheduleFetchExtensionTimeline(900);
       bar.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;background:#1e293b;border-bottom:2px solid #f59e0b;padding:6px 16px;display:flex;align-items:center;gap:12px;font-size:.8rem;color:#f59e0b";
       bar.innerHTML = '<span style="font-weight:700">DEV ' + modeLabel + '</span>' +
         '<span style="color:#94a3b8">Source: ' + escHtml(info.dev_proxy_source || "") + '</span>' +
-        '<span style="color:#94a3b8">Auto-sync: ' + info.refresh_sec + 's</span>' +
+        '<span id="dev-last-sync" style="color:#94a3b8">Sync: ' + info.refresh_sec + 's</span>' +
         '<button id="dev-sync-btn" style="background:#f59e0b;color:#0f172a;border:none;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:.75rem;font-weight:600">Sync Now</button>' +
         '<span id="dev-sync-status" style="color:#64748b;font-size:.7rem"></span>';
       document.body.prepend(bar);
@@ -5184,7 +5197,7 @@ scheduleFetchExtensionTimeline(900);
         st.textContent = "syncing...";
         var sx = new XMLHttpRequest();
         sx.open("POST", "/api/debug/sync-proxy-logs", true);
-        sx.onload = function () { st.textContent = "synced " + new Date().toLocaleTimeString(); };
+        sx.onload = function () { st.textContent = "synced " + new Date().toLocaleTimeString(); st.style.color = "#22c55e"; setTimeout(function(){ st.style.color = "#64748b"; }, 3000); };
         sx.onerror = function () { st.textContent = "sync failed"; };
         sx.send();
       });
