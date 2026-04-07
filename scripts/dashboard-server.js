@@ -2904,6 +2904,7 @@ function parseProxyNdjsonFiles() {
 }
 
 function refreshProxyCache() {
+  if (__devProxyPending) return;
   try {
     __proxyCache.data = parseProxyNdjsonFiles();
     __proxyCache.generated = new Date().toISOString();
@@ -2914,11 +2915,18 @@ function refreshProxyCache() {
 }
 
 // ── Dev: fetch proxy logs from remote when DEV_PROXY_SOURCE is set ────────
+var __devProxyPending = !!(process.env.DEV_PROXY_SOURCE || '').trim();
+
 function devFetchProxyLogs(cb) {
   var source = (process.env.DEV_PROXY_SOURCE || '').trim();
   if (!source) return cb();
+  // Pre-set log dir to temp BEFORE fetch so any early proxy reads go to the right place
+  var logDir = path.join(os.tmpdir(), 'claude-proxy-logs-dev');
+  if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+  process.env.ANTHROPIC_PROXY_LOG_DIR = logDir;
+
   var url = source.replace(/\/+$/, '') + '/api/debug/proxy-logs';
-  serviceLog.info('dev', 'fetching proxy logs from ' + url);
+  serviceLog.info('dev', 'fetching proxy logs from ' + url + ' → ' + logDir);
   var proto = url.startsWith('https') ? require('https') : require('http');
   proto.get(url, function (resp) {
     var body = '';
@@ -2927,13 +2935,10 @@ function devFetchProxyLogs(cb) {
       try {
         var parsed = JSON.parse(body);
         var files = parsed.files || [];
-        var logDir = process.env.ANTHROPIC_PROXY_LOG_DIR || path.join(os.tmpdir(), 'claude-proxy-logs-dev');
-        if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
         for (var i = 0; i < files.length; i++) {
           var fp = path.join(logDir, files[i].name);
           fs.writeFileSync(fp, files[i].content, 'utf8');
         }
-        if (!process.env.ANTHROPIC_PROXY_LOG_DIR) process.env.ANTHROPIC_PROXY_LOG_DIR = logDir;
         serviceLog.info('dev', 'fetched ' + files.length + ' proxy log files to ' + logDir);
       } catch (e) {
         serviceLog.error('dev', 'proxy log fetch parse failed: ' + (e.message || e));
@@ -3114,7 +3119,14 @@ server.listen(PORT, function () {
   setTimeout(maybeRefreshReleasesCacheOnStartup, 1400);
   setTimeout(refreshMarketplaceExtensionCache, 2400);
   devFetchProxyLogs(function () {
-    setTimeout(refreshProxyCache, 3000);
+    __devProxyPending = false;
+    setTimeout(function () {
+      refreshProxyCache();
+      if (__proxyCache.data && cachedData) {
+        cachedData.proxy = __proxyCache.data;
+        broadcastSse();
+      }
+    }, 3000);
   });
 });
 
