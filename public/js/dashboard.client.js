@@ -1592,6 +1592,33 @@ window.addEventListener("resize", function () {
   clearTimeout(__layoutOvTimer);
   __layoutOvTimer = setTimeout(scheduleLayoutUpdateGuideOverlays, 200);
 });
+
+// ── Date Range + Host Filter ──────────────────────────────────────────────
+function getFilteredDays(days) {
+  if (!days || !days.length) return days;
+  var startEl = document.getElementById("filter-date-start");
+  var endEl = document.getElementById("filter-date-end");
+  var startVal = startEl ? startEl.value : "";
+  var endVal = endEl ? endEl.value : "";
+  if (!startVal && !endVal) return days;
+  var filtered = [];
+  for (var i = 0; i < days.length; i++) {
+    var d = days[i].date;
+    if (startVal && d < startVal) continue;
+    if (endVal && d > endVal) continue;
+    filtered.push(days[i]);
+  }
+  return filtered.length ? filtered : days;
+}
+
+function getFilterHost() {
+  var chips = document.getElementById("filter-host-chips");
+  if (!chips) return "";
+  var active = chips.querySelector(".filter-chip.active");
+  if (!active) return "";
+  return active.dataset.host || "";
+}
+
 function renderDashboard(data, urgent) {
   if (urgent) clearTimeout(__dashRenderCoreCoalesce);
   __lastUsageData = data;
@@ -1603,7 +1630,7 @@ function renderDashboard(data, urgent) {
   renderHealthScore(data);
   initFilterBar(data);
   renderKeyFindings(data);
-  var days = data.days;
+  var days = getFilteredDays(data.days);
   var sp = data.scan_progress;
   var scanInc = data.scanning && sp && sp.total > 0 && sp.done < sp.total;
   if (!days || !days.length) {
@@ -1760,7 +1787,7 @@ function syncForensicHostFilterBar(data) {
 function renderDashboardCore(data) {
   renderProxyAnalysis(data);
   updateMetaDetailsSummary(data);
-  var days = data.days;
+  var days = getFilteredDays(data.days);
   if(!days.length){
     window.__usageVersionDayIndices = [];
     var fsO = document.getElementById("fs-update-overlay");
@@ -4791,6 +4818,7 @@ function initFilterBar(data) {
         var fbtn = fChips.querySelector('[data-host="' + (btn.dataset.host || '') + '"]');
         if (!fbtn && !btn.dataset.host) fbtn = fChips.querySelector('.forensic-host-chip');
         if (fbtn) fbtn.click();
+      if (__lastUsageData) renderDashboard(__lastUsageData, true);
       }
     });
   }
@@ -4822,7 +4850,6 @@ function initFilterBar(data) {
 }
 
 function onFilterDateChange() {
-  // Re-render with date filter applied
   if (__lastUsageData) renderDashboard(__lastUsageData, true);
 }
 
