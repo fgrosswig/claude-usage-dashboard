@@ -272,7 +272,7 @@ tr:hover td{background:#334155}
 .top-bar .meta-details{margin-bottom:0;border:none;background:transparent;border-radius:0;overflow:visible;flex:none;min-width:0}
 
 
-.top-bar .meta-details-inner{position:absolute;right:0;top:100%;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:10px;z-index:200;min-width:320px;max-width:500px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.top-bar .meta-details-inner{position:absolute;right:8px;top:100%;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:10px;z-index:200;min-width:320px;max-width:500px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
 
 
 
@@ -310,7 +310,7 @@ tr:hover td{background:#334155}
 .top-bar-badge:hover{background:#475569}
 
 /* Meta badge hover popup */
-.top-bar .meta-details{position:relative}
+.top-bar .meta-details{position:static}
 .top-bar .meta-details-inner{display:none}
 .top-bar .meta-details:hover .meta-details-inner,.top-bar .meta-details[open] .meta-details-inner{display:block}
 .top-bar .meta-details[open] .meta-details-summary{border-bottom:none}
