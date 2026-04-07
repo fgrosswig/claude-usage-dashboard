@@ -2879,6 +2879,13 @@ function parseProxyNdjsonFiles() {
         dd.models[model].total_duration_ms += dur;
         if (u) dd.models[model].output_tokens += (u.output_tokens || 0);
 
+        // Stop-reason from proxy (SSE + JSON responses)
+        var rh2 = rec.response_hints || {};
+        if (rh2.stop_reason) {
+          if (!dd.stop_reasons) dd.stop_reasons = {};
+          dd.stop_reasons[rh2.stop_reason] = (dd.stop_reasons[rh2.stop_reason] || 0) + 1;
+        }
+
         // Rate limit snapshot (keep last per day, not all)
         var rlh = rec.response_anthropic_headers;
         if (rlh) {
@@ -2939,6 +2946,7 @@ function parseProxyNdjsonFiles() {
       per_hour_latency: d.per_hour_latency,
       false_429s: d.false_429s,
       context_resets: d.context_resets,
+      stop_reasons: d.stop_reasons || {},
       visible_tokens_per_pct: null
     });
     // Quota benchmark: visible tokens per 1% quota

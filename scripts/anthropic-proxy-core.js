@@ -308,29 +308,62 @@ function cacheHealthLabel(ratio, usage) {
 
 function responseHintsFromBuffer(buf, contentType) {
   var ct = (contentType || '').toLowerCase();
+
+  // SSE stream: extract stop_reason + content block counts from streamed events
+  if (ct.indexOf('text/event-stream') >= 0) {
+    var s = buf.toString('utf8');
+    var lines = s.split(/\r?\n/);
+    var hints = {};
+    var toolUse = 0, toolResult = 0, text = 0;
+    for (var si = 0; si < lines.length; si++) {
+      var sline = lines[si];
+      if (sline.indexOf('data:') !== 0) continue;
+      var sjson = sline.slice(5).trim();
+      if (!sjson || sjson === '[DONE]') continue;
+      try {
+        var so = JSON.parse(sjson);
+        // message_delta contains stop_reason
+        if (so.type === 'message_delta' && so.delta) {
+          if (so.delta.stop_reason) hints.stop_reason = so.delta.stop_reason;
+        }
+        // content_block_start contains block types
+        if (so.type === 'content_block_start' && so.content_block) {
+          var btype = so.content_block.type;
+          if (btype === 'tool_use') toolUse++;
+          else if (btype === 'tool_result') toolResult++;
+          else if (btype === 'text') text++;
+        }
+      } catch (e) {}
+    }
+    if (toolUse) hints.response_tool_use_blocks = toolUse;
+    if (toolResult) hints.response_tool_result_blocks = toolResult;
+    if (text) hints.response_text_blocks = text;
+    hints.response_root_type = 'stream';
+    return Object.keys(hints).length ? hints : null;
+  }
+
+  // JSON response: parse directly
   if (ct.indexOf('application/json') < 0) return null;
   try {
     var o = JSON.parse(buf.toString('utf8'));
-    var hints = {};
+    var jHints = {};
     var content = o.content;
     if (Array.isArray(content)) {
-      var toolUse = 0;
-      var toolResult = 0;
-      var text = 0;
+      var jToolUse = 0, jToolResult = 0, jText = 0;
       for (var i = 0; i < content.length; i++) {
         var b = content[i];
         if (!b || !b.type) continue;
-        if (b.type === 'tool_use') toolUse++;
-        else if (b.type === 'tool_result') toolResult++;
-        else if (b.type === 'text') text++;
+        if (b.type === 'tool_use') jToolUse++;
+        else if (b.type === 'tool_result') jToolResult++;
+        else if (b.type === 'text') jText++;
       }
-      if (toolUse) hints.response_tool_use_blocks = toolUse;
-      if (toolResult) hints.response_tool_result_blocks = toolResult;
-      if (text) hints.response_text_blocks = text;
+      if (jToolUse) jHints.response_tool_use_blocks = jToolUse;
+      if (jToolResult) jHints.response_tool_result_blocks = jToolResult;
+      if (jText) jHints.response_text_blocks = jText;
     }
-    if (o.stop_reason) hints.stop_reason = o.stop_reason;
-    if (o.type) hints.response_root_type = o.type;
-    return Object.keys(hints).length ? hints : null;
+    if (o.stop_reason) jHints.stop_reason = o.stop_reason;
+    if (o.type) jHints.response_root_type = o.type;
+    return Object.keys(jHints).length ? jHints : null;
   } catch (e) {
     return null;
   }
