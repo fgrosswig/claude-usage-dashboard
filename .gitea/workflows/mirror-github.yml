@@ -80,19 +80,8 @@ jobs:
             [ -z "${p}" ] && continue
             rm -rf "${EXPORT_DIR}/${p}"
           done
-          find "${EXPORT_DIR}" -type f \( \
-              -name '*.md' -o -name '*.yml' -o -name '*.yaml' -o -name '*.sh' -o -name '*.tpl' \
-              -o -name 'Dockerfile' -o -name 'Dockerfile.*' -o -name 'docker-compose*.yml' \
-            \) -print0 | while IFS= read -r -d '' f; do
-              sed -i \
-                -e 's/harbor\.grosswig-it\.de/registry.example.com/g' \
-                -e 's/gitea\.grosswig-it\.de/git.example.com/g' \
-                -e 's/ci\.grosswig-it\.de/ci.example.com/g' \
-                "$f" || true
-            done
-          find "${EXPORT_DIR}" -type f -name '*.md' -print0 | while IFS= read -r -d '' f; do
-              sed -i '/Woodpecker CI/d;/grosswig-it\.de/d' "$f" || true
-            done
+          # Vollständige Bereinigung nur im Snapshot (siehe scripts/scrub-for-public.sh).
+          sh "${EXPORT_DIR}/scripts/scrub-for-public.sh" "${EXPORT_DIR}"
           git fetch github "refs/heads/${MIRROR_DEST_BRANCH}:refs/remotes/github/${MIRROR_DEST_BRANCH}" 2>/dev/null \
             || git fetch github || true
           if git rev-parse --verify "github/${MIRROR_DEST_BRANCH}" >/dev/null 2>&1; then
