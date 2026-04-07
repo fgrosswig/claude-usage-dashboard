@@ -2913,6 +2913,39 @@ function refreshProxyCache() {
   }
 }
 
+// ── Dev: fetch proxy logs from remote when DEV_PROXY_SOURCE is set ────────
+function devFetchProxyLogs(cb) {
+  var source = (process.env.DEV_PROXY_SOURCE || '').trim();
+  if (!source) return cb();
+  var url = source.replace(/\/+$/, '') + '/api/debug/proxy-logs';
+  serviceLog.info('dev', 'fetching proxy logs from ' + url);
+  var proto = url.startsWith('https') ? require('https') : require('http');
+  proto.get(url, function (resp) {
+    var body = '';
+    resp.on('data', function (chunk) { body += chunk; });
+    resp.on('end', function () {
+      try {
+        var parsed = JSON.parse(body);
+        var files = parsed.files || [];
+        var logDir = process.env.ANTHROPIC_PROXY_LOG_DIR || path.join(os.tmpdir(), 'claude-proxy-logs-dev');
+        if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+        for (var i = 0; i < files.length; i++) {
+          var fp = path.join(logDir, files[i].name);
+          fs.writeFileSync(fp, files[i].content, 'utf8');
+        }
+        if (!process.env.ANTHROPIC_PROXY_LOG_DIR) process.env.ANTHROPIC_PROXY_LOG_DIR = logDir;
+        serviceLog.info('dev', 'fetched ' + files.length + ' proxy log files to ' + logDir);
+      } catch (e) {
+        serviceLog.error('dev', 'proxy log fetch parse failed: ' + (e.message || e));
+      }
+      cb();
+    });
+  }).on('error', function (e) {
+    serviceLog.error('dev', 'proxy log fetch failed: ' + (e.message || e));
+    cb();
+  });
+}
+
 var server = http.createServer(function (req, res) {
   var pathname = dashboardHttp.requestPathname(req.url);
   if (
@@ -3021,6 +3054,23 @@ var server = http.createServer(function (req, res) {
     refreshMarketplaceExtensionCache();
     res.writeHead(200, corsMp);
     res.end(JSON.stringify({ ok: true, message: 'marketplace_refresh_started' }));
+  } else if (pathname === '/api/debug/proxy-logs' && process.env.DEBUG_API === '1') {
+    // Debug endpoint: serve raw proxy NDJSON files for local dev testing
+    var proxyFiles = collectProxyNdjsonFiles();
+    var result = [];
+    for (var pfi = 0; pfi < proxyFiles.length; pfi++) {
+      try {
+        var fname = path.basename(proxyFiles[pfi]);
+        var content = fs.readFileSync(proxyFiles[pfi], 'utf8');
+        result.push({ name: fname, content: content });
+      } catch (e) {}
+    }
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'no-store'
+    });
+    res.end(JSON.stringify({ files: result }));
   } else if (pathname === '/api/proxy-usage') {
     if (!__proxyCache.data) refreshProxyCache();
     res.writeHead(200, {
@@ -3063,7 +3113,9 @@ server.listen(PORT, function () {
   setTimeout(refreshOutageCache, 400);
   setTimeout(maybeRefreshReleasesCacheOnStartup, 1400);
   setTimeout(refreshMarketplaceExtensionCache, 2400);
-  setTimeout(refreshProxyCache, 3000);
+  devFetchProxyLogs(function () {
+    setTimeout(refreshProxyCache, 3000);
+  });
 });
 
 setInterval(runScanAndBroadcast, REFRESH_SEC * 1000);

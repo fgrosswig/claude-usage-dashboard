@@ -137,7 +137,11 @@ extraEnv: []
 #       name: claude-dashboard-secrets
 #       key: github-token
 
-command: ["node", "start.js", "both"]
+# Dashboard + Proxy im selben Pod (Ingress nutzt http-dashboard + http-proxy)
+command:
+  - node
+  - start.js
+  - both
 args: []
 
 livenessProbe:

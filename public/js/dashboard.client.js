@@ -3791,7 +3791,7 @@ function copyReport(){
 })();
 
 // ── Proxy Analytics Panel ─────────────────────────────────────────────────
-var _proxyCharts = { gauge5h: null, gauge7d: null, tokens: null, latency: null };
+var _proxyCharts = { tokens: null, latency: null };
 
 function getProxyDay(data) {
   if (!data || !data.proxy || !data.proxy.proxy_days) return null;
@@ -3845,11 +3845,36 @@ function renderProxyAnalysis(data) {
     else otherReqs += models[mk].requests || 0;
   }
 
+  // Status code breakdown for request card sub text
+  var sc = pd.status_codes || {};
+  var scParts = [];
+  var scKeys = Object.keys(sc).sort();
+  for (var si = 0; si < scKeys.length; si++) {
+    if (scKeys[si] !== "200" && sc[scKeys[si]] > 0) scParts.push(scKeys[si] + ":" + sc[scKeys[si]]);
+  }
+  var reqSub = tr("proxyCardRequestsSub", { errs: pd.errors || 0, rate: (pd.error_rate || 0).toFixed(1) });
+  if (scParts.length) reqSub += " (" + scParts.join(", ") + ")";
+
+  // Quota values (rl already declared above for summary line)
+  var q5raw = parseFloat(rl["anthropic-ratelimit-unified-5h-utilization"] || 0);
+  var q7raw = parseFloat(rl["anthropic-ratelimit-unified-7d-utilization"] || 0);
+  var q5pctVal = q5raw * 100;
+  var q7pctVal = q7raw * 100;
+
+  function quotaResetStr(epoch) {
+    if (!epoch) return "";
+    var diff = parseInt(epoch, 10) - Date.now() / 1000;
+    if (diff <= 0) return "";
+    var rh = Math.floor(diff / 3600);
+    var rm = Math.floor((diff % 3600) / 60);
+    return tr("proxyGaugeResetIn", { h: rh, m: rm });
+  }
+
   var pcards = [
     {
       label: t("proxyCardRequests"),
       value: String(pd.requests || 0),
-      sub: tr("proxyCardRequestsSub", { errs: pd.errors || 0, rate: (pd.error_rate || 0).toFixed(1) }),
+      sub: reqSub,
       cls: (pd.error_rate || 0) > 5 ? "warn" : ""
     },
     {
@@ -3869,21 +3894,32 @@ function renderProxyAnalysis(data) {
       value: String(pd.requests || 0),
       sub: tr("proxyCardModelsSub", { opus: opusReqs, sonnet: sonnetReqs, other: otherReqs }),
       cls: ""
+    },
+    {
+      label: t("proxyCardQuota5h"),
+      value: q5pctVal.toFixed(1) + "%",
+      sub: quotaResetStr(rl["anthropic-ratelimit-unified-5h-reset"]),
+      cls: q5pctVal >= 80 ? "danger" : q5pctVal >= 50 ? "warn" : "",
+      valueColor: gaugeColor(q5pctVal)
+    },
+    {
+      label: t("proxyCardQuota7d"),
+      value: q7pctVal.toFixed(1) + "%",
+      sub: quotaResetStr(rl["anthropic-ratelimit-unified-7d-reset"]),
+      cls: q7pctVal >= 80 ? "danger" : q7pctVal >= 50 ? "warn" : "",
+      valueColor: gaugeColor(q7pctVal)
     }
   ];
   if (cardsEl) {
     var ch2 = "";
     pcards.forEach(function (c) {
-      ch2 += "<div class=\"card " + c.cls + "\"><div class=\"label\">" + escHtml(c.label) + "</div><div class=\"value\">" + escHtml(c.value) + "</div><div class=\"sub\">" + escHtml(c.sub) + "</div></div>";
+      var valStyle = c.valueColor ? " style=\"color:" + c.valueColor + "\"" : "";
+      ch2 += "<div class=\"card " + c.cls + "\"><div class=\"label\">" + escHtml(c.label) + "</div><div class=\"value\"" + valStyle + ">" + escHtml(c.value) + "</div><div class=\"sub\">" + escHtml(c.sub) + "</div></div>";
     });
     cardsEl.innerHTML = ch2;
   }
 
   // i18n labels for chart headings
-  var h3rl = document.getElementById("proxy-ratelimit-h3");
-  if (h3rl) h3rl.textContent = t("proxyRatelimitTitle");
-  var blurbRl = document.getElementById("proxy-ratelimit-blurb");
-  if (blurbRl) blurbRl.textContent = t("proxyRatelimitBlurb");
   var h3tok = document.getElementById("proxy-token-chart-h3");
   if (h3tok) h3tok.textContent = t("proxyTokenChartTitle");
   var blurbTok = document.getElementById("proxy-token-blurb");
@@ -3893,12 +3929,10 @@ function renderProxyAnalysis(data) {
   var blurbLat = document.getElementById("proxy-latency-blurb");
   if (blurbLat) blurbLat.textContent = t("proxyLatencyBlurb");
 
-  renderProxyGauges(pd);
   renderProxyTokenChart(data);
   renderProxyLatencyChart(data);
   renderProxyHourlyHeatmap(pd);
   renderProxyModelChart(pd);
-  renderProxyStatusChart(pd);
   renderProxyInvisibleCost(pd);
   // i18n for new chart headings
   var h3hr = document.getElementById("proxy-hourly-h3");
@@ -3930,81 +3964,6 @@ function gaugeColor(pct) {
   return "#22c55e";
 }
 
-function renderProxyGauges(pd) {
-  if (typeof Chart === "undefined") return;
-  var rl = pd.rate_limit || {};
-
-  var q5 = parseFloat(rl["anthropic-ratelimit-unified-5h-utilization"] || 0) * 100;
-  var q7 = parseFloat(rl["anthropic-ratelimit-unified-7d-utilization"] || 0) * 100;
-
-  renderOneGauge("c-proxy-5h", "gauge5h", q5, "proxy-gauge-5h-title", t("proxyGauge5hTitle"), rl["anthropic-ratelimit-unified-5h-reset"]);
-  renderOneGauge("c-proxy-7d", "gauge7d", q7, "proxy-gauge-7d-title", t("proxyGauge7dTitle"), rl["anthropic-ratelimit-unified-7d-reset"]);
-}
-
-function renderOneGauge(canvasId, chartKey, usedPct, titleId, titleText, resetEpoch) {
-  var el = document.getElementById(canvasId);
-  if (!el) return;
-  var titleEl = document.getElementById(titleId);
-  var resetStr = "";
-  if (resetEpoch) {
-    var now = Date.now() / 1000;
-    var diff = parseInt(resetEpoch, 10) - now;
-    if (diff > 0) {
-      var rh = Math.floor(diff / 3600);
-      var rm = Math.floor((diff % 3600) / 60);
-      resetStr = tr("proxyGaugeResetIn", { h: rh, m: rm });
-    }
-  }
-  if (titleEl) titleEl.textContent = titleText + (resetStr ? " — " + resetStr : "");
-
-  var remaining = Math.max(0, 100 - usedPct);
-  var color = gaugeColor(usedPct);
-
-  if (_proxyCharts[chartKey]) {
-    _proxyCharts[chartKey].data.datasets[0].data = [usedPct, remaining];
-    _proxyCharts[chartKey].data.datasets[0].backgroundColor = [color, "rgba(51,65,85,.3)"];
-    _proxyCharts[chartKey].options.plugins.title.text = usedPct.toFixed(1) + "%";
-    freezeChartNoAnim(_proxyCharts[chartKey]);
-    _proxyCharts[chartKey].update("none");
-    return;
-  }
-
-  _proxyCharts[chartKey] = new Chart(el.getContext("2d"), {
-    type: "doughnut",
-    data: {
-      labels: [t("proxyGaugeUsed"), t("proxyGaugeRemaining")],
-      datasets: [{
-        data: [usedPct, remaining],
-        backgroundColor: [color, "rgba(51,65,85,.3)"],
-        borderWidth: 0,
-        cutout: "75%"
-      }]
-    },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      maintainAspectRatio: true,
-      transitions: __chartTransitionsOff,
-      plugins: {
-        legend: { display: false },
-        title: {
-          display: true,
-          text: usedPct.toFixed(1) + "%",
-          color: color,
-          font: { size: 28, weight: "bold" },
-          position: "bottom",
-          padding: { top: 0 }
-        },
-        tooltip: {
-          callbacks: {
-            label: function (ctx) { return ctx.label + ": " + ctx.parsed.toFixed(1) + "%"; }
-          }
-        }
-      }
-    }
-  });
-}
 
 function renderProxyTokenChart(data) {
   if (typeof Chart === "undefined") return;
@@ -4076,13 +4035,11 @@ function renderProxyLatencyChart(data) {
   var labels = [];
   var avg = [];
   var mn = [];
-  var mx = [];
   for (var i = 0; i < proxyDays.length; i++) {
     var d = proxyDays[i];
     labels.push(d.date ? d.date.slice(5) : String(i));
     avg.push(d.avg_duration_ms || 0);
     mn.push(d.min_duration_ms || 0);
-    mx.push(d.max_duration_ms || 0);
   }
 
   chartShellSetLoading("c-proxy-latency", false);
@@ -4093,7 +4050,6 @@ function renderProxyLatencyChart(data) {
     _proxyCharts.latency.data.labels = labels;
     _proxyCharts.latency.data.datasets[0].data = avg;
     _proxyCharts.latency.data.datasets[1].data = mn;
-    _proxyCharts.latency.data.datasets[2].data = mx;
     freezeChartNoAnim(_proxyCharts.latency);
     _proxyCharts.latency.update("none");
     return;
@@ -4104,9 +4060,8 @@ function renderProxyLatencyChart(data) {
     data: {
       labels: labels,
       datasets: [
-        { label: t("proxyDSAvgLatency"), data: avg, borderColor: "#3b82f6", backgroundColor: "rgba(59,130,246,.15)", fill: true, tension: .3, pointRadius: 3 },
-        { label: t("proxyDSMinLatency"), data: mn, borderColor: "#22c55e", borderDash: [4, 2], tension: .3, pointRadius: 2 },
-        { label: t("proxyDSMaxLatency"), data: mx, borderColor: "#ef4444", borderDash: [4, 2], tension: .3, pointRadius: 2 }
+        { label: t("proxyDSAvgLatency"), data: avg, borderColor: "#3b82f6", backgroundColor: "rgba(59,130,246,.15)", fill: true, tension: .3, pointRadius: 3, borderWidth: 2 },
+        { label: t("proxyDSMinLatency"), data: mn, borderColor: "#22c55e", borderDash: [4, 2], tension: .3, pointRadius: 2, borderWidth: 1 }
       ]
     },
     options: {
@@ -4116,13 +4071,16 @@ function renderProxyLatencyChart(data) {
       interaction: { mode: "index", intersect: false },
       scales: {
         x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { ticks: { color: "#94a3b8", callback: function (v) { return v + "ms"; } }, grid: { color: "rgba(51,65,85,.4)" } }
+        y: { ticks: { color: "#94a3b8", callback: function (v) { return v >= 1000 ? (v/1000).toFixed(1) + "s" : v + "ms"; } }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true }
       },
       plugins: {
         legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
         tooltip: {
           callbacks: {
-            label: function (ctx) { return ctx.dataset.label + ": " + Math.round(ctx.parsed.y) + "ms"; }
+            label: function (ctx) {
+              var v = ctx.parsed.y;
+              return ctx.dataset.label + ": " + (v >= 1000 ? (v/1000).toFixed(1) + "s" : Math.round(v) + "ms");
+            }
           }
         }
       }
@@ -4211,58 +4169,6 @@ function renderProxyHourlyHeatmap(pd) {
   });
 }
 
-// ── Phase 4: Error/Status Timeline ────────────────────────────────────────
-function renderProxyStatusChart(pd) {
-  if (typeof Chart === "undefined") return;
-  var el = document.getElementById("c-proxy-status");
-  if (!el) return;
-  var sc = pd.status_codes || {};
-  var labels = [];
-  var values = [];
-  var colors = [];
-  var colorMap = { "200": "#22c55e", "401": "#f59e0b", "403": "#f97316", "404": "#94a3b8", "405": "#94a3b8", "429": "#ef4444", "500": "#ef4444", "502": "#ef4444", "503": "#ef4444" };
-  var keys = Object.keys(sc).sort();
-  for (var i = 0; i < keys.length; i++) {
-    labels.push(keys[i]);
-    values.push(sc[keys[i]]);
-    colors.push(colorMap[keys[i]] || "#8b5cf6");
-  }
-
-  chartShellSetLoading("c-proxy-status", false);
-  if (!keys.length) return;
-
-  if (_proxyCharts.status) {
-    _proxyCharts.status.data.labels = labels;
-    _proxyCharts.status.data.datasets[0].data = values;
-    _proxyCharts.status.data.datasets[0].backgroundColor = colors;
-    freezeChartNoAnim(_proxyCharts.status);
-    _proxyCharts.status.update("none");
-    return;
-  }
-
-  _proxyCharts.status = new Chart(el.getContext("2d"), {
-    type: "doughnut",
-    data: {
-      labels: labels,
-      datasets: [{ data: values, backgroundColor: colors, borderWidth: 0 }]
-    },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      maintainAspectRatio: true,
-      transitions: __chartTransitionsOff,
-      plugins: {
-        legend: { position: "right", labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
-        tooltip: {
-          callbacks: {
-            label: function (ctx) { return "HTTP " + ctx.label + ": " + ctx.parsed + " (" + pct(ctx.parsed, pd.requests || 1) + ")"; }
-          }
-        }
-      }
-    }
-  });
-}
 
 // ── Phase 5: Model Breakdown ──────────────────────────────────────────────
 function renderProxyModelChart(pd) {
