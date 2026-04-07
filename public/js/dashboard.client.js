@@ -5000,12 +5000,14 @@ function renderUptimeChart(data) {
       transitions: __chartTransitionsOff,
       interaction: { mode: "index", intersect: false },
       scales: {
-        x: { stacked: true, ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.3)" } },
-        y: { stacked: true, max: 24, ticks: { color: "#94a3b8", stepSize: 6, callback: function(v) { return v + "h"; } }, grid: { color: "rgba(51,65,85,.3)" } }
+        x: { stacked: true, ticks: { color: "#cbd5e1", font: { size: _cf().tick } }, grid: { color: "rgba(51,65,85,.3)" } },
+        y: { stacked: true, max: 24, ticks: { color: "#cbd5e1", font: { size: _cf().tick }, stepSize: 6, callback: function(v) { return v + "h"; } }, grid: { color: "rgba(51,65,85,.3)" } }
       },
       plugins: {
-        legend: { labels: { color: "#e2e8f0", boxWidth: 10, font: { size: 10 } } },
+        legend: { labels: { color: "#f8fafc", boxWidth: 12, font: { size: _cf().legend } } },
         tooltip: {
+          titleFont: { size: _cf().tooltip },
+          bodyFont: { size: _cf().tooltip },
           callbacks: {
             label: function(ctx) { return ctx.dataset.label + ": " + ctx.parsed.y + "h"; }
           }
@@ -5086,13 +5088,15 @@ function renderIncidentHistory(data) {
       transitions: __chartTransitionsOff,
       interaction: { mode: "index", intersect: false },
       scales: {
-        x: { stacked: true, ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { stacked: true, position: "left", ticks: { color: "#94a3b8" }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, title: { display: true, text: t("incidentAxisOutage"), color: "#94a3b8", font: { size: 10 } } },
-        y1: { position: "right", ticks: { color: "#f59e0b" }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: t("incidentAxisHitLimits"), color: "#f59e0b", font: { size: 10 } } }
+        x: { stacked: true, ticks: { color: "#cbd5e1", font: { size: _cf().tick } }, grid: { color: "rgba(51,65,85,.4)" } },
+        y: { stacked: true, position: "left", ticks: { color: "#cbd5e1", font: { size: _cf().tick } }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, title: { display: true, text: t("incidentAxisOutage"), color: "#cbd5e1", font: { size: _cf().title } } },
+        y1: { position: "right", ticks: { color: "#f59e0b", font: { size: _cf().tick } }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: t("incidentAxisHitLimits"), color: "#f59e0b", font: { size: _cf().title } } }
       },
       plugins: {
-        legend: { labels: { color: "#e2e8f0", boxWidth: 10, font: { size: 10 }, filter: function(item) { return item.text !== ""; } } },
+        legend: { labels: { color: "#f8fafc", boxWidth: 12, font: { size: _cf().legend }, filter: function(item) { return item.text !== ""; } } },
         tooltip: {
+          titleFont: { size: _cf().tooltip },
+          bodyFont: { size: _cf().tooltip },
           callbacks: {
             label: function(ctx) { if (!ctx.dataset.label) return null; return ctx.dataset.label + ": " + ctx.parsed.y + (ctx.dataset.yAxisID === "y1" ? "" : "h"); }
           }
@@ -5165,6 +5169,10 @@ function updateAnthropicPopup(data) {
 
 
 // ── Outage Timeline (24h stacked per day) ─────────────────────────────────
+var _isModalOpen = false;
+var _modalFontScale = { tick: 13, legend: 12, title: 12, tooltip: 12 };
+var _popupFontScale = { tick: 10, legend: 10, title: 10, tooltip: 11 };
+function _cf() { return _isModalOpen ? _modalFontScale : _popupFontScale; }
 var _outageTimelineMonthFilter = null;   // null = all, "2026-03" = single month
 var _outageImpactExclude = {};            // { "critical": true, "minor": true } = hidden
 var _outageStatusExclude = {};            // { "major_outage": true } = hidden (uptime chart)
@@ -5262,8 +5270,8 @@ function renderOutageTimeline(data, monthFilter) {
   // Always stacked bar — thin bars for many days
   var barOpts = paddedDays.length > 31 ? { barPercentage: 0.95, categoryPercentage: 0.95 } : {};
   var xTickOpts = paddedDays.length > 31
-    ? { color: "#94a3b8", font: { size: 9 }, maxRotation: 45, autoSkip: true, maxTicksLimit: 25 }
-    : { color: "#94a3b8", font: { size: 10 } };
+    ? { color: "#cbd5e1", font: { size: Math.max(9, _cf().tick - 2) }, maxRotation: 45, autoSkip: true, maxTicksLimit: 25 }
+    : { color: "#cbd5e1", font: { size: _cf().tick } };
 
   var datasets = [
     Object.assign({ label: "none", data: noneData, backgroundColor: "rgba(34,197,94,.25)", borderColor: "rgba(34,197,94,.5)", borderWidth: 1, stack: "s" }, barOpts),
@@ -5274,7 +5282,7 @@ function renderOutageTimeline(data, monthFilter) {
   ];
   var scaleOpts = {
     x: { stacked: true, ticks: xTickOpts, grid: { color: "rgba(51,65,85,.3)" } },
-    y: { stacked: true, max: 24, ticks: { color: "#94a3b8", stepSize: 6, callback: function(v) { return v + "h"; } }, grid: { color: "rgba(51,65,85,.3)" } }
+    y: { stacked: true, max: 24, ticks: { color: "#cbd5e1", font: { size: _cf().tick }, stepSize: 6, callback: function(v) { return v + "h"; } }, grid: { color: "rgba(51,65,85,.3)" } }
   };
 
   _proxyCharts.outageTimeline = new Chart(el.getContext("2d"), {
@@ -5287,8 +5295,10 @@ function renderOutageTimeline(data, monthFilter) {
       interaction: { mode: "index", intersect: false },
       scales: scaleOpts,
       plugins: {
-        legend: { labels: { color: "#e2e8f0", boxWidth: 10, font: { size: 10 }, filter: function(item) { return item.text !== ""; } } },
+        legend: { labels: { color: "#f8fafc", boxWidth: 12, font: { size: _cf().legend }, filter: function(item) { return item.text !== ""; } } },
         tooltip: {
+          titleFont: { size: _cf().tooltip },
+          bodyFont: { size: _cf().tooltip },
           callbacks: {
             label: function(ctx) { if (!ctx.dataset.label) return null; return ctx.dataset.label + ": " + ctx.parsed.y + "h"; }
           }
@@ -5311,9 +5321,11 @@ function renderAvailabilityKpis(data) {
   var allDays = data.days || [];
   if (allDays.length < 2) { panel.innerHTML = ""; return; }
 
-  // ── Collect per-day degradation + per-incident impact counts ──
+  // ── Collect per-day degradation + uptime + per-incident impact counts ──
   // Degradation = critical + major + minor hours (NOT "none")
+  // Outage = only major_outage comp_status hours
   var totalDegradationH = 0;
+  var totalOutageH = 0;
   var byMonth = {};       // { "2026-03": { count, hours, days } }
   var byImpact = {};      // { "critical": { count, hours } }
   var seenIncidents = {};  // dedup by name+date
@@ -5328,6 +5340,7 @@ function renderAvailabilityKpis(data) {
       var imp = spans[si].impact || "none";
       // Only critical/major/minor count as degradation
       if (imp !== "none") dayDegH += dur;
+      if ((spans[si].comp_status || "degraded_performance") === "major_outage") totalOutageH += dur;
       if (!byImpact[imp]) byImpact[imp] = { count: 0, hours: 0 };
       byImpact[imp].hours += dur;
     }
@@ -5360,17 +5373,47 @@ function renderAvailabilityKpis(data) {
   var firstDate = allDays[0].date || "";
   var lastDate = allDays[allDays.length - 1].date || "";
 
-  // ── Color class ──
-  var colorCls = uptimePct >= 99 ? "avail-green" : uptimePct >= 95 ? "avail-yellow" : "avail-red";
+  var realUptimePct = totalH > 0 ? ((totalH - totalOutageH) / totalH * 100) : 100;
+
+  // Median-based color: per-day weighted quality %, sort, take median
+  // Severity weights: critical=1.0, major=0.7, minor=0.3, none=0
+  var _sevWeight = { critical: 1.0, major: 0.7, minor: 0.3, none: 0 };
+  var dailySqPcts = [];
+  var dailyUtPcts = [];
+  for (var dpi = 0; dpi < allDays.length; dpi++) {
+    var dpSpans = allDays[dpi].outage_spans || [];
+    var dpWeightedH = 0, dpOutH = 0;
+    for (var dpsi = 0; dpsi < dpSpans.length; dpsi++) {
+      var dpDur = (dpSpans[dpsi].to || 0) - (dpSpans[dpsi].from || 0);
+      if (dpDur < 0) dpDur = 0;
+      var dpImp = dpSpans[dpsi].impact || "none";
+      dpWeightedH += dpDur * (_sevWeight[dpImp] || 0);
+      if ((dpSpans[dpsi].comp_status || "degraded_performance") === "major_outage") dpOutH += dpDur;
+    }
+    if (dpWeightedH > 24) dpWeightedH = 24;
+    dailySqPcts.push(((24 - dpWeightedH) / 24 * 100));
+    dailyUtPcts.push(dpOutH > 24 ? 0 : ((24 - dpOutH) / 24 * 100));
+  }
+  dailySqPcts.sort(function(a, b) { return a - b; });
+  dailyUtPcts.sort(function(a, b) { return a - b; });
+  var medianSq = dailySqPcts.length > 0 ? dailySqPcts[Math.floor(dailySqPcts.length / 2)] : 100;
+  var medianUt = dailyUtPcts.length > 0 ? dailyUtPcts[Math.floor(dailyUtPcts.length / 2)] : 100;
+
+  // ITSCM color bands based on MEDIAN (not average)
+  var utColorCls = medianUt >= 99.8 ? "ok" : medianUt >= 99 ? "warn" : medianUt >= 95 ? "caution" : "danger";
+  var sqColorCls = medianSq >= 99 ? "ok" : medianSq >= 95 ? "warn" : medianSq >= 85 ? "caution" : "danger";
 
   // ── Build HTML ──
   var h = "";
 
-  // Total badge
-  h += "<div class=\"avail-kpi-total\">";
-  h += "<span class=\"avail-kpi-total-value " + colorCls + "\">" + uptimePct.toFixed(1) + "%</span>";
-  h += "<span class=\"avail-kpi-total-meta\">" + escHtml(t("availKpiPeriod")) + ": " + escHtml(firstDate) + " \u2013 " + escHtml(lastDate);
-  h += "<br>" + escHtml(t("availKpiDowntime")) + ": " + Math.round(totalDegradationH * 10) / 10 + "h / " + totalDays + "d</span>";
+  // Two KPI cards side by side
+  h += "<div class=\"avail-kpi-cards\">";
+  h += "<div class=\"card " + utColorCls + "\"><div class=\"label\">" + escHtml(t("cardUptime")) + "</div>";
+  h += "<div class=\"value\">" + realUptimePct.toFixed(2) + "%</div>";
+  h += "<div class=\"sub\">" + escHtml(firstDate) + " \u2013 " + escHtml(lastDate) + " (" + totalDays + "d)</div></div>";
+  h += "<div class=\"card " + sqColorCls + "\"><div class=\"label\">" + escHtml(t("cardServiceQuality")) + "</div>";
+  h += "<div class=\"value\">" + uptimePct.toFixed(1) + "%</div>";
+  h += "<div class=\"sub\">" + escHtml(t("availKpiDowntime")) + ": " + (Math.round(totalDegradationH * 10) / 10) + "h</div></div>";
   h += "</div>";
 
   // Monthly table
@@ -5463,7 +5506,7 @@ function renderAvailabilityKpis(data) {
         if (cp.empty) {
           h += "<td class=\"num avail-kpi-empty\">\u2013</td>";
         } else {
-          var pctCls = cp.pct >= 99 ? "avail-green" : cp.pct >= 95 ? "avail-yellow" : "avail-red";
+          var pctCls = cp.pct >= 99 ? "avail-green" : cp.pct >= 95 ? "avail-yellow" : cp.pct >= 85 ? "avail-orange" : "avail-red";
           h += "<td class=\"num\"><span class=\"" + pctCls + "\">" + (cp.bold ? "<strong>" : "") + cp.pct.toFixed(1) + "%" + (cp.bold ? "</strong>" : "") + "</span>";
           if (cp.trendHtml) h += " " + cp.trendHtml;
           h += "</td>";
@@ -5493,7 +5536,7 @@ function renderAvailabilityKpis(data) {
         h += "</td>";
         h += "<td class=\"num\">" + rc.count + "</td>";
         h += "<td class=\"num\">" + (Math.round(rc.hours * 10) / 10) + "h</td>";
-        var rpCls = rc.pct >= 99 ? "avail-green" : rc.pct >= 95 ? "avail-yellow" : "avail-red";
+        var rpCls = rc.pct >= 99 ? "avail-green" : rc.pct >= 95 ? "avail-yellow" : rc.pct >= 85 ? "avail-orange" : "avail-red";
         h += "<td class=\"num\"><span class=\"" + rpCls + "\">" + (rc.bold ? "<strong>" : "") + rc.pct.toFixed(1) + "%" + (rc.bold ? "</strong>" : "") + "</span>";
         if (rc.trendHtml) h += " " + rc.trendHtml;
         h += "</td></tr>";
@@ -5684,11 +5727,14 @@ function renderAvailabilityKpis(data) {
     if (badge) badge.classList.remove("popup-open");
     overlay.classList.add("is-open");
     document.body.style.overflow = "hidden";
-    // Re-render KPIs in modal layout (columns) + resize charts
-    if (_lastAvailKpiData) renderAvailabilityKpis(_lastAvailKpiData);
-    if (_proxyCharts.uptimeChart) _proxyCharts.uptimeChart.resize();
-    if (_proxyCharts.anthropicIncidents) _proxyCharts.anthropicIncidents.resize();
-    if (_proxyCharts.outageTimeline) _proxyCharts.outageTimeline.resize();
+    _isModalOpen = true;
+    // Re-render all charts with modal font sizes
+    if (_lastAvailKpiData) {
+      renderUptimeChart(_lastAvailKpiData);
+      renderIncidentHistory(_lastAvailKpiData);
+      renderOutageTimeline(_lastAvailKpiData);
+      renderAvailabilityKpis(_lastAvailKpiData);
+    }
   }
 
   function closeModal() {
@@ -5707,11 +5753,14 @@ function renderAvailabilityKpis(data) {
     if (expInPopup) expInPopup.style.display = "";
     overlay.classList.remove("is-open");
     document.body.style.overflow = "";
-    // Re-render KPIs in popup layout (rows) + resize charts
-    if (_lastAvailKpiData) renderAvailabilityKpis(_lastAvailKpiData);
-    if (_proxyCharts.uptimeChart) _proxyCharts.uptimeChart.resize();
-    if (_proxyCharts.anthropicIncidents) _proxyCharts.anthropicIncidents.resize();
-    if (_proxyCharts.outageTimeline) _proxyCharts.outageTimeline.resize();
+    _isModalOpen = false;
+    // Re-render all charts with popup font sizes
+    if (_lastAvailKpiData) {
+      renderUptimeChart(_lastAvailKpiData);
+      renderIncidentHistory(_lastAvailKpiData);
+      renderOutageTimeline(_lastAvailKpiData);
+      renderAvailabilityKpis(_lastAvailKpiData);
+    }
   }
 
   expandBtn.addEventListener("click", function(e) {
