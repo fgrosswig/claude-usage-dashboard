@@ -4748,13 +4748,9 @@ function renderKeyFindings(data) {
 }
 
 // ── Filter Bar ────────────────────────────────────────────────────────────
-var __filterBarInitialized = false;
-
 function initFilterBar(data) {
-  if (__filterBarInitialized) return;
   var days = data.days || [];
   if (!days.length) return;
-  __filterBarInitialized = true;
 
   // Date labels
   var dlabel = document.getElementById('filter-date-label');
@@ -4767,7 +4763,8 @@ function initFilterBar(data) {
   // Date range selects
   var startEl = document.getElementById('filter-date-start');
   var endEl = document.getElementById('filter-date-end');
-  if (startEl && endEl && days.length) {
+  if (startEl && endEl && days.length && !startEl.dataset.bound) {
+    startEl.dataset.bound = '1';
     var opts = '';
     for (var di = 0; di < days.length; di++) opts += '<option value="' + escHtml(days[di].date) + '">' + escHtml(days[di].date) + '</option>';
     startEl.innerHTML = opts;
@@ -4778,7 +4775,8 @@ function initFilterBar(data) {
 
   // Scope chips (All days / 24h) — mirror existing main-charts-scope
   var scopeChips = document.getElementById('filter-scope-chips');
-  if (scopeChips) {
+  if (scopeChips && !scopeChips.dataset.bound) {
+    scopeChips.dataset.bound = '1';
     scopeChips.innerHTML = '<button type="button" class="filter-chip active" data-scope="timeline">' + escHtml(t('mainChartsScopeTimeline')) + '</button>' +
       '<button type="button" class="filter-chip" data-scope="hourly">' + escHtml(t('mainChartsScopeHourly')) + '</button>';
     scopeChips.addEventListener('click', function(e) {
