@@ -4441,6 +4441,34 @@ function computeHealthIndicators(data) {
   var avgLatMs = pd ? (pd.avg_duration_ms || 0) : 0;
   var avgLatS = avgLatMs / 1000;
   var coldStarts = pd ? (pd.cold_starts || 0) : 0;
+  var false429s = pd ? (pd.false_429s || 0) : 0;
+  var contextResets = pd ? (pd.context_resets || 0) : 0;
+  var tokPerPct = pd ? (pd.visible_tokens_per_pct || 0) : 0;
+  var tokPerPctM = tokPerPct > 0 ? (tokPerPct / 1000000).toFixed(1) + "M" : "-";
+
+  // B5: Truncations from JSONL session_signals
+  var truncPerDay = 0;
+  if (days.length) {
+    var truncTotal = 0;
+    for (var tri = 0; tri < days.length; tri++) {
+      var trSig = days[tri].session_signals;
+      if (trSig) truncTotal += (trSig.truncated || 0);
+    }
+    truncPerDay = Math.round(truncTotal / days.length);
+  }
+
+  // Stop-reason anomalies: count non-standard stop reasons
+  var anomalStops = 0;
+  if (days.length) {
+    for (var sri = 0; sri < days.length; sri++) {
+      var sr = days[sri].stop_reasons || {};
+      for (var srk in sr) {
+        if (srk !== "end_turn" && srk !== "tool_use" && srk !== "max_tokens" && srk !== "unknown") {
+          anomalStops += sr[srk];
+        }
+      }
+    }
+  }
 
   return [
     { id: "quota5h", label: t("healthQuota5h"), value: q5h, display: q5h.toFixed(0) + "%", color: healthColor(q5h, 50, 80), barPct: Math.min(100, q5h) },
@@ -4451,7 +4479,12 @@ function computeHealthIndicators(data) {
     { id: "latency", label: t("healthLatency"), value: avgLatS, display: avgLatS >= 1 ? avgLatS.toFixed(1) + "s" : Math.round(avgLatMs) + "ms", color: healthColor(avgLatS, 5, 15), barPct: Math.min(100, avgLatS * 5) },
     { id: "interrupts", label: t("healthInterrupts"), value: interruptsPerDay, display: String(interruptsPerDay), color: healthColor(interruptsPerDay, 100, 500), barPct: Math.min(100, interruptsPerDay / 10) },
     { id: "coldStarts", label: t("healthColdStarts"), value: coldStarts, display: String(coldStarts), color: healthColor(coldStarts, 0, 5), barPct: Math.min(100, coldStarts * 10) },
-    { id: "retries", label: t("healthRetries"), value: retriesPerDay, display: String(retriesPerDay), color: healthColor(retriesPerDay, 50, 200), barPct: Math.min(100, retriesPerDay / 5) }
+    { id: "retries", label: t("healthRetries"), value: retriesPerDay, display: String(retriesPerDay), color: healthColor(retriesPerDay, 50, 200), barPct: Math.min(100, retriesPerDay / 5) },
+    { id: "false429", label: t("healthFalse429"), value: false429s, display: String(false429s), color: healthColor(false429s, 0, 1), barPct: Math.min(100, false429s * 50) },
+    { id: "truncations", label: t("healthTruncations"), value: truncPerDay, display: String(truncPerDay), color: healthColor(truncPerDay, 0, 5), barPct: Math.min(100, truncPerDay * 10) },
+    { id: "contextResets", label: t("healthContextResets"), value: contextResets, display: String(contextResets), color: healthColor(contextResets, 0, 3), barPct: Math.min(100, contextResets * 20) },
+    { id: "quotaBench", label: t("healthQuotaBench"), value: tokPerPct, display: tokPerPctM, color: tokPerPct > 0 ? healthColor(tokPerPct / 1000000, 2.1, 3) : "gray", barPct: tokPerPct > 0 ? Math.min(100, tokPerPct / 21000) : 0 },
+    { id: "anomalStops", label: t("healthAnomalStops"), value: anomalStops, display: String(anomalStops), color: healthColor(anomalStops, 0, 10), barPct: Math.min(100, anomalStops * 5) }
   ];
 }
 

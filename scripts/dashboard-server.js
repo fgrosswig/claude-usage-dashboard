@@ -1375,7 +1375,7 @@ function buildDashboardStatePaths() {
 }
 
 function emptySessionSignals() {
-  return { continue: 0, resume: 0, retry: 0, interrupt: 0 };
+  return { continue: 0, resume: 0, retry: 0, interrupt: 0, truncated: 0 };
 }
 
 function bumpSessionSignals(bucket, tagList) {
@@ -1466,6 +1466,10 @@ function classifyJsonlSessionSignals(line, rec) {
       if (/interrupt|cancel|abort/.test(ej)) add('interrupt');
     } catch (eJ) {}
   }
+  // B5: Tool result truncation
+  if (/["']is_truncated["']\s*:\s*true|["']truncated["']\s*:\s*true/.test(line)) {
+    add('truncated');
+  }
   return tags;
 }
 
@@ -1482,7 +1486,8 @@ function emptyHostSlice() {
     hours: {},
     hour_signals: {},
     hit_limit: 0,
-    session_signals: emptySessionSignals()
+    session_signals: emptySessionSignals(),
+    stop_reasons: {}
   };
 }
 
@@ -1502,7 +1507,8 @@ function emptyDailyBucket() {
     versions: {},
     hit_limit: 0,
     hosts: {},
-    session_signals: emptySessionSignals()
+    session_signals: emptySessionSignals(),
+    stop_reasons: {}
   };
 }
 
@@ -1523,6 +1529,7 @@ function mergeTopSessionSignalsInto(bucket, srcSs) {
   d.resume += srcSs.resume || 0;
   d.retry += srcSs.retry || 0;
   d.interrupt += srcSs.interrupt || 0;
+  d.truncated += srcSs.truncated || 0;
 }
 
 function mergeHostSliceInto(dst, src) {
@@ -1539,6 +1546,16 @@ function mergeHostSliceInto(dst, src) {
   mergeHoursInto(dst.hours || (dst.hours = {}), src.hours);
   mergeHourSignalsInto(dst, src.hour_signals);
   mergeTopSessionSignalsInto(dst, src.session_signals);
+  mergeStopReasons(dst, src);
+}
+
+function mergeStopReasons(dst, src) {
+  if (!src.stop_reasons) return;
+  if (!dst.stop_reasons) dst.stop_reasons = {};
+  var sk = Object.keys(src.stop_reasons);
+  for (var si = 0; si < sk.length; si++) {
+    dst.stop_reasons[sk[si]] = (dst.stop_reasons[sk[si]] || 0) + (src.stop_reasons[sk[si]] || 0);
+  }
 }
 
 /** Additiver Merge: ''heute''-Fragmente aus mehreren JSONL in einen Tages-Bucket (today_nly + Index). */
@@ -1556,6 +1573,7 @@ function mergeDayBucketInto(target, src) {
   mergeHoursInto(target.hours || (target.hours = {}), src.hours);
   mergeHourSignalsInto(target, src.hour_signals);
   mergeTopSessionSignalsInto(target, src.session_signals);
+  mergeStopReasons(target, src);
   var hk = Object.keys(src.hosts || {});
   for (var hi = 0; hi < hk.length; hi++) {
     var lab = hk[hi];
@@ -1617,6 +1635,7 @@ function hostSliceFromRow(h) {
     base.session_signals.resume = ss.resume || 0;
     base.session_signals.retry = ss.retry || 0;
     base.session_signals.interrupt = ss.interrupt || 0;
+    base.session_signals.truncated = ss.truncated || 0;
   }
   var hsRow = h.hour_signals && typeof h.hour_signals === 'object' ? h.hour_signals : {};
   return {
@@ -1658,8 +1677,10 @@ function rowToDailyEntry(row) {
     sigRow.resume = ss0.resume || 0;
     sigRow.retry = ss0.retry || 0;
     sigRow.interrupt = ss0.interrupt || 0;
+    sigRow.truncated = ss0.truncated || 0;
   }
   var hourSigRow = row.hour_signals && typeof row.hour_signals === 'object' ? row.hour_signals : {};
+  var stopR = row.stop_reasons && typeof row.stop_reasons === 'object' ? row.stop_reasons : {};
   return {
     input: row.input || 0,
     output: row.output || 0,
@@ -1675,7 +1696,8 @@ function rowToDailyEntry(row) {
     versions: versNorm,
     hit_limit: row.hit_limit || 0,
     hosts: hosts,
-    session_signals: sigRow
+    session_signals: sigRow,
+    stop_reasons: stopR
   };
 }
 
@@ -1819,6 +1841,9 @@ function processJsonlFile(fileRef, daily, onlyDate, isolateTodayFrag, fileTodayF
       dd.models[model].calls++;
       dd.models[model].output += outTok;
       dd.models[model].cache_read += crTok;
+      // Stop-reason tracking
+      var stopR = (rec.message && rec.message.stop_reason) || 'unknown';
+      dd.stop_reasons[stopR] = (dd.stop_reasons[stopR] || 0) + 1;
       var cliVer = extractCliVersion(rec);
       if (cliVer) dd.versions[cliVer] = (dd.versions[cliVer] || 0) + 1;
       if (fileTodayFrag && todayYmdForFrag && day === todayYmdForFrag) {
@@ -2752,7 +2777,10 @@ function emptyProxyDayBucket() {
     rate_limit_snapshots: [],
     cold_starts: 0,
     cache_ratios: [],
-    per_hour_latency: {}
+    per_hour_latency: {},
+    false_429s: 0,
+    context_resets: 0,
+    _prev_cache_read_high: false
   };
 }
 
@@ -2787,6 +2815,12 @@ function parseProxyNdjsonFiles() {
         dd.status_codes[status] = (dd.status_codes[status] || 0) + 1;
         if (status >= 400) dd.errors++;
 
+        // B3: False 429 — client-generated rate limit (no cf-ray = not from Anthropic)
+        if (status === 429) {
+          var rah = rec.response_anthropic_headers || {};
+          if (!rah['cf-ray']) dd.false_429s++;
+        }
+
         // Hour tracking
         if (tsEnd.length >= 13) {
           var hour = parseInt(tsEnd.slice(11, 13), 10);
@@ -2802,6 +2836,17 @@ function parseProxyNdjsonFiles() {
           dd.output_tokens += (u.output_tokens || 0);
           dd.cache_read_tokens += (u.cache_read_input_tokens || 0);
           dd.cache_creation_tokens += (u.cache_creation_input_tokens || 0);
+        }
+
+        // B4: Context Reset heuristic — cache_creation spikes after high cache_read phase
+        if (u && status === 200) {
+          var crt = u.cache_read_input_tokens || 0;
+          var cct = u.cache_creation_input_tokens || 0;
+          if (crt > 100000) dd._prev_cache_read_high = true;
+          if (dd._prev_cache_read_high && cct > 0 && crt < cct) {
+            dd.context_resets++;
+            dd._prev_cache_read_high = false;
+          }
         }
 
         // Cache health
@@ -2891,8 +2936,21 @@ function parseProxyNdjsonFiles() {
       hours: d.hours,
       active_hours: Object.keys(d.hours).length,
       rate_limit: d.rate_limit_snapshots.length ? d.rate_limit_snapshots[0] : null,
-      per_hour_latency: d.per_hour_latency
+      per_hour_latency: d.per_hour_latency,
+      false_429s: d.false_429s,
+      context_resets: d.context_resets,
+      visible_tokens_per_pct: null
     });
+    // Quota benchmark: visible tokens per 1% quota
+    var lastResult = result[result.length - 1];
+    var rl = lastResult.rate_limit;
+    if (rl) {
+      var q5 = parseFloat(rl['anthropic-ratelimit-unified-5h-utilization'] || 0);
+      if (q5 > 0) {
+        var visTokens = lastResult.input_tokens + lastResult.output_tokens;
+        lastResult.visible_tokens_per_pct = Math.round(visTokens / (q5 * 100));
+      }
+    }
   }
 
   return {
