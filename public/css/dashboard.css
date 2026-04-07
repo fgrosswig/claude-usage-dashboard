@@ -306,3 +306,6 @@ tr:hover td{background:#334155}
 #filter-host-select{min-width:100px;max-width:200px;background:#0f172a;border:1px solid #475569;color:#e2e8f0;border-radius:6px;font-size:.78rem;padding:2px}
 #filter-host-select option{padding:4px 8px}
 #filter-host-select option:checked{background:#3b82f6;color:#fff}
+
+.top-bar-badge{background:#334155;color:#e2e8f0;border:none;padding:8px 14px;border-radius:6px;font-size:.8rem;display:flex;align-items:center;cursor:help;white-space:nowrap}
+.top-bar-badge:hover{background:#475569}

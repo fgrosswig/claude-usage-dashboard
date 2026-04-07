@@ -316,5 +316,10 @@
   "filterHostAll": "All",
   "healthHistoryLabel": "Health Score",
   "healthHistoryWarn": "Warning",
-  "healthHistoryCrit": "Critical"
+  "healthHistoryCrit": "Critical",
+  "incidentHistoryLabel": "Incidents & Hit Limits (per day)",
+  "incidentDSOutageHours": "Outage (hours)",
+  "incidentDSHitLimits": "Hit limits",
+  "incidentAxisOutage": "Outage (h)",
+  "incidentAxisHitLimits": "Hit limits"
 }
