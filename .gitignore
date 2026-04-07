@@ -54,8 +54,8 @@
 !/.gitea/workflows/
 !/.gitea/workflows/**/*
 
-!/.woodpecker/
-!/.woodpecker/**/*
+!/ci-config/
+!/ci-config/**/*
 
 # Lokale Secrets / Session-Token — explizit nie committen (Absicherung gegen spätere breitere !-Regeln)
 /.github_session_token

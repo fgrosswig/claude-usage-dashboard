@@ -34,9 +34,9 @@ Optionen, Logging, Cache, Multi-Host und Sync: jeweils in der **[Dokumentation](
 
 Zwei Images: **`Dockerfile.base`** (npm-Deps) → **`Dockerfile`** (App inkl. **`images/`**-Screenshots unter `/app/images`). Lokal z. B. `docker build -f Dockerfile.base -t claude-base:local .` dann **`BASE_IMAGE=claude-base BASE_TAG=local docker compose build`**. **`docker compose up`** = **`node start.js both`** (3333 / 8080); weitere Modi: Kopfzeilen in **`docker-compose.yml`**. CI: **`docker-compose.ci.yml`**, **`.github/workflows/docker.yml`**.
 
-### Gitea und GitHub (Routine nach Merge auf `main`)
+### Arbeitskopie und GitHub
 
-Arbeit läuft primär auf **Gitea** (Branch z. B. **`feat/proxy-logs`** → PR → **`main`**). **GitHub** dient als öffentlicher Spiegel; dort heißt der Branch aktuell meist **`feat/proxy-analytics`** → PR → **`main`** ([Repo](https://github.com/fgrosswig/claude-usage-dashboard)).
+Die Entwicklung läuft primär auf einem **privaten Forge** (Branch z. B. **`feat/proxy-logs`** → PR → **`main`**). **GitHub** dient als öffentlicher Spiegel; dort heißt der Branch aktuell meist **`feat/proxy-analytics`** → PR → **`main`** ([Repo](https://github.com/fgrosswig/claude-usage-dashboard)).
 
 **Einmalig — zweiten Remote:**
 
@@ -45,17 +45,17 @@ git remote add github https://github.com/fgrosswig/claude-usage-dashboard.git   
 git fetch github
 ```
 
-**A) Nach Merge auf Gitea-`main` — GitHub-`main` nachziehen**
+**A) Nach Merge auf dem privaten Upstream-`main` — GitHub-`main` nachziehen**
 
 ```bash
 git checkout main
-git pull origin main                    # origin = Gitea
+git pull origin main                    # upstream: private forge
 git push github main                   # github-Remote: main aktualisieren
 ```
 
 **B) Feature für GitHub-PR hochladen (Branch-Namen abgleichen)**
 
-Vom gleichen Stand wie der Gitea-Feature-Branch, aber unter dem GitHub-Branch-Namen pushen (damit der offene PR dort aktualisiert wird):
+Vom gleichen Stand wie der private Feature-Branch, aber unter dem GitHub-Branch-Namen pushen (damit der offene PR dort aktualisiert wird):
 
 ```bash
 git checkout feat/proxy-logs
@@ -66,7 +66,7 @@ git push github feat/proxy-logs:feat/proxy-analytics
 Auf GitHub: PR **„feat/proxy-analytics“ → `main`** anlegen oder den bestehenden PR prüfen (zeigt neuen Push).  
 Optional lokal: **`gh pr create`** / **`gh pr sync`** mit installiertem [GitHub CLI](https://cli.github.com/), falls du nicht nur im Web arbeitest.
 
-**Automatischer Spiegel:** Nach Merge auf Gitea-`main` pusht **`.gitea/workflows/mirror-github.yml`** einen bereinigten Snapshot nach **GitHub `main`** (intern bleibt alles unverändert; Domains und `.woodpecker`/`.gitea` erscheinen nicht öffentlich). Die `git push github`-Beispiele oben nur bei Bedarf (z. B. ohne Workflow oder für einen separaten GitHub-Feature-Branch).
+**Automatischer Spiegel:** Nach Merge auf dem privaten Upstream-`main` pusht **`private automation (paths omitted in public tree)`** einen bereinigten Snapshot nach **GitHub `main`** (die öffentliche Kopie enthält keine privaten Infrastruktur- oder Domain-Angaben). Die `git push github`-Beispiele oben nur bei Bedarf (z. B. ohne Workflow oder für einen separaten GitHub-Feature-Branch).
 
 ### Server- und CLI-Optionen
 
@@ -280,15 +280,15 @@ Dashboard lokal mit echten Remote-Daten testen (Cluster braucht `DEBUG_API=1`):
 
 ```powershell
 # PowerShell — alles vom Remote (kein lokaler Scan)
-$env:DEV_PROXY_SOURCE="https://claude-usage.grosswig-it.de"; $env:DEV_MODE="full"; node start.js dashboard
+$env:DEV_PROXY_SOURCE="https://claude-usage.example.com"; $env:DEV_MODE="full"; node start.js dashboard
 
 # PowerShell — nur Proxy vom Remote, JSONL lokal
-$env:DEV_PROXY_SOURCE="https://claude-usage.grosswig-it.de"; $env:DEV_MODE="proxy"; node start.js dashboard
+$env:DEV_PROXY_SOURCE="https://claude-usage.example.com"; $env:DEV_MODE="proxy"; node start.js dashboard
 ```
 
 ```bash
 # bash — alles vom Remote
-DEV_PROXY_SOURCE=https://claude-usage.grosswig-it.de DEV_MODE=full node start.js dashboard
+DEV_PROXY_SOURCE=https://claude-usage.example.com DEV_MODE=full node start.js dashboard
 ```
 
 - **DEV FULL Banner** oben mit Sync-Button + Last-Sync-Timestamp

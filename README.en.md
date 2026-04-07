@@ -32,9 +32,9 @@ node start.js forensics     # CLI report
 
 Two images: **`Dockerfile.base`** (npm deps) → **`Dockerfile`** (app including **`images/`** screenshots at **`/app/images`**). Locally e.g. `docker build -f Dockerfile.base -t claude-base:local .` then **`BASE_IMAGE=claude-base BASE_TAG=local docker compose build`**. **`docker compose up`** = **`node start.js both`**; other modes: **`docker-compose.yml`** header. CI: **`docker-compose.ci.yml`**, **`.github/workflows/docker.yml`**.
 
-### Gitea and GitHub (routine after merging to `main`)
+### Working copy and GitHub
 
-Primary work is on **Gitea** (e.g. branch **`feat/proxy-logs`** → PR → **`main`**). **GitHub** is the public mirror; the branch there is often **`feat/proxy-analytics`** → PR → **`main`** ([repo](https://github.com/fgrosswig/claude-usage-dashboard)).
+Primary development is on a **private forge** (e.g. branch **`feat/proxy-logs`** → PR → **`main`**). **GitHub** is the public mirror; the branch there is often **`feat/proxy-analytics`** → PR → **`main`** ([repo](https://github.com/fgrosswig/claude-usage-dashboard)).
 
 **One-time — second remote:**
 
@@ -43,11 +43,11 @@ git remote add github https://github.com/fgrosswig/claude-usage-dashboard.git
 git fetch github
 ```
 
-**A) After merging to Gitea `main` — update GitHub `main`**
+**A) After merging to the private upstream `main` — update GitHub `main`**
 
 ```bash
 git checkout main
-git pull origin main                    # origin = Gitea
+git pull origin main                    # upstream: private forge
 git push github main
 ```
 
@@ -63,7 +63,7 @@ git push github feat/proxy-logs:feat/proxy-analytics
 
 On GitHub: open or refresh PR **feat/proxy-analytics → `main`**. Optional locally: [GitHub CLI](https://cli.github.com/) `gh pr create` / `gh pr sync`.
 
-**Automatic mirror:** After merging to Gitea `main`, **`.gitea/workflows/mirror-github.yml`** publishes a scrubbed snapshot to **GitHub `main`** (your internal forge tree stays as-is; public copy drops `.woodpecker`/`.gitea` and replaces internal hostnames in text). The manual `git push github` steps above are only if you bypass that workflow or maintain a separate GitHub feature branch.
+**Automatic mirror:** After merging to the private upstream `main`, **`private automation (paths omitted in public tree)`** publishes a scrubbed snapshot to **GitHub `main`** (the published tree omits private infrastructure and hostnames). The manual `git push github` steps above are only if you bypass that workflow or maintain a separate GitHub feature branch.
 
 ### Screenshots
 
