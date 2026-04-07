@@ -3451,7 +3451,7 @@ function updateStatusLamp(data) {
   var st = data.outage_status || "pending";
   if (st === "error" || st === "pending") {
     dot.style.background = "#475569";
-    label.textContent = t("statusPending");
+    label.textContent = "Anthropic";
     dot.parentElement.title = t("statusPendingTip");
     return;
   }
@@ -3471,15 +3471,15 @@ function updateStatusLamp(data) {
   }
   if (hasActiveOutage) {
     dot.style.background = "#ef4444";
-    label.textContent = t("statusOutage");
+    label.textContent = "Anthropic";
     dot.parentElement.title = t("statusOutageTip");
   } else if (hasRecentIncident) {
     dot.style.background = "#f59e0b";
-    label.textContent = t("statusIncident");
+    label.textContent = "Anthropic";
     dot.parentElement.title = t("statusIncidentTip");
   } else {
     dot.style.background = "#22c55e";
-    label.textContent = t("statusOk");
+    label.textContent = "Anthropic";
     dot.parentElement.title = t("statusOkTip");
   }
 }
