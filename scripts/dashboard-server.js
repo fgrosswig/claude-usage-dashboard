@@ -17,12 +17,13 @@ var fs = require('fs');
 // Resolve version from git tag at startup (no hardcoded version)
 var __appVersion = (function () {
   try {
-    return require('child_process').execSync('git describe --tags --abbrev=0 2>/dev/null || echo dev', { encoding: 'utf8' }).trim();
-  } catch (e) {
-    // In Docker (no git): read from VERSION file, or fallback
-    try { return fs.readFileSync(require('path').join(__dirname, '..', 'VERSION'), 'utf8').trim(); } catch (e2) {}
-    return 'dev';
-  }
+    // git tag --sort=-v:refname finds newest tag repo-wide (not just current branch)
+    var tag = require('child_process').execSync('git tag --sort=-v:refname 2>/dev/null', { encoding: 'utf8' }).trim().split('\n')[0];
+    if (tag) return tag;
+  } catch (e) {}
+  // In Docker (no git): read from VERSION file, or fallback
+  try { return fs.readFileSync(require('path').join(__dirname, '..', 'VERSION'), 'utf8').trim(); } catch (e2) {}
+  return 'dev';
 })();
 var path = require('path');
 var os = require('os');
