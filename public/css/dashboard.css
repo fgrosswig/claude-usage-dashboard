@@ -298,3 +298,5 @@ tr:hover td{background:#334155}
 .top-bar .meta-details[open] .meta-details-summary{background:#475569;border-bottom:none}
 .filter-day-select{max-width:160px;min-width:120px}
 
+
+.health-summary-left{display:flex;align-items:center;gap:10px;flex-shrink:0}
