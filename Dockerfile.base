@@ -1,12 +1,12 @@
-# Minimales Base: reines Node — kein optional OCR/PDF stack (not used here), kein apk, solange keine Git-URL-Deps / native Libs nötig sind.
-# FROM node:20-alpine: Pull beim **base.yml**-Build auf CI build host (Registry/Mirror dort — nicht secondary-registry-path im Dockerfile).
+# Minimales Base: reines Node — kein SCHUFA-OCR/PDF-Stack, kein apk, solange keine Git-URL-Deps / native Libs nötig sind.
+# FROM node:20-alpine: Pull beim **base.yml**-Build auf Docker-Agent .220 (Registry/Mirror dort — nicht poc-Pfad im Dockerfile).
 FROM node:20-alpine
-LABEL maintainer="public@example.com" version="3"
+LABEL maintainer="falk@grosswig.de" version="3"
 
 WORKDIR /app
 
 # NPM Production-Dependencies nur hier — App-Dockerfile kopiert kein node_modules.
-# Änderung an package.json / package-lock.json: CI base.yml baut registry.example.com/claude/base neu
-# (oder on CI host manuell). Bei Bedarf version.json (base_image) hochziehen + ARG BASE_TAG in Dockerfile.
+# Änderung an package.json / package-lock.json: Woodpecker base.yml baut harbor.../claude/base neu
+# (oder auf .220 manuell). Bei Bedarf version.json (base_image) hochziehen + ARG BASE_TAG in Dockerfile.
 COPY package.json ./
 RUN npm install --omit=dev --no-audit --no-fund

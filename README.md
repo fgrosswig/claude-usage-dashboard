@@ -280,15 +280,15 @@ Dashboard lokal mit echten Remote-Daten testen (Cluster braucht `DEBUG_API=1`):
 
 ```powershell
 # PowerShell — alles vom Remote (kein lokaler Scan)
-$env:DEV_PROXY_SOURCE="https://claude-usage.example.com"; $env:DEV_MODE="full"; node start.js dashboard
+$env:DEV_PROXY_SOURCE="https://claude-usage.grosswig-it.de"; $env:DEV_MODE="full"; node start.js dashboard
 
 # PowerShell — nur Proxy vom Remote, JSONL lokal
-$env:DEV_PROXY_SOURCE="https://claude-usage.example.com"; $env:DEV_MODE="proxy"; node start.js dashboard
+$env:DEV_PROXY_SOURCE="https://claude-usage.grosswig-it.de"; $env:DEV_MODE="proxy"; node start.js dashboard
 ```
 
 ```bash
 # bash — alles vom Remote
-DEV_PROXY_SOURCE=https://claude-usage.example.com DEV_MODE=full node start.js dashboard
+DEV_PROXY_SOURCE=https://claude-usage.grosswig-it.de DEV_MODE=full node start.js dashboard
 ```
 
 - **DEV FULL Banner** oben mit Sync-Button + Last-Sync-Timestamp
