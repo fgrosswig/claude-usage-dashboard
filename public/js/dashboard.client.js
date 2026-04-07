@@ -4825,6 +4825,8 @@ function initFilterBar(data) {
         if (!btn) return;
         hostContainer.querySelectorAll('.filter-chip').forEach(function(c) { c.classList.remove('active'); });
         btn.classList.add('active');
+        // Sync with forensic host filter
+        __forensicHostFilterSig = btn.dataset.host || "";
         if (__lastUsageData) renderDashboard(__lastUsageData, true);
       });
     } else {
