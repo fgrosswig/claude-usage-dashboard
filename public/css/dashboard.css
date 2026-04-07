@@ -317,14 +317,14 @@ tr:hover td{background:#334155}
 
 /* Anthropic badge click popup */
 .top-bar-badge{position:relative}
-.anthropic-popup{display:none;position:absolute;left:0;top:100%;margin-top:6px;background:#1e293b;border:1px solid #475569;border-radius:8px;padding:12px 14px;z-index:9500;min-width:420px;max-width:480px;box-shadow:0 12px 40px rgba(0,0,0,.7);max-height:80vh;overflow-y:auto}
+.anthropic-popup{display:none;position:absolute;left:0;top:100%;margin-top:6px;background:#1e293b;border:1px solid #475569;border-radius:8px;padding:12px 14px;z-index:9500;min-width:560px;max-width:640px;box-shadow:0 12px 40px rgba(0,0,0,.7);max-height:80vh;overflow-y:auto}
 .top-bar-badge.popup-open .anthropic-popup{display:block}
 .anthropic-popup-head{font-size:.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
 .anthropic-popup-list{list-style:none;padding:0;margin:0;font-size:.68rem;color:#e2e8f0;line-height:1.5}
 .anthropic-popup-list li{padding:2px 0;border-bottom:1px solid rgba(51,65,85,.4)}
 .anthropic-popup-list li:last-child{border-bottom:none}
 
-.health-charts-row{display:grid;grid-template-columns:1fr;gap:10px;margin-top:0}
-.health-chart-sm{background:rgba(15,23,42,.4);border:1px solid #334155;border-radius:8px;padding:8px 10px}
+.health-charts-row{display:grid;grid-template-columns:1fr;gap:12px;margin-top:0}
+.health-chart-sm{background:rgba(15,23,42,.4);border:1px solid #334155;border-radius:8px;padding:12px 14px}
 .health-chart-sm h4{font-size:.68rem;color:#94a3b8;margin:0 0 4px}
 @media(max-width:900px){.health-charts-row{grid-template-columns:1fr}}
