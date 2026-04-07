@@ -1771,7 +1771,7 @@ function renderDashboardCore(data) {
     var ls0=document.getElementById("limit-source");
     if(ls0) ls0.textContent = apiNote(data, "limit_source_note", "limit_source_note_en");
     if(data.scanning){
-      var dps=document.getElementById("day-picker-row");if(dps)dps.style.display="";
+      
       var selScan=document.getElementById("day-picker");
       if(selScan){
         selScan.innerHTML="<option value=\"\">"+escHtml(t("dayPickerScanning"))+"</option>";
@@ -1793,7 +1793,7 @@ function renderDashboardCore(data) {
       document.getElementById("live-label").textContent=t("liveWaitData");
       return;
     }
-    var dpe=document.getElementById("day-picker-row");if(dpe)dpe.style.display="";
+    
     var selNd=document.getElementById("day-picker");
     if(selNd){
       selNd.innerHTML="<option value=\"\">"+escHtml(t("dayPickerNoData"))+"</option>";
@@ -1814,7 +1814,7 @@ function renderDashboardCore(data) {
     chartShellSetLoading("c-service", false);
     return;
   }
-  var dpr0=document.getElementById("day-picker-row");if(dpr0)dpr0.style.display="";
+  
   showMainChartsSkeleton(false);
   
   var calToday = data.calendar_today || "";
