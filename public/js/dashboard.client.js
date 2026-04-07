@@ -5093,7 +5093,7 @@ function updateAnthropicPopup(data) {
     labels.push(d.date.slice(5));
     var oh = d.outage_hours || 0;
     outageH.push(oh);
-    outageColors.push(oh > 2 ? "#ef4444" : oh > 0 ? "#f59e0b" : "rgba(34,197,94,.3)");
+    outageColors.push(oh > 2 ? "rgba(239,68,68,.55)" : oh > 0 ? "rgba(245,158,11,.45)" : "rgba(51,65,85,.2)");
     incidentCounts.push((d.outage_incidents || []).length);
   }
 
@@ -5112,8 +5112,8 @@ function updateAnthropicPopup(data) {
     data: {
       labels: labels,
       datasets: [
-        { label: t("incidentDSOutageHours"), data: outageH, backgroundColor: outageColors, yAxisID: "y", borderRadius: 3 },
-        { label: "Incidents", data: incidentCounts, type: "scatter", borderColor: "#ef4444", backgroundColor: "#ef4444", pointRadius: function(ctx) { return ctx.parsed.y > 0 ? 6 : 0; }, pointStyle: "circle", yAxisID: "y1" }
+        { label: t("incidentDSOutageHours"), data: outageH, backgroundColor: outageColors, yAxisID: "y", borderRadius: 2, barPercentage: 0.6, categoryPercentage: 0.7 },
+        { label: "Incidents", data: incidentCounts, type: "scatter", borderColor: "rgba(239,68,68,.8)", backgroundColor: "rgba(239,68,68,.15)", pointRadius: function(ctx) { return ctx.parsed.y > 0 ? 4 : 0; }, pointBorderWidth: 2, pointStyle: "circle", yAxisID: "y1" }
       ]
     },
     options: {
