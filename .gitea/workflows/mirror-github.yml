@@ -1,6 +1,7 @@
 # Gitea (intern) → GitHub (öffentlich): nur branch main, flacher Snapshot — Forge-Repo bleibt unverändert.
 # - MIRROR_EXCLUDE_PATHS: .woodpecker / .gitea bleiben nur intern (nicht auf GitHub).
 # - .github/ wird gespiegelt (öffentliche GitHub Actions CI).
+# - Aufbereitung nur unter /tmp/…-Snapshot: Gitea-Arbeitskopie bleibt unberührt (kein reset).
 # - Danach: interne Hosts/Domains in Textdateien → Platzhalter (nur im Snapshot, nicht im Gitea-Repo).
 #
 # Secret GH_PAT_TOKEN (Repo- oder Org-Secret in Gitea):
@@ -70,11 +71,16 @@ jobs:
           git config user.name "public-mirror"
           git remote add github "https://x-access-token:${GH_MIRROR_TOKEN}@github.com/fgrosswig/claude-usage-dashboard.git"
           SHORT="$(git rev-parse --short HEAD)"
+          EXPORT_DIR="/tmp/mirror-publish-tree"
+          rm -rf "${EXPORT_DIR}"
+          mkdir -p "${EXPORT_DIR}"
+          # Nur EXPORT_DIR: Gitea-Klon bleibt unverändert (kein sed/rm im Checkout, kein git reset).
+          tar --exclude=.git -cf - . | (cd "${EXPORT_DIR}" && tar -xf -)
           for p in ${MIRROR_EXCLUDE_PATHS}; do
             [ -z "${p}" ] && continue
-            rm -rf "${p}"
+            rm -rf "${EXPORT_DIR}/${p}"
           done
-          find . -type f ! -path './.git/*' \( \
+          find "${EXPORT_DIR}" -type f \( \
               -name '*.md' -o -name '*.yml' -o -name '*.yaml' -o -name '*.sh' -o -name '*.tpl' \
               -o -name 'Dockerfile' -o -name 'Dockerfile.*' -o -name 'docker-compose*.yml' \
             \) -print0 | while IFS= read -r -d '' f; do
@@ -84,16 +90,9 @@ jobs:
                 -e 's/ci\.grosswig-it\.de/ci.example.com/g' \
                 "$f" || true
             done
-          find . -type f ! -path './.git/*' -name '*.md' -print0 | while IFS= read -r -d '' f; do
+          find "${EXPORT_DIR}" -type f -name '*.md' -print0 | while IFS= read -r -d '' f; do
               sed -i '/Woodpecker CI/d;/grosswig-it\.de/d' "$f" || true
             done
-          EXPORT_DIR="/tmp/mirror-publish-tree"
-          rm -rf "${EXPORT_DIR}"
-          mkdir -p "${EXPORT_DIR}"
-          # Kein rsync: schlanke/act-Runner liefern es oft nicht (exit 127).
-          tar --exclude=.git -cf - . | (cd "${EXPORT_DIR}" && tar -xf -)
-          # sed ändert tracked files im Klon; Snapshot liegt in EXPORT_DIR — sonst verweigert checkout.
-          git reset --hard HEAD
           git fetch github "refs/heads/${MIRROR_DEST_BRANCH}:refs/remotes/github/${MIRROR_DEST_BRANCH}" 2>/dev/null \
             || git fetch github || true
           if git rev-parse --verify "github/${MIRROR_DEST_BRANCH}" >/dev/null 2>&1; then
