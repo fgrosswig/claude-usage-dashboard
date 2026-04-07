@@ -1612,14 +1612,20 @@ function getFilteredDays(days) {
 }
 
 function getFilterHost() {
-  var sel = document.getElementById("filter-host-select");
-  if (!sel) return "";
-  var opts = sel.selectedOptions;
-  if (!opts || !opts.length) return "";
-  var vals = [];
-  for (var i = 0; i < opts.length; i++) vals.push(opts[i].value);
-  if (vals.indexOf("") >= 0) return "";
-  return vals.join(",");
+  var container = document.getElementById("filter-host-container");
+  if (!container) return "";
+  var sel = container.querySelector("select");
+  if (sel) {
+    var opts = sel.selectedOptions;
+    if (!opts || !opts.length) return "";
+    var vals = [];
+    for (var i = 0; i < opts.length; i++) vals.push(opts[i].value);
+    if (vals.indexOf("") >= 0) return "";
+    return vals.join(",");
+  }
+  var active = container.querySelector(".filter-chip.active");
+  if (!active) return "";
+  return active.dataset.host || "";
 }
 
 function renderDashboard(data, urgent) {
@@ -4795,25 +4801,43 @@ function initFilterBar(data) {
     });
   }
 
-  // Host select (multi)
-  var hostSelect = document.getElementById('filter-host-select');
-  if (hostSelect && days.length && !hostSelect.dataset.bound) {
-    hostSelect.dataset.bound = '1';
+  // Host filter: chips if <=3, multi-select if 4+
+  var hostContainer = document.getElementById('filter-host-container');
+  if (hostContainer && days.length && !hostContainer.dataset.bound) {
+    hostContainer.dataset.bound = '1';
     var hosts = {};
     for (var hdi = 0; hdi < days.length; hdi++) {
       var dh = days[hdi].hosts || {};
       for (var hk in dh) { if (Object.prototype.hasOwnProperty.call(dh, hk)) hosts[hk] = true; }
     }
     var hkeys = Object.keys(hosts).sort();
-    var hopts = '<option value="" selected>' + escHtml(t('filterHostAll')) + '</option>';
-    for (var hii = 0; hii < hkeys.length; hii++) {
-      hopts += '<option value="' + escHtml(hkeys[hii]) + '">' + escHtml(hkeys[hii]) + '</option>';
+    if (hkeys.length <= 3) {
+      // Chips mode
+      var hhtml = '<div class="filter-chips">';
+      hhtml += '<button type="button" class="filter-chip active" data-host="">' + escHtml(t('filterHostAll')) + '</button>';
+      for (var hci = 0; hci < hkeys.length; hci++) {
+        hhtml += '<button type="button" class="filter-chip" data-host="' + escHtml(hkeys[hci]) + '">' + escHtml(hkeys[hci]) + '</button>';
+      }
+      hhtml += '</div>';
+      hostContainer.innerHTML = hhtml;
+      hostContainer.addEventListener('click', function(e) {
+        var btn = e.target.closest('.filter-chip');
+        if (!btn) return;
+        hostContainer.querySelectorAll('.filter-chip').forEach(function(c) { c.classList.remove('active'); });
+        btn.classList.add('active');
+        if (__lastUsageData) renderDashboard(__lastUsageData, true);
+      });
+    } else {
+      // Multi-select mode
+      var hopts = '<option value="" selected>' + escHtml(t('filterHostAll')) + '</option>';
+      for (var hsi = 0; hsi < hkeys.length; hsi++) {
+        hopts += '<option value="' + escHtml(hkeys[hsi]) + '">' + escHtml(hkeys[hsi]) + '</option>';
+      }
+      hostContainer.innerHTML = '<select class="filter-input" multiple size="' + Math.min(hkeys.length + 1, 6) + '">' + hopts + '</select>';
+      hostContainer.querySelector('select').addEventListener('change', function() {
+        if (__lastUsageData) renderDashboard(__lastUsageData, true);
+      });
     }
-    hostSelect.innerHTML = hopts;
-    hostSelect.setAttribute('size', Math.min(hkeys.length + 1, 6));
-    hostSelect.addEventListener('change', function() {
-      if (__lastUsageData) renderDashboard(__lastUsageData, true);
-    });
   }
 
   // Day picker in filter bar — mirror the original day-picker
