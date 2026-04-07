@@ -64,6 +64,7 @@ tr:hover td{background:#334155}
 .live-pop.live-files-open .live-files-panel{display:block}
 .live-files-head{font-size:.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
 .live-panel-section{margin-top:12px;padding-top:12px;border-top:1px solid #334155}
+#live-release-details+.live-panel-section{border-top:none;margin-top:0;padding-top:10px}
 .live-panel-subhead{margin-bottom:6px}
 #live-files-list{list-style:none;margin:0;padding:0;font-size:.72rem;line-height:1.4;color:#cbd5e1;word-break:break-all}
 #live-files-list li{padding:5px 0;border-bottom:1px solid #334155}
@@ -404,9 +405,10 @@ tr:hover td{background:#334155}
 .avail-kpi-filters-row{display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;padding-top:10px;border-top:1px solid #334155;align-items:flex-start}
 .avail-kpi-filter-group{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .avail-kpi-filter-label{font-size:.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;margin-right:2px}
-.live-release-row{display:flex;align-items:center;gap:8px;padding-bottom:8px;margin-bottom:4px;border-bottom:1px solid #334155;font-size:.72rem;line-height:1.4}
-.live-release-row .live-rel-tag{font-weight:700;color:#22c55e}
-.live-release-row .live-rel-date{color:#64748b;font-size:.65rem}
+.live-release-row{display:flex;align-items:center;gap:8px;padding:8px 14px;font-size:.72rem;line-height:1.4}
+.live-rel-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:.65rem;font-weight:700;line-height:1.2}
+.live-rel-badge-ok{background:rgba(34,197,94,.2);color:#22c55e;border:1px solid rgba(34,197,94,.4)}
+.live-rel-badge-dev{background:rgba(100,116,139,.2);color:#94a3b8;border:1px solid rgba(100,116,139,.4)}
 .live-release-row .live-rel-link{color:#93c5fd;text-decoration:underline;text-underline-offset:2px;font-size:.65rem}
 .live-release-row .live-rel-link:hover{color:#bfdbfe}
 .live-release-row .live-rel-expand{background:transparent;border:1px solid #475569;color:#94a3b8;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:.62rem;line-height:1.2;margin-left:auto}

@@ -5882,11 +5882,11 @@ function inlineMd(s) {
       var ver = info.version && info.version !== "dev" ? info.version : null;
       if (relRow) {
         if (ver) {
-          relRow.innerHTML = '<span>Release:</span> <span class="live-rel-tag">' + escHtml(ver) + '</span>' +
+          relRow.innerHTML = '<span class="live-rel-badge live-rel-badge-ok">' + escHtml(ver) + '</span>' +
             '<a class="live-rel-link" href="https://github.com/fgrosswig/claude-usage-dashboard/releases/tag/' + escHtml(ver) + '" target="_blank" rel="noopener">GitHub</a>' +
             '<button class="live-rel-expand" id="live-rel-expand-btn">History</button>';
         } else {
-          relRow.innerHTML = '<span>Release:</span> <span style="color:#64748b">dev (untagged)</span>' +
+          relRow.innerHTML = '<span class="live-rel-badge live-rel-badge-dev">dev</span>' +
             '<a class="live-rel-link" href="https://github.com/fgrosswig/claude-usage-dashboard/releases" target="_blank" rel="noopener">GitHub</a>' +
             '<button class="live-rel-expand" id="live-rel-expand-btn">History</button>';
         }
