@@ -266,7 +266,7 @@ tr:hover td{background:#334155}
 .hs-inline-badge strong{color:#e2e8f0;font-weight:600}
 .hs-inline-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .hs-inline-sep{color:#475569;margin:0 6px;font-size:.8rem}
-.health-collapse-summary{flex-wrap:wrap;gap:6px 12px}
+.health-collapse-summary{flex-wrap:nowrap;gap:8px 12px;overflow-x:auto}
 
 /* meta-details in top-bar */
 .top-bar .meta-details{margin-bottom:0;border:none;background:transparent;border-radius:0;overflow:visible;flex:none;min-width:0}
@@ -299,3 +299,6 @@ tr:hover td{background:#334155}
 .filter-day-select{max-width:160px;min-width:120px}
 
 
+
+#health-summary-text{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:2px 0;align-items:center}
+#c-health-sparkline{flex-shrink:0;flex-grow:0}
