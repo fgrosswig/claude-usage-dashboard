@@ -2926,7 +2926,7 @@ function devFetchProxyLogs(cb) {
   process.env.ANTHROPIC_PROXY_LOG_DIR = logDir;
 
   var url = source.replace(/\/+$/, '') + '/api/debug/proxy-logs';
-  serviceLog.info('dev', 'fetching proxy logs from ' + url + ' → ' + logDir);
+  serviceLog.info('dev', 'fetching proxy logs from ' + url);
   var proto = url.startsWith('https') ? require('https') : require('http');
   proto.get(url, function (resp) {
     var body = '';
@@ -2936,8 +2936,7 @@ function devFetchProxyLogs(cb) {
         var parsed = JSON.parse(body);
         var files = parsed.files || [];
         for (var i = 0; i < files.length; i++) {
-          var fp = path.join(logDir, files[i].name);
-          fs.writeFileSync(fp, files[i].content, 'utf8');
+          fs.writeFileSync(path.join(logDir, files[i].name), files[i].content, 'utf8');
         }
         serviceLog.info('dev', 'fetched ' + files.length + ' proxy log files to ' + logDir);
       } catch (e) {
@@ -3076,6 +3075,20 @@ var server = http.createServer(function (req, res) {
       'Cache-Control': 'no-store'
     });
     res.end(JSON.stringify({ files: result }));
+  } else if (pathname === '/api/debug/sync-proxy-logs' && (process.env.DEV_PROXY_SOURCE || '').trim()) {
+    // Manual trigger: re-fetch proxy logs from remote and refresh
+    var corsSync = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+    devFetchAndRefreshProxy();
+    res.writeHead(200, corsSync);
+    res.end(JSON.stringify({ ok: true, message: 'sync_started' }));
+  } else if (pathname === '/api/debug/status') {
+    // Debug status: expose dev mode info to the frontend
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({
+      dev_proxy_source: (process.env.DEV_PROXY_SOURCE || '').trim() || null,
+      proxy_log_dir: getProxyLogDir(),
+      refresh_sec: REFRESH_SEC
+    }));
   } else if (pathname === '/api/proxy-usage') {
     if (!__proxyCache.data) refreshProxyCache();
     res.writeHead(200, {
@@ -3128,7 +3141,24 @@ server.listen(PORT, function () {
       }
     }, 3000);
   });
+  // Periodic dev sync
+  if ((process.env.DEV_PROXY_SOURCE || '').trim()) {
+    setInterval(function () {
+      devFetchAndRefreshProxy();
+    }, REFRESH_SEC * 1000);
+  }
 });
+
+function devFetchAndRefreshProxy() {
+  devFetchProxyLogs(function () {
+    refreshProxyCache();
+    if (__proxyCache.data && cachedData) {
+      cachedData.proxy = __proxyCache.data;
+      broadcastSse();
+      serviceLog.info('dev', 'proxy logs synced + broadcast');
+    }
+  });
+}
 
 setInterval(runScanAndBroadcast, REFRESH_SEC * 1000);
 setInterval(refreshProxyCache, REFRESH_SEC * 1000);
