@@ -1,6 +1,7 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Nur für öffentlichen Export (GitHub / Mirror-EXPORT_DIR). Diese Datei wird übersprungen.
-set -eu
+# Bash nötig: find -print0 | while read -r -d '' — POSIX-sh (z. B. dash) meldet "read: Illegal option -d".
+set -euo pipefail
 ROOT="${1:-.}"
 cd "$ROOT"
 
