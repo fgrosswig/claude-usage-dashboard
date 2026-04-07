@@ -5406,13 +5406,16 @@ function renderAvailabilityKpis(data) {
   // ── Build HTML ──
   var h = "";
 
+  var inModal = document.getElementById("anthropic-modal-overlay");
+  var isWide = inModal && inModal.classList.contains("is-open");
+
   var utCCls = medianUt >= 99.8 ? "ok" : medianUt >= 99 ? "warn" : medianUt >= 95 ? "caution" : "danger";
   var sqCCls = medianSq >= 99 ? "ok" : medianSq >= 95 ? "warn" : medianSq >= 85 ? "caution" : "danger";
   var utColorTxt = "avail-" + (medianUt >= 99.8 ? "green" : medianUt >= 99 ? "yellow" : medianUt >= 95 ? "orange" : "red");
   var sqColorTxt = "avail-" + (medianSq >= 99 ? "green" : medianSq >= 95 ? "yellow" : medianSq >= 85 ? "orange" : "red");
 
   if (isWide) {
-    // Popout: full cards side by side
+    // Popout: full cards side by side (like Peak-Tag Total)
     h += "<div class=\"avail-kpi-cards\">";
     h += "<div class=\"card " + utCCls + "\"><div class=\"label\">" + escHtml(t("cardUptime")) + "</div>";
     h += "<div class=\"value\">" + realUptimePct.toFixed(2) + "%</div>";
@@ -5481,13 +5484,10 @@ function renderAvailabilityKpis(data) {
       padStart.setMonth(padStart.getMonth() + 1);
     }
 
-    var inModal = document.getElementById("anthropic-modal-overlay");
-    var isWide = inModal && inModal.classList.contains("is-open");
-
-    h += "<div class=\"avail-kpi-section-head\">" + escHtml(t("availKpiMonth")) + "</div>";
-
     if (isWide) {
-      // ── Modal: transposed — months as columns, metrics as rows ──
+      // ── Modal: transposed — months as columns, in card wrapper ──
+      h += "<div class=\"card\" style=\"margin-top:12px;padding:14px 16px;overflow-x:auto\">";
+      h += "<div class=\"label\" style=\"margin-bottom:8px\">" + escHtml(t("availKpiMonth")) + "</div>";
       h += "<table class=\"avail-kpi-table avail-kpi-table-cols\"><thead><tr><th></th>";
       for (var ci = 0; ci < cols.length; ci++) {
         var c = cols[ci];
@@ -5496,7 +5496,7 @@ function renderAvailabilityKpis(data) {
         if (c.isCurrent) thCls.push("avail-kpi-col-current");
         h += "<th class=\"num" + (thCls.length ? " " + thCls.join(" ") : "") + "\" data-month=\"" + escHtml(c.key) + "\"" + (c.empty ? "" : " style=\"cursor:pointer\"") + ">";
         h += (c.bold ? "<strong>" : "") + escHtml(c.label) + (c.bold ? "</strong>" : "");
-        if (c.isActive) h += " \u25bc";
+        h += "<span style=\"display:inline-block;width:1em;text-align:center\">" + (c.isActive ? "\u25bc" : "") + "</span>";
         h += "</th>";
       }
       h += "</tr></thead><tbody>";
@@ -5526,8 +5526,9 @@ function renderAvailabilityKpis(data) {
         }
       }
       h += "</tr>";
-      h += "</tbody></table>";
+      h += "</tbody></table></div>";
     } else {
+      h += "<div class=\"avail-kpi-section-head\">" + escHtml(t("availKpiMonth")) + "</div>";
       // ── Popup: classic rows — months as rows, metrics as columns ──
       h += "<table class=\"avail-kpi-table\"><thead><tr>";
       h += "<th>" + escHtml(t("availKpiMonth")) + "</th>";
@@ -5558,44 +5559,74 @@ function renderAvailabilityKpis(data) {
     }
   }
 
-  // Impact breakdown
+  // Impact breakdown + Status filters
   var impactOrder = ["critical", "major", "minor", "none"];
   var hasImpact = false;
   for (var ci = 0; ci < impactOrder.length; ci++) {
     if (byImpact[impactOrder[ci]]) { hasImpact = true; break; }
   }
-  if (hasImpact) {
-    h += "<div class=\"avail-kpi-section-head\">" + escHtml(t("availKpiImpact")) + "</div>";
-    h += "<div class=\"avail-kpi-impact-row\">";
-    for (var bi = 0; bi < impactOrder.length; bi++) {
-      var ik = impactOrder[bi];
-      var iv = byImpact[ik];
-      if (!iv) continue;
-      var impExcluded = !!_outageImpactExclude[ik];
-      h += "<span class=\"avail-kpi-impact-badge impact-" + ik + (impExcluded ? " impact-excluded" : "") + "\" data-impact=\"" + ik + "\" style=\"cursor:pointer\">";
-      h += escHtml(ik) + ": " + iv.count + " / " + (Math.round(iv.hours * 10) / 10) + "h";
-      h += "</span>";
-    }
-    h += "</div>";
-  }
-
-  // Uptime status filter (for Service-Uptime chart)
   var statusOrder = [
     { key: "operational", label: t("uptimeOperational"), cls: "kind-ok" },
     { key: "degraded_performance", label: t("uptimeDegraded"), cls: "impact-minor" },
     { key: "partial_outage", label: t("uptimePartial"), cls: "impact-major" },
     { key: "major_outage", label: t("uptimeOutage"), cls: "impact-critical" }
   ];
-  h += "<div class=\"avail-kpi-section-head\">Service Status</div>";
-  h += "<div class=\"avail-kpi-impact-row\">";
-  for (var sti = 0; sti < statusOrder.length; sti++) {
-    var st = statusOrder[sti];
-    var stExcl = !!_outageStatusExclude[st.key];
-    h += "<span class=\"avail-kpi-impact-badge " + st.cls + (stExcl ? " impact-excluded" : "") + "\" data-status=\"" + st.key + "\" style=\"cursor:pointer\">";
-    h += st.label;
-    h += "</span>";
+
+  if (isWide) {
+    // Popout: both filter groups side by side in one row
+    h += "<div class=\"avail-kpi-filters-row\">";
+    if (hasImpact) {
+      h += "<div class=\"avail-kpi-filter-group\">";
+      h += "<span class=\"avail-kpi-filter-label\">" + escHtml(t("availKpiImpact")) + "</span>";
+      for (var bi = 0; bi < impactOrder.length; bi++) {
+        var ik = impactOrder[bi];
+        var iv = byImpact[ik];
+        if (!iv) continue;
+        var impExcluded = !!_outageImpactExclude[ik];
+        h += "<span class=\"avail-kpi-impact-badge impact-" + ik + (impExcluded ? " impact-excluded" : "") + "\" data-impact=\"" + ik + "\" style=\"cursor:pointer\">";
+        h += escHtml(ik) + ": " + iv.count + " / " + (Math.round(iv.hours * 10) / 10) + "h";
+        h += "</span>";
+      }
+      h += "</div>";
+    }
+    h += "<div class=\"avail-kpi-filter-group\">";
+    h += "<span class=\"avail-kpi-filter-label\">Service Status</span>";
+    for (var sti = 0; sti < statusOrder.length; sti++) {
+      var st = statusOrder[sti];
+      var stExcl = !!_outageStatusExclude[st.key];
+      h += "<span class=\"avail-kpi-impact-badge " + st.cls + (stExcl ? " impact-excluded" : "") + "\" data-status=\"" + st.key + "\" style=\"cursor:pointer\">";
+      h += st.label;
+      h += "</span>";
+    }
+    h += "</div>";
+    h += "</div>";
+  } else {
+    // Popup: stacked with section heads
+    if (hasImpact) {
+      h += "<div class=\"avail-kpi-section-head\">" + escHtml(t("availKpiImpact")) + "</div>";
+      h += "<div class=\"avail-kpi-impact-row\">";
+      for (var bi2 = 0; bi2 < impactOrder.length; bi2++) {
+        var ik2 = impactOrder[bi2];
+        var iv2 = byImpact[ik2];
+        if (!iv2) continue;
+        var impExcl2 = !!_outageImpactExclude[ik2];
+        h += "<span class=\"avail-kpi-impact-badge impact-" + ik2 + (impExcl2 ? " impact-excluded" : "") + "\" data-impact=\"" + ik2 + "\" style=\"cursor:pointer\">";
+        h += escHtml(ik2) + ": " + iv2.count + " / " + (Math.round(iv2.hours * 10) / 10) + "h";
+        h += "</span>";
+      }
+      h += "</div>";
+    }
+    h += "<div class=\"avail-kpi-section-head\">Service Status</div>";
+    h += "<div class=\"avail-kpi-impact-row\">";
+    for (var sti2 = 0; sti2 < statusOrder.length; sti2++) {
+      var st2 = statusOrder[sti2];
+      var stExcl2 = !!_outageStatusExclude[st2.key];
+      h += "<span class=\"avail-kpi-impact-badge " + st2.cls + (stExcl2 ? " impact-excluded" : "") + "\" data-status=\"" + st2.key + "\" style=\"cursor:pointer\">";
+      h += st2.label;
+      h += "</span>";
+    }
+    h += "</div>";
   }
-  h += "</div>";
 
   panel.innerHTML = h;
 
