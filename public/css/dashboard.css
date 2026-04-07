@@ -212,6 +212,7 @@ tr:hover td{background:#334155}
 
 /* ── Token Stats (collapsible cards) ────────────────── */
 .token-stats-details{margin-bottom:14px}
+.token-stats-details .forensic-inner{padding-top:12px}
 .token-stats-summary{background:rgba(30,41,59,.55);border-color:#334155}
 
 /* ── Proxy Analytics ─────────────────────────────────── */
