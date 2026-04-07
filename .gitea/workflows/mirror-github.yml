@@ -81,8 +81,8 @@ jobs:
             [ -z "${p}" ] && continue
             rm -rf "${EXPORT_DIR}/${p}"
           done
-          # Vollständige Bereinigung nur im Snapshot (siehe scripts/scrub-for-public.sh).
-          sh "${EXPORT_DIR}/scripts/scrub-for-public.sh" "${EXPORT_DIR}"
+          # Vollständige Bereinigung nur im Snapshot (siehe scripts/scrub-for-public.sh; Bash wegen read -d '').
+          bash "${EXPORT_DIR}/scripts/scrub-for-public.sh" "${EXPORT_DIR}"
           # Leak-Check: kein grep -r --include (BusyBox/GNU unterscheiden sich); Python ist einheitlich.
           export EXPORT_DIR
           python3 <<'PY'
