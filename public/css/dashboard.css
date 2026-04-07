@@ -316,8 +316,8 @@ tr:hover td{background:#334155}
 .top-bar .meta-details[open] .meta-details-summary{border-bottom:none}
 
 /* Anthropic badge click popup */
-/* position:static so popup aligns to top-bar right edge, not badge */
-.top-bar-badge{position:static}
+
+.top-bar-badge{position:relative}
 .anthropic-popup{display:none;position:absolute;right:0;top:100%;margin-top:6px;background:#1e293b;border:1px solid #475569;border-radius:8px;padding:12px 14px;z-index:9500;min-width:420px;max-width:500px;box-shadow:0 12px 40px rgba(0,0,0,.7);max-height:80vh;overflow-y:auto}
 .top-bar-badge.popup-open .anthropic-popup{display:block}
 .anthropic-popup-head{font-size:.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
