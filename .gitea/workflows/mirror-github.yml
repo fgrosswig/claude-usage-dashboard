@@ -90,7 +90,8 @@ jobs:
           EXPORT_DIR="/tmp/mirror-publish-tree"
           rm -rf "${EXPORT_DIR}"
           mkdir -p "${EXPORT_DIR}"
-          rsync -a --exclude .git ./ "${EXPORT_DIR}/"
+          # Kein rsync: schlanke/act-Runner liefern es oft nicht (exit 127).
+          tar --exclude=.git -cf - . | (cd "${EXPORT_DIR}" && tar -xf -)
           git fetch github "refs/heads/${MIRROR_DEST_BRANCH}:refs/remotes/github/${MIRROR_DEST_BRANCH}" 2>/dev/null \
             || git fetch github || true
           if git rev-parse --verify "github/${MIRROR_DEST_BRANCH}" >/dev/null 2>&1; then
@@ -100,7 +101,7 @@ jobs:
           else
             git checkout --orphan public-publish
           fi
-          rsync -a --delete --exclude .git "${EXPORT_DIR}/" ./
+          tar -C "${EXPORT_DIR}" -cf - . | tar -xf -
           git add -A
           if git diff --cached --quiet; then
             echo "mirror: no changes vs GitHub ${MIRROR_DEST_BRANCH}; skip"
