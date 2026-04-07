@@ -309,3 +309,18 @@ tr:hover td{background:#334155}
 
 .top-bar-badge{background:#334155;color:#e2e8f0;border:none;padding:8px 14px;border-radius:6px;font-size:.8rem;display:flex;align-items:center;cursor:help;white-space:nowrap}
 .top-bar-badge:hover{background:#475569}
+
+/* Meta badge hover popup */
+.top-bar .meta-details{position:relative}
+.top-bar .meta-details-inner{display:none}
+.top-bar .meta-details:hover .meta-details-inner,.top-bar .meta-details[open] .meta-details-inner{display:block}
+.top-bar .meta-details[open] .meta-details-summary{border-bottom:none}
+
+/* Anthropic badge hover popup */
+.top-bar-badge{position:relative}
+.anthropic-popup{display:none;position:absolute;right:0;top:100%;margin-top:6px;background:#1e293b;border:1px solid #475569;border-radius:8px;padding:10px 12px;z-index:200;min-width:320px;max-width:480px;box-shadow:0 8px 24px rgba(0,0,0,.5);max-height:60vh;overflow:auto}
+.top-bar-badge:hover .anthropic-popup{display:block}
+.anthropic-popup-head{font-size:.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+.anthropic-popup-list{list-style:none;padding:0;margin:0;font-size:.68rem;color:#e2e8f0;line-height:1.5}
+.anthropic-popup-list li{padding:2px 0;border-bottom:1px solid rgba(51,65,85,.4)}
+.anthropic-popup-list li:last-child{border-bottom:none}

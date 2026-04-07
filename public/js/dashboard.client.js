@@ -1637,6 +1637,7 @@ function renderDashboard(data, urgent) {
   updateStatePathsRow(data);
   updateStatusLamp(data);
   renderHealthScore(data);
+  updateAnthropicPopup(data);
   initFilterBar(data);
   renderKeyFindings(data);
   var days = getFilteredDays(data.days);
@@ -5069,6 +5070,39 @@ function renderIncidentHistory(data) {
       }
     }
   });
+}
+
+
+function updateAnthropicPopup(data) {
+  var oHead = document.getElementById("anthropic-popup-outage-head");
+  var oList = document.getElementById("anthropic-popup-outage-list");
+  var eHead = document.getElementById("anthropic-popup-ext-head");
+  var eList = document.getElementById("anthropic-popup-ext-list");
+  if (!oHead) return;
+
+  // Outages
+  var outages = data.outages || [];
+  oHead.textContent = t("liveOutageHead");
+  var ohtml = "";
+  for (var oi = 0; oi < outages.length; oi++) {
+    var o = outages[oi];
+    var imp = (o.impact || "none").toUpperCase();
+    var kind = o.kind ? " (" + o.kind + ")" : "";
+    ohtml += "<li>" + escHtml(o.date || "") + " · [" + escHtml(imp) + "] " + escHtml(o.name || "") + escHtml(kind) + "</li>";
+  }
+  if (!ohtml) ohtml = '<li style="color:#64748b">' + escHtml(t("liveOutageEmpty")) + '</li>';
+  if (oList) oList.innerHTML = ohtml;
+
+  // Extensions
+  var exts = data.extension_updates || [];
+  eHead.textContent = t("liveExtHead");
+  var ehtml = "";
+  for (var ei = 0; ei < exts.length; ei++) {
+    var ex = exts[ei];
+    ehtml += "<li>" + escHtml(ex.date || "") + ": " + escHtml(ex.summary || ex.from + " → " + ex.to) + "</li>";
+  }
+  if (!ehtml) ehtml = '<li style="color:#64748b">' + escHtml(t("liveExtEmpty")) + '</li>';
+  if (eList) eList.innerHTML = ehtml;
 }
 
 fetchUsageJsonOnce();
