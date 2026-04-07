@@ -138,7 +138,7 @@ flowchart LR
         ENV --> Start
         Start --> Fetch
         Fetch -->|HTTP GET| API
-        API -->|JSON files[]| Fetch
+        API -->|JSON / paths| Fetch
         Fetch -->|writes| TMP
         TMP -->|ANTHROPIC_PROXY_LOG_DIR| Server
         Server -->|SSE| Browser
