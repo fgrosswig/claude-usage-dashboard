@@ -5156,12 +5156,13 @@ scheduleFetchExtensionTimeline(900);
     if (xhr.status !== 200) return;
     try {
       var info = JSON.parse(xhr.responseText);
-      if (!info.dev_proxy_source) return;
+      if (!info.dev_mode) return;
+      var modeLabel = info.dev_mode === "full" ? "FULL" : "PROXY";
       var bar = document.createElement("div");
       bar.id = "dev-overlay";
       bar.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;background:#1e293b;border-bottom:2px solid #f59e0b;padding:6px 16px;display:flex;align-items:center;gap:12px;font-size:.8rem;color:#f59e0b";
-      bar.innerHTML = '<span style="font-weight:700">DEV MODE</span>' +
-        '<span style="color:#94a3b8">Source: ' + escHtml(info.dev_proxy_source) + '</span>' +
+      bar.innerHTML = '<span style="font-weight:700">DEV ' + modeLabel + '</span>' +
+        '<span style="color:#94a3b8">Source: ' + escHtml(info.dev_proxy_source || "") + '</span>' +
         '<span style="color:#94a3b8">Auto-sync: ' + info.refresh_sec + 's</span>' +
         '<button id="dev-sync-btn" style="background:#f59e0b;color:#0f172a;border:none;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:.75rem;font-weight:600">Sync Now</button>' +
         '<span id="dev-sync-status" style="color:#64748b;font-size:.7rem"></span>';
