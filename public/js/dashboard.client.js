@@ -4565,7 +4565,7 @@ function renderHealthScore(data) {
 
     smText.innerHTML = sh;
   }
-  renderHealthSparkline(data);
+  renderHealthHistory(data);
 
   // Grid
   var gh = "";
@@ -4797,33 +4797,24 @@ function initFilterBar(data) {
     });
   }
 
-  // Host chips
-  var hostChips = document.getElementById('filter-host-chips');
-  if (hostChips && days.length) {
+  // Host select (multi)
+  var hostSelect = document.getElementById('filter-host-select');
+  if (hostSelect && days.length && !hostSelect.dataset.bound) {
+    hostSelect.dataset.bound = '1';
     var hosts = {};
-    for (var di = 0; di < days.length; di++) {
-      var dh = days[di].hosts || {};
+    for (var hdi = 0; hdi < days.length; hdi++) {
+      var dh = days[hdi].hosts || {};
       for (var hk in dh) { if (Object.prototype.hasOwnProperty.call(dh, hk)) hosts[hk] = true; }
     }
     var hkeys = Object.keys(hosts).sort();
-    var hhtml = '<button type="button" class="filter-chip active" data-host="">' + escHtml(t('filterHostAll')) + '</button>';
-    for (var hi = 0; hi < hkeys.length; hi++) {
-      hhtml += '<button type="button" class="filter-chip" data-host="' + escHtml(hkeys[hi]) + '">' + escHtml(hkeys[hi]) + '</button>';
+    var hopts = '<option value="" selected>' + escHtml(t('filterHostAll')) + '</option>';
+    for (var hii = 0; hii < hkeys.length; hii++) {
+      hopts += '<option value="' + escHtml(hkeys[hii]) + '">' + escHtml(hkeys[hii]) + '</option>';
     }
-    hostChips.innerHTML = hhtml;
-    hostChips.addEventListener('click', function(e) {
-      var btn = e.target.closest('.filter-chip');
-      if (!btn) return;
-      hostChips.querySelectorAll('.filter-chip').forEach(function(c) { c.classList.remove('active'); });
-      btn.classList.add('active');
-      // Sync with existing forensic host filter
-      var fChips = document.getElementById('forensic-host-filter-chips');
-      if (fChips) {
-        var fbtn = fChips.querySelector('[data-host="' + (btn.dataset.host || '') + '"]');
-        if (!fbtn && !btn.dataset.host) fbtn = fChips.querySelector('.forensic-host-chip');
-        if (fbtn) fbtn.click();
+    hostSelect.innerHTML = hopts;
+    hostSelect.setAttribute('size', Math.min(hkeys.length + 1, 6));
+    hostSelect.addEventListener('change', function() {
       if (__lastUsageData) renderDashboard(__lastUsageData, true);
-      }
     });
   }
 
@@ -4907,61 +4898,69 @@ function buildHealthScoreHistory(data) {
   return scores;
 }
 
-function renderHealthSparkline(data) {
+function renderHealthHistory(data) {
   if (typeof Chart === "undefined") return;
-  var el = document.getElementById("c-health-sparkline");
+  var el = document.getElementById("c-health-history");
   if (!el) return;
-  var scores = buildHealthScoreHistory(data);
-  if (scores.length < 2) { el.style.display = "none"; return; }
-  el.style.display = "";
+  var titleEl = document.getElementById("health-history-title");
+  if (titleEl) titleEl.textContent = t("healthHistoryLabel");
 
+  var scores = buildHealthScoreHistory(data);
+  if (scores.length < 2) { return; }
+
+  var days = getFilteredDays(data.days || []);
+  var labels = [];
   var colors = [];
-  for (var i = 0; i < scores.length; i++) {
+  for (var i = 0; i < days.length && i < scores.length; i++) {
+    labels.push(days[i].date.slice(5));
     colors.push(scores[i] > 7 ? "#22c55e" : scores[i] >= 4 ? "#f59e0b" : "#ef4444");
   }
-  var labels = [];
-  for (var j = 0; j < scores.length; j++) labels.push("");
 
-  if (_proxyCharts.healthSparkline) {
-    freezeChartNoAnim(_proxyCharts.healthSparkline);
-    _proxyCharts.healthSparkline.data.labels = labels;
-    _proxyCharts.healthSparkline.data.datasets[0].data = scores;
-    _proxyCharts.healthSparkline.data.datasets[0].pointBackgroundColor = colors;
-    _proxyCharts.healthSparkline.update("none");
+  if (_proxyCharts.healthHistory) {
+    freezeChartNoAnim(_proxyCharts.healthHistory);
+    _proxyCharts.healthHistory.data.labels = labels;
+    _proxyCharts.healthHistory.data.datasets[0].data = scores;
+    _proxyCharts.healthHistory.data.datasets[0].pointBackgroundColor = colors;
+    _proxyCharts.healthHistory.update("none");
     return;
   }
 
-  _proxyCharts.healthSparkline = new Chart(el.getContext("2d"), {
+  _proxyCharts.healthHistory = new Chart(el.getContext("2d"), {
     type: "line",
     data: {
       labels: labels,
       datasets: [{
+        label: t("healthHistoryLabel"),
         data: scores,
-        borderColor: function(ctx) {
-          var idx = ctx.dataIndex != null ? ctx.dataIndex : 0;
-          return colors[idx] || "#3b82f6";
-        },
-        borderWidth: 2,
-        pointRadius: 0,
+        borderColor: "#3b82f6",
+        backgroundColor: "rgba(59,130,246,.08)",
+        fill: true,
+        tension: 0.3,
+        pointRadius: 5,
         pointBackgroundColor: colors,
-        tension: 0.4,
-        fill: false
+        pointBorderColor: colors
       }]
     },
     options: {
       responsive: true,
       animation: false,
       transitions: __chartTransitionsOff,
-      maintainAspectRatio: false,
       scales: {
-        x: { display: false },
-        y: { display: false, min: 0, max: 10 }
+        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
+        y: { min: 0, max: 10, ticks: { color: "#94a3b8", stepSize: 2 }, grid: { color: "rgba(51,65,85,.4)" } }
       },
       plugins: {
         legend: { display: false },
-        tooltip: { enabled: false }
-      },
-      elements: { point: { radius: 0 } }
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              var s = ctx.parsed.y;
+              var status = s > 7 ? "OK" : s >= 4 ? t("healthHistoryWarn") : t("healthHistoryCrit");
+              return t("healthScoreTitle") + ": " + s + "/10 (" + status + ")";
+            }
+          }
+        }
+      }
     }
   });
 }
