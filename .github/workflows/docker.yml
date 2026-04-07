@@ -32,8 +32,8 @@ jobs:
         run: |
           docker run --rm claude-usage:ci sh -c 'test -d /app/images && ls -1 /app/images/*.png >/dev/null'
 
-      # Node startet mit CMD ["node","start.js","both"]: Dashboard :3333 + Proxy :8080 — nur Stabilität prüfen.
-      - name: Smoke — Container, HTTP root + API /api/usage (JSON)
+      # Image-CMD ist node start.js both (nicht server.js — server.js ist nur Dashboard-Einstieg).
+      - name: Smoke — Dashboard :3333, Proxy :8080, Logs, Container weg
         run: |
           docker run -d --name cud-smoke -p 3333:3333 -p 8080:8080 \
             -e ANTHROPIC_PROXY_BIND=0.0.0.0 \
@@ -41,14 +41,38 @@ jobs:
             claude-usage:ci
           ok=0
           for i in $(seq 1 30); do
-            if curl -sf --max-time 3 http://127.0.0.1:3333/ -o /dev/null \
-              && curl -sf --max-time 3 http://127.0.0.1:3333/api/usage \
-                | python3 -c 'import json,sys; json.load(sys.stdin)'; then
+            if curl -sf --max-time 3 http://127.0.0.1:3333/ -o /dev/null; then
               ok=1
               break
             fi
             sleep 2
           done
-          docker logs cud-smoke 2>&1 | tail -n 80 || true
-          docker rm -f cud-smoke
           test "$ok" = 1
+          curl -sf --max-time 3 http://127.0.0.1:3333/api/usage -o /dev/null
+          px=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 http://127.0.0.1:8080/ || echo 000)
+          test "$px" != "000"
+          echo "===== cud-smoke logs (nach localhost curl) ====="
+          docker logs --tail 400 cud-smoke 2>&1 || true
+          docker rm -f cud-smoke
+
+      - name: Compose smoke — gleiches Muster (both im Image)
+        env:
+          CLAUDE_USAGE_IMAGE: claude-usage:ci
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml build claude-usage
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d claude-usage
+          ok=0
+          for i in $(seq 1 30); do
+            if curl -sf --max-time 3 http://127.0.0.1:3333/ -o /dev/null; then
+              ok=1
+              break
+            fi
+            sleep 2
+          done
+          test "$ok" = 1
+          curl -sf --max-time 3 http://127.0.0.1:3333/api/usage -o /dev/null
+          px=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 http://127.0.0.1:8080/ || echo 000)
+          test "$px" != "000"
+          echo "===== compose logs (nach curl) ====="
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --no-color --tail 400 2>&1 || true
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml down
