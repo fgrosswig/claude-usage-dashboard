@@ -258,6 +258,8 @@
   "proxyCardCacheRatioSub": "{healthy} healthy · {affected} affected",
   "proxyCardModels": "Model Split",
   "proxyCardModelsSub": "{opus} Opus · {sonnet} Sonnet · {other} other",
+  "proxyCardQuota5h": "5h Quota",
+  "proxyCardQuota7d": "7d Quota",
   "proxyDSCacheRead": "Cache read",
   "proxyDSCacheCreate": "Cache create",
   "proxyDSOutput": "Output",

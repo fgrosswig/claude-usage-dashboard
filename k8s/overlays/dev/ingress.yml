@@ -1,6 +1,8 @@
-# Traefik-Ingress. DNS (AdGuard-Rewrite o. ä.) → IP, auf der Traefik 80/443 ausliefert (06-traefik.md).
-# Standard: nur HTTP (web). TLS: unten spec.tls einfügen + Secret claude-usage-tls ODER TLS am Traefik-Edge.
-# Ohne Ingress: nur ClusterIP — z. B. kubectl -n claude port-forward svc/claude-app 3333:3333
+# Ingress wird vom Cluster-Controller verarbeitet (hier: nginx apps ingress, siehe `kubectl get ingressclass`).
+# ERR_CONNECTION_REFUSED: Auf dem K8s-Node lauscht Ingress meist nicht auf :80, sondern als NodePort (z. B. :32080).
+# DNS daher entweder auf Traefik (.220) mit Dynamic-Config → NodePort .171:32080 (06-traefik.md / k8s-services.yml),
+# oder Test: curl -v --resolve claude-usage.grosswig-it.de:32080:192.168.1.171 http://claude-usage.grosswig-it.de:32080/
+# Ohne Ingress: ClusterIP — z. B. kubectl -n claude port-forward svc/claude-app 3333:3333
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -8,13 +10,9 @@ metadata:
   labels:
     app: claude-dashboard
   annotations:
-    # Explizit HTTP-Entrypoint (Traefik-Chart: meist "web"; sonst in Traefik-Konfig prüfen)
-    traefik.ingress.kubernetes.io/router.entrypoints: web
-    # HTTPS mit cert-manager im Cluster:
-    # cert-manager.io/cluster-issuer: letsencrypt-prod
-    # Dann spec.tls (siehe README) + traefik router entrypoints: web,websecure
+    # HTTPS im Cluster (optional): cert-manager.io/cluster-issuer: letsencrypt-prod + spec.tls unten
 spec:
-  ingressClassName: traefik
+  ingressClassName: nginx
   rules:
     - host: claude-usage.grosswig-it.de
       http:

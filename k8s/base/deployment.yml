@@ -24,7 +24,11 @@ spec:
         - name: app
           image: harbor.grosswig-it.de/claude/claude-usage-dashboard:latest
           imagePullPolicy: Always
-          command: ["node", "start.js", "both"]
+          # Dashboard (3333) + Anthropic-Proxy (8080) — nicht server.js / dashboard allein
+          command:
+            - node
+            - start.js
+            - both
           ports:
             - name: http-dashboard
               containerPort: 3333
@@ -34,9 +38,9 @@ spec:
             - name: HOME
               value: /root
             - name: ANTHROPIC_PROXY_BIND
-              value: "0.0.0.0"
+              value: '0.0.0.0'
             - name: NODE_ENV
-              value: "production"
+              value: 'production'
           livenessProbe:
             httpGet:
               path: /

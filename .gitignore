@@ -50,6 +50,5 @@
 /.github_session_token
 /.env
 /.env.*
-
-# Harbor: exportierter Robot-Account (JSON mit secret — nur lokal)
-/k8/claude-usage-dashboard/robot*.json
+# no source code from plugin into repo!
+/source/*

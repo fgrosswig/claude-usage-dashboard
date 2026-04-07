@@ -211,19 +211,16 @@ tr:hover td{background:#334155}
 /* ── Proxy Analytics ─────────────────────────────────── */
 .proxy-details{margin-bottom:14px}
 .proxy-summary{background:rgba(30,41,59,.55);border-color:#334155}
-.proxy-top-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px}
-.proxy-gauge-box{max-width:200px;margin:0 auto}
-.proxy-gauge-box h3{font-size:.72rem;color:#94a3b8;text-align:center;margin-bottom:4px}
 .proxy-charts-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:16px;align-items:stretch}
-.proxy-charts-full{margin-bottom:16px}
+.proxy-charts-grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:16px;align-items:stretch}
 .proxy-section-blurb{font-size:.75rem;color:#94a3b8;margin:0 0 10px;line-height:1.45}
 .proxy-chart-blurb{font-size:.7rem;color:#64748b;margin:4px 0 8px;line-height:1.4}
 .chart-shell--proxy{position:relative;min-height:200px;border-radius:8px}
 .proxy-info-row{display:flex;flex-wrap:wrap;gap:8px 24px;margin-top:8px;margin-bottom:4px}
 .proxy-info-item{font-size:.75rem;color:#94a3b8;margin:0;line-height:1.45}
 .proxy-info-warn{color:#f59e0b}
-@media(max-width:900px){.proxy-top-row{grid-template-columns:1fr 1fr}.proxy-gauge-box{max-width:180px}}
-@media(max-width:600px){.proxy-top-row{grid-template-columns:1fr}.proxy-gauge-box{max-width:200px}}
+@media(max-width:900px){.proxy-charts-grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.proxy-charts-grid-3{grid-template-columns:1fr}}
 @media(max-width:720px){.proxy-charts-grid{grid-template-columns:1fr}}
 
 

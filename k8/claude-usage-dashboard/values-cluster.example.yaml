@@ -5,6 +5,12 @@
 #   helm upgrade --install cud ./k8/claude-usage-dashboard -n claude --create-namespace \
 #     -f values.yaml -f values-cluster.example.yaml -f secrets.local.yaml
 
+# Dashboard (3333) + Anthropic-Proxy (8080) im selben Container
+command:
+  - node
+  - start.js
+  - both
+
 image:
   # Host aus 05-harbor.md; Projekt claude, Repo claude-usage-dashboard
   repository: harbor.grosswig-it.de/claude/claude-usage-dashboard
