@@ -39,6 +39,19 @@ find . -type f ! -path './.git/*' ! -path './node_modules/*' \( \
       -e 's|\.woodpecker/|ci-config/|g' \
       -e 's/poc-Pfad/secondary-registry-path/g' \
       -e 's/\.220/CI-host/g' \
+      -e 's|\.gitea/workflows/mirror-github\.yml|private automation (paths omitted in public tree)|g' \
+      -e 's|### Gitea and GitHub (routine after merging to `main`)|### Working copy and GitHub|g' \
+      -e 's|### Gitea und GitHub (Routine nach Merge auf `main`)|### Arbeitskopie und GitHub|g' \
+      -e 's|Primary work is on \*\*Gitea\*\*|Primary development is on a **private forge**|g' \
+      -e 's|Arbeit läuft primär auf \*\*Gitea\*\*|Die Entwicklung läuft primär auf einem **privaten Forge**|g' \
+      -e 's|After merging to Gitea `main` — update|After merging to the private upstream `main` — update|g' \
+      -e 's|After merging to Gitea `main`,|After merging to the private upstream `main`,|g' \
+      -e 's|Nach Merge auf Gitea-`main` —|Nach Merge auf dem privaten Upstream-`main` —|g' \
+      -e 's|Nach Merge auf Gitea-`main` pusht|Nach Merge auf dem privaten Upstream-`main` pusht|g' \
+      -e 's|(your internal forge tree stays as-is; public copy drops `.woodpecker`/`.gitea` and replaces internal hostnames in text)|(the published tree omits private infrastructure and hostnames)|g' \
+      -e 's|(intern bleibt alles unverändert; Domains und `.woodpecker`/`.gitea` erscheinen nicht öffentlich)|(die öffentliche Kopie enthält keine privaten Infrastruktur- oder Domain-Angaben)|g' \
+      -e 's|# origin = Gitea|# upstream: private forge|g' \
+      -e 's|Vom gleichen Stand wie der Gitea-Feature-Branch|Vom gleichen Stand wie der private Feature-Branch|g' \
       "$f" 2>/dev/null || true
   done
 
