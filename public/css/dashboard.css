@@ -208,7 +208,7 @@ tr:hover td{background:#334155}
 /* pulse (from original inline block) */
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
-/* ── Proxy Analytics ─────────────────────────────────────────── */
+/* ── Proxy Analytics ─────────────────────────────────── */
 .proxy-details{margin-bottom:14px}
 .proxy-summary{background:rgba(30,41,59,.55);border-color:#334155}
 .proxy-gauge-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:0}
@@ -220,7 +220,7 @@ tr:hover td{background:#334155}
 @media(max-width:720px){.proxy-split-row{grid-template-columns:1fr}}
 
 
-/* ── Health Score Ampel ──────────────────────────────────── */
+/* ── Health Score Ampel ──────────────────────────────── */
 .health-score{margin-bottom:16px;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px 20px;overflow:hidden}
 .health-header{display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap}
 .health-total-circle{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:700;color:#fff;flex-shrink:0}
@@ -242,7 +242,7 @@ tr:hover td{background:#334155}
 .health-badge-bar-fill--yellow{background:#f59e0b}
 .health-badge-bar-fill--red{background:#ef4444}
 
-/* ── Key Findings ────────────────────────────────────────── */
+/* ── Key Findings ─────────────────────────────────────── */
 .key-findings{margin-bottom:14px;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:14px 18px;overflow:hidden}
 .key-findings-header{margin-bottom:10px;font-size:.85rem;color:#cbd5e1}
 .key-findings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:8px}
@@ -253,7 +253,7 @@ tr:hover td{background:#334155}
 .finding-value{margin-left:auto;font-size:.9rem;font-weight:600;color:#e2e8f0}
 .finding-detail{font-size:.68rem;color:#64748b;line-height:1.4}
 
-/* ── Health Collapse ─────────────────────────────────────── */
+/* ── Health Collapse ──────────────────────────────────── */
 .health-collapse{margin-bottom:14px;border:1px solid #334155;border-radius:10px;background:#1e293b;overflow:hidden}
 
 .health-collapse-summary:hover{color:#f8fafc}
@@ -277,8 +277,7 @@ tr:hover td{background:#334155}
 
 
 
-
-/* ── Filter Bar ──────────────────────────────────────────── */
+/* ── Filter Bar ─────────────────────────────────────────── */
 .filter-bar{display:flex;flex-wrap:wrap;align-items:center;gap:14px 24px;margin-bottom:14px;padding:14px 18px;background:#1e293b;border:1px solid #334155;border-radius:10px}
 .filter-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .filter-label{font-size:.78rem;color:#94a3b8;white-space:nowrap;margin-right:4px;font-weight:600}
@@ -307,7 +306,7 @@ tr:hover td{background:#334155}
 #filter-host-select option{padding:4px 8px}
 #filter-host-select option:checked{background:#3b82f6;color:#fff}
 
-.top-bar-badge{background:#334155;color:#e2e8f0;border:none;padding:8px 14px;border-radius:6px;font-size:.8rem;display:flex;align-items:center;cursor:help;white-space:nowrap}
+.top-bar-badge{background:#334155;color:#e2e8f0;border:none;padding:8px 14px;border-radius:6px;font-size:.8rem;display:flex;align-items:center;cursor:pointer;white-space:nowrap}
 .top-bar-badge:hover{background:#475569}
 
 /* Meta badge hover popup */
@@ -316,16 +315,16 @@ tr:hover td{background:#334155}
 .top-bar .meta-details:hover .meta-details-inner,.top-bar .meta-details[open] .meta-details-inner{display:block}
 .top-bar .meta-details[open] .meta-details-summary{border-bottom:none}
 
-/* Anthropic badge hover popup */
+/* Anthropic badge click popup */
 .top-bar-badge{position:relative}
-.anthropic-popup{display:none;position:absolute;left:0;top:100%;margin-top:6px;background:#1e293b;border:1px solid #475569;border-radius:8px;padding:12px 14px;z-index:9500;min-width:500px;max-width:700px;box-shadow:0 12px 40px rgba(0,0,0,.7);max-height:80vh;overflow-y:auto}
+.anthropic-popup{display:none;position:absolute;left:0;top:100%;margin-top:6px;background:#1e293b;border:1px solid #475569;border-radius:8px;padding:12px 14px;z-index:9500;min-width:420px;max-width:480px;box-shadow:0 12px 40px rgba(0,0,0,.7);max-height:80vh;overflow-y:auto}
 .top-bar-badge.popup-open .anthropic-popup{display:block}
 .anthropic-popup-head{font-size:.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
 .anthropic-popup-list{list-style:none;padding:0;margin:0;font-size:.68rem;color:#e2e8f0;line-height:1.5}
 .anthropic-popup-list li{padding:2px 0;border-bottom:1px solid rgba(51,65,85,.4)}
 .anthropic-popup-list li:last-child{border-bottom:none}
 
-.health-charts-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.health-charts-row{display:grid;grid-template-columns:1fr;gap:10px;margin-top:0}
 .health-chart-sm{background:rgba(15,23,42,.4);border:1px solid #334155;border-radius:8px;padding:8px 10px}
 .health-chart-sm h4{font-size:.68rem;color:#94a3b8;margin:0 0 4px}
 @media(max-width:900px){.health-charts-row{grid-template-columns:1fr}}
