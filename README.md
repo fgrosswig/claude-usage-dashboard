@@ -32,7 +32,7 @@ Optionen, Logging, Cache, Multi-Host und Sync: jeweils in der **[Dokumentation](
 
 ### Docker
 
-Zwei Images: **`Dockerfile.base`** (npm-Deps) → **`Dockerfile`** (App inkl. **`images/`**-Screenshots unter `/app/images`). Lokal z. B. `docker build -f Dockerfile.base -t claude-base:local .` dann **`BASE_IMAGE=claude-base BASE_TAG=local docker compose build`**. **`docker compose up`** = **`node start.js both`** (3333 / 8080); weitere Modi: Kopfzeilen in **`docker-compose.yml`**. CI: **`docker-compose.ci.yml`**, **`.github/workflows/docker.yml`**.
+Zwei Images: **`Dockerfile.base`** (npm-Deps) → **`Dockerfile`** (App). Lokal z. B. `docker build -f Dockerfile.base -t claude-base:local .` dann **`BASE_IMAGE=claude-base BASE_TAG=local docker compose build`**. **`docker compose up`** = **`node start.js both`** (3333 / 8080); weitere Modi: Kopfzeilen in **`docker-compose.yml`**. CI: **`docker-compose.ci.yml`**, **`.github/workflows/docker.yml`**.
 
 ### Arbeitskopie und GitHub
 

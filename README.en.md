@@ -30,7 +30,7 @@ node start.js forensics     # CLI report
 
 ### Docker
 
-Two images: **`Dockerfile.base`** (npm deps) → **`Dockerfile`** (app including **`images/`** screenshots at **`/app/images`**). Locally e.g. `docker build -f Dockerfile.base -t claude-base:local .` then **`BASE_IMAGE=claude-base BASE_TAG=local docker compose build`**. **`docker compose up`** = **`node start.js both`**; other modes: **`docker-compose.yml`** header. CI: **`docker-compose.ci.yml`**, **`.github/workflows/docker.yml`**.
+Two images: **`Dockerfile.base`** (npm deps) → **`Dockerfile`** (app). Locally e.g. `docker build -f Dockerfile.base -t claude-base:local .` then **`BASE_IMAGE=claude-base BASE_TAG=local docker compose build`**. **`docker compose up`** = **`node start.js both`**; other modes: **`docker-compose.yml`** header. CI: **`docker-compose.ci.yml`**, **`.github/workflows/docker.yml`**.
 
 ### Working copy and GitHub
 
