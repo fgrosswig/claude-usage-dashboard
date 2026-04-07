@@ -1895,6 +1895,12 @@ function renderDashboardCore(data) {
     }
     if (!pick || !valid[pick]) {
       pick = (calToday && valid[calToday]) ? calToday : days[days.length - 1].date;
+      // In dev mode: skip today if it has no data, pick last day with output
+      if (pick === calToday && data.dev_source) {
+        for (var dp = days.length - 1; dp >= 0; dp--) {
+          if ((days[dp].output || 0) > 0) { pick = days[dp].date; break; }
+        }
+      }
     }
     selEl.value = pick;
     if (!selEl.dataset.bound) {
@@ -1907,6 +1913,11 @@ function renderDashboardCore(data) {
   } else {
     if (!pick || !valid[pick]) {
       pick = (calToday && valid[calToday]) ? calToday : days[days.length - 1].date;
+      if (pick === calToday && data.dev_source) {
+        for (var dp2 = days.length - 1; dp2 >= 0; dp2--) {
+          if ((days[dp2].output || 0) > 0) { pick = days[dp2].date; break; }
+        }
+      }
     }
   }
   var selDay = null;
