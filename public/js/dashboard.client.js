@@ -5115,7 +5115,7 @@ function updateAnthropicPopup(data) {
     data: {
       labels: labels,
       datasets: [
-        { label: t("incidentDSOutageHours"), data: outageH, backgroundColor: outageColors, yAxisID: "y", borderRadius: 2, barPercentage: 0.6, categoryPercentage: 0.7 },
+        { label: t("incidentDSOutageHours"), data: outageH, backgroundColor: outageColors, yAxisID: "y", borderRadius: 2, barPercentage: 0.35, categoryPercentage: 0.6 },
         { label: "Incidents", data: incidentCounts, type: "scatter", borderColor: "rgba(239,68,68,.8)", backgroundColor: "rgba(239,68,68,.15)", pointRadius: function(ctx) { return ctx.parsed.y > 0 ? 4 : 0; }, pointBorderWidth: 2, pointStyle: "circle", yAxisID: "y1" }
       ]
     },
