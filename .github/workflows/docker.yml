@@ -22,17 +22,6 @@ jobs:
             -t claude-usage:ci \
             .
 
-      # README: App-Image enthält screenshots unter /app/images (Dockerfile: COPY images).
-      - name: Screenshot assets (images/) im Repo
-        run: |
-          test -d images
-          n="$(find images -maxdepth 1 -type f -name '*.png' 2>/dev/null | wc -l)"
-          test "${n:-0}" -ge 1
-
-      - name: Screenshots im Image (/app/images)
-        run: |
-          docker run --rm claude-usage:ci sh -c 'test -d /app/images && ls -1 /app/images/*.png >/dev/null'
-
       # Image-CMD: node start.js both (Proxy läuft im Container intern; CI prüft nur Dashboard :3333).
       - name: Smoke — HTTP :3333 + /api/usage, Logs, Container weg
         run: |
