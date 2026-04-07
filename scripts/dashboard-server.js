@@ -2914,8 +2914,42 @@ function refreshProxyCache() {
   }
 }
 
-// ── Dev: fetch proxy logs from remote when DEV_PROXY_SOURCE is set ────────
-var __devProxyPending = !!(process.env.DEV_PROXY_SOURCE || '').trim();
+// ── Dev: fetch data from remote when DEV_PROXY_SOURCE + DEV_MODE set ─────
+var __devSource = (process.env.DEV_PROXY_SOURCE || '').trim();
+var __devMode = (process.env.DEV_MODE || '').trim().toLowerCase(); // "proxy" | "full"
+var __devProxyPending = !!__devSource && (__devMode === 'proxy' || __devMode === 'full');
+
+function devFetchRemoteUsage(cb) {
+  if (!__devSource) return cb();
+  var url = __devSource.replace(/\/+$/, '') + '/api/debug/proxy-logs';
+  serviceLog.info('dev', 'fetching remote data from ' + url);
+  var proto = url.startsWith('https') ? require('https') : require('http');
+  proto.get(url, function (resp) {
+    var body = '';
+    resp.on('data', function (chunk) { body += chunk; });
+    resp.on('end', function () {
+      try {
+        var parsed = JSON.parse(body);
+        var remote = parsed.usage || null;
+        if (!remote) {
+          serviceLog.warn('dev', 'remote has old format (no usage key) — need deploy with new /api/debug/proxy-logs');
+          return cb();
+        }
+        remote.dev_source = __devSource;
+        remote.generated = new Date().toISOString();
+        cachedData = remote;
+        serviceLog.info('dev', 'remote data fetched: ' + (remote.days || []).length + ' days, proxy_days=' + (remote.proxy && remote.proxy.proxy_days ? remote.proxy.proxy_days.length : 0));
+        broadcastSse();
+      } catch (e) {
+        serviceLog.error('dev', 'remote data parse failed: ' + (e.message || e));
+      }
+      cb();
+    });
+  }).on('error', function (e) {
+    serviceLog.error('dev', 'remote data fetch failed: ' + (e.message || e));
+    cb();
+  });
+}
 
 function devFetchProxyLogs(cb) {
   var source = (process.env.DEV_PROXY_SOURCE || '').trim();
@@ -3059,34 +3093,32 @@ var server = http.createServer(function (req, res) {
     res.writeHead(200, corsMp);
     res.end(JSON.stringify({ ok: true, message: 'marketplace_refresh_started' }));
   } else if (pathname === '/api/debug/proxy-logs' && process.env.DEBUG_API === '1') {
-    // Debug endpoint: serve raw proxy NDJSON files for local dev testing
-    var proxyFiles = collectProxyNdjsonFiles();
-    var result = [];
-    for (var pfi = 0; pfi < proxyFiles.length; pfi++) {
-      try {
-        var fname = path.basename(proxyFiles[pfi]);
-        var content = fs.readFileSync(proxyFiles[pfi], 'utf8');
-        result.push({ name: fname, content: content });
-      } catch (e) {}
-    }
+    // Debug endpoint: serve usage data + proxy NDJSON files in one call
     res.writeHead(200, {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
       'Cache-Control': 'no-store'
     });
-    res.end(JSON.stringify({ files: result }));
-  } else if (pathname === '/api/debug/sync-proxy-logs' && (process.env.DEV_PROXY_SOURCE || '').trim()) {
-    // Manual trigger: re-fetch proxy logs from remote and refresh
+    res.end(JSON.stringify({ usage: cachedData }));
+  } else if (pathname === '/api/debug/sync-proxy-logs' && __devMode && __devSource) {
+    // Manual trigger: re-fetch data from remote
     var corsSync = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
-    devFetchAndRefreshProxy();
+    if (__devMode === 'full') {
+      devFetchRemoteUsage(function () {});
+    } else {
+      devFetchProxyLogs(function () {
+        refreshProxyCache();
+        if (__proxyCache.data && cachedData) { cachedData.proxy = __proxyCache.data; broadcastSse(); }
+      });
+    }
     res.writeHead(200, corsSync);
-    res.end(JSON.stringify({ ok: true, message: 'sync_started' }));
+    res.end(JSON.stringify({ ok: true, message: 'sync_started', mode: __devMode }));
   } else if (pathname === '/api/debug/status') {
     // Debug status: expose dev mode info to the frontend
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({
-      dev_proxy_source: (process.env.DEV_PROXY_SOURCE || '').trim() || null,
-      proxy_log_dir: getProxyLogDir(),
+      dev_mode: __devMode || null,
+      dev_proxy_source: __devSource || null,
       refresh_sec: REFRESH_SEC
     }));
   } else if (pathname === '/api/proxy-usage') {
@@ -3127,40 +3159,46 @@ server.listen(PORT, function () {
       (process.env.CLAUDE_USAGE_LOG_LEVEL || 'info') +
       (process.env.CLAUDE_USAGE_LOG_FILE ? ' log_file=' + process.env.CLAUDE_USAGE_LOG_FILE : '')
   );
-  primeDashboardAndScheduleFirstScan();
-  setTimeout(refreshOutageCache, 400);
-  setTimeout(maybeRefreshReleasesCacheOnStartup, 1400);
-  setTimeout(refreshMarketplaceExtensionCache, 2400);
-  devFetchProxyLogs(function () {
-    __devProxyPending = false;
-    setTimeout(function () {
-      refreshProxyCache();
-      if (__proxyCache.data && cachedData) {
-        cachedData.proxy = __proxyCache.data;
-        broadcastSse();
-      }
-    }, 3000);
-  });
-  // Periodic dev sync
-  if ((process.env.DEV_PROXY_SOURCE || '').trim()) {
+  if (__devMode === 'full' && __devSource) {
+    // Dev full: fetch usage + proxy from remote, no local scan
+    try { getDashboardHtml(); } catch (e) {}
+    serviceLog.info('dev', 'DEV_MODE=full — all data from ' + __devSource);
+    devFetchRemoteUsage(function () { __devProxyPending = false; });
+    setInterval(function () { devFetchRemoteUsage(function () {}); }, REFRESH_SEC * 1000);
+  } else if (__devMode === 'proxy' && __devSource) {
+    // Dev proxy: local JSONL scan + proxy data from remote
+    serviceLog.info('dev', 'DEV_MODE=proxy — local JSONL + remote proxy from ' + __devSource);
+    primeDashboardAndScheduleFirstScan();
+    devFetchProxyLogs(function () {
+      __devProxyPending = false;
+      setTimeout(function () {
+        refreshProxyCache();
+        if (__proxyCache.data && cachedData) { cachedData.proxy = __proxyCache.data; broadcastSse(); }
+      }, 3000);
+    });
     setInterval(function () {
-      devFetchAndRefreshProxy();
+      devFetchProxyLogs(function () {
+        refreshProxyCache();
+        if (__proxyCache.data && cachedData) { cachedData.proxy = __proxyCache.data; broadcastSse(); }
+      });
     }, REFRESH_SEC * 1000);
+    setTimeout(refreshOutageCache, 400);
+    setTimeout(maybeRefreshReleasesCacheOnStartup, 1400);
+    setTimeout(refreshMarketplaceExtensionCache, 2400);
+  } else {
+    // Production: normal local scan
+    primeDashboardAndScheduleFirstScan();
+    setTimeout(refreshOutageCache, 400);
+    setTimeout(maybeRefreshReleasesCacheOnStartup, 1400);
+    setTimeout(refreshMarketplaceExtensionCache, 2400);
   }
 });
 
-function devFetchAndRefreshProxy() {
-  devFetchProxyLogs(function () {
-    refreshProxyCache();
-    if (__proxyCache.data && cachedData) {
-      cachedData.proxy = __proxyCache.data;
-      broadcastSse();
-      serviceLog.info('dev', 'proxy logs synced + broadcast');
-    }
-  });
+if (!__devMode) {
+  setInterval(runScanAndBroadcast, REFRESH_SEC * 1000);
+  setInterval(refreshProxyCache, REFRESH_SEC * 1000);
+} else if (__devMode === 'proxy') {
+  setInterval(runScanAndBroadcast, REFRESH_SEC * 1000);
 }
-
-setInterval(runScanAndBroadcast, REFRESH_SEC * 1000);
-setInterval(refreshProxyCache, REFRESH_SEC * 1000);
 setInterval(refreshOutageCache, OUTAGE_REFRESH_MS);
 setInterval(refreshMarketplaceExtensionCache, 6 * 60 * 60 * 1000);
