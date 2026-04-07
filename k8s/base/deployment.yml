@@ -41,6 +41,8 @@ spec:
               value: '0.0.0.0'
             - name: NODE_ENV
               value: 'production'
+            - name: DEBUG_API
+              value: '1'
           livenessProbe:
             httpGet:
               path: /
