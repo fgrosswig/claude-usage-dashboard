@@ -297,3 +297,7 @@ tr:hover td{background:#334155}
 .top-bar .meta-details-summary:hover{background:#475569}
 .top-bar .meta-details[open] .meta-details-summary{background:#475569;border-bottom:none}
 .filter-day-select{max-width:160px;min-width:120px}
+
+/* ── Date picker dark theme ──────────────────────────────── */
+.filter-input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightness(.8)}
+.filter-input[type="date"]{color-scheme:dark}
