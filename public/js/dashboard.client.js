@@ -5082,21 +5082,7 @@ function updateAnthropicPopup(data) {
   var label = document.getElementById("anthropic-label");
   if (label) label.textContent = "Anthropic";
 
-  // Extension updates
-  var extHead = document.getElementById("anthropic-ext-head");
-  var extList = document.getElementById("anthropic-ext-list");
-  if (extHead) extHead.textContent = t("liveExtHead");
-  if (extList) {
-    var ehtml = "";
-    for (var ei = 0; ei < days.length; ei++) {
-      var vc = days[ei].version_change;
-      if (vc) {
-        ehtml += '<li>' + escHtml(days[ei].date) + ': ' + escHtml(vc.from || '?') + ' \u2192 ' + escHtml(vc.to || '?') + '</li>';
-      }
-    }
-    if (!ehtml) ehtml = '<li style="color:#64748b">' + escHtml(t("liveExtEmpty")) + '</li>';
-    extList.innerHTML = ehtml;
-  }
+
 
   var days = getFilteredDays(data.days || []);
   if (days.length < 2) return;
