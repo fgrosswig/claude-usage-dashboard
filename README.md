@@ -11,19 +11,21 @@ Standalone Node-Server fuer **Claude Code** Token-Nutzungs-Analyse, Anomalie-Erk
 ### Features
 
 #### Health Score Ampel
-- **9 Indikatoren** mit Gruen/Gelb/Rot Schwellwerten: Quota 5h, Thinking Gap, Cache Health, Error Rate, Hit Limits, Latenz, Interrupts, Cold Starts, Retries
+- **14 Indikatoren** mit Gruen/Gelb/Rot Schwellwerten: Quota 5h, Thinking Gap, Cache Health, Error Rate, Hit Limits, Latenz, Interrupts, Cold Starts, Retries, False 429 (B3), Truncations (B5), Context Resets (B4), Tokens/1% Quota, Anomale Stops
 - **Score 0-10** mit farbcodiertem Trend-Chart ueber alle Tage
 - **Kernbefunde** — 8 auto-berechnete Findings (Thinking Token Gap, Overhead, Cache-Paradox etc.)
+- **ArkNill Bug Detection** — automatische Erkennung der 7 bekannten Claude Code Bugs (B1-B8)
 - Collapsible Section: Ampel-Badges im zugeklappten Zustand
 
 #### Proxy Analytics (Anthropic Monitor Proxy)
 - Transparenter HTTPS-Proxy fuer die Anthropic API mit NDJSON-Logging
-- **Rate Limit Gauges** (5h + 7d Doughnut-Charts mit Reset-Countdown)
+- **6 Stat-Cards** (Requests, Latenz, Cache Ratio, Models, 5h-Quota, 7d-Quota mit Farbcodierung)
 - **Token Cost Attribution** (Stacked Bar: Cache Read / Creation / Output)
-- **Latenz-Charts** (Avg/Min/Max Trend + pro Stunde)
+- **Latenz-Chart** (Avg + Min Trend, Outlier-bereinigt)
 - **Modell-Verteilung** (Requests + Latenz pro Modell, dual-axis)
-- **Status-Code Doughnut** (200/401/404/429 farbcodiert)
+- **Hourly Heatmap** (Requests pro Stunde, Intensitaets-Faerbung)
 - **Cold-Start Erkennung** (Requests mit <50% Cache-Ratio)
+- **SSE stop_reason Extraktion** (end_turn, tool_use, max_tokens aus Streaming-Responses)
 - **JSONL vs Proxy Vergleich** (Thinking Token Duplication Ratio)
 
 #### Anthropic Status & Incidents
@@ -32,12 +34,18 @@ Standalone Node-Server fuer **Claude Code** Token-Nutzungs-Analyse, Anomalie-Erk
 - **Extension-Updates** Timeline (Claude Code Versionen)
 - Live Anthropic Status Badge in der Top-Bar
 
+#### Token Stats (collapsible)
+- **Stat-Cards** mit Tag-Output, Cache Read, Total, Hit Limits, Overhead, Peak, Gesamt, Session-Signale
+- **4 Main-Charts** (Token-Verbrauch, Cache:Output, Output/Stunde, Subagent-Cache)
+- Collapsible Section mit Summary-Zeile
+
 #### Forensic Analyse
 - Hit-Limit Erkennung aus JSONL-Logs
-- Session-Signale (continue/resume/retry/interrupt)
-- Service Impact Chart (Arbeitszeit vs Ausfall)
+- Session-Signale (continue/resume/retry/interrupt/truncated)
+- Service Impact Chart (Arbeitszeit vs Ausfall) — nebeneinander mit Session-Signale
 - Cache Read Korrelation
 - Forensic Report (Markdown-Export)
+- HiDPI Chart-Rendering (devicePixelRatio)
 
 #### Multi-Host Support
 - Mehrere Maschinen als separate Quellen (HOST-B, HOST-C, HOST-D etc.)
@@ -291,6 +299,9 @@ kubectl apply -k k8s/overlays/dev
 | `CLAUDE_USAGE_LOG_FILE` | — | Log-Datei (zusaetzlich zu stderr) |
 | `GITHUB_TOKEN` / `GH_TOKEN` | — | GitHub PAT fuer Releases (>60 req/h) |
 | `CLAUDE_USAGE_ADMIN_TOKEN` | — | Bearer-Token fuer Admin-Endpoints |
+| `DEBUG_API` | — | `1` aktiviert `/api/debug/proxy-logs` Endpoint |
+| `DEV_PROXY_SOURCE` | — | URL des Remote-Dashboards fuer Dev-Testing |
+| `DEV_MODE` | — | `proxy` (nur Proxy remote) oder `full` (alles remote) |
 
 ### API (kurz)
 
@@ -299,10 +310,33 @@ kubectl apply -k k8s/overlays/dev
 - **`POST /api/claude-data-sync`**: JSONL-Upload (gzip tar).
 - **`POST /api/github-releases-refresh`**: Releases manuell aktualisieren.
 
+### Lokales Dev-Testing
+
+Dashboard lokal mit echten Remote-Daten testen (Cluster braucht `DEBUG_API=1`):
+
+```powershell
+# PowerShell — alles vom Remote (kein lokaler Scan)
+$env:DEV_PROXY_SOURCE="https://claude-usage.grosswig-it.de"; $env:DEV_MODE="full"; node start.js dashboard
+
+# PowerShell — nur Proxy vom Remote, JSONL lokal
+$env:DEV_PROXY_SOURCE="https://claude-usage.grosswig-it.de"; $env:DEV_MODE="proxy"; node start.js dashboard
+```
+
+```bash
+# bash — alles vom Remote
+DEV_PROXY_SOURCE=https://claude-usage.grosswig-it.de DEV_MODE=full node start.js dashboard
+```
+
+- **DEV FULL Banner** oben mit Sync-Button + Last-Sync-Timestamp
+- Auto-Sync alle 180s, `node start.js both` blockiert im Dev-Mode
+- Siehe `k8s/README.md` fuer Mermaid-Flowchart
+
 ### Referenzen
 
-- [Claude Code Hidden Problem Analysis](https://github.com/ArkNill/claude-code-hidden-problem-analysis) — Grundlage fuer Anomalie-Erkennung
-- Basiert auf Erkenntnissen zu Thinking Token Blind Spot, Cache-Paradox, False Rate Limiter
+- [Claude Code Hidden Problem Analysis](https://github.com/ArkNill/claude-code-hidden-problem-analysis) — Grundlage fuer Anomalie-Erkennung (B1-B8)
+- Bug Detection im Health Panel: B3 False Rate Limiter, B4 Context Stripping, B5 Tool Truncation
+- Quota-Benchmark: 1% ≈ 1.5-2.1M sichtbare Tokens (ArkNill-Referenz)
+- SSE stop_reason Extraktion fuer Stop-Anomalie-Erkennung
 
 ### Screenshots
 
