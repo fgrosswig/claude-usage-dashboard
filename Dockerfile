@@ -9,6 +9,9 @@ WORKDIR /app
 
 COPY start.js server.js anthropic-proxy.js claude-usage-dashboard.js token_forensics.js ./
 COPY scripts ./scripts
+# Write version from build arg (CI sets from git tag)
+ARG APP_VERSION=dev
+RUN echo "$APP_VERSION" > VERSION
 COPY tpl ./tpl
 COPY public ./public
 

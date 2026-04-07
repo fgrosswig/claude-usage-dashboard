@@ -13,6 +13,17 @@
 var http = require('http');
 var https = require('https');
 var fs = require('fs');
+
+// Resolve version from git tag at startup (no hardcoded version)
+var __appVersion = (function () {
+  try {
+    return require('child_process').execSync('git describe --tags --abbrev=0 2>/dev/null || echo dev', { encoding: 'utf8' }).trim();
+  } catch (e) {
+    // In Docker (no git): read from VERSION file, or fallback
+    try { return fs.readFileSync(require('path').join(__dirname, '..', 'VERSION'), 'utf8').trim(); } catch (e2) {}
+    return 'dev';
+  }
+})();
 var path = require('path');
 var os = require('os');
 var dashboardHttp = require('./dashboard-http');
@@ -3221,7 +3232,8 @@ var server = http.createServer(function (req, res) {
     res.end(JSON.stringify({
       dev_mode: __devMode || null,
       dev_proxy_source: __devSource || null,
-      refresh_sec: REFRESH_SEC
+      refresh_sec: REFRESH_SEC,
+      version: __appVersion
     }));
   } else if (pathname === '/api/proxy-usage') {
     if (!__proxyCache.data) refreshProxyCache();

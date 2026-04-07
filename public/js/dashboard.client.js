@@ -5743,6 +5743,12 @@ scheduleFetchExtensionTimeline(900);
     if (xhr.status !== 200) return;
     try {
       var info = JSON.parse(xhr.responseText);
+      // Show release version in Live panel
+      var relEl = document.getElementById("live-release-info");
+      if (relEl && info.version) {
+        relEl.innerHTML = '<span class="live-release-version">' + escHtml(info.version) + '</span>' +
+          ' <a class="live-release-link" href="https://github.com/fgrosswig/claude-usage-dashboard/releases" target="_blank" rel="noopener">GitHub Releases</a>';
+      }
       if (!info.dev_mode) return;
       var modeLabel = info.dev_mode === "full" ? "FULL" : "PROXY";
       var bar = document.createElement("div");
