@@ -15,7 +15,6 @@ services:
         BASE_TAG: ci
     ports:
       - "3333:3333"
-      - "8080:8080"
     environment:
       ANTHROPIC_PROXY_BIND: "0.0.0.0"
     volumes:

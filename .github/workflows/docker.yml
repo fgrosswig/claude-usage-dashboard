@@ -32,10 +32,10 @@ jobs:
         run: |
           docker run --rm claude-usage:ci sh -c 'test -d /app/images && ls -1 /app/images/*.png >/dev/null'
 
-      # Image-CMD ist node start.js both (nicht server.js — server.js ist nur Dashboard-Einstieg).
-      - name: Smoke — Dashboard :3333, Proxy :8080, Logs, Container weg
+      # Image-CMD: node start.js both (Proxy läuft im Container intern; CI prüft nur Dashboard :3333).
+      - name: Smoke — HTTP :3333 + /api/usage, Logs, Container weg
         run: |
-          docker run -d --name cud-smoke -p 3333:3333 -p 8080:8080 \
+          docker run -d --name cud-smoke -p 3333:3333 \
             -e ANTHROPIC_PROXY_BIND=0.0.0.0 \
             --tmpfs /root/.claude:rw,size=256m \
             claude-usage:ci
@@ -49,13 +49,11 @@ jobs:
           done
           test "$ok" = 1
           curl -sf --max-time 3 http://127.0.0.1:3333/api/usage -o /dev/null
-          px=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 http://127.0.0.1:8080/ || echo 000)
-          test "$px" != "000"
-          echo "===== cud-smoke logs (nach localhost curl) ====="
+          echo "===== cud-smoke logs (nach curl :3333) ====="
           docker logs --tail 400 cud-smoke 2>&1 || true
           docker rm -f cud-smoke
 
-      - name: Compose smoke — gleiches Muster (both im Image)
+      - name: Compose smoke — nur :3333
         env:
           CLAUDE_USAGE_IMAGE: claude-usage:ci
         run: |
@@ -71,8 +69,6 @@ jobs:
           done
           test "$ok" = 1
           curl -sf --max-time 3 http://127.0.0.1:3333/api/usage -o /dev/null
-          px=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 http://127.0.0.1:8080/ || echo 000)
-          test "$px" != "000"
-          echo "===== compose logs (nach curl) ====="
+          echo "===== compose logs (nach curl :3333) ====="
           docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --no-color --tail 400 2>&1 || true
           docker compose -f docker-compose.yml -f docker-compose.ci.yml down
