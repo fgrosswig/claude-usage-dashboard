@@ -11,6 +11,7 @@ COPY start.js server.js anthropic-proxy.js claude-usage-dashboard.js token_foren
 COPY scripts ./scripts
 COPY tpl ./tpl
 COPY public ./public
+COPY images ./images
 
 ENV NODE_ENV=production
 # Proxy must listen on all interfaces inside the container (published ports).
