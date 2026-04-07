@@ -1,0 +1,6 @@
+{
+  "name": "claude-usage-dashboard",
+  "private": true,
+  "description": "Runtime deps live in Harbor claude/base (Dockerfile.base); app image has no npm install.",
+  "dependencies": {}
+}

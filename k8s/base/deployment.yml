@@ -1,0 +1,66 @@
+# Analog RefOrg k8s/base/deployment.yml — App „claude-app“, Container „app“.
+# Abgleich mit Helm-Chart: k8/claude-usage-dashboard (Ports, Command, PVC, Probes).
+# Image „can’t be pulled“: Secret harbor-pull im Namespace claude anlegen (k8/README.md) + Robot mit Pull auf claude/claude-usage-dashboard.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: claude-app
+  labels:
+    app: claude-dashboard
+spec:
+  progressDeadlineSeconds: 180
+  replicas: 1
+  selector:
+    matchLabels:
+      app: claude-dashboard
+  template:
+    metadata:
+      labels:
+        app: claude-dashboard
+    spec:
+      imagePullSecrets:
+        - name: harbor-pull
+      containers:
+        - name: app
+          image: registry.example.com/claude/claude-usage-dashboard:latest
+          imagePullPolicy: Always
+          # Dashboard (3333) + Anthropic-Proxy (8080) — nicht server.js / dashboard allein
+          command:
+            - node
+            - start.js
+            - both
+          ports:
+            - name: http-dashboard
+              containerPort: 3333
+            - name: http-proxy
+              containerPort: 8080
+          env:
+            - name: HOME
+              value: /root
+            - name: ANTHROPIC_PROXY_BIND
+              value: '0.0.0.0'
+            - name: NODE_ENV
+              value: 'production'
+            - name: DEBUG_API
+              value: '1'
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http-dashboard
+            initialDelaySeconds: 25
+            periodSeconds: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http-dashboard
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          volumeMounts:
+            - name: claude-data
+              mountPath: /root/.claude
+      volumes:
+        - name: claude-data
+          persistentVolumeClaim:
+            claimName: claude-data

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: claude-app
+spec:
+  selector:
+    app: claude-dashboard
+  ports:
+    - name: http-dashboard
+      port: 3333
+      targetPort: http-dashboard
+      nodePort: 31333
+      protocol: TCP
+    - name: http-proxy
+      port: 8080
+      targetPort: http-proxy
+      nodePort: 31808
+      protocol: TCP
+  type: NodePort

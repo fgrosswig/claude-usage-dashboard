@@ -1,0 +1,34 @@
+# Dashboard (3333) + Anthropic proxy (8080). Mount ~/.claude read-write (day cache + indices).
+#
+# Build:  docker compose build
+# Run:    docker compose up
+#
+# Browser: http://localhost:3333
+# Claude on the host (example): ANTHROPIC_BASE_URL=http://127.0.0.1:8080 claude
+#
+# Windows: set CLAUDECONFIG to your profile path if ~/.claude does not resolve.
+services:
+  usage-dashboard:
+    build: .
+    ports:
+      - "3333:3333"
+      - "8080:8080"
+    environment:
+      ANTHROPIC_PROXY_BIND: "0.0.0.0"
+      # Optional: POST /api/claude-data-sync (tar.gz) — set a long random secret
+      # CLAUDE_USAGE_SYNC_TOKEN: "change-me"
+      # Optional: same semantics as bare metal (see readme.md)
+      # CLAUDE_USAGE_SCAN_INTERVAL_SEC: "180"
+      # CLAUDE_USAGE_EXTRA_BASES: "/extra/host-b"
+    volumes:
+      # Host Claude config + logs + caches (JSONL, day cache, proxy NDJSON, …)
+      - type: bind
+        source: ${CLAUDE_CONFIG_DIR:-${HOME}/.claude}
+        target: /root/.claude
+      # Uncomment to merge another machine’s tree (must match dashboard scan roots rules)
+      # - type: bind
+      #   source: /path/on/host/HOST-B
+      #   target: /extra/HOST-B
+      #   read_only: true
+    # If you use the extra mount, also set in environment:
+    # CLAUDE_USAGE_EXTRA_BASES: "/extra/HOST-B"

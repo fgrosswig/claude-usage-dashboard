@@ -1,0 +1,65 @@
+# Whitelist: standardmäßig nichts versionieren — nur unten explizit freigegebene Pfade.
+# (Kein „Blacklist“-Sammelsurium; lokale Artefakte landen nicht im Index, solange sie nicht whitelisted sind.)
+
+# Alles ignorieren …
+*
+
+# … Verzeichnisse wieder sichtbar (sonst keine Rekursion in Unterordner)
+!**/
+
+# Repo-Wurzel
+!/.gitignore
+!/README.md
+!/README.en.md
+!/server.js
+!/start.js
+!/anthropic-proxy.js
+!/claude-usage-dashboard.js
+!/token_forensics.js
+
+!/public/
+!/public/**/*
+
+!/scripts/
+!/scripts/**/*
+
+!/tpl/
+!/tpl/**/*
+
+!/images/
+!/images/**/*
+
+!/docs/
+!/docs/**/*
+
+!/k8/
+!/k8/**/*
+
+!/k8s/
+!/k8s/**/*
+
+!/Dockerfile
+!/Dockerfile.base
+!/version.json
+!/package.json
+!/package-lock.json
+!/.dockerignore
+!/docker-compose.yml
+!/docker-compose.ci.yml
+
+!/.github/
+!/.github/**/*
+
+!/.gitea/
+!/.gitea/workflows/
+!/.gitea/workflows/**/*
+
+!/ci-config/
+!/ci-config/**/*
+
+# Lokale Secrets / Session-Token — explizit nie committen (Absicherung gegen spätere breitere !-Regeln)
+/.github_session_token
+/.env
+/.env.*
+# no source code from plugin into repo!
+/source/*

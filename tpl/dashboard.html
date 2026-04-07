@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Claude Code Usage Dashboard</title>
+<link rel="stylesheet" href="/assets/dashboard.css">
+</head>
+<body>
+<header class="top-bar" role="banner">
+<div class="top-bar-cluster">
+<h1 class="top-bar-title" id="main-heading">Claude Code Token Usage</h1>
+<div class="lang-switch" id="lang-switch-wrap" role="group" aria-label="Language">
+<span id="lang-switch-label" class="lang-switch-label"></span>
+<button type="button" class="lang-btn" id="lang-de" data-lang="de" aria-pressed="false">DE</button>
+<button type="button" class="lang-btn" id="lang-en" data-lang="en" aria-pressed="false">EN</button>
+</div>
+<div class="live-pop" id="live-pop" tabindex="-1">
+<div class="refresh" id="live-trigger" tabindex="0" role="button" aria-expanded="false" aria-haspopup="true" aria-controls="live-files-panel" title="">
+<span id="live-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:6px;animation:pulse 2s infinite;vertical-align:middle"></span><span id="live-label">Live</span>
+</div>
+<div class="live-files-panel" id="live-files-panel" role="region" aria-label="Gescannte JSONL-Dateien">
+<div class="live-files-head" id="live-files-head">Gescannte JSONL</div>
+<ul id="live-files-list"></ul>
+<div class="live-files-hint" id="live-files-hint"></div>
+<div class="live-panel-section" id="live-outage-section" style="display:none">
+<div class="live-files-head live-panel-subhead" id="live-outage-head"></div>
+<ul class="live-panel-list" id="live-outage-list"></ul>
+<p class="live-panel-empty" id="live-outage-empty" style="display:none"></p>
+</div>
+<div class="live-panel-section" id="live-ext-section" style="display:none">
+<div class="live-files-head live-panel-subhead" id="live-ext-head"></div>
+<ul class="live-panel-list" id="live-ext-list"></ul>
+<p class="live-panel-empty" id="live-ext-empty" style="display:none"></p>
+</div>
+</div>
+</div>
+
+<div class="top-bar-badge" id="anthropic-badge"><span id="anthropic-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#475569;margin-right:6px"></span><span id="anthropic-label">Anthropic</span><div class="anthropic-popup" id="anthropic-popup">
+<div class="health-charts-row">
+<div class="health-chart-sm"><h4 id="health-history-title"></h4><canvas id="c-health-history" height="180"></canvas></div>
+<div class="health-chart-sm"><h4 id="incident-history-title"></h4><canvas id="c-incident-history" height="180"></canvas></div>
+<div class="health-chart-sm"><h4 id="outage-timeline-title"></h4><canvas id="c-outage-timeline" height="180"></canvas></div>
+</div>
+<p id="anthropic-status-line" style="font-size:.72rem;margin-top:6px;color:#94a3b8"></p>
+<div id="anthropic-ext-section" style="margin-top:4px"><h4 style="font-size:.68rem;color:#64748b;margin-bottom:2px" id="anthropic-ext-head"></h4><ul class="anthropic-popup-list" id="anthropic-ext-list" style="font-size:.65rem;color:#64748b"></ul></div>
+</div></div>
+<details class="meta-details" id="meta-details">
+<summary class="meta-details-summary" id="meta-details-summary"></summary>
+<div class="meta-details-inner">
+<div class="subtitle" id="sub-models">Nur <strong>Claude</strong>-Modelle (<code>claude-*</code>) — keine <code>&lt;synthetic&gt;</code>-Zeilen.</div>
+<div class="subtitle" id="meta"></div>
+<div class="subtitle" id="limit-source" style="margin-top:4px;line-height:1.45"></div>
+<div class="subtitle" id="scan-sources" style="margin-top:2px;color:#64748b;line-height:1.45;display:none"></div>
+<div class="subtitle" id="state-cache-paths" style="margin-top:8px;padding-top:8px;border-top:1px solid #334155;color:#64748b;line-height:1.5;font-size:.62rem;white-space:pre-line;word-break:break-all"></div>
+<div class="github-token-row" style="margin-top:8px">
+<button type="button" class="lang-btn" id="marketplace-extension-refresh"></button>
+</div>
+<div class="github-token-panel" id="github-token-panel">
+<div id="github-token-edit-block">
+<label id="github-token-label" class="github-token-label" for="github-token-input"></label>
+<div class="github-token-row">
+<input type="password" id="github-token-input" autocomplete="off" autocapitalize="off" spellcheck="false" />
+<button type="button" class="lang-btn" id="github-token-save"></button>
+</div>
+</div>
+<div id="github-token-saved-block" class="github-token-saved-block" style="display:none">
+<p class="github-token-saved-label" id="github-token-saved-label" aria-live="polite"></p>
+<div class="github-token-row">
+<button type="button" class="lang-btn" id="github-token-clear"></button>
+<button type="button" class="lang-btn" id="github-releases-refresh"></button>
+</div>
+</div>
+<p class="subtitle github-token-hint" id="github-token-hint"></p>
+<p class="subtitle github-token-status" id="github-token-status" style="display:none" aria-live="polite"></p>
+</div>
+
+</div>
+</details>
+</div>
+</header>
+<div class="filter-bar" id="filter-bar">
+<div class="filter-group">
+<label class="filter-label" id="filter-date-label"></label>
+<select id="filter-date-start" class="filter-input filter-day-select"></select>
+<span class="filter-sep">–</span>
+<select id="filter-date-end" class="filter-input filter-day-select"></select>
+</div>
+<div class="filter-group">
+<label class="filter-label" id="filter-day-label"></label>
+<select id="filter-day-picker" class="filter-input filter-day-select"></select>
+</div>
+<div class="filter-group">
+<label class="filter-label" id="filter-scope-label"></label>
+<div class="filter-chips" id="filter-scope-chips" role="group"></div>
+</div>
+<div class="filter-group">
+<label class="filter-label" id="filter-host-label"></label>
+<div id="filter-host-container"></div>
+</div>
+</div>
+<details class="health-collapse" id="health-collapse">
+<summary class="health-collapse-summary" id="health-collapse-summary">
+<div class="health-total-circle-sm" id="health-circle-sm"></div><span id="health-summary-text"></span></summary>
+<div class="health-collapse-inner">
+
+<div class="health-score" id="health-score">
+<div class="health-header" id="health-header"></div>
+<div class="health-grid" id="health-grid"></div>
+</div>
+<div class="key-findings" id="key-findings">
+<div class="key-findings-header" id="key-findings-header"></div>
+<div class="key-findings-grid" id="key-findings-grid"></div>
+</div>
+</div>
+</details>
+
+<details class="forensic-details" id="forensic-collapse">
+<summary class="forensic-summary forensic-summary--bar">
+<div class="forensic-summary-row">
+<p id="forensic-summary-line" class="forensic-summary-metrics">Forensic (token_forensics)</p>
+<div class="forensic-summary-actions" id="forensic-summary-actions">
+<div class="forensic-host-filter-wrap" id="forensic-host-filter-wrap" style="display:none!important" hidden>
+<span class="forensic-host-filter-label" id="forensic-host-filter-label"></span>
+<div class="forensic-host-filter-chips" id="forensic-host-filter-chips" role="group"></div>
+</div>
+<button type="button" class="report-btn report-btn--toolbar" id="forensic-report-btn" title="Forensic Report">
+<span id="report-btn-label">Forensic Report</span>
+</button>
+</div>
+</div>
+<p class="forensic-host-filter-hint" id="forensic-host-filter-hint" style="display:none;font-size:.7rem;color:#64748b;margin:8px 0 0;line-height:1.45" aria-live="polite"></p>
+</summary>
+<div class="forensic-inner">
+<p class="forensic-note-p" id="forensic-note"></p>
+<div class="grid" id="forensic-cards"></div>
+<div class="forensic-charts-stack" id="forensic-charts-stack">
+<div class="forensic-charts-host-scope">
+<!-- Row 1: Forensic & Hit Limit (full width) -->
+<details class="forensic-chart-disclosure" open>
+<summary class="forensic-chart-summary"><span id="forensic-chart-h3">Forensic &amp; Hit Limit pro Tag</span></summary>
+<div class="forensic-chart-panel">
+<p id="forensic-chart-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"><strong style="color:#ef4444">Rot (Balken)</strong> = Zähler Hit-Limit-Zeilen in JSONL. <strong style="color:#f59e0b">Linie</strong> = Score 3=? · 2=HIT · 1=&lt;&lt;P (Peak-Vergleich, nicht Claude-UI 90%/100%).</p>
+<div class="chart-shell chart-shell--forensic is-loading" id="chart-shell-forensic">
+<div class="chart-shell-ph" aria-hidden="true"></div>
+<canvas id="c-forensic"></canvas>
+</div>
+</div>
+</details>
+</div>
+<!-- Row 2: Session-Signale + Service Impact (side by side) -->
+<div class="forensic-charts-pair">
+<details class="forensic-chart-disclosure" open>
+<summary class="forensic-chart-summary"><span id="forensic-signals-chart-h3"></span></summary>
+<div class="forensic-chart-panel">
+<p id="forensic-signals-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"></p>
+<div class="chart-shell chart-shell--forensic is-loading" id="chart-shell-forensic-signals">
+<div class="chart-shell-ph" aria-hidden="true"></div>
+<canvas id="c-forensic-signals"></canvas>
+</div>
+</div>
+</details>
+<details class="forensic-chart-disclosure" open>
+<summary class="forensic-chart-summary"><span id="service-chart-h3">Service Impact</span></summary>
+<div class="forensic-chart-panel">
+<p id="service-chart-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"></p>
+<div class="service-chart-canvas-wrap" id="service-chart-canvas-wrap">
+<div class="chart-shell chart-shell--service is-loading" id="chart-shell-service">
+<div class="chart-shell-ph" aria-hidden="true"></div>
+<div class="fs-update-overlay" id="fs-update-overlay" aria-hidden="true"></div>
+<canvas id="c-service"></canvas>
+</div>
+</div>
+</div>
+</details>
+</div>
+</div>
+<p id="thinking-note" style="font-size:.75rem;color:#f59e0b;margin:12px 0 4px;line-height:1.45"></p>
+</div>
+</details>
+<div class="report-modal-overlay" id="report-modal-overlay">
+<div class="report-modal">
+<div class="report-modal-head">
+<h3 id="report-modal-title">Forensic Report</h3>
+<div class="report-modal-actions">
+<button type="button" id="report-copy-btn">Copy</button>
+<button type="button" class="primary" id="report-download-btn">Download .md</button>
+<button type="button" id="report-close-btn">✕</button>
+</div>
+</div>
+<div class="report-modal-body"><pre id="report-content"></pre></div>
+</div>
+</div>
+
+<div class="day-picker-row" id="day-picker-row" style="display:none">
+<label id="lbl-day-picker" for="day-picker">Karten &amp; Tabelle (Tag wählen)</label>
+<select id="day-picker" aria-label=""></select>
+<span class="day-picker-hint" id="day-picker-hint"></span>
+</div>
+<div class="main-charts-scope-wrap" id="main-charts-scope-wrap" style="display:none">
+<span class="main-charts-scope-label" id="main-charts-scope-label"></span>
+<div class="main-charts-scope-chips" id="main-charts-scope-chips" role="group"></div>
+</div>
+<details class="forensic-details token-stats-details" id="token-stats-collapse" open>
+<summary class="forensic-summary forensic-summary--bar token-stats-summary">
+<div class="forensic-summary-row">
+<p id="token-stats-summary-line" class="forensic-summary-metrics">Token Stats</p>
+</div>
+</summary>
+<div class="forensic-inner">
+<div class="grid" id="cards"></div>
+<div class="main-charts-wrap main-charts-loading" id="main-charts-wrap">
+<div class="main-charts-update-overlay" id="main-charts-update-overlay" aria-hidden="true"></div>
+<div class="main-charts-skeleton" id="main-charts-skeleton" aria-busy="true">
+<p class="main-charts-skel-hint" id="main-charts-skel-hint"></p>
+<div class="charts">
+<div class="chart-box chart-skel"><div class="chart-skel-ph"></div></div>
+<div class="chart-box chart-skel"><div class="chart-skel-ph"></div></div>
+</div>
+<div class="charts-pair no-host-chart">
+<div class="chart-box chart-skel"><div class="chart-skel-ph"></div></div>
+<div class="chart-box chart-skel"><div class="chart-skel-ph"></div></div>
+</div>
+</div>
+<div class="charts" id="charts">
+<div class="chart-box"><h3></h3><canvas id="c1"></canvas></div>
+<div class="chart-box"><h3></h3><canvas id="c2"></canvas></div>
+</div>
+<div class="charts-pair no-host-chart" id="charts-host-sub">
+<div class="chart-box"><h3></h3><canvas id="c3"></canvas></div>
+<div class="chart-box"><h3></h3><canvas id="c4"></canvas></div>
+</div>
+</div>
+</div>
+</details>
+<!-- Proxy Analytics -->
+<details class="forensic-details proxy-details" id="proxy-collapse">
+<summary class="forensic-summary forensic-summary--bar proxy-summary">
+<div class="forensic-summary-row">
+<p id="proxy-summary-line" class="forensic-summary-metrics">Proxy Analytics</p>
+</div>
+</summary>
+<div class="forensic-inner proxy-inner">
+<p class="forensic-note-p" id="proxy-note"></p>
+<div class="grid" id="proxy-cards"></div>
+<!-- Row 1: Token Cost + Model Breakdown + Hourly Heatmap (3-col) -->
+<div class="proxy-charts-grid-3">
+<div class="chart-box"><h3 id="proxy-token-chart-h3"></h3><p id="proxy-token-blurb" class="proxy-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-tokens"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-tokens"></canvas></div></div>
+<div class="chart-box"><h3 id="proxy-model-h3"></h3><p id="proxy-model-blurb" class="proxy-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-models"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-models"></canvas></div></div>
+<div class="chart-box"><h3 id="proxy-hourly-h3"></h3><p id="proxy-hourly-blurb" class="proxy-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-hourly"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-hourly"></canvas></div></div>
+</div>
+<!-- Row 2: API Latency + Hourly Latency (2-col) -->
+<div class="proxy-charts-grid">
+<div class="chart-box"><h3 id="proxy-latency-chart-h3"></h3><p id="proxy-latency-blurb" class="proxy-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-latency"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-latency"></canvas></div></div>
+<div class="chart-box"><h3 id="proxy-hourly-latency-h3"></h3><p id="proxy-hourly-latency-blurb" class="proxy-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-hourly-latency"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-hourly-latency"></canvas></div></div>
+</div>
+<!-- Info line -->
+<div class="proxy-info-row">
+<p id="proxy-coldstart-info" class="proxy-info-item"></p>
+<p id="proxy-jsonl-compare" class="proxy-info-item"></p>
+<p id="proxy-invisible-cost" class="proxy-info-item proxy-info-warn"></p>
+</div>
+</div>
+</details>
+<div class="chart-box" style="margin-bottom:24px"><h3 id="daily-detail-heading">Tagesdetail</h3><div style="overflow-x:auto"><table id="tbl"><thead><tr></tr></thead><tbody></tbody></table></div></div>
+<div id="update-slideout-backdrop" class="update-sl-backdrop"></div>
+<aside id="update-slideout" class="update-sl" aria-hidden="true">
+<div class="update-sl-head">
+<h3 id="update-sl-title"></h3>
+<button type="button" class="update-sl-close" id="update-sl-close" aria-label="Close">&times;</button>
+</div>
+<div class="update-sl-body" id="update-sl-body"></div>
+</aside>
+<script>window.__I18N_BUNDLES=__I18N_PLACEHOLDER__;</script>
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script defer src="/assets/dashboard.client.js"></script>
+</body>
+</html>

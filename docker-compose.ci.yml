@@ -1,0 +1,20 @@
+# GitHub Actions / ohne Bind-Mount: tmpfs statt Host ~/.claude
+# Voraussetzung: docker build -f Dockerfile.base -t claude-base:ci .
+#
+#   CLAUDE_USAGE_IMAGE=claude-usage:ci docker compose -f docker-compose.yml -f docker-compose.ci.yml build claude-usage
+#   docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d claude-usage
+
+services:
+  claude-usage:
+    image: ${CLAUDE_USAGE_IMAGE:-claude-usage:ci}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: claude-base
+        BASE_TAG: ci
+    volumes:
+      - type: tmpfs
+        target: /root/.claude
+        tmpfs:
+          size: 268435456
