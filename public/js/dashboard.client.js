@@ -4797,6 +4797,27 @@ function initFilterBar(data) {
     });
   }
 
+  // Day picker in filter bar — mirror the original day-picker
+  var fDayPicker = document.getElementById('filter-day-picker');
+  var origDayPicker = document.getElementById('day-picker');
+  var fDayLabel = document.getElementById('filter-day-label');
+  if (fDayLabel) fDayLabel.textContent = t('dayPickerLabel');
+  if (fDayPicker && origDayPicker) {
+    // Copy options from original
+    fDayPicker.innerHTML = origDayPicker.innerHTML;
+    fDayPicker.value = origDayPicker.value;
+    fDayPicker.addEventListener('change', function() {
+      origDayPicker.value = this.value;
+      origDayPicker.dispatchEvent(new Event('change'));
+    });
+    // Watch original for changes
+    var _origObserver = new MutationObserver(function() {
+      if (fDayPicker.innerHTML !== origDayPicker.innerHTML) fDayPicker.innerHTML = origDayPicker.innerHTML;
+      if (fDayPicker.value !== origDayPicker.value) fDayPicker.value = origDayPicker.value;
+    });
+    _origObserver.observe(origDayPicker, { childList: true, attributes: true });
+  }
+
   // Date change listeners
   if (startEl) startEl.addEventListener('change', onFilterDateChange);
   if (endEl) endEl.addEventListener('change', onFilterDateChange);

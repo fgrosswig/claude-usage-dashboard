@@ -296,3 +296,4 @@ tr:hover td{background:#334155}
 .top-bar .meta-details-summary{background:#334155;color:#e2e8f0;border:none;padding:8px 14px;border-radius:6px;font-size:.8rem;cursor:pointer;white-space:nowrap;display:block;text-align:left}
 .top-bar .meta-details-summary:hover{background:#475569}
 .top-bar .meta-details[open] .meta-details-summary{background:#475569;border-bottom:none}
+.filter-day-select{max-width:160px;min-width:120px}
