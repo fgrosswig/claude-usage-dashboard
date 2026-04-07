@@ -1139,19 +1139,27 @@ if (typeof Chart !== "undefined") {
   };
   Chart.defaults.responsive = true;
   Chart.defaults.resizeDelay = 300;
-  Chart.defaults.elements.bar.borderRadius = 2;
-  Chart.defaults.elements.bar.borderSkipped = false;
-  Chart.defaults.elements.point.radius = 2.5;
-  Chart.defaults.elements.point.hoverRadius = 4;
-  Chart.defaults.elements.line.borderWidth = 1.5;
-  Chart.defaults.elements.line.tension = 0.35;
-  Chart.defaults.datasets.bar.barPercentage = 0.6;
-  Chart.defaults.datasets.bar.categoryPercentage = 0.75;
-  Chart.defaults.plugins.legend.labels.boxWidth = 10;
-  Chart.defaults.plugins.legend.labels.font = { size: 10 };
-  Chart.defaults.scale.grid.color = "rgba(51,65,85,.35)";
-  Chart.defaults.scale.ticks.font = { size: 10 };
-  Chart.defaults.scale.ticks.color = "#94a3b8";
+  try {
+    Chart.defaults.elements.bar.borderRadius = 2;
+    Chart.defaults.elements.bar.borderSkipped = false;
+    Chart.defaults.elements.point.radius = 2.5;
+    Chart.defaults.elements.point.hoverRadius = 4;
+    Chart.defaults.elements.line.borderWidth = 1.5;
+    Chart.defaults.elements.line.tension = 0.35;
+  } catch(ed1) {}
+  try {
+    Chart.defaults.datasets.bar.barPercentage = 0.6;
+    Chart.defaults.datasets.bar.categoryPercentage = 0.75;
+  } catch(ed2) {}
+  try {
+    Chart.defaults.plugins.legend.labels.boxWidth = 10;
+    Chart.defaults.plugins.legend.labels.font = { size: 10 };
+  } catch(ed3) {}
+  try {
+    Chart.defaults.scale.grid.color = "rgba(51,65,85,.35)";
+    Chart.defaults.scale.ticks.font = { size: 10 };
+    Chart.defaults.scale.ticks.color = "#94a3b8";
+  } catch(ed4) {}
 }
 var __usageUpdatePluginRegistered = false;
 function registerUsageUpdateVLinePlugin() {
