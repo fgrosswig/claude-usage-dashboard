@@ -313,5 +313,8 @@
   "filterDateRange": "Date range:",
   "filterScope": "Charts:",
   "filterHost": "Source:",
-  "filterHostAll": "All"
+  "filterHostAll": "All",
+  "healthHistoryLabel": "Health Score",
+  "healthHistoryWarn": "Warning",
+  "healthHistoryCrit": "Critical"
 }
