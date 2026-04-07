@@ -4562,6 +4562,7 @@ function renderHealthScore(data) {
 
     smText.innerHTML = sh;
   }
+  renderHealthSparkline(data);
 
   // Grid
   var gh = "";
@@ -4857,6 +4858,109 @@ function getFilterDateRange() {
   var s = document.getElementById('filter-date-start');
   var e = document.getElementById('filter-date-end');
   return { start: s ? s.value : '', end: e ? e.value : '' };
+}
+
+// ── Health Score History ──────────────────────────────────────────────────
+function computeHealthScoreForDay(dayData, proxyDay) {
+  var pd = proxyDay || null;
+  var d = dayData;
+  var ss = d.session_signals || {};
+  var hits = d.hit_limit || 0;
+  var interrupts = ss.interrupt || 0;
+  var retries = ss.retry || 0;
+  var rl = pd ? (pd.rate_limit || {}) : {};
+  var q5h = parseFloat(rl["anthropic-ratelimit-unified-5h-utilization"] || 0) * 100;
+  var cacheRatio = pd ? ((pd.cache_read_ratio || 0) * 100) : 95;
+  var errorRate = pd ? (pd.error_rate || 0) : 0;
+  var avgLatS = pd ? ((pd.avg_duration_ms || 0) / 1000) : 5;
+  var coldStarts = pd ? (pd.cold_starts || 0) : 0;
+  var thinkingGap = (pd && pd.total_tokens > 0 && d.total > 0) ? d.total / pd.total_tokens : 0;
+
+  var colors = [
+    healthColor(q5h, 50, 80),
+    thinkingGap <= 0 ? "green" : healthColor(thinkingGap, 2, 5),
+    healthColorInverse(cacheRatio, 90, 70),
+    healthColor(errorRate, 3, 10),
+    healthColor(hits, 50, 500),
+    healthColor(avgLatS, 5, 15),
+    healthColor(interrupts, 100, 500),
+    healthColor(coldStarts, 0, 5),
+    healthColor(retries, 50, 200)
+  ];
+  var pts = 0;
+  for (var i = 0; i < colors.length; i++) pts += healthPoints(colors[i]);
+  return Math.round(pts / (colors.length * 2) * 10);
+}
+
+function buildHealthScoreHistory(data) {
+  var days = getFilteredDays(data.days || []);
+  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  var proxyByDate = {};
+  for (var pi = 0; pi < proxyDays.length; pi++) proxyByDate[proxyDays[pi].date] = proxyDays[pi];
+  var scores = [];
+  for (var di = 0; di < days.length; di++) {
+    scores.push(computeHealthScoreForDay(days[di], proxyByDate[days[di].date] || null));
+  }
+  return scores;
+}
+
+function renderHealthSparkline(data) {
+  if (typeof Chart === "undefined") return;
+  var el = document.getElementById("c-health-sparkline");
+  if (!el) return;
+  var scores = buildHealthScoreHistory(data);
+  if (scores.length < 2) { el.style.display = "none"; return; }
+  el.style.display = "";
+
+  var colors = [];
+  for (var i = 0; i < scores.length; i++) {
+    colors.push(scores[i] > 7 ? "#22c55e" : scores[i] >= 4 ? "#f59e0b" : "#ef4444");
+  }
+  var labels = [];
+  for (var j = 0; j < scores.length; j++) labels.push("");
+
+  if (_proxyCharts.healthSparkline) {
+    freezeChartNoAnim(_proxyCharts.healthSparkline);
+    _proxyCharts.healthSparkline.data.labels = labels;
+    _proxyCharts.healthSparkline.data.datasets[0].data = scores;
+    _proxyCharts.healthSparkline.data.datasets[0].pointBackgroundColor = colors;
+    _proxyCharts.healthSparkline.update("none");
+    return;
+  }
+
+  _proxyCharts.healthSparkline = new Chart(el.getContext("2d"), {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [{
+        data: scores,
+        borderColor: function(ctx) {
+          var idx = ctx.dataIndex != null ? ctx.dataIndex : 0;
+          return colors[idx] || "#3b82f6";
+        },
+        borderWidth: 2,
+        pointRadius: 0,
+        pointBackgroundColor: colors,
+        tension: 0.4,
+        fill: false
+      }]
+    },
+    options: {
+      responsive: false,
+      animation: false,
+      transitions: __chartTransitionsOff,
+      maintainAspectRatio: false,
+      scales: {
+        x: { display: false },
+        y: { display: false, min: 0, max: 10 }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: false }
+      },
+      elements: { point: { radius: 0 } }
+    }
+  });
 }
 fetchUsageJsonOnce();
 connectUsageStream();

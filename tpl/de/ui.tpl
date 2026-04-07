@@ -313,5 +313,8 @@
   "filterDateRange": "Zeitraum:",
   "filterScope": "Diagramme:",
   "filterHost": "Quelle:",
-  "filterHostAll": "Gesamt"
+  "filterHostAll": "Gesamt",
+  "healthHistoryLabel": "Gesundheits-Score",
+  "healthHistoryWarn": "Warnung",
+  "healthHistoryCrit": "Kritisch"
 }
