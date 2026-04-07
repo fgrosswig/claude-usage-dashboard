@@ -41,6 +41,7 @@
 !/Dockerfile
 !/Dockerfile.base
 !/version.json
+!/sonar-project.properties
 !/package.json
 !/package-lock.json
 !/.dockerignore
