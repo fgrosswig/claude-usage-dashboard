@@ -7,10 +7,8 @@
 # - GitHub PAT dieses Benutzers muss **Schreibzugriff** auf fgrosswig/claude-usage-dashboard haben.
 # - Classic PAT: Scope **repo** (voll). Fine-grained: Repo auswählen, **Contents: Read and write**.
 # - Bei Org/SSO: Token dort **autorisieren**. Abgelaufenes/falsches Secret → oft 401/403.
-# - git push -f auf main: Branch protection blockiert oft Force-Push. Auf GitHub:
-#   Settings → Branches → Rule für „main“ → „Allow force pushes“ (nur für dich) aktivieren,
-#   oder Regel lockern / Bypass für Maintainer.
-# - PAT-Tipp: Lieber **Classic** mit Scope **repo** testen — Fine-grained oft Read-only vergessen.
+# - Kein Force-Push: Arbeitsbaum = aktuelle github/main + ein normaler Snapshot-Commit (Branch-Schutz-kompatibel).
+# - PAT: Classic **repo** oder Fine-grained **Contents: Read and write**; SSO ggf. authorize.
 
 name: Mirror to GitHub
 
@@ -76,7 +74,6 @@ jobs:
             [ -z "${p}" ] && continue
             rm -rf "${p}"
           done
-          git checkout --orphan public-publish
           find . -type f ! -path './.git/*' \( \
               -name '*.md' -o -name '*.yml' -o -name '*.yaml' -o -name '*.sh' -o -name '*.tpl' \
               -o -name 'Dockerfile' -o -name 'Dockerfile.*' -o -name 'docker-compose*.yml' \
@@ -90,14 +87,24 @@ jobs:
           find . -type f ! -path './.git/*' -name '*.md' -print0 | while IFS= read -r -d '' f; do
               sed -i '/Woodpecker CI/d;/grosswig-it\.de/d' "$f" || true
             done
+          EXPORT_DIR="/tmp/mirror-publish-tree"
+          rm -rf "${EXPORT_DIR}"
+          mkdir -p "${EXPORT_DIR}"
+          rsync -a --exclude .git ./ "${EXPORT_DIR}/"
+          git fetch github "refs/heads/${MIRROR_DEST_BRANCH}:refs/remotes/github/${MIRROR_DEST_BRANCH}" 2>/dev/null \
+            || git fetch github || true
+          if git rev-parse --verify "github/${MIRROR_DEST_BRANCH}" >/dev/null 2>&1; then
+            git checkout -B public-publish "github/${MIRROR_DEST_BRANCH}"
+            git ls-files -z | xargs -0 -r git rm -f --
+            git clean -fdx
+          else
+            git checkout --orphan public-publish
+          fi
+          rsync -a --delete --exclude .git "${EXPORT_DIR}/" ./
           git add -A
           if git diff --cached --quiet; then
-            echo "nothing to publish"
-            exit 1
+            echo "mirror: no changes vs GitHub ${MIRROR_DEST_BRANCH}; skip"
+            exit 0
           fi
           git commit -m "chore(publish): public snapshot (internal ${SHORT})"
-          if ! git push -f github "HEAD:${MIRROR_DEST_BRANCH}"; then
-            echo "git push failed with 403? If API check passed: **branch protection** blocks force-push to main."
-            echo "On github.com: Repo → Settings → Branches → edit rule for main → allow force pushes (or bypass for your user)."
-            exit 1
-          fi
+          git push github "HEAD:refs/heads/${MIRROR_DEST_BRANCH}"
