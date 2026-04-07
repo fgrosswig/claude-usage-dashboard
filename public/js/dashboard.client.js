@@ -4811,7 +4811,7 @@ function initFilterBar(data) {
       for (var hk in dh) { if (Object.prototype.hasOwnProperty.call(dh, hk)) hosts[hk] = true; }
     }
     var hkeys = Object.keys(hosts).sort();
-    if (hkeys.length <= 3) {
+    if (hkeys.length <= 5) {
       // Chips mode
       var hhtml = '<div class="filter-chips">';
       hhtml += '<button type="button" class="filter-chip active" data-host="">' + escHtml(t('filterHostAll')) + '</button>';
