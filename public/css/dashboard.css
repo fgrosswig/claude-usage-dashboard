@@ -31,6 +31,7 @@ h1{font-size:1.5rem;margin-bottom:4px;color:#f8fafc}
 .card .value{font-size:1.8rem;font-weight:700;margin-top:4px;color:#f8fafc}
 .card .sub{font-size:.75rem;color:#64748b;margin-top:2px}
 .card.warn{border-color:#f59e0b}
+.card.caution{border-color:#f97316}
 .card.danger{border-color:#ef4444}
 .card.ok{border-color:#22c55e}
 .charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:24px;align-items:stretch}
@@ -352,10 +353,21 @@ tr:hover td{background:#334155}
 .avail-kpi-summary:hover{color:#cbd5e1}
 .avail-kpi-details[open] .avail-kpi-summary{color:#cbd5e1;border-bottom:1px solid #334155}
 .avail-kpi-panel{padding:10px 12px 12px}
+.avail-kpi-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.avail-kpi-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #334155}
+.avail-kpi-metric{display:inline-flex;align-items:baseline;gap:5px}
+.avail-kpi-label{font-size:.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.03em}
+.avail-kpi-val{font-size:1.1rem;font-weight:700;font-variant-numeric:tabular-nums}
+.avail-kpi-meta{font-size:.62rem;color:#64748b;margin-left:auto}
 .avail-kpi-total{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
 .avail-kpi-total-value{font-size:1.6rem;font-weight:700;font-variant-numeric:tabular-nums}
+.avail-green{color:#22c55e}
+.avail-yellow{color:#f59e0b}
+.avail-orange{color:#f97316}
+.avail-red{color:#ef4444}
 .avail-kpi-total-value.avail-green{color:#22c55e}
 .avail-kpi-total-value.avail-yellow{color:#f59e0b}
+.avail-kpi-total-value.avail-orange{color:#f97316}
 .avail-kpi-total-value.avail-red{color:#ef4444}
 .avail-kpi-total-meta{font-size:.65rem;color:#64748b;line-height:1.4}
 .avail-kpi-section-head{font-size:.65rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin:8px 0 4px;padding-top:8px;border-top:1px solid #334155}
@@ -364,7 +376,7 @@ tr:hover td{background:#334155}
 .avail-kpi-table td{padding:4px 8px;color:#cbd5e1;border-bottom:1px solid rgba(51,65,85,.4);font-variant-numeric:tabular-nums}
 .avail-kpi-table .num{text-align:right}
 .avail-kpi-table-cols{overflow-x:auto;display:block;white-space:nowrap}
-.avail-kpi-table-cols th[data-month]{white-space:nowrap;min-width:72px;box-sizing:border-box}
+.avail-kpi-table-cols th[data-month]{white-space:nowrap;min-width:72px;box-sizing:border-box;padding-right:18px}
 .avail-kpi-table-cols th[data-month]:hover{background:rgba(59,130,246,.08)}
 .avail-kpi-col-active{background:rgba(59,130,246,.12)!important;color:#93c5fd!important;border-bottom:2px solid #3b82f6}
 .avail-kpi-col-current{border-bottom:2px solid #22c55e}
@@ -388,10 +400,22 @@ tr:hover td{background:#334155}
 .avail-kpi-impact-badge.kind-client{background:rgba(245,158,11,.12);color:#fbbf24;border:1px solid rgba(245,158,11,.25)}
 .avail-kpi-impact-badge:hover{opacity:.85}
 .avail-kpi-filter-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;padding:0 2px}
-.live-release-info{font-size:.72rem;color:#cbd5e1;line-height:1.5}
-.live-release-version{font-weight:700;color:#22c55e;font-size:.8rem}
-.live-release-link{color:#93c5fd;text-decoration:underline;text-underline-offset:2px}
-.live-release-link:hover{color:#bfdbfe}
+.live-release-row{display:flex;align-items:center;gap:8px;padding-bottom:8px;margin-bottom:4px;border-bottom:1px solid #334155;font-size:.72rem;line-height:1.4}
+.live-release-row .live-rel-tag{font-weight:700;color:#22c55e}
+.live-release-row .live-rel-date{color:#64748b;font-size:.65rem}
+.live-release-row .live-rel-link{color:#93c5fd;text-decoration:underline;text-underline-offset:2px;font-size:.65rem}
+.live-release-row .live-rel-link:hover{color:#bfdbfe}
+.live-release-row .live-rel-expand{background:transparent;border:1px solid #475569;color:#94a3b8;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:.62rem;line-height:1.2;margin-left:auto}
+.live-release-row .live-rel-expand:hover{color:#e2e8f0;border-color:#64748b}
+.release-modal-item{border:1px solid #334155;border-radius:8px;margin-bottom:8px;overflow:hidden}
+.release-modal-item-head{cursor:pointer;padding:10px 14px;font-size:.82rem;color:#e2e8f0;list-style-position:outside;user-select:none}
+.release-modal-item-head:hover{color:#f8fafc;background:rgba(51,65,85,.2)}
+.release-modal-item-head .rel-tag{font-weight:700;margin-right:8px}
+.release-modal-item-head .rel-date{color:#64748b;font-size:.72rem}
+.release-modal-item-body{padding:8px 14px 12px;font-size:.75rem;color:#94a3b8;line-height:1.55;border-top:1px solid #334155}
+.release-modal-item-body ul{list-style:disc}
+.release-modal-item-body li{padding:1px 0}
+.release-modal-item-body strong{color:#cbd5e1}
 
 .anthropic-popup-expand{position:absolute;top:8px;right:8px;background:transparent;border:none;color:#64748b;font-size:1rem;cursor:pointer;padding:2px 6px;border-radius:4px;line-height:1;z-index:2}
 .anthropic-popup-expand:hover{color:#e2e8f0;background:rgba(51,65,85,.5)}
@@ -405,11 +429,13 @@ tr:hover td{background:#334155}
 .anthropic-modal-close:hover{color:#f8fafc;background:rgba(239,68,68,.2)}
 .anthropic-modal-body{padding:24px;overflow-y:auto;flex:1;font-size:.82rem}
 .anthropic-modal-body .health-charts-row{grid-template-columns:repeat(3,1fr);gap:20px;margin-top:16px}
-.anthropic-modal-body .health-chart-sm{min-height:0;padding:16px 18px}
-.anthropic-modal-body .health-chart-sm>summary{font-size:.78rem}
+.anthropic-modal-body .health-chart-sm{min-height:0;padding:18px 20px}
+.anthropic-modal-body .health-chart-sm>summary{font-size:.95rem;font-weight:600;color:#e2e8f0}
 .anthropic-modal-body .health-chart-sm canvas{height:calc(50vh - 100px)!important;min-height:240px;max-height:500px}
 .anthropic-modal-body .avail-kpi-details{font-size:.78rem}
-.anthropic-modal-body .avail-kpi-total-value{font-size:2rem}
+.anthropic-modal-body .avail-kpi-val{font-size:1.4rem}
+.anthropic-modal-body .avail-kpi-label{font-size:.78rem}
+.anthropic-modal-body .avail-kpi-meta{font-size:.72rem}
 .anthropic-modal-body .avail-kpi-total-meta{font-size:.75rem}
 .anthropic-modal-body .avail-kpi-section-head{font-size:.72rem}
 .anthropic-modal-body .avail-kpi-table{font-size:.85rem}
