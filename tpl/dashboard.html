@@ -136,6 +136,7 @@
 <div class="grid" id="forensic-cards"></div>
 <div class="forensic-charts-stack" id="forensic-charts-stack">
 <div class="forensic-charts-host-scope">
+<!-- Row 1: Forensic & Hit Limit (full width) -->
 <details class="forensic-chart-disclosure" open>
 <summary class="forensic-chart-summary"><span id="forensic-chart-h3">Forensic &amp; Hit Limit pro Tag</span></summary>
 <div class="forensic-chart-panel">
@@ -146,6 +147,9 @@
 </div>
 </div>
 </details>
+</div>
+<!-- Row 2: Session-Signale + Service Impact (side by side) -->
+<div class="forensic-charts-pair">
 <details class="forensic-chart-disclosure" open>
 <summary class="forensic-chart-summary"><span id="forensic-signals-chart-h3"></span></summary>
 <div class="forensic-chart-panel">
@@ -156,8 +160,7 @@
 </div>
 </div>
 </details>
-</div>
-<details class="forensic-chart-disclosure forensic-chart-disclosure--service" open>
+<details class="forensic-chart-disclosure" open>
 <summary class="forensic-chart-summary"><span id="service-chart-h3">Service Impact</span></summary>
 <div class="forensic-chart-panel">
 <p id="service-chart-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"></p>
@@ -170,6 +173,7 @@
 </div>
 </div>
 </details>
+</div>
 </div>
 <p id="thinking-note" style="font-size:.75rem;color:#f59e0b;margin:12px 0 4px;line-height:1.45"></p>
 </div>
@@ -197,7 +201,16 @@
 <span class="main-charts-scope-label" id="main-charts-scope-label"></span>
 <div class="main-charts-scope-chips" id="main-charts-scope-chips" role="group"></div>
 </div>
+<details class="forensic-details token-stats-details" id="token-stats-collapse" open>
+<summary class="forensic-summary forensic-summary--bar token-stats-summary">
+<div class="forensic-summary-row">
+<p id="token-stats-summary-line" class="forensic-summary-metrics">Token Stats</p>
+</div>
+</summary>
+<div class="forensic-inner">
 <div class="grid" id="cards"></div>
+</div>
+</details>
 <div class="main-charts-wrap main-charts-loading" id="main-charts-wrap">
 <div class="main-charts-update-overlay" id="main-charts-update-overlay" aria-hidden="true"></div>
 <div class="main-charts-skeleton" id="main-charts-skeleton" aria-busy="true">
