@@ -5080,29 +5080,38 @@ function updateAnthropicPopup(data) {
   var eList = document.getElementById("anthropic-popup-ext-list");
   if (!oHead) return;
 
-  // Outages
-  var outages = data.outages || [];
+  var days = data.days || [];
+
+  // Collect outages from all days
   oHead.textContent = t("liveOutageHead");
   var ohtml = "";
-  for (var oi = 0; oi < outages.length; oi++) {
-    var o = outages[oi];
-    var imp = (o.impact || "none").toUpperCase();
-    var kind = o.kind ? " (" + o.kind + ")" : "";
-    ohtml += "<li>" + escHtml(o.date || "") + " · [" + escHtml(imp) + "] " + escHtml(o.name || "") + escHtml(kind) + "</li>";
+  for (var di = 0; di < days.length; di++) {
+    var incs = days[di].outage_incidents || [];
+    for (var ii = 0; ii < incs.length; ii++) {
+      var o = incs[ii];
+      var imp = (o.impact || "none").toUpperCase();
+      var kind = o.kind ? " (" + o.kind + ")" : "";
+      ohtml += "<li>" + escHtml(days[di].date) + " · [" + escHtml(imp) + "] " + escHtml(o.name || "") + escHtml(kind) + "</li>";
+    }
   }
   if (!ohtml) ohtml = '<li style="color:#64748b">' + escHtml(t("liveOutageEmpty")) + '</li>';
   if (oList) oList.innerHTML = ohtml;
 
-  // Extensions
-  var exts = data.extension_updates || [];
+  // Collect extension version changes from days
   eHead.textContent = t("liveExtHead");
   var ehtml = "";
-  for (var ei = 0; ei < exts.length; ei++) {
-    var ex = exts[ei];
-    ehtml += "<li>" + escHtml(ex.date || "") + ": " + escHtml(ex.summary || ex.from + " → " + ex.to) + "</li>";
+  for (var ei = 0; ei < days.length; ei++) {
+    var vc = days[ei].version_change;
+    if (vc) {
+      ehtml += "<li>" + escHtml(days[ei].date) + ": " + escHtml(vc.from || "?") + " → " + escHtml(vc.to || "?") + "</li>";
+    }
   }
   if (!ehtml) ehtml = '<li style="color:#64748b">' + escHtml(t("liveExtEmpty")) + '</li>';
   if (eList) eList.innerHTML = ehtml;
+
+  // Update badge label
+  var label = document.getElementById("anthropic-label");
+  if (label) label.textContent = "Anthropic";
 }
 
 fetchUsageJsonOnce();
