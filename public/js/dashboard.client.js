@@ -4946,7 +4946,7 @@ function renderHealthSparkline(data) {
       }]
     },
     options: {
-      responsive: false,
+      responsive: true,
       animation: false,
       transitions: __chartTransitionsOff,
       maintainAspectRatio: false,
