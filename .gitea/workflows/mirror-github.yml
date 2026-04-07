@@ -92,6 +92,8 @@ jobs:
           mkdir -p "${EXPORT_DIR}"
           # Kein rsync: schlanke/act-Runner liefern es oft nicht (exit 127).
           tar --exclude=.git -cf - . | (cd "${EXPORT_DIR}" && tar -xf -)
+          # sed ändert tracked files im Klon; Snapshot liegt in EXPORT_DIR — sonst verweigert checkout.
+          git reset --hard HEAD
           git fetch github "refs/heads/${MIRROR_DEST_BRANCH}:refs/remotes/github/${MIRROR_DEST_BRANCH}" 2>/dev/null \
             || git fetch github || true
           if git rev-parse --verify "github/${MIRROR_DEST_BRANCH}" >/dev/null 2>&1; then
