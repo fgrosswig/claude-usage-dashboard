@@ -5406,15 +5406,28 @@ function renderAvailabilityKpis(data) {
   // ── Build HTML ──
   var h = "";
 
-  // Two KPI cards side by side
-  h += "<div class=\"avail-kpi-cards\">";
-  h += "<div class=\"card " + utColorCls + "\"><div class=\"label\">" + escHtml(t("cardUptime")) + "</div>";
-  h += "<div class=\"value\">" + realUptimePct.toFixed(2) + "%</div>";
-  h += "<div class=\"sub\">" + escHtml(firstDate) + " \u2013 " + escHtml(lastDate) + " (" + totalDays + "d)</div></div>";
-  h += "<div class=\"card " + sqColorCls + "\"><div class=\"label\">" + escHtml(t("cardServiceQuality")) + "</div>";
-  h += "<div class=\"value\">" + uptimePct.toFixed(1) + "%</div>";
-  h += "<div class=\"sub\">" + escHtml(t("availKpiDowntime")) + ": " + (Math.round(totalDegradationH * 10) / 10) + "h</div></div>";
-  h += "</div>";
+  var utCCls = medianUt >= 99.8 ? "ok" : medianUt >= 99 ? "warn" : medianUt >= 95 ? "caution" : "danger";
+  var sqCCls = medianSq >= 99 ? "ok" : medianSq >= 95 ? "warn" : medianSq >= 85 ? "caution" : "danger";
+  var utColorTxt = "avail-" + (medianUt >= 99.8 ? "green" : medianUt >= 99 ? "yellow" : medianUt >= 95 ? "orange" : "red");
+  var sqColorTxt = "avail-" + (medianSq >= 99 ? "green" : medianSq >= 95 ? "yellow" : medianSq >= 85 ? "orange" : "red");
+
+  if (isWide) {
+    // Popout: full cards side by side
+    h += "<div class=\"avail-kpi-cards\">";
+    h += "<div class=\"card " + utCCls + "\"><div class=\"label\">" + escHtml(t("cardUptime")) + "</div>";
+    h += "<div class=\"value\">" + realUptimePct.toFixed(2) + "%</div>";
+    h += "<div class=\"sub\">" + escHtml(firstDate) + " \u2013 " + escHtml(lastDate) + " (" + totalDays + "d)</div></div>";
+    h += "<div class=\"card " + sqCCls + "\"><div class=\"label\">" + escHtml(t("cardServiceQuality")) + "</div>";
+    h += "<div class=\"value\">" + uptimePct.toFixed(1) + "%</div>";
+    h += "<div class=\"sub\">" + escHtml(t("availKpiDowntime")) + ": " + (Math.round(totalDegradationH * 10) / 10) + "h</div></div>";
+    h += "</div>";
+  } else {
+    // Popup: compact inline row
+    h += "<div class=\"avail-kpi-row\">";
+    h += "<span class=\"avail-kpi-metric\"><span class=\"avail-kpi-label\">" + escHtml(t("cardUptime")) + "</span> <span class=\"" + utColorTxt + " avail-kpi-val\">" + realUptimePct.toFixed(2) + "%</span></span>";
+    h += "<span class=\"avail-kpi-metric\"><span class=\"avail-kpi-label\">" + escHtml(t("cardServiceQuality")) + "</span> <span class=\"" + sqColorTxt + " avail-kpi-val\">" + uptimePct.toFixed(1) + "%</span></span>";
+    h += "</div>";
+  }
 
   // Monthly table
   var monthKeys = Object.keys(byMonth).sort();
@@ -5784,6 +5797,47 @@ fetchUsageJsonOnce();
 connectUsageStream();
 scheduleFetchExtensionTimeline(900);
 
+// ── Mini Markdown → HTML (for release notes) ────────────────────────────
+function miniMd(src) {
+  var lines = (src || "").split("\n");
+  var html = "", inList = false;
+  for (var i = 0; i < lines.length; i++) {
+    var ln = lines[i];
+    // Headings
+    var hm = ln.match(/^(#{1,4})\s+(.*)/);
+    if (hm) {
+      if (inList) { html += "</ul>"; inList = false; }
+      var lvl = hm[1].length;
+      html += "<h" + lvl + " style=\"font-size:" + (1.1 - lvl * 0.1) + "rem;color:#e2e8f0;margin:10px 0 4px\">" + escHtml(hm[2]) + "</h" + lvl + ">";
+      continue;
+    }
+    // List items
+    var lm = ln.match(/^[-*]\s+(?:\[.\]\s*)?(.*)/);
+    if (lm) {
+      if (!inList) { html += "<ul style=\"margin:4px 0;padding-left:18px\">"; inList = true; }
+      html += "<li>" + inlineMd(lm[1]) + "</li>";
+      continue;
+    }
+    // Empty line
+    if (!ln.trim()) {
+      if (inList) { html += "</ul>"; inList = false; }
+      continue;
+    }
+    // Paragraph
+    if (inList) { html += "</ul>"; inList = false; }
+    html += "<p style=\"margin:3px 0\">" + inlineMd(ln) + "</p>";
+  }
+  if (inList) html += "</ul>";
+  return html;
+}
+function inlineMd(s) {
+  s = escHtml(s);
+  s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/`([^`]+)`/g, "<code style=\"background:#334155;padding:1px 4px;border-radius:3px;font-size:.9em\">$1</code>");
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "<a href=\"$2\" target=\"_blank\" rel=\"noopener\" style=\"color:#93c5fd\">$1</a>");
+  return s;
+}
+
 // ── Dev Mode Overlay ─────────────────────────────────────────────────────
 (function () {
   var xhr = new XMLHttpRequest();
@@ -5792,11 +5846,61 @@ scheduleFetchExtensionTimeline(900);
     if (xhr.status !== 200) return;
     try {
       var info = JSON.parse(xhr.responseText);
-      // Show release version in Live panel
-      var relEl = document.getElementById("live-release-info");
-      if (relEl && info.version) {
-        relEl.innerHTML = '<span class="live-release-version">' + escHtml(info.version) + '</span>' +
-          ' <a class="live-release-link" href="https://github.com/fgrosswig/claude-usage-dashboard/releases" target="_blank" rel="noopener">GitHub Releases</a>';
+      // Show release version in Live panel — compact row
+      var relRow = document.getElementById("live-release-row");
+      var ver = info.version && info.version !== "dev" ? info.version : null;
+      if (relRow) {
+        if (ver) {
+          relRow.innerHTML = '<span>Release:</span> <span class="live-rel-tag">' + escHtml(ver) + '</span>' +
+            '<a class="live-rel-link" href="https://github.com/fgrosswig/claude-usage-dashboard/releases/tag/' + escHtml(ver) + '" target="_blank" rel="noopener">GitHub</a>' +
+            '<button class="live-rel-expand" id="live-rel-expand-btn">History</button>';
+        } else {
+          relRow.innerHTML = '<span>Release:</span> <span style="color:#64748b">dev (untagged)</span>' +
+            '<a class="live-rel-link" href="https://github.com/fgrosswig/claude-usage-dashboard/releases" target="_blank" rel="noopener">GitHub</a>' +
+            '<button class="live-rel-expand" id="live-rel-expand-btn">History</button>';
+        }
+        // Release History popout
+        var expandBtn = document.getElementById("live-rel-expand-btn");
+        var relOverlay = document.getElementById("release-modal-overlay");
+        var relBody = document.getElementById("release-modal-body");
+        var relClose = document.getElementById("release-modal-close");
+        if (expandBtn && relOverlay && relBody) {
+          expandBtn.addEventListener("click", function() {
+            relOverlay.classList.add("is-open");
+            document.body.style.overflow = "hidden";
+            if (relBody.dataset.loaded) return;
+            relBody.innerHTML = '<p style="color:#64748b;font-size:.75rem">Loading releases...</p>';
+            var rlXhr = new XMLHttpRequest();
+            rlXhr.open("GET", "https://api.github.com/repos/fgrosswig/claude-usage-dashboard/releases?per_page=20", true);
+            rlXhr.onload = function() {
+              if (rlXhr.status !== 200) { relBody.innerHTML = '<p style="color:#ef4444;font-size:.75rem">Failed to load releases</p>'; return; }
+              try {
+                var releases = JSON.parse(rlXhr.responseText);
+                if (!releases.length) { relBody.innerHTML = '<p style="color:#64748b;font-size:.75rem">No releases found</p>'; return; }
+                var rh = "";
+                for (var ri = 0; ri < releases.length; ri++) {
+                  var rel = releases[ri];
+                  var rDate = rel.published_at ? rel.published_at.slice(0, 10) : "";
+                  var rBody2 = (rel.body || "").replace(/^## .+\n?/m, "");
+                  var isFirst = ri === 0;
+                  rh += "<details class=\"release-modal-item\"" + (isFirst ? " open" : "") + ">";
+                  rh += "<summary class=\"release-modal-item-head\">";
+                  rh += "<span class=\"rel-tag\">" + escHtml(rel.tag_name) + "</span>";
+                  rh += "<span class=\"rel-date\">" + escHtml(rDate) + "</span>";
+                  if (rel.name && rel.name !== rel.tag_name) rh += " — " + escHtml(rel.name);
+                  rh += "</summary>";
+                  rh += "<div class=\"release-modal-item-body\">" + miniMd(rBody2) + "</div>";
+                  rh += "</details>";
+                }
+                relBody.innerHTML = rh;
+                relBody.dataset.loaded = "1";
+              } catch (e) { relBody.innerHTML = '<p style="color:#ef4444;font-size:.75rem">Parse error</p>'; }
+            };
+            rlXhr.send();
+          });
+          if (relClose) relClose.addEventListener("click", function() { relOverlay.classList.remove("is-open"); document.body.style.overflow = ""; });
+          relOverlay.addEventListener("click", function(e) { if (e.target === relOverlay) { relOverlay.classList.remove("is-open"); document.body.style.overflow = ""; } });
+        }
       }
       if (!info.dev_mode) return;
       var modeLabel = info.dev_mode === "full" ? "FULL" : "PROXY";
