@@ -129,6 +129,8 @@ tr:hover td{background:#334155}
 .day-picker-row select{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 12px;font-size:.9rem;min-width:220px}
 .day-picker-hint{font-size:.75rem;color:#64748b;max-width:36rem;line-height:1.4}
 .forensic-charts-stack{margin-top:8px}
+.forensic-charts-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
+@media(max-width:720px){.forensic-charts-pair{grid-template-columns:1fr}}
 .forensic-host-filter-wrap{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 6px}
 .forensic-host-filter-label{font-size:.72rem;color:#94a3b8;flex-shrink:0}
 .forensic-host-filter-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
@@ -142,7 +144,7 @@ tr:hover td{background:#334155}
 .service-chart-canvas-wrap{position:relative}
 .service-chart-canvas-wrap canvas{position:relative;z-index:1}
 .chart-shell{position:relative;min-height:220px;border-radius:8px}
-.chart-shell--forensic{min-height:240px}
+.chart-shell--forensic{min-height:200px}
 .chart-shell .chart-shell-ph{
   position:absolute;inset:0;border-radius:inherit;z-index:3;
   background:linear-gradient(105deg,#1e293b 0%,#334155 50%,#1e293b 100%);
@@ -207,6 +209,10 @@ tr:hover td{background:#334155}
 
 /* pulse (from original inline block) */
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── Token Stats (collapsible cards) ────────────────── */
+.token-stats-details{margin-bottom:14px}
+.token-stats-summary{background:rgba(30,41,59,.55);border-color:#334155}
 
 /* ── Proxy Analytics ─────────────────────────────────── */
 .proxy-details{margin-bottom:14px}

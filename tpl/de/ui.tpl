@@ -93,6 +93,7 @@
   "cardAllCacheSub": "{pct} vom Total",
   "cardSessionSignals": "Session-Signale (JSONL)",
   "cardSessionSignalsSub": "continue {c} · resume {r} · retry {y} · interrupt {i} — heuristischer Textabgleich",
+  "tokenStatsSummary": "{date} — {out} Output · {cache} Cache · {overhead} Overhead",
   "chartSessionSignalsTitle": "Session-Signale in den Logs (pro Tag)",
   "chartSessionSignalsBlurb": "Anzahl JSONL-Zeilen mit --continue/--resume, Retry-/429-Mustern oder Interrupt/Abbruch (heuristisch; kein API-Nachweis).",
   "sigContinue": "continue",

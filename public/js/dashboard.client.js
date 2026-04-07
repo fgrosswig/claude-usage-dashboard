@@ -1139,6 +1139,7 @@ if (typeof Chart !== "undefined") {
   };
   Chart.defaults.responsive = true;
   Chart.defaults.resizeDelay = 300;
+  Chart.defaults.devicePixelRatio = window.devicePixelRatio || 1;
 
 }
 var __usageUpdatePluginRegistered = false;
@@ -2082,6 +2083,8 @@ function renderDashboardCore(data) {
   var chtml="";
   cards.forEach(function(c){chtml+="<div class=\"card "+c.cls+"\"><div class=\"label\">"+escHtml(c.label)+"</div><div class=\"value\">"+escHtml(c.value)+"</div><div class=\"sub\">"+escHtml(c.sub)+"</div></div>";});
   var _ce=document.getElementById("cards");if(_ce&&_ce.innerHTML!==chtml)_ce.innerHTML=chtml;
+  var tsSum=document.getElementById("token-stats-summary-line");
+  if(tsSum) tsSum.textContent=tr("tokenStatsSummary",{date:selDay.date||"",out:fmt(cardBase.output||0),cache:fmt(cardBase.cache_read||0),overhead:(cardBase.overhead||0)+"x"});
   var fch="";
   fcards.forEach(function(c){fch+="<div class=\"card "+c.cls+"\"><div class=\"label\">"+escHtml(c.label)+"</div><div class=\"value\">"+escHtml(c.value)+"</div><div class=\"sub\">"+escHtml(c.sub)+"</div></div>";});
   var fcg=document.getElementById("forensic-cards");if(fcg&&fcg.innerHTML!==fch)fcg.innerHTML=fch;

@@ -211,6 +211,45 @@ DEV_PROXY_SOURCE=https://claude-usage.grosswig-it.de node start.js dashboard
 
 Dann `http://localhost:3333` öffnen. Die Logs werden nach `%TEMP%/claude-proxy-logs-dev` (Windows) bzw. `/tmp/claude-proxy-logs-dev` (Linux) geschrieben.
 
+### Dev-Testing Flow
+
+```mermaid
+flowchart LR
+    subgraph Cluster
+        Pod["Pod claude-app<br/>DEBUG_API=1"]
+        PVC["PVC /root/.claude<br/>anthropic-proxy-logs/*.ndjson"]
+        Pod -->|schreibt| PVC
+        API["/api/debug/proxy-logs"]
+        PVC -->|liest| API
+    end
+
+    subgraph Lokal
+        ENV["DEV_PROXY_SOURCE=https://..."]
+        Start["node start.js dashboard"]
+        Fetch["devFetchProxyLogs()"]
+        TMP["%TEMP%/claude-proxy-logs-dev"]
+        Server["Dashboard :3333"]
+        Browser["Browser localhost:3333"]
+
+        ENV --> Start
+        Start --> Fetch
+        Fetch -->|HTTP GET| API
+        API -->|JSON files[]| Fetch
+        Fetch -->|schreibt| TMP
+        TMP -->|ANTHROPIC_PROXY_LOG_DIR| Server
+        Server -->|SSE| Browser
+    end
+
+    subgraph Auto-Sync
+        Interval["setInterval 180s"]
+        Sync["Sync Now Button"]
+        Interval -->|devFetchAndRefreshProxy| Fetch
+        Sync -->|POST /api/debug/sync-proxy-logs| Fetch
+    end
+```
+
+**Hinweis:** `node start.js both` ist mit `DEV_PROXY_SOURCE` blockiert — kein lokaler Proxy im Dev-Modus.
+
 ## Proxy und Claude Code
 
 Der Container lauscht mit `ANTHROPIC_PROXY_BIND=0.0.0.0` auf Port **8080**. Clients außerhalb des Clusters brauchen einen erreichbaren Service (NodePort, LoadBalancer, Ingress mit TCP oder separater Route) und setzen z. B. `ANTHROPIC_BASE_URL=http://…:8080`.
