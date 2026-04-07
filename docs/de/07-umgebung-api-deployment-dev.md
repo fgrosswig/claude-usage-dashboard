@@ -58,7 +58,7 @@ Zwei-Stufen-Image wie in **`docker-compose.yml`** skizziert:
 
 ## CI (GitHub Actions)
 
-Workflow **`.github/workflows/docker.yml`** (bei Push/PR auf u. a. `main`): baut Base- und App-Image, prüft **`images/*.png`** im Repo und unter **`/app/images`** im Image, **Smoke-Test** (`curl` auf Port **3333**), optional **Compose** mit **`docker-compose.ci.yml`**.
+Workflow **`.github/workflows/docker.yml`** (bei Push/PR auf u. a. `main`): baut Base- und App-Image, **Smoke** mit **`curl`** auf **`/`** und **`/api/usage`** (Port **3333**, **tmpfs** statt Host-`~/.claude`), danach **Container-Logs**; anschließend zweiter Lauf mit **Compose** (**`docker-compose.yml`** + **`docker-compose.ci.yml`**, nur **3333** nach außen).
 
 Kubernetes-Manifeste und Cluster-Betrieb: **[k8s/README.md](../../k8s/README.md)**.
 

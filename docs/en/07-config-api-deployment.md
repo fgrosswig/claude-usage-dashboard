@@ -59,7 +59,7 @@ Two-stage image as in **`docker-compose.yml`**:
 
 ## CI (GitHub Actions)
 
-**`.github/workflows/docker.yml`** (on push/PR to e.g. `main`): builds base + app images, checks **`images/*.png`** in repo and under **`/app/images`** in the image, **smoke test** (`curl` on port **3333**), optional **compose** with **`docker-compose.ci.yml`**.
+**`.github/workflows/docker.yml`** (on push/PR to e.g. `main`): builds base + app images, **smoke** with **`curl`** on **`/`** and **`/api/usage`** (port **3333**, **tmpfs** instead of host `~/.claude`), then **container logs**; then a second run with **compose** (**`docker-compose.yml`** + **`docker-compose.ci.yml`**, only **3333** published).
 
 Kubernetes manifests and deployment: **[k8s/README.md](../../k8s/README.md)**.
 
