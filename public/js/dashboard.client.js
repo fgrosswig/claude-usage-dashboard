@@ -4575,6 +4575,7 @@ function renderHealthScore(data) {
   }
   renderHealthHistory(data);
   renderIncidentHistory(data);
+  renderOutageTimeline(data);
 
   // Grid
   var gh = "";
@@ -5005,6 +5006,9 @@ function renderIncidentHistory(data) {
   var titleEl = document.getElementById("incident-history-title");
   if (titleEl) titleEl.textContent = t("incidentHistoryLabel");
 
+  var titleOT = document.getElementById("outage-timeline-title");
+  if (titleOT) titleOT.textContent = t("outageTimelineTitle");
+
   var days = getFilteredDays(data.days || []);
   if (days.length < 2) return;
 
@@ -5134,6 +5138,82 @@ function updateAnthropicPopup(data) {
         y1: { position: "right", ticks: { color: "#ef4444" }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: "Incidents", color: "#ef4444", font: { size: 9 } } }
       },
       plugins: { legend: { labels: { color: "#e2e8f0", boxWidth: 10, font: { size: 10 } } } }
+    }
+  });
+}
+
+
+// ── Outage Timeline (24h stacked per day) ─────────────────────────────────
+function renderOutageTimeline(data) {
+  if (typeof Chart === "undefined") return;
+  var el = document.getElementById("c-outage-timeline");
+  if (!el) return;
+
+  var days = getFilteredDays(data.days || []);
+  if (days.length < 2) return;
+
+  var labels = [];
+  var greenData = [];
+  var redData = [];
+  var yellowData = [];
+
+  for (var di = 0; di < days.length; di++) {
+    var d = days[di];
+    labels.push(d.date.slice(5));
+    var spans = d.outage_spans || [];
+    var serverH = 0, clientH = 0;
+    for (var si = 0; si < spans.length; si++) {
+      var dur = (spans[si].to || 0) - (spans[si].from || 0);
+      if (dur < 0) dur = 0;
+      if (spans[si].kind === "server") serverH += dur;
+      else clientH += dur;
+    }
+    if (serverH > 24) serverH = 24;
+    if (clientH > 24 - serverH) clientH = 24 - serverH;
+    var okH = 24 - serverH - clientH;
+    if (okH < 0) okH = 0;
+    greenData.push(Math.round(okH * 10) / 10);
+    redData.push(Math.round(serverH * 10) / 10);
+    yellowData.push(Math.round(clientH * 10) / 10);
+  }
+
+  if (_proxyCharts.outageTimeline) {
+    freezeChartNoAnim(_proxyCharts.outageTimeline);
+    _proxyCharts.outageTimeline.data.labels = labels;
+    _proxyCharts.outageTimeline.data.datasets[0].data = greenData;
+    _proxyCharts.outageTimeline.data.datasets[1].data = redData;
+    _proxyCharts.outageTimeline.data.datasets[2].data = yellowData;
+    _proxyCharts.outageTimeline.update("none");
+    return;
+  }
+
+  _proxyCharts.outageTimeline = new Chart(el.getContext("2d"), {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [
+        { label: t("outageTimelineOk"), data: greenData, backgroundColor: "rgba(34,197,94,.25)", borderColor: "rgba(34,197,94,.5)", borderWidth: 1, stack: "s" },
+        { label: t("outageTimelineServer"), data: redData, backgroundColor: "rgba(239,68,68,.3)", borderColor: "rgba(239,68,68,.7)", borderWidth: 1, stack: "s" },
+        { label: t("outageTimelineClient"), data: yellowData, backgroundColor: "rgba(245,158,11,.25)", borderColor: "rgba(245,158,11,.6)", borderWidth: 1, stack: "s" }
+      ]
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      transitions: __chartTransitionsOff,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { stacked: true, ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.3)" } },
+        y: { stacked: true, max: 24, ticks: { color: "#94a3b8", stepSize: 6, callback: function(v) { return v + "h"; } }, grid: { color: "rgba(51,65,85,.3)" } }
+      },
+      plugins: {
+        legend: { labels: { color: "#e2e8f0", boxWidth: 10, font: { size: 10 } } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) { return ctx.dataset.label + ": " + ctx.parsed.y + "h"; }
+          }
+        }
+      }
     }
   });
 }

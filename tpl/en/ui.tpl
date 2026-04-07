@@ -321,5 +321,9 @@
   "incidentDSOutageHours": "Outage (hours)",
   "incidentDSHitLimits": "Hit limits",
   "incidentAxisOutage": "Outage (h)",
-  "incidentAxisHitLimits": "Hit limits"
+  "incidentAxisHitLimits": "Hit limits",
+  "outageTimelineTitle": "Service Availability (24h per day)",
+  "outageTimelineOk": "OK",
+  "outageTimelineServer": "Server Outage",
+  "outageTimelineClient": "Client Incident"
 }
