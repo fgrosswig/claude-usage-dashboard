@@ -2,6 +2,8 @@
 
 ## Claude Usage Dashboard
 
+[![Docker build](https://github.com/fgrosswig/claude-usage-dashboard/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/fgrosswig/claude-usage-dashboard/actions/workflows/docker.yml)
+
 ### Summary
 
 **Anthropic / Claude Code monitoring:** A **self-hosted web dashboard** and optional **transparent HTTP proxy** to the **Anthropic API** — surfacing **tokens**, heuristic limits, **forensics**, and proxy-side metrics. **Why it exists:** many users see **fast “usage drains”** on **Anthropic** workloads (Claude Code, Max / session windows, etc.) where the official counters do not fully explain **why** the budget empties so quickly. Inputs: **`~/.claude/projects/**/*.jsonl`**, and — with the proxy — **per-request NDJSON** (latency, cache, **rate-limit-related headers**, etc.). Only **`claude-*`** models (no `<synthetic>`). Runs **locally** or in **Docker/Kubernetes** — not a central SaaS.
