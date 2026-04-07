@@ -4,6 +4,14 @@ set -eu
 ROOT="${1:-.}"
 cd "$ROOT"
 
+# Kein sed -i: auf manchen Runnern (BusyBox/Ash) unzuverlässig; ohne Fehler sichtbar war 2>/dev/null || true fatal.
+_apply_sed_to_file() {
+  f="$1"
+  shift
+  t="${f}.scrubtmp.$$"
+  sed "$@" "$f" > "$t" && mv -f "$t" "$f"
+}
+
 find . -type f ! -path './.git/*' ! -path './node_modules/*' \( \
     -name '*.md' -o -name '*.mdx' \
     -o -name '*.yml' -o -name '*.yaml' \
@@ -18,7 +26,7 @@ find . -type f ! -path './.git/*' ! -path './node_modules/*' \( \
     case "$f" in
       ./scripts/scrub-for-public.sh|scripts/scrub-for-public.sh) continue ;;
     esac
-    sed -i \
+    _apply_sed_to_file "$f" \
       -e 's/SCHUFA-OCR\/PDF-Stack/optional OCR\/PDF stack (not used here)/g' \
       -e 's/SCHUFA/RefOrg/g' \
       -e 's/harbor\.grosswig-it\.de/registry.example.com/g' \
@@ -51,8 +59,7 @@ find . -type f ! -path './.git/*' ! -path './node_modules/*' \( \
       -e 's|(your internal forge tree stays as-is; public copy drops `.woodpecker`/`.gitea` and replaces internal hostnames in text)|(the published tree omits private infrastructure and hostnames)|g' \
       -e 's|(intern bleibt alles unverändert; Domains und `.woodpecker`/`.gitea` erscheinen nicht öffentlich)|(die öffentliche Kopie enthält keine privaten Infrastruktur- oder Domain-Angaben)|g' \
       -e 's|# origin = Gitea|# upstream: private forge|g' \
-      -e 's|Vom gleichen Stand wie der Gitea-Feature-Branch|Vom gleichen Stand wie der private Feature-Branch|g' \
-      "$f" 2>/dev/null || true
+      -e 's|Vom gleichen Stand wie der Gitea-Feature-Branch|Vom gleichen Stand wie der private Feature-Branch|g'
   done
 
 find . -type f ! -path './.git/*' -name '*.md' -print0 |
@@ -60,13 +67,12 @@ find . -type f ! -path './.git/*' -name '*.md' -print0 |
     case "$f" in
       ./scripts/scrub-for-public.sh|scripts/scrub-for-public.sh) continue ;;
     esac
-    sed -i \
+    _apply_sed_to_file "$f" \
       -e '/Woodpecker CI/d' \
-      -e '/grosswig-it\.de/d' \
-      "$f" 2>/dev/null || true
+      -e '/grosswig-it\.de/d' || true
   done
 
 find . -type f ! -path './.git/*' \( -name 'Dockerfile' -o -name 'Dockerfile.*' \) -print0 |
   while IFS= read -r -d '' f; do
-    sed -i 's/^LABEL maintainer="[^"]*"/LABEL maintainer="public@example.com"/' "$f" 2>/dev/null || true
+    _apply_sed_to_file "$f" -e 's/^LABEL maintainer="[^"]*"/LABEL maintainer="public@example.com"/' || true
   done
