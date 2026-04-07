@@ -187,6 +187,30 @@ kubectl create secret generic claude-usage-dashboard-app -n claude \
   --from-literal=admin-token="$(openssl rand -hex 16)"
 ```
 
+## Lokales Dev-Testing (Proxy-Logs vom Cluster)
+
+Der Server kann Proxy-NDJSON-Logs vom Remote-Cluster holen, um das Dashboard lokal mit echten Daten zu testen. Voraussetzung: auf dem Cluster ist `DEBUG_API=1` gesetzt (`k8s/base/deployment.yml`).
+
+**PowerShell:**
+
+```powershell
+$env:DEV_PROXY_SOURCE="https://claude-usage.grosswig-it.de"; node start.js dashboard
+```
+
+**CMD:**
+
+```cmd
+set DEV_PROXY_SOURCE=https://claude-usage.grosswig-it.de && node start.js dashboard
+```
+
+**bash / Linux / macOS:**
+
+```bash
+DEV_PROXY_SOURCE=https://claude-usage.grosswig-it.de node start.js dashboard
+```
+
+Dann `http://localhost:3333` öffnen. Die Logs werden nach `%TEMP%/claude-proxy-logs-dev` (Windows) bzw. `/tmp/claude-proxy-logs-dev` (Linux) geschrieben.
+
 ## Proxy und Claude Code
 
 Der Container lauscht mit `ANTHROPIC_PROXY_BIND=0.0.0.0` auf Port **8080**. Clients außerhalb des Clusters brauchen einen erreichbaren Service (NodePort, LoadBalancer, Ingress mit TCP oder separater Route) und setzen z. B. `ANTHROPIC_BASE_URL=http://…:8080`.

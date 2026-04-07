@@ -78,6 +78,12 @@ if (cmd === 'help' || cmd === '-h' || cmd === '--help') {
   process.exit(0);
 }
 
+if ((cmd === 'both' || cmd === 'all') && (process.env.DEV_PROXY_SOURCE || '').trim()) {
+  console.error('start.js: "both" mode is not allowed with DEV_PROXY_SOURCE (local dev uses remote proxy logs, not a local proxy)');
+  console.error('Use: node start.js dashboard');
+  process.exit(1);
+}
+
 if (cmd === 'both' || cmd === 'all') {
   var cp = require('child_process');
   var spawnOpts = { stdio: 'inherit', cwd: __dirname };
