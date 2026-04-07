@@ -4825,8 +4825,13 @@ function initFilterBar(data) {
         if (!btn) return;
         hostContainer.querySelectorAll('.filter-chip').forEach(function(c) { c.classList.remove('active'); });
         btn.classList.add('active');
-        // Sync with forensic host filter
-        __forensicHostFilterSig = btn.dataset.host || "";
+        // Sync with forensic host filter + persist in sessionStorage
+        var hostVal = btn.dataset.host || "";
+        __forensicHostFilterSig = hostVal;
+        try {
+          if (hostVal) sessionStorage.setItem("usageForensicHostFilter", hostVal);
+          else sessionStorage.removeItem("usageForensicHostFilter");
+        } catch(ehf) {}
         if (__lastUsageData) renderDashboard(__lastUsageData, true);
       });
     } else {
