@@ -195,13 +195,16 @@ jobs:
               body = re.sub(r"https?://harbor\.grosswig-it\.de[^\s)]*", "", body)
               body = re.sub(r"https?://sonar\.grosswig-it\.de[^\s)]*", "", body)
 
+              # Last release in loop (newest) gets "Latest" on GitHub
+              is_last = (rel == releases[-1])
               payload = json.dumps({
                   "tag_name": tag,
                   "target_commitish": "main",
                   "name": rel["name"],
                   "body": body,
                   "draft": False,
-                  "prerelease": False
+                  "prerelease": False,
+                  "make_latest": "true" if is_last else "false"
               }).encode()
 
               create = urllib.request.Request(
