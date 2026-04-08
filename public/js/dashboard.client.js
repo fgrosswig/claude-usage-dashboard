@@ -4476,87 +4476,128 @@ function renderBudgetWaterfall(tot, quota) {
 
   var isCost = __budgetViewMode === "cost";
 
-  // Compute weighted values
-  var outVal   = isCost ? tot.output * __quotaWeights.output               : tot.output;
-  var inVal    = isCost ? tot.input * __quotaWeights.input                 : tot.input;
-  var crVal    = isCost ? tot.cache_read * __quotaWeights.cache_read       : tot.cache_read;
-  var ccVal    = isCost ? tot.cache_creation * __quotaWeights.cache_creation: tot.cache_creation;
-  var totalVal = outVal + inVal + crVal + ccVal;
+  // Compute raw and weighted values
+  var raw = { out: tot.output, inp: tot.input, cr: tot.cache_read, cc: tot.cache_creation };
+  var weighted = {
+    out: tot.output * __quotaWeights.output,
+    inp: tot.input * __quotaWeights.input,
+    cr:  tot.cache_read * __quotaWeights.cache_read,
+    cc:  tot.cache_creation * __quotaWeights.cache_creation
+  };
+  var src = isCost ? weighted : raw;
+  var totalVal = src.out + src.inp + src.cr + src.cc;
 
-  if (blurb) {
-    var blurbText = isCost ? t("budgetWaterfallBlurbCost") : t("budgetWaterfallBlurb");
-    if (quota && quota.visible_tokens_per_pct > 0) {
-      var quotaUsedPct = totalVal / (quota.visible_tokens_per_pct * 100);
-      blurbText += " \u00B7 ~" + Math.round(quotaUsedPct * 100) + "% " + t("budgetWfOfQuota");
-    }
-    blurb.textContent = blurbText;
-  }
-
-  // Sankey: Total Budget flows into 4 token types
-  // Then each type flows into "Productive" or "Overhead"
-  var fmtPct = function(v) { return totalVal > 0 ? Math.round(v / totalVal * 1000) / 10 : 0; };
   var fmtTok = function(v) {
     if (v >= 1e9) return (v / 1e9).toFixed(1) + "B";
     if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
     if (v >= 1e3) return (v / 1e3).toFixed(0) + "K";
     return String(Math.round(v));
   };
+  var pctOf = function(v) { return totalVal > 0 ? Math.round(v / totalVal * 1000) / 10 : 0; };
 
-  var budgetLabel = t("budgetWfBudget") + " (" + fmtTok(totalVal) + ")";
-  var outputLabel = t("budgetWfOutput") + " " + fmtPct(outVal) + "%";
-  var inputLabel  = t("budgetWfInput") + " " + fmtPct(inVal) + "%";
-  var cacheRLabel = t("budgetWfCacheRead") + " " + fmtPct(crVal) + "%";
-  var cacheCLabel = t("budgetWfCacheCreate") + " " + fmtPct(ccVal) + "%";
-  var prodLabel   = t("budgetWfProductive");
-  var overLabel   = t("budgetWfOverhead");
+  // Blurb
+  if (blurb) {
+    var blurbText = isCost ? t("budgetWaterfallBlurbCost") : t("budgetWaterfallBlurb");
+    blurb.textContent = blurbText;
+  }
 
-  // Sankey flows: budget → token types → productive/overhead
+  // Use PERCENTAGE flows so all segments are visible regardless of absolute size
+  var pOut = pctOf(src.out);
+  var pInp = pctOf(src.inp);
+  var pCr  = pctOf(src.cr);
+  var pCc  = pctOf(src.cc);
+  // Ensure min 0.5% for visibility
+  var minFlow = 0.5;
+  if (pOut > 0 && pOut < minFlow) pOut = minFlow;
+  if (pInp > 0 && pInp < minFlow) pInp = minFlow;
+  if (pCr > 0 && pCr < minFlow) pCr = minFlow;
+  if (pCc > 0 && pCc < minFlow) pCc = minFlow;
+
+  // Node labels
+  var nBudget = t("budgetWfBudget");
+  var nOutput = t("budgetWfOutput") + " (" + fmtTok(raw.out) + ")";
+  var nInput  = t("budgetWfInput") + " (" + fmtTok(raw.inp) + ")";
+  var nCacheR = t("budgetWfCacheRead") + " (" + fmtTok(raw.cr) + ")";
+  var nCacheC = t("budgetWfCacheCreate") + " (" + fmtTok(raw.cc) + ")";
+  var nProd   = t("budgetWfProductive") + " (" + pctOf(src.out) + "%)";
+  var nOver   = t("budgetWfOverhead") + " (" + (100 - pctOf(src.out)) + "%)";
+
+  // Label display map (node key → display text)
+  var labelMap = {};
+  labelMap[nBudget] = nBudget;
+  labelMap[nOutput] = nOutput;
+  labelMap[nInput]  = nInput;
+  labelMap[nCacheR] = nCacheR;
+  labelMap[nCacheC] = nCacheC;
+  labelMap[nProd]   = nProd;
+  labelMap[nOver]   = nOver;
+
+  // Color map for nodes
+  var nodeColors = {};
+  nodeColors[nBudget] = "#94a3b8";
+  nodeColors[nOutput] = "#22c55e";
+  nodeColors[nInput]  = "#3b82f6";
+  nodeColors[nCacheR] = "#22d3ee";
+  nodeColors[nCacheC] = "#f59e0b";
+  nodeColors[nProd]   = "#22c55e";
+  nodeColors[nOver]   = "#f87171";
+
+  // Raw token values for tooltips
+  var rawMap = {};
+  rawMap[nOutput] = raw.out;
+  rawMap[nInput]  = raw.inp;
+  rawMap[nCacheR] = raw.cr;
+  rawMap[nCacheC] = raw.cc;
+
   var flows = [];
-  // Budget → token types (all with min flow for visibility)
-  if (outVal > 0) flows.push({ from: budgetLabel, to: outputLabel, flow: outVal });
-  if (inVal > 0)  flows.push({ from: budgetLabel, to: inputLabel,  flow: inVal });
-  if (crVal > 0)  flows.push({ from: budgetLabel, to: cacheRLabel, flow: crVal });
-  if (ccVal > 0)  flows.push({ from: budgetLabel, to: cacheCLabel, flow: ccVal });
-
-  // Token types → productive/overhead
-  if (outVal > 0)  flows.push({ from: outputLabel, to: prodLabel,  flow: outVal });
-  if (inVal > 0)   flows.push({ from: inputLabel,  to: overLabel,  flow: inVal });
-  if (crVal > 0)   flows.push({ from: cacheRLabel, to: overLabel,  flow: crVal });
-  if (ccVal > 0)   flows.push({ from: cacheCLabel, to: overLabel,  flow: ccVal });
-
-  var colorMap = {};
-  colorMap[budgetLabel] = "rgba(148,163,184,0.7)";
-  colorMap[outputLabel] = "rgba(34,197,94,0.7)";
-  colorMap[inputLabel]  = "rgba(59,130,246,0.7)";
-  colorMap[cacheRLabel] = "rgba(34,211,238,0.7)";
-  colorMap[cacheCLabel] = "rgba(245,158,11,0.7)";
-  colorMap[prodLabel]   = "rgba(34,197,94,0.5)";
-  colorMap[overLabel]   = "rgba(248,113,113,0.5)";
+  if (pOut > 0) flows.push({ from: nBudget, to: nOutput, flow: pOut });
+  if (pInp > 0) flows.push({ from: nBudget, to: nInput,  flow: pInp });
+  if (pCr > 0)  flows.push({ from: nBudget, to: nCacheR, flow: pCr });
+  if (pCc > 0)  flows.push({ from: nBudget, to: nCacheC, flow: pCc });
+  if (pOut > 0) flows.push({ from: nOutput, to: nProd,   flow: pOut });
+  if (pInp > 0) flows.push({ from: nInput,  to: nOver,   flow: pInp });
+  if (pCr > 0)  flows.push({ from: nCacheR, to: nOver,   flow: pCr });
+  if (pCc > 0)  flows.push({ from: nCacheC, to: nOver,   flow: pCc });
 
   _budgetCharts.waterfall = new Chart(el, {
     type: "sankey",
     data: {
       datasets: [{
         data: flows,
-        colorFrom: function(ctx) { return colorMap[ctx.dataset.data[ctx.dataIndex].from] || "rgba(148,163,184,0.5)"; },
-        colorTo: function(ctx) { return colorMap[ctx.dataset.data[ctx.dataIndex].to] || "rgba(148,163,184,0.5)"; },
+        colorFrom: function(ctx) {
+          var d = ctx.dataset.data[ctx.dataIndex];
+          return d ? (nodeColors[d.from] || "#94a3b8") : "#94a3b8";
+        },
+        colorTo: function(ctx) {
+          var d = ctx.dataset.data[ctx.dataIndex];
+          return d ? (nodeColors[d.to] || "#94a3b8") : "#94a3b8";
+        },
         colorMode: "gradient",
-        labels: colorMap,
-        size: "max"
+        labels: labelMap,
+        size: "max",
+        nodeWidth: 14,
+        color: "#e2e8f0",
+        borderWidth: 0
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: true,
-      aspectRatio: 2.5,
+      aspectRatio: 3.5,
       animation: false,
+      layout: { padding: { left: 0, right: 0 } },
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
             label: function(ctx) {
               var item = ctx.dataset.data[ctx.dataIndex];
-              return item.from + " \u2192 " + item.to + ": " + fmtTok(item.flow);
+              if (!item) return "";
+              var tokVal = rawMap[item.to] || rawMap[item.from] || 0;
+              var line = item.from.split(" (")[0] + " \u2192 " + item.to.split(" (")[0];
+              line += ": " + item.flow.toFixed(1) + "%";
+              if (tokVal > 0) line += " (" + fmtTok(tokVal) + " tokens)";
+              return line;
             }
           }
         }
