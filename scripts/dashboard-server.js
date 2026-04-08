@@ -1,5 +1,5 @@
 // Claude Code Token Usage Dashboard — standalone, zero dependencies (lädt Submodule aus diesem Ordner)
-// Usage: node server.js [--port=3333] [--refresh=SEK]   oder   node start.js dashboard
+// Usage: node server.js [--port=3333] [--refresh=SEK] [--no-cache]   oder   node start.js dashboard [--no-cache]
 // --refresh = voller Daten-Scan + SSE (Standard 180s, Minimum 60s). Kurze Werte lesen alle JSONL unnötig oft neu ein.
 // CLAUDE_USAGE_WALK_SLICE=N (5–500): größer = schnellere Projektbaum-Ermittlung, kleiner = responsiver direkt nach Start (Default 40 readdir/Tick).
 // Tages-Cache: ~/.claude/usage-dashboard-days.json (Vortage). Bei passender jsonl-Anzahl nur noch „heute“ aus JSONL.
@@ -87,6 +87,7 @@ process.argv.forEach(function(a) {
   if (lv) process.env.CLAUDE_USAGE_LOG_LEVEL = lv[1].trim();
   var lf = a.match(/--log-file=(.+)$/);
   if (lf) process.env.CLAUDE_USAGE_LOG_FILE = lf[1].trim();
+  if (a === '--no-cache') process.env.CLAUDE_USAGE_NO_CACHE = '1';
 });
 serviceLog.refreshFromEnv();
 
