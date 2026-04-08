@@ -4401,61 +4401,114 @@ function renderBudgetEfficiency(data) {
     cardsEl.innerHTML = ch;
   }
 
+  // Extract quota info from proxy data
+  var quota = { pct_5h: null, pct_7d: null, visible_tokens_per_pct: 0 };
+  if (data.proxy && data.proxy.proxy_days && data.proxy.proxy_days.length) {
+    var lastPd = data.proxy.proxy_days[data.proxy.proxy_days.length - 1];
+    if (lastPd.rate_limit) {
+      var q5 = lastPd.rate_limit["anthropic-ratelimit-unified-5h-utilization"];
+      var q7 = lastPd.rate_limit["anthropic-ratelimit-unified-7d-utilization"];
+      if (q5 != null) quota.pct_5h = parseFloat(q5) * 100;
+      if (q7 != null) quota.pct_7d = parseFloat(q7) * 100;
+    }
+    if (lastPd.visible_tokens_per_pct) quota.visible_tokens_per_pct = lastPd.visible_tokens_per_pct;
+  }
+
   // Waterfall Chart
-  renderBudgetWaterfall(tot);
+  renderBudgetWaterfall(tot, quota);
 
   // Trend Chart
   renderBudgetTrend(dailyTrend);
 }
 
-function renderBudgetWaterfall(tot) {
+// Approximate quota cost weights (relative to output=1.0)
+var __quotaWeights = {
+  output: 1.0,
+  input: 0.33,
+  cache_creation: 0.42,
+  cache_read: 0.03
+};
+var __budgetViewMode = "volume"; // "volume" | "cost"
+var __budgetWaterfallState = null; // cached data for toggle
+
+function renderBudgetWaterfall(tot, quota) {
+  __budgetWaterfallState = { tot: tot, quota: quota };
+
+  // Wire toggle button (once)
+  var toggleBtn = document.getElementById("budget-view-toggle");
+  if (toggleBtn && !toggleBtn.__wired) {
+    toggleBtn.__wired = true;
+    toggleBtn.addEventListener("click", function() {
+      __budgetViewMode = __budgetViewMode === "volume" ? "cost" : "volume";
+      if (__budgetWaterfallState) renderBudgetWaterfall(__budgetWaterfallState.tot, __budgetWaterfallState.quota);
+    });
+  }
+  if (toggleBtn) toggleBtn.textContent = __budgetViewMode === "volume" ? t("budgetWfVolume") : t("budgetWfCost");
+
   var el = document.getElementById("c-budget-waterfall");
   var h3 = document.getElementById("budget-waterfall-h3");
   if (h3) h3.textContent = t("budgetWaterfallTitle");
   var blurb = document.getElementById("budget-waterfall-blurb");
-  if (blurb) blurb.textContent = t("budgetWaterfallBlurb");
   if (!el) return;
   if (_budgetCharts.waterfall) { _budgetCharts.waterfall.destroy(); _budgetCharts.waterfall = null; }
   if (tot.total <= 0) return;
 
-  // Waterfall segments: each starts where the previous ended
   var segments = [
-    { key: "output",         value: tot.output,         color: "rgba(34,197,94,0.85)",  label: t("budgetWfOutput") },
-    { key: "cache_read",     value: tot.cache_read,     color: "rgba(34,211,238,0.8)",  label: t("budgetWfCacheRead") },
-    { key: "input",          value: tot.input,          color: "rgba(59,130,246,0.8)",   label: t("budgetWfInput") },
-    { key: "cache_creation", value: tot.cache_creation, color: "rgba(245,158,11,0.85)", label: t("budgetWfCacheCreate") }
+    { key: "output",         value: tot.output,         weight: __quotaWeights.output,        color: "rgba(34,197,94,0.85)",  label: t("budgetWfOutput") },
+    { key: "input",          value: tot.input,          weight: __quotaWeights.input,          color: "rgba(59,130,246,0.8)",  label: t("budgetWfInput") },
+    { key: "cache_read",     value: tot.cache_read,     weight: __quotaWeights.cache_read,     color: "rgba(34,211,238,0.8)",  label: t("budgetWfCacheRead") },
+    { key: "cache_creation", value: tot.cache_creation, weight: __quotaWeights.cache_creation, color: "rgba(245,158,11,0.85)", label: t("budgetWfCacheCreate") }
   ];
 
-  var labels = [];
-  var datasets = [];
-  var runningStart = 0;
+  var isCost = __budgetViewMode === "cost";
 
-  // Build floating bar data: each bar = [start, end]
-  var barData = [];
-  var bgColors = [];
-  for (var si = 0; si < segments.length; si++) {
-    var seg = segments[si];
-    var pct = Math.round(seg.value / tot.total * 1000) / 10;
-    labels.push(seg.label + " (" + pct + "%)");
-    barData.push([runningStart, runningStart + seg.value]);
-    bgColors.push(seg.color);
-    runningStart += seg.value;
+  // Compute values based on mode
+  var totalCost = 0;
+  for (var wi = 0; wi < segments.length; wi++) {
+    segments[wi].cost = segments[wi].value * segments[wi].weight;
+    totalCost += segments[wi].cost;
+  }
+  var displayTotal = isCost ? totalCost : tot.total;
+
+  // Blurb with quota context
+  if (blurb) {
+    var blurbText = isCost ? t("budgetWaterfallBlurbCost") : t("budgetWaterfallBlurb");
+    if (quota && quota.visible_tokens_per_pct > 0) {
+      var quotaUsedPct = displayTotal / (quota.visible_tokens_per_pct * 100);
+      blurbText += " \u00B7 ~" + Math.round(quotaUsedPct * 100) + "% " + t("budgetWfOfQuota");
+    }
+    blurb.textContent = blurbText;
   }
 
-  datasets.push({
-    data: barData,
-    backgroundColor: bgColors,
-    borderSkipped: false
-  });
+  // Build stacked bar (single row, 100% = displayTotal)
+  var datasets = [];
+  var runStart = 0;
+  for (var si = 0; si < segments.length; si++) {
+    var seg = segments[si];
+    var segVal = isCost ? seg.cost : seg.value;
+    var pct = displayTotal > 0 ? Math.round(segVal / displayTotal * 1000) / 10 : 0;
+    datasets.push({
+      label: seg.label + " (" + pct + "%)",
+      data: [[runStart, runStart + segVal]],
+      backgroundColor: seg.color,
+      borderSkipped: false,
+      _rawValue: segVal,
+      _pct: pct,
+      _tokens: seg.value
+    });
+    runStart += segVal;
+  }
+
+  var xLabel = isCost ? t("budgetWfXCost") : t("budgetWfXAxis");
 
   _budgetCharts.waterfall = new Chart(el, {
     type: "bar",
-    data: { labels: labels, datasets: datasets },
+    data: { labels: [isCost ? t("budgetWfCost") : t("budgetWfVolume")], datasets: datasets },
     options: {
       indexAxis: "y",
       responsive: true,
       maintainAspectRatio: true,
-      aspectRatio: 3,
+      aspectRatio: 5,
       animation: false,
       transitions: __chartTransitionsOff,
       scales: {
@@ -4463,23 +4516,33 @@ function renderBudgetWaterfall(tot) {
           grid: { color: "rgba(51,65,85,0.5)" },
           ticks: {
             color: "#94a3b8",
-            callback: function(v) { return (v / 1e6).toFixed(1) + "M"; }
+            callback: function(v) {
+              if (v >= 1e9) return (v / 1e9).toFixed(1) + "B";
+              if (v >= 1e6) return (v / 1e6).toFixed(0) + "M";
+              if (v >= 1e3) return (v / 1e3).toFixed(0) + "K";
+              return String(v);
+            }
           },
-          title: { display: true, text: t("budgetWfXAxis"), color: "#64748b", font: { size: 11 } }
+          title: { display: true, text: xLabel, color: "#64748b", font: { size: 11 } }
         },
         y: {
-          grid: { color: "rgba(51,65,85,0.18)" },
-          ticks: { color: "#e2e8f0", font: { family: "monospace" } }
+          grid: { display: false },
+          ticks: { color: "#e2e8f0", font: { family: "monospace", weight: "bold" } }
         }
       },
       plugins: {
-        legend: { display: false },
+        legend: { labels: { color: "#cbd5e1" } },
         tooltip: {
           callbacks: {
             label: function(ctx) {
               var range = ctx.raw;
               var val = range[1] - range[0];
-              return (val / 1e6).toFixed(2) + "M tokens (" + Math.round(val / tot.total * 100) + "%)";
+              var pct = displayTotal > 0 ? Math.round(val / displayTotal * 1000) / 10 : 0;
+              var tokVal = ctx.dataset._tokens || val;
+              var fmtVal = val >= 1e9 ? (val / 1e9).toFixed(2) + "B" : val >= 1e6 ? (val / 1e6).toFixed(2) + "M" : (val / 1e3).toFixed(0) + "K";
+              var fmtTok = tokVal >= 1e9 ? (tokVal / 1e9).toFixed(2) + "B" : tokVal >= 1e6 ? (tokVal / 1e6).toFixed(2) + "M" : (tokVal / 1e3).toFixed(0) + "K";
+              if (isCost) return ctx.dataset.label.split(" (")[0] + ": " + fmtVal + " weighted (" + pct + "%) \u00B7 " + fmtTok + " tokens";
+              return ctx.dataset.label.split(" (")[0] + ": " + fmtVal + " tokens (" + pct + "%)";
             }
           }
         }
