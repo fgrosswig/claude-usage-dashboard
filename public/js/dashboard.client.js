@@ -4501,13 +4501,15 @@ function renderBudgetWaterfall(tot, quota) {
     blurb.textContent = blurbText;
   }
 
-  // Use PERCENTAGE flows so all segments are visible regardless of absolute size
-  var pOut = pctOf(src.out);
-  var pInp = pctOf(src.inp);
-  var pCr  = pctOf(src.cr);
-  var pCc  = pctOf(src.cc);
-  // Ensure min 0.5% for visibility
-  var minFlow = 0.5;
+  // Square-root scaled flows: compresses dominant flows, amplifies small ones
+  // This keeps relative ordering but makes all bands visible as distinct flows
+  var sqrtScale = function(v) { return v > 0 ? Math.sqrt(v) : 0; };
+  var pOut = sqrtScale(pctOf(src.out));
+  var pInp = sqrtScale(pctOf(src.inp));
+  var pCr  = sqrtScale(pctOf(src.cr));
+  var pCc  = sqrtScale(pctOf(src.cc));
+  // Min band width for visibility
+  var minFlow = 0.4;
   if (pOut > 0 && pOut < minFlow) pOut = minFlow;
   if (pInp > 0 && pInp < minFlow) pInp = minFlow;
   if (pCr > 0 && pCr < minFlow) pCr = minFlow;
