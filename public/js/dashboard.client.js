@@ -4635,22 +4635,6 @@ function renderBudgetWaterfall(tot, quota) {
     if (pCc > 0)  flows.push({ from: nCacheC, to: nResult, flow: pCc });
   }
 
-  // Force end-nodes to render as bars by adding tiny epsilon flows to a terminator
-  var termNode = " ";
-  labelMap[termNode] = " ";
-  nodeColors[termNode] = "rgba(0,0,0,0)";
-  var outgoing = {};
-  var incoming = {};
-  for (var fi = 0; fi < flows.length; fi++) {
-    outgoing[flows[fi].from] = true;
-    incoming[flows[fi].to] = true;
-  }
-  for (var nk in incoming) {
-    if (!outgoing[nk]) {
-      flows.push({ from: nk, to: termNode, flow: 0.01 });
-    }
-  }
-
   _budgetCharts.waterfall = new Chart(el, {
     type: "sankey",
     data: {
