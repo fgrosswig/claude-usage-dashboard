@@ -2463,13 +2463,15 @@ function loadUiTpl(lang) {
 function buildI18nBundles() {
   var mde = getUiTplMtimeMs('de');
   var men = getUiTplMtimeMs('en');
+  var mko = getUiTplMtimeMs('ko');
   var c = __i18nPageCache;
-  if (c.bundles && c.mde === mde && c.men === men) {
+  if (c.bundles && c.mde === mde && c.men === men && c.mko === mko) {
     return c.bundles;
   }
-  c.bundles = { de: loadUiTpl('de'), en: loadUiTpl('en') };
+  c.bundles = { de: loadUiTpl('de'), en: loadUiTpl('en'), ko: loadUiTpl('ko') };
   c.mde = mde;
   c.men = men;
+  c.mko = mko;
   c.inlineJson = '';
   c.fullHtml = null;
   return c.bundles;
@@ -2490,6 +2492,7 @@ function getDashboardHtml() {
   var c = __i18nPageCache;
   var mde = getUiTplMtimeMs('de');
   var men = getUiTplMtimeMs('en');
+  var mko = getUiTplMtimeMs('ko');
   var md = getPathMtimeMs(DASHBOARD_TPL_FILE);
   var mc = getPathMtimeMs(DASHBOARD_CSS_FILE);
   var mj = getPathMtimeMs(DASHBOARD_CLIENT_JS_FILE);
@@ -2497,6 +2500,7 @@ function getDashboardHtml() {
     c.fullHtml &&
     c.mde === mde &&
     c.men === men &&
+    c.mko === mko &&
     c.mdashboard === md &&
     c.mcss === mc &&
     c.mjs === mj
