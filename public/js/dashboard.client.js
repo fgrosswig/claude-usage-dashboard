@@ -82,12 +82,12 @@ function extractDaySignals(d, hostKey) {
     var H = d?.hosts?.[hostKey];
     if (H) {
       var sH = H.session_signals || {};
-      return { cont: sH.continue || 0, res: sH.resume || 0, retry: sH.retry || 0, intr: sH.interrupt || 0, cacheRead: H.cache_read != null ? Number(H.cache_read) || 0 : 0 };
+      return { cont: sH.continue || 0, res: sH.resume || 0, retry: sH.retry || 0, intr: sH.interrupt || 0, cacheRead: H.cache_read == null ? 0 : Number(H.cache_read) || 0 };
     }
     return { cont: 0, res: 0, retry: 0, intr: 0, cacheRead: 0 };
   }
-  var s = (d && d.session_signals) || {};
-  return { cont: s.continue || 0, res: s.resume || 0, retry: s.retry || 0, intr: s.interrupt || 0, cacheRead: d && d.cache_read != null ? Number(d.cache_read) || 0 : 0 };
+  var s = d?.session_signals || {};
+  return { cont: s.continue || 0, res: s.resume || 0, retry: s.retry || 0, intr: s.interrupt || 0, cacheRead: d?.cache_read == null ? 0 : Number(d.cache_read) || 0 };
 }
 function buildSessionSignalsStackedByDay(days, hostLabel) {
   var hostKey = hostLabel && String(hostLabel).trim() ? String(hostLabel).trim() : "";
@@ -147,13 +147,13 @@ function detectLang() {
   if (langs && langs.length) {
     for (var li = 0; li < langs.length; li++) {
       var x = String(langs[li] || "").toLowerCase();
-      if (x.indexOf("ko") === 0) return "ko";
-      if (x.indexOf("de") === 0) return "de";
+      if (x.startsWith("ko")) return "ko";
+      if (x.startsWith("de")) return "de";
     }
   }
   var nav = String(navigator.language || "").toLowerCase();
-  if (nav.indexOf("ko") === 0) return "ko";
-  if (nav.indexOf("de") === 0) return "de";
+  if (nav.startsWith("ko")) return "ko";
+  if (nav.startsWith("de")) return "de";
   return "en";
 }
 var __lang = detectLang();
@@ -336,13 +336,13 @@ function dayNumericForMainCharts(d, hostKey, field) {
 }
 function dayRatioCacheOutForMainCharts(d, hostKey) {
   if (!hostKey) return d.cache_output_ratio || 0;
-  var H = d.hosts && d.hosts[hostKey];
-  return H && H.cache_output_ratio != null ? H.cache_output_ratio : 0;
+  var H = d.hosts?.[hostKey];
+  return H?.cache_output_ratio != null ? H.cache_output_ratio : 0;
 }
 function dayOutputPerHourForMainCharts(d, hostKey) {
   if (!hostKey) return d.output_per_hour || 0;
-  var H = d.hosts && d.hosts[hostKey];
-  return H && H.output_per_hour != null ? H.output_per_hour : 0;
+  var H = d.hosts?.[hostKey];
+  return H?.output_per_hour != null ? H.output_per_hour : 0;
 }
 function subCachePctForDayMainCharts(d, hostKey) {
   if (!hostKey) return d.sub_cache_pct != null ? d.sub_cache_pct : 0;
@@ -3885,7 +3885,7 @@ function sortVersionKeys(keys, stats, mode) {
   if (mode === "newest") {
     arr.sort(semverCmpDesc);
   } else if (mode === "calls") {
-    arr.sort(function(a, b) { return ((stats[b] || {}).calls || 0) - ((stats[a] || {}).calls || 0); });
+    arr.sort(function(a, b) { return (stats[b]?.calls || 0) - (stats[a]?.calls || 0); });
   } else {
     arr.sort(function(a, b) { return versionAnomalyTotal(stats[b]) - versionAnomalyTotal(stats[a]); });
   }
@@ -3920,8 +3920,10 @@ function buildFilterCheckboxHtml(allVers, stats) {
   for (const v of allVers) {
     var checked = !__userVersionFilter || __userVersionFilter.includes(v);
     var anomalies = versionAnomalyTotal(stats[v]);
-    var calls = stats[v] ? stats[v].calls || 0 : 0;
-    var badge = anomalies > 0 ? " (" + anomalies + "!)" : calls > 0 ? " (" + calls + ")" : "";
+    var calls = stats[v]?.calls || 0;
+    var badge = "";
+    if (anomalies > 0) badge = " (" + anomalies + "!)";
+    else if (calls > 0) badge = " (" + calls + ")";
     html += '<label><input type="checkbox" value="' + v + '"' + (checked ? ' checked' : '') + '>' + v + '<span style="color:#64748b;font-size:.65rem">' + badge + '</span></label>';
   }
   html += '<div class="user-filter-actions"><button id="user-ver-all">Alle</button><button id="user-ver-none">Keine</button></div>';
@@ -3988,6 +3990,10 @@ function initUserVersionControls(stats, days) {
 function collectAllVersionKeys(stats, days) {
   var allVers = Object.keys(stats);
   if (allVers.length) return allVers;
+  return collectFallbackVersionKeys(days);
+}
+
+function collectFallbackVersionKeys(days) {
   var fallbackVers = {};
   for (const day of days) {
     for (const fk of Object.keys(day.versions || {})) fallbackVers[fk] = true;
@@ -4047,12 +4053,6 @@ function renderUserProfileCharts(days) {
   var stats = aggregateVersionStats(days);
   var allVers = collectAllVersionKeys(stats, days);
 
-  var allEntrypoints = {};
-  for (const day of days) {
-    for (const ek of Object.keys(day.entrypoints || {})) allEntrypoints[ek] = true;
-  }
-  var entrypointKeys = Object.keys(allEntrypoints).sort(function(a, b) { return a.localeCompare(b); });
-
   var top = findLatestDayTopEntries(days);
   var anom = computeAnomalyStats(allVers, stats);
 
@@ -4069,125 +4069,114 @@ function renderUserProfileCharts(days) {
   // Init sort/filter controls
   initUserVersionControls(stats, days);
 
-  // ── Version Health Chart (horizontal bar) ──
+  // Sort + filter (declared here so it's available for both charts)
+  var filteredVers = __userVersionFilter
+    ? allVers.filter(function(v) { return __userVersionFilter.includes(v); })
+    : allVers;
+  var sortedVers = sortVersionKeys(filteredVers, stats, __userVersionSort);
+
+  renderVersionHealthChart(sortedVers, stats, allVers);
+  renderEntrypointsChart(sortedVers, stats);
+}
+
+function renderVersionHealthChart(sortedVers, stats, allVers) {
   var elV = document.getElementById("c-user-versions");
   var h3V = document.getElementById("user-version-h3");
   if (h3V) h3V.textContent = t("userVersionHealthTitle");
   var blurbV = document.getElementById("user-version-blurb");
   if (blurbV) blurbV.textContent = t("userVersionHealthBlurb");
-  if (elV && allVers.length) {
-    if (_userCharts.versions) { _userCharts.versions.destroy(); _userCharts.versions = null; }
+  if (!elV || !allVers.length) return;
+  if (_userCharts.versions) { _userCharts.versions.destroy(); _userCharts.versions = null; }
 
-    // Sort + filter
-    var filteredVers = __userVersionFilter
-      ? allVers.filter(function(v) { return __userVersionFilter.includes(v); })
-      : allVers;
-    var sortedVers = sortVersionKeys(filteredVers, stats, __userVersionSort);
+  var datasets = [];
+  for (const m of __versionHealthMetrics) {
+    var mData = sortedVers.map(function(sv) { return stats[sv] ? (stats[sv][m.key] || 0) : 0; });
+    datasets.push({ label: t(m.label), data: mData, backgroundColor: m.color });
+  }
 
-    var datasets = [];
-    for (const m of __versionHealthMetrics) {
-      var mData = [];
-      for (const sv of sortedVers) {
-        var sv2 = stats[sv];
-        mData.push(sv2 ? (sv2[m.key] || 0) : 0);
-      }
-      datasets.push({
-        label: t(m.label),
-        data: mData,
-        backgroundColor: m.color
-      });
-    }
-
-    _userCharts.versions = new Chart(elV, {
-      type: "bar",
-      data: { labels: sortedVers, datasets: datasets },
-      options: {
-        indexAxis: "y",
-        responsive: true,
-        animation: false,
-        transitions: __chartTransitionsOff,
-        interaction: { mode: "index", intersect: false },
-        scales: {
-          x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8", precision: 0 } },
-          y: { stacked: true, grid: { color: "rgba(51,65,85,0.3)" }, ticks: { color: "#e2e8f0", font: { family: "monospace" } } }
-        },
-        plugins: {
-          legend: { labels: { color: "#cbd5e1" } },
-          tooltip: {
-            callbacks: {
-              afterBody: function(items) {
-                if (!items.length) return "";
-                var ver = sortedVers[items[0].dataIndex];
-                var s = stats[ver];
-                if (!s) return "";
-                return t("userProfileCardVersion") + ": " + ver + " | Calls: " + (s.calls || 0) + " | Output: " + (s.output || 0);
-              }
+  _userCharts.versions = new Chart(elV, {
+    type: "bar",
+    data: { labels: sortedVers, datasets: datasets },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      animation: false,
+      transitions: __chartTransitionsOff,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8", precision: 0 } },
+        y: { stacked: true, grid: { color: "rgba(51,65,85,0.3)" }, ticks: { color: "#e2e8f0", font: { family: "monospace" } } }
+      },
+      plugins: {
+        legend: { labels: { color: "#cbd5e1" } },
+        tooltip: {
+          callbacks: {
+            afterBody: function(items) {
+              if (!items.length) return "";
+              var ver = sortedVers[items[0].dataIndex];
+              var s = stats[ver];
+              if (!s) return "";
+              return t("userProfileCardVersion") + ": " + ver + " | Calls: " + (s.calls || 0) + " | Output: " + (s.output || 0);
             }
           }
         }
       }
-    });
-  }
+    }
+  });
+}
 
-  // ── Entrypoints per Version Chart (horizontal bar) ──
+function renderEntrypointsChart(sortedVers, stats) {
   var elE = document.getElementById("c-user-entrypoints");
   var h3E = document.getElementById("user-entrypoint-h3");
   if (h3E) h3E.textContent = t("userEntrypointChartTitle");
   var blurbE = document.getElementById("user-entrypoint-blurb");
   if (blurbE) blurbE.textContent = t("userEntrypointBlurb");
-  if (elE && sortedVers.length) {
-    if (_userCharts.entrypoints) { _userCharts.entrypoints.destroy(); _userCharts.entrypoints = null; }
+  if (!elE || !sortedVers.length) return;
+  if (_userCharts.entrypoints) { _userCharts.entrypoints.destroy(); _userCharts.entrypoints = null; }
 
-    // Collect all entrypoint keys across versions
-    var allEp = {};
-    for (const sv of sortedVers) {
-      var evs = stats[sv];
-      if (evs?.entrypoints) {
-        for (const epk of Object.keys(evs.entrypoints)) allEp[epk] = true;
-      }
+  var allEp = {};
+  for (const sv of sortedVers) {
+    if (stats[sv]?.entrypoints) {
+      for (const epk of Object.keys(stats[sv].entrypoints)) allEp[epk] = true;
     }
-    var epKeys = Object.keys(allEp).sort(function(a, b) { return a.localeCompare(b); });
+  }
+  var epKeys = Object.keys(allEp).sort(function(a, b) { return a.localeCompare(b); });
 
-    var epColors = {
-      "claude-vscode": "rgba(59,130,246,0.8)",
-      "cli": "rgba(34,197,94,0.8)",
-      "claude-jetbrains": "rgba(245,158,11,0.8)"
-    };
-    var epDatasets = [];
-    for (var edi = 0; edi < epKeys.length; edi++) {
-      var eKey = epKeys[edi];
-      var eData = [];
-      for (const sv of sortedVers) {
-        var evs2 = stats[sv];
-        eData.push(evs2?.entrypoints ? (evs2.entrypoints[eKey] || 0) : 0);
-      }
-      epDatasets.push({
-        label: eKey,
-        data: eData,
-        backgroundColor: epColors[eKey] || __userProfileColors[edi % __userProfileColors.length],
-        stack: "ep"
-      });
-    }
-    _userCharts.entrypoints = new Chart(elE, {
-      type: "bar",
-      data: { labels: sortedVers, datasets: epDatasets },
-      options: {
-        indexAxis: "y",
-        responsive: true,
-        animation: false,
-        transitions: __chartTransitionsOff,
-        interaction: { mode: "index", intersect: false },
-        scales: {
-          x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8", precision: 0 } },
-          y: { stacked: true, grid: { color: "rgba(51,65,85,0.3)" }, ticks: { color: "#e2e8f0", font: { family: "monospace" } } }
-        },
-        plugins: {
-          legend: { labels: { color: "#cbd5e1" } },
-          tooltip: { callbacks: { label: function(c) { return c.dataset.label + ": " + c.raw; } } }
-        }
-      }
+  var epColors = {
+    "claude-vscode": "rgba(59,130,246,0.8)",
+    "cli": "rgba(34,197,94,0.8)",
+    "claude-jetbrains": "rgba(245,158,11,0.8)"
+  };
+  var epDatasets = [];
+  for (var edi = 0; edi < epKeys.length; edi++) {
+    var eKey = epKeys[edi];
+    var eData = sortedVers.map(function(sv) { return stats[sv]?.entrypoints ? (stats[sv].entrypoints[eKey] || 0) : 0; });
+    epDatasets.push({
+      label: eKey,
+      data: eData,
+      backgroundColor: epColors[eKey] || __userProfileColors[edi % __userProfileColors.length],
+      stack: "ep"
     });
   }
+  _userCharts.entrypoints = new Chart(elE, {
+    type: "bar",
+    data: { labels: sortedVers, datasets: epDatasets },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      animation: false,
+      transitions: __chartTransitionsOff,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8", precision: 0 } },
+        y: { stacked: true, grid: { color: "rgba(51,65,85,0.3)" }, ticks: { color: "#e2e8f0", font: { family: "monospace" } } }
+      },
+      plugins: {
+        legend: { labels: { color: "#cbd5e1" } },
+        tooltip: { callbacks: { label: function(c) { return c.dataset.label + ": " + c.raw; } } }
+      }
+    }
+  });
 }
 
 // ── Proxy Analytics Panel ─────────────────────────────────────────────────
@@ -6229,7 +6218,7 @@ function renderAvailabilityKpis(data) {
   var rows = panel.querySelectorAll("[data-month]");
   for (var ri = 0; ri < rows.length; ri++) {
     rows[ri].addEventListener("click", function() {
-      var mk = this.getAttribute("data-month");
+      var mk = this.dataset.month;
       var newFilter;
       if (mk === "__all__") {
         newFilter = null;
@@ -6250,7 +6239,7 @@ function renderAvailabilityKpis(data) {
   var badges = panel.querySelectorAll("[data-impact]");
   for (var bi2 = 0; bi2 < badges.length; bi2++) {
     badges[bi2].addEventListener("click", function() {
-      var imp = this.getAttribute("data-impact");
+      var imp = this.dataset.impact;
       if (_outageImpactExclude[imp]) { delete _outageImpactExclude[imp]; } else { _outageImpactExclude[imp] = true; }
       renderUptimeChart(data);
       renderIncidentHistory(data);
@@ -6265,7 +6254,7 @@ function renderAvailabilityKpis(data) {
   var stBadges = panel.querySelectorAll("[data-status]");
   for (var sb = 0; sb < stBadges.length; sb++) {
     stBadges[sb].addEventListener("click", function() {
-      var sk = this.getAttribute("data-status");
+      var sk = this.dataset.status;
       if (_outageStatusExclude[sk]) { delete _outageStatusExclude[sk]; } else { _outageStatusExclude[sk] = true; }
       renderUptimeChart(data);
       renderAvailabilityKpis(data);
@@ -6427,8 +6416,7 @@ scheduleFetchExtensionTimeline(900);
 function miniMd(src) {
   var lines = (src || "").split("\n");
   var html = "", inList = false;
-  for (var i = 0; i < lines.length; i++) {
-    var ln = lines[i];
+  for (const ln of lines) {
     // Headings
     var hm = ln.match(/^(#{1,4})\s+(.*)/);
     if (hm) {
@@ -6474,7 +6462,7 @@ function inlineMd(s) {
       var info = JSON.parse(xhr.responseText);
       // Show release version in Live panel — compact row
       var relRow = document.getElementById("live-release-row");
-      var ver = info.version && info.version !== "dev" ? info.version : null;
+      var ver = info.version?.length && info.version !== "dev" ? info.version : null;
       if (relRow) {
         if (ver) {
           relRow.innerHTML = '<span class="live-rel-badge live-rel-badge-ok">' + escHtml(ver) + '</span>' +
@@ -6504,12 +6492,12 @@ function inlineMd(s) {
                 var releases = JSON.parse(rlXhr.responseText);
                 if (!releases.length) { relBody.innerHTML = '<p style="color:#64748b;font-size:.75rem">No releases found</p>'; return; }
                 var rh = "";
-                for (var ri = 0; ri < releases.length; ri++) {
-                  var rel = releases[ri];
+                var isFirst = true;
+                for (const rel of releases) {
                   var rDate = rel.published_at ? rel.published_at.slice(0, 10) : "";
                   var rBody2 = (rel.body || "").replace(/^## .+\n?/m, "");
-                  var isFirst = ri === 0;
                   rh += "<details class=\"release-modal-item\"" + (isFirst ? " open" : "") + ">";
+                  isFirst = false;
                   rh += "<summary class=\"release-modal-item-head\">";
                   rh += "<span class=\"rel-tag\">" + escHtml(rel.tag_name) + "</span>";
                   rh += "<span class=\"rel-date\">" + escHtml(rDate) + "</span>";
@@ -6599,7 +6587,7 @@ function inlineMd(s) {
   document.body.appendChild(pop);
 
   function showPop(e) {
-    var tip = e.currentTarget.getAttribute("data-tip");
+    var tip = e.currentTarget.dataset.tip;
     if (!tip) return;
     pop.textContent = tip;
     pop.style.opacity = "1";
@@ -6639,7 +6627,7 @@ function inlineMd(s) {
       } else {
         var span = document.createElement("span");
         span.className = "tt";
-        span.setAttribute("data-tip", GLOSSARY[term]);
+        span.dataset.tip = GLOSSARY[term];
         span.textContent = term;
         span.addEventListener("mouseenter", showPop);
         span.addEventListener("mousemove", movePop);
@@ -6650,7 +6638,7 @@ function inlineMd(s) {
       lastIdx = RE.lastIndex;
     }
     if (lastIdx < text.length) frag.appendChild(document.createTextNode(text.slice(lastIdx)));
-    if (frag.childNodes.length) parent.replaceChild(frag, node);
+    if (frag.childNodes.length) node.replaceWith(frag);
   }
 
   function scanElement(root) {
@@ -6678,7 +6666,7 @@ function inlineMd(s) {
       span.removeEventListener("mouseleave", hidePop);
       var parent = span.parentNode;
       if (parent) {
-        parent.replaceChild(document.createTextNode(span.textContent), span);
+        span.replaceWith(document.createTextNode(span.textContent));
         parent.normalize();
         if (parent.__ttSeen) parent.__ttSeen = {};
       }

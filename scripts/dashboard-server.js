@@ -1653,6 +1653,13 @@ function mergeDayBucketInto(target, src) {
   mergeVersionStatsInto(target, src.version_stats);
 }
 
+function mergeEntrypointsInto(tgt, srcEntrypoints) {
+  if (!tgt.entrypoints) tgt.entrypoints = {};
+  for (var ek of Object.keys(srcEntrypoints || {})) {
+    tgt.entrypoints[ek] = (tgt.entrypoints[ek] || 0) + (srcEntrypoints[ek] || 0);
+  }
+}
+
 function mergeVersionStatsInto(target, srcVersionStats) {
   if (!srcVersionStats) return;
   if (!target.version_stats) target.version_stats = {};
@@ -1662,10 +1669,7 @@ function mergeVersionStatsInto(target, srcVersionStats) {
     var srcVs = srcVersionStats[vsKey];
     for (var f of Object.keys(srcVs)) {
       if (f === 'entrypoints') {
-        if (!tgt.entrypoints) tgt.entrypoints = {};
-        for (var ek of Object.keys(srcVs.entrypoints || {})) {
-          tgt.entrypoints[ek] = (tgt.entrypoints[ek] || 0) + (srcVs.entrypoints[ek] || 0);
-        }
+        mergeEntrypointsInto(tgt, srcVs.entrypoints);
       } else {
         tgt[f] = (tgt[f] || 0) + (srcVs[f] || 0);
       }
@@ -3332,8 +3336,8 @@ var server = http.createServer(function (req, res) {
     }));
   } else if (pathname === '/api/debug/cache-reset' && req.method === 'POST' && process.env.DEBUG_API === '1') {
     // Loescht Day-Cache + Today-Index und triggert Full-Rescan
-    try { fs.unlinkSync(USAGE_DAY_CACHE_FILE); } catch (e) {}
-    try { fs.unlinkSync(JSONL_TODAY_INDEX_FILE); } catch (e) {}
+    try { fs.unlinkSync(USAGE_DAY_CACHE_FILE); } catch (_ignored) { /* file may not exist */ }
+    try { fs.unlinkSync(JSONL_TODAY_INDEX_FILE); } catch (_ignored) { /* file may not exist */ }
     serviceLog.info('cache', 'cache-reset via /api/debug/cache-reset — full rescan triggered');
     runScanAndBroadcast();
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
@@ -3354,6 +3358,48 @@ var server = http.createServer(function (req, res) {
     res.end(getDashboardHtml());
   }
 });
+
+function startupDevFull() {
+  try { getDashboardHtml(); } catch (_ignored) { /* template init */ }
+  serviceLog.info('dev', 'DEV_MODE=full — all data from ' + __devSource);
+  if (process.env.CLAUDE_USAGE_NO_CACHE === '1') {
+    serviceLog.info('dev', '--no-cache: sending POST /api/debug/cache-reset to ' + __devSource);
+    try {
+      var resetUrl = new URL('/api/debug/cache-reset', __devSource);
+      var resetMod = resetUrl.protocol === 'https:' ? https : http;
+      var resetReq = resetMod.request(resetUrl, { method: 'POST', timeout: 10000 }, function(r) {
+        var b = '';
+        r.on('data', function(c) { b += c; });
+        r.on('end', function() { serviceLog.info('dev', 'remote cache-reset response: ' + r.statusCode + ' ' + b.slice(0, 200)); });
+      });
+      resetReq.on('error', function(e) { serviceLog.warn('dev', 'remote cache-reset failed: ' + (e.message || e)); });
+      resetReq.end();
+    } catch (e) { serviceLog.warn('dev', 'remote cache-reset error: ' + (e.message || e)); }
+  }
+  devFetchRemoteUsage(function () { __devProxyPending = false; });
+  setInterval(function () { devFetchRemoteUsage(function () {}); }, REFRESH_SEC * 1000);
+}
+
+function startupDevProxy() {
+  serviceLog.info('dev', 'DEV_MODE=proxy — local JSONL + remote proxy from ' + __devSource);
+  primeDashboardAndScheduleFirstScan();
+  devFetchProxyLogs(function () {
+    __devProxyPending = false;
+    setTimeout(function () {
+      refreshProxyCache();
+      if (__proxyCache.data && cachedData) { cachedData.proxy = __proxyCache.data; broadcastSse(); }
+    }, 3000);
+  });
+  setInterval(function () {
+    devFetchProxyLogs(function () {
+      refreshProxyCache();
+      if (__proxyCache.data && cachedData) { cachedData.proxy = __proxyCache.data; broadcastSse(); }
+    });
+  }, REFRESH_SEC * 1000);
+  setTimeout(refreshOutageCache, 400);
+  setTimeout(maybeRefreshReleasesCacheOnStartup, 1400);
+  setTimeout(refreshMarketplaceExtensionCache, 2400);
+}
 
 server.listen(PORT, function () {
   console.log('Claude Code Usage Dashboard running at http://localhost:' + PORT);
@@ -3377,47 +3423,10 @@ server.listen(PORT, function () {
       (process.env.CLAUDE_USAGE_LOG_FILE ? ' log_file=' + process.env.CLAUDE_USAGE_LOG_FILE : '')
   );
   if (__devMode === 'full' && __devSource) {
-    // Dev full: fetch usage + proxy from remote, no local scan
-    try { getDashboardHtml(); } catch (e) {}
-    serviceLog.info('dev', 'DEV_MODE=full — all data from ' + __devSource);
-    if (process.env.CLAUDE_USAGE_NO_CACHE === '1') {
-      serviceLog.info('dev', '--no-cache: sending POST /api/debug/cache-reset to ' + __devSource);
-      try {
-        var resetUrl = new URL('/api/debug/cache-reset', __devSource);
-        var resetMod = resetUrl.protocol === 'https:' ? https : http;
-        var resetReq = resetMod.request(resetUrl, { method: 'POST', timeout: 10000 }, function(r) {
-          var b = '';
-          r.on('data', function(c) { b += c; });
-          r.on('end', function() { serviceLog.info('dev', 'remote cache-reset response: ' + r.statusCode + ' ' + b.slice(0, 200)); });
-        });
-        resetReq.on('error', function(e) { serviceLog.warn('dev', 'remote cache-reset failed: ' + (e.message || e)); });
-        resetReq.end();
-      } catch (e) { serviceLog.warn('dev', 'remote cache-reset error: ' + (e.message || e)); }
-    }
-    devFetchRemoteUsage(function () { __devProxyPending = false; });
-    setInterval(function () { devFetchRemoteUsage(function () {}); }, REFRESH_SEC * 1000);
+    startupDevFull();
   } else if (__devMode === 'proxy' && __devSource) {
-    // Dev proxy: local JSONL scan + proxy data from remote
-    serviceLog.info('dev', 'DEV_MODE=proxy — local JSONL + remote proxy from ' + __devSource);
-    primeDashboardAndScheduleFirstScan();
-    devFetchProxyLogs(function () {
-      __devProxyPending = false;
-      setTimeout(function () {
-        refreshProxyCache();
-        if (__proxyCache.data && cachedData) { cachedData.proxy = __proxyCache.data; broadcastSse(); }
-      }, 3000);
-    });
-    setInterval(function () {
-      devFetchProxyLogs(function () {
-        refreshProxyCache();
-        if (__proxyCache.data && cachedData) { cachedData.proxy = __proxyCache.data; broadcastSse(); }
-      });
-    }, REFRESH_SEC * 1000);
-    setTimeout(refreshOutageCache, 400);
-    setTimeout(maybeRefreshReleasesCacheOnStartup, 1400);
-    setTimeout(refreshMarketplaceExtensionCache, 2400);
+    startupDevProxy();
   } else {
-    // Production: normal local scan
     primeDashboardAndScheduleFirstScan();
     setTimeout(refreshOutageCache, 400);
     setTimeout(maybeRefreshReleasesCacheOnStartup, 1400);
