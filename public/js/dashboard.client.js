@@ -4016,21 +4016,26 @@ function renderUserProfileCharts(days) {
   }
   var entrypointKeys = Object.keys(allEntrypoints).sort();
 
-  // Latest day summary
-  var lastDay = days[days.length - 1];
+  // Find latest day with actual data (skip days with 0 calls)
   var topVersion = "";
   var topVersionCount = 0;
-  var lv = lastDay.versions || {};
-  var lvk = Object.keys(lv);
-  for (var tvi = 0; tvi < lvk.length; tvi++) {
-    if (lv[lvk[tvi]] > topVersionCount) { topVersion = lvk[tvi]; topVersionCount = lv[lvk[tvi]]; }
-  }
   var topEntrypoint = "";
   var topEpCount = 0;
-  var le = lastDay.entrypoints || {};
-  var lek = Object.keys(le);
-  for (var tei = 0; tei < lek.length; tei++) {
-    if (le[lek[tei]] > topEpCount) { topEntrypoint = lek[tei]; topEpCount = le[lek[tei]]; }
+  for (var ldi = days.length - 1; ldi >= 0; ldi--) {
+    var ld = days[ldi];
+    var ldv = ld.versions || {};
+    if (Object.keys(ldv).length) {
+      var ldvk = Object.keys(ldv);
+      for (var tvi = 0; tvi < ldvk.length; tvi++) {
+        if (ldv[ldvk[tvi]] > topVersionCount) { topVersion = ldvk[tvi]; topVersionCount = ldv[ldvk[tvi]]; }
+      }
+      var lde = ld.entrypoints || {};
+      var ldek = Object.keys(lde);
+      for (var tei = 0; tei < ldek.length; tei++) {
+        if (lde[ldek[tei]] > topEpCount) { topEntrypoint = ldek[tei]; topEpCount = lde[ldek[tei]]; }
+      }
+      break;
+    }
   }
 
   // Anomaly rate
