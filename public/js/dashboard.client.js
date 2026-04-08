@@ -1145,7 +1145,7 @@ if (typeof Chart !== "undefined") {
   };
   Chart.defaults.responsive = true;
   Chart.defaults.resizeDelay = 300;
-  Chart.defaults.devicePixelRatio = window.devicePixelRatio || 1;
+  Chart.defaults.devicePixelRatio = Math.max(window.devicePixelRatio || 1, 2);
 
 }
 var __usageUpdatePluginRegistered = false;
@@ -3822,7 +3822,7 @@ function copyReport(){
 // ── User Profile Charts ──────────────────────────────────────────────────
 var _userCharts = { versions: null, entrypoints: null };
 var __userVersionSort = "anomalies"; // anomalies | newest | calls
-var __userVersionFilter = []; // empty = all
+var __userVersionFilter = null; // null = all, [] = none selected
 
 var __userProfileColors = [
   "rgba(59,130,246,0.8)",   // blue
@@ -3858,11 +3858,17 @@ function aggregateVersionStats(days) {
   for (const day of days) {
     var vs = day.version_stats || {};
     for (const ver of Object.keys(vs)) {
-      if (!merged[ver]) merged[ver] = { calls: 0, output: 0, cache_read: 0, hit_limit: 0, retry: 0, interrupt: 0, continue: 0, resume: 0, truncated: 0, api_error: 0 };
+      if (!merged[ver]) merged[ver] = { calls: 0, output: 0, cache_read: 0, hit_limit: 0, retry: 0, interrupt: 0, continue: 0, resume: 0, truncated: 0, api_error: 0, entrypoints: {} };
       var src = vs[ver];
       var tgt = merged[ver];
       for (const fk of Object.keys(src)) {
-        tgt[fk] = (tgt[fk] || 0) + (src[fk] || 0);
+        if (fk === 'entrypoints') {
+          for (const ek of Object.keys(src.entrypoints || {})) {
+            tgt.entrypoints[ek] = (tgt.entrypoints[ek] || 0) + (src.entrypoints[ek] || 0);
+          }
+        } else {
+          tgt[fk] = (tgt[fk] || 0) + (src[fk] || 0);
+        }
       }
     }
   }
@@ -3912,7 +3918,7 @@ function initVersionSortDropdown(days) {
 function buildFilterCheckboxHtml(allVers, stats) {
   var html = "";
   for (const v of allVers) {
-    var checked = !__userVersionFilter.length || __userVersionFilter.includes(v);
+    var checked = !__userVersionFilter || __userVersionFilter.includes(v);
     var anomalies = versionAnomalyTotal(stats[v]);
     var calls = stats[v] ? stats[v].calls || 0 : 0;
     var badge = anomalies > 0 ? " (" + anomalies + "!)" : calls > 0 ? " (" + calls + ")" : "";
@@ -3933,7 +3939,7 @@ function initUserVersionControls(stats, days) {
   var allVers = Object.keys(stats).sort(semverCmpDesc);
 
   function updateCount() {
-    var n = __userVersionFilter.length;
+    var n = __userVersionFilter ? __userVersionFilter.length : 0;
     if (countEl) countEl.textContent = n ? "(" + n + "/" + allVers.length + ")" : "(" + allVers.length + ")";
   }
 
@@ -3959,7 +3965,7 @@ function initUserVersionControls(stats, days) {
     for (const cb of cbs) {
       if (cb.checked) sel.push(cb.value);
     }
-    __userVersionFilter = sel.length === allVers.length ? [] : sel;
+    __userVersionFilter = sel.length === allVers.length ? null : sel;
     updateCount();
     renderUserProfileCharts(days);
   }
@@ -4067,11 +4073,13 @@ function renderUserProfileCharts(days) {
   var elV = document.getElementById("c-user-versions");
   var h3V = document.getElementById("user-version-h3");
   if (h3V) h3V.textContent = t("userVersionHealthTitle");
+  var blurbV = document.getElementById("user-version-blurb");
+  if (blurbV) blurbV.textContent = t("userVersionHealthBlurb");
   if (elV && allVers.length) {
     if (_userCharts.versions) { _userCharts.versions.destroy(); _userCharts.versions = null; }
 
     // Sort + filter
-    var filteredVers = __userVersionFilter.length
+    var filteredVers = __userVersionFilter
       ? allVers.filter(function(v) { return __userVersionFilter.includes(v); })
       : allVers;
     var sortedVers = sortVersionKeys(filteredVers, stats, __userVersionSort);
@@ -4125,6 +4133,8 @@ function renderUserProfileCharts(days) {
   var elE = document.getElementById("c-user-entrypoints");
   var h3E = document.getElementById("user-entrypoint-h3");
   if (h3E) h3E.textContent = t("userEntrypointChartTitle");
+  var blurbE = document.getElementById("user-entrypoint-blurb");
+  if (blurbE) blurbE.textContent = t("userEntrypointBlurb");
   if (elE && sortedVers.length) {
     if (_userCharts.entrypoints) { _userCharts.entrypoints.destroy(); _userCharts.entrypoints = null; }
 
