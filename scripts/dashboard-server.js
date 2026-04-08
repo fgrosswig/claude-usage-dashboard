@@ -426,7 +426,7 @@ function maybeRefreshReleasesCacheOnStartup() {
 /** "v2.1.87", "2.1.87", "…2.1.87…" -> "2.1.87" (GitHub-Release-Keys) */
 function normalizeCliSemver(s) {
   if (s == null || s === '') return '';
-  var m = String(s).match(/\d+\.\d+\.\d+/);
+  var m = String(s).match(/\d{1,10}\.\d{1,10}\.\d{1,10}/);
   return m ? m[0] : '';
 }
 
@@ -477,12 +477,12 @@ function extractReleaseHighlights(body) {
   var highlights = [];
   var lines = slice.split('\n');
   for (var li = 0; li < lines.length && li < 140 && highlights.length < 12; li++) {
-    var ln = lines[li].replace(/^[\s>*\-•]+/, '').trim();
+    var ln = lines[li].replace(/^[ \t>*\-•]+/, '').trim();
     if (!ln || ln.length < 6) continue;
     if (/^#{1,6}\s/.test(ln)) break;
     if (/^---+(\s|$)|^\*{3,}(\s|$)/.test(ln)) continue;
     if (/^(full changelog|see also)\b/i.test(ln)) continue;
-    if (/^assets\s*\d*\s*$/i.test(ln)) continue;
+    if (/^assets[\s\d]*$/i.test(ln)) continue;
     highlights.push(ln.slice(0, 220));
   }
   return highlights;
@@ -3105,7 +3105,7 @@ function devFetchRemoteUsage(cb, retryCount) {
   retryCount = retryCount || 0;
   var maxRetries = 3;
   var retryDelayMs = 5000;
-  var url = __devSource.replace(/\/+$/, '') + '/api/debug/proxy-logs';
+  var url = __devSource.replace(/\/$/, '') + '/api/debug/proxy-logs';
   if (retryCount === 0) serviceLog.info('dev', 'fetching remote data from ' + url);
   var proto = url.startsWith('https') ? require('https') : require('http');
   proto.get(url, function (resp) {
@@ -3171,7 +3171,7 @@ function devFetchProxyLogs(cb) {
   if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
   process.env.ANTHROPIC_PROXY_LOG_DIR = logDir;
 
-  var url = source.replace(/\/+$/, '') + '/api/debug/proxy-logs';
+  var url = source.replace(/\/$/, '') + '/api/debug/proxy-logs';
   serviceLog.info('dev', 'fetching proxy logs from ' + url);
   var proto = url.startsWith('https') ? require('https') : require('http');
   proto.get(url, function (resp) {

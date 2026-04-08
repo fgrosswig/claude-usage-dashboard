@@ -67,7 +67,7 @@ function requestPathname(reqUrl) {
   if (raw[0] !== '/') raw = '/' + raw;
   var p = '/';
   try {
-    p = new URL(raw, 'http://dashboard.asset').pathname || '/';
+    p = new URL(raw, 'https://dashboard.local').pathname || '/';
   } catch (e) {
     p = '/';
   }

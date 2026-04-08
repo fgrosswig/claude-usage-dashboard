@@ -6437,7 +6437,7 @@ function miniMd(src) {
 }
 function inlineMd(s) {
   s = escHtml(s);
-  s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   s = s.replace(/`([^`]+)`/g, "<code style=\"background:#334155;padding:1px 4px;border-radius:3px;font-size:.9em\">$1</code>");
   s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "<a href=\"$2\" target=\"_blank\" rel=\"noopener\" style=\"color:#93c5fd\">$1</a>");
   return s;
