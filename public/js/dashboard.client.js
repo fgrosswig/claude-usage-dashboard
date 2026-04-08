@@ -138,30 +138,32 @@ function buildSessionSignalsStackedByDay(days, hostLabel) {
 
 var I18N = (typeof __I18N_BUNDLES === "object" && __I18N_BUNDLES && __I18N_BUNDLES.de && __I18N_BUNDLES.en)
   ? __I18N_BUNDLES
-  : { de: {}, en: {} };
+  : { de: {}, en: {}, ko: {} };
 function detectLang() {
   try {
     var sv = localStorage.getItem("usageDashboardLang");
-    if (sv === "de" || sv === "en") return sv;
+    if (sv === "de" || sv === "en" || sv === "ko") return sv;
   } catch (e0) {}
   var langs = navigator.languages;
   if (langs && langs.length) {
     for (var li = 0; li < langs.length; li++) {
       var x = String(langs[li] || "").toLowerCase();
+      if (x.indexOf("ko") === 0) return "ko";
       if (x.indexOf("de") === 0) return "de";
     }
   }
   var nav = String(navigator.language || "").toLowerCase();
+  if (nav.indexOf("ko") === 0) return "ko";
   if (nav.indexOf("de") === 0) return "de";
   return "en";
 }
 var __lang = detectLang();
 function getLang() { return __lang; }
 function setLang(code) {
-  if (code !== "de" && code !== "en") return;
+  if (code !== "de" && code !== "en" && code !== "ko") return;
   __lang = code;
   try { localStorage.setItem("usageDashboardLang", code); } catch (e1) {}
-  document.documentElement.lang = code === "de" ? "de" : "en";
+  document.documentElement.lang = code;
   updateLangButtons();
   applyStaticChrome();
   if (typeof __lastUsageData !== "undefined" && __lastUsageData) renderDashboard(__lastUsageData, true);
@@ -457,6 +459,7 @@ function syncMainChartsScopeUi() {
 function updateLangButtons() {
   var bde = document.getElementById("lang-de");
   var ben = document.getElementById("lang-en");
+  var bko = document.getElementById("lang-ko");
   if (bde) {
     bde.classList.toggle("active", __lang === "de");
     bde.setAttribute("aria-pressed", __lang === "de" ? "true" : "false");
@@ -464,6 +467,10 @@ function updateLangButtons() {
   if (ben) {
     ben.classList.toggle("active", __lang === "en");
     ben.setAttribute("aria-pressed", __lang === "en" ? "true" : "false");
+  }
+  if (bko) {
+    bko.classList.toggle("active", __lang === "ko");
+    bko.setAttribute("aria-pressed", __lang === "ko" ? "true" : "false");
   }
 }
 function apiNote(data, deKey, enKey) {
@@ -677,7 +684,7 @@ function applyStaticChrome() {
   if (tn) tn.textContent = t("thinkingNote");
   var lf = document.getElementById("live-files-hint");
   if (lf) lf.textContent = t("liveFilesHint");
-  document.documentElement.lang = __lang === "de" ? "de" : "en";
+  document.documentElement.lang = __lang;
   var usc = document.getElementById("update-sl-close");
   if (usc) usc.setAttribute("aria-label", t("updateSlideoutClose"));
   var gtl = document.getElementById("github-token-label");
@@ -3742,8 +3749,10 @@ function copyReport(){
 (function(){
   var bde=document.getElementById("lang-de");
   var ben=document.getElementById("lang-en");
+  var bko=document.getElementById("lang-ko");
   if(bde) bde.addEventListener("click",function(){ setLang("de"); });
   if(ben) ben.addEventListener("click",function(){ setLang("en"); });
+  if(bko) bko.addEventListener("click",function(){ setLang("ko"); });
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) return;
     updateGithubTokenPanelMode();
@@ -5958,3 +5967,4 @@ function inlineMd(s) {
   };
   xhr.send();
 })();
+
