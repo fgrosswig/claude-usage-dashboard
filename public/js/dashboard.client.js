@@ -4450,10 +4450,10 @@ var __quotaWeights = {
   cache_read: 0.03
 };
 var __budgetViewMode = "volume"; // "volume" | "cost"
-var __budgetWaterfallState = null; // cached data for toggle
+var __budgetSankeyState = null;
 
 function renderBudgetWaterfall(tot, quota) {
-  __budgetWaterfallState = { tot: tot, quota: quota };
+  __budgetSankeyState = { tot: tot, quota: quota };
 
   // Wire toggle button (once)
   var toggleBtn = document.getElementById("budget-view-toggle");
@@ -4461,7 +4461,7 @@ function renderBudgetWaterfall(tot, quota) {
     toggleBtn.__wired = true;
     toggleBtn.addEventListener("click", function() {
       __budgetViewMode = __budgetViewMode === "volume" ? "cost" : "volume";
-      if (__budgetWaterfallState) renderBudgetWaterfall(__budgetWaterfallState.tot, __budgetWaterfallState.quota);
+      if (__budgetSankeyState) renderBudgetWaterfall(__budgetSankeyState.tot, __budgetSankeyState.quota);
     });
   }
   if (toggleBtn) toggleBtn.textContent = __budgetViewMode === "volume" ? t("budgetWfVolume") : t("budgetWfCost");
@@ -4474,96 +4474,89 @@ function renderBudgetWaterfall(tot, quota) {
   if (_budgetCharts.waterfall) { _budgetCharts.waterfall.destroy(); _budgetCharts.waterfall = null; }
   if (tot.total <= 0) return;
 
-  var segments = [
-    { key: "output",         value: tot.output,         weight: __quotaWeights.output,        color: "rgba(34,197,94,0.85)",  label: t("budgetWfOutput") },
-    { key: "input",          value: tot.input,          weight: __quotaWeights.input,          color: "rgba(59,130,246,0.8)",  label: t("budgetWfInput") },
-    { key: "cache_read",     value: tot.cache_read,     weight: __quotaWeights.cache_read,     color: "rgba(34,211,238,0.8)",  label: t("budgetWfCacheRead") },
-    { key: "cache_creation", value: tot.cache_creation, weight: __quotaWeights.cache_creation, color: "rgba(245,158,11,0.85)", label: t("budgetWfCacheCreate") }
-  ];
-
   var isCost = __budgetViewMode === "cost";
 
-  // Compute values based on mode
-  var totalCost = 0;
-  for (var wi = 0; wi < segments.length; wi++) {
-    segments[wi].cost = segments[wi].value * segments[wi].weight;
-    totalCost += segments[wi].cost;
-  }
-  var displayTotal = isCost ? totalCost : tot.total;
+  // Compute weighted values
+  var outVal   = isCost ? tot.output * __quotaWeights.output               : tot.output;
+  var inVal    = isCost ? tot.input * __quotaWeights.input                 : tot.input;
+  var crVal    = isCost ? tot.cache_read * __quotaWeights.cache_read       : tot.cache_read;
+  var ccVal    = isCost ? tot.cache_creation * __quotaWeights.cache_creation: tot.cache_creation;
+  var totalVal = outVal + inVal + crVal + ccVal;
 
-  // Blurb with quota context
   if (blurb) {
     var blurbText = isCost ? t("budgetWaterfallBlurbCost") : t("budgetWaterfallBlurb");
     if (quota && quota.visible_tokens_per_pct > 0) {
-      var quotaUsedPct = displayTotal / (quota.visible_tokens_per_pct * 100);
+      var quotaUsedPct = totalVal / (quota.visible_tokens_per_pct * 100);
       blurbText += " \u00B7 ~" + Math.round(quotaUsedPct * 100) + "% " + t("budgetWfOfQuota");
     }
     blurb.textContent = blurbText;
   }
 
-  // Build stacked bar (single row, 100% = displayTotal)
-  var datasets = [];
-  var runStart = 0;
-  for (var si = 0; si < segments.length; si++) {
-    var seg = segments[si];
-    var segVal = isCost ? seg.cost : seg.value;
-    var pct = displayTotal > 0 ? Math.round(segVal / displayTotal * 1000) / 10 : 0;
-    datasets.push({
-      label: seg.label + " (" + pct + "%)",
-      data: [[runStart, runStart + segVal]],
-      backgroundColor: seg.color,
-      borderSkipped: false,
-      _rawValue: segVal,
-      _pct: pct,
-      _tokens: seg.value
-    });
-    runStart += segVal;
-  }
+  // Sankey: Total Budget flows into 4 token types
+  // Then each type flows into "Productive" or "Overhead"
+  var fmtPct = function(v) { return totalVal > 0 ? Math.round(v / totalVal * 1000) / 10 : 0; };
+  var fmtTok = function(v) {
+    if (v >= 1e9) return (v / 1e9).toFixed(1) + "B";
+    if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
+    if (v >= 1e3) return (v / 1e3).toFixed(0) + "K";
+    return String(Math.round(v));
+  };
 
-  var xLabel = isCost ? t("budgetWfXCost") : t("budgetWfXAxis");
+  var budgetLabel = t("budgetWfBudget") + " (" + fmtTok(totalVal) + ")";
+  var outputLabel = t("budgetWfOutput") + " " + fmtPct(outVal) + "%";
+  var inputLabel  = t("budgetWfInput") + " " + fmtPct(inVal) + "%";
+  var cacheRLabel = t("budgetWfCacheRead") + " " + fmtPct(crVal) + "%";
+  var cacheCLabel = t("budgetWfCacheCreate") + " " + fmtPct(ccVal) + "%";
+  var prodLabel   = t("budgetWfProductive");
+  var overLabel   = t("budgetWfOverhead");
+
+  // Sankey flows: budget → token types → productive/overhead
+  var flows = [];
+  // Budget → token types (all with min flow for visibility)
+  if (outVal > 0) flows.push({ from: budgetLabel, to: outputLabel, flow: outVal });
+  if (inVal > 0)  flows.push({ from: budgetLabel, to: inputLabel,  flow: inVal });
+  if (crVal > 0)  flows.push({ from: budgetLabel, to: cacheRLabel, flow: crVal });
+  if (ccVal > 0)  flows.push({ from: budgetLabel, to: cacheCLabel, flow: ccVal });
+
+  // Token types → productive/overhead
+  if (outVal > 0)  flows.push({ from: outputLabel, to: prodLabel,  flow: outVal });
+  if (inVal > 0)   flows.push({ from: inputLabel,  to: overLabel,  flow: inVal });
+  if (crVal > 0)   flows.push({ from: cacheRLabel, to: overLabel,  flow: crVal });
+  if (ccVal > 0)   flows.push({ from: cacheCLabel, to: overLabel,  flow: ccVal });
+
+  var colorMap = {};
+  colorMap[budgetLabel] = "rgba(148,163,184,0.7)";
+  colorMap[outputLabel] = "rgba(34,197,94,0.7)";
+  colorMap[inputLabel]  = "rgba(59,130,246,0.7)";
+  colorMap[cacheRLabel] = "rgba(34,211,238,0.7)";
+  colorMap[cacheCLabel] = "rgba(245,158,11,0.7)";
+  colorMap[prodLabel]   = "rgba(34,197,94,0.5)";
+  colorMap[overLabel]   = "rgba(248,113,113,0.5)";
 
   _budgetCharts.waterfall = new Chart(el, {
-    type: "bar",
-    data: { labels: [isCost ? t("budgetWfCost") : t("budgetWfVolume")], datasets: datasets },
+    type: "sankey",
+    data: {
+      datasets: [{
+        data: flows,
+        colorFrom: function(ctx) { return colorMap[ctx.dataset.data[ctx.dataIndex].from] || "rgba(148,163,184,0.5)"; },
+        colorTo: function(ctx) { return colorMap[ctx.dataset.data[ctx.dataIndex].to] || "rgba(148,163,184,0.5)"; },
+        colorMode: "gradient",
+        labels: colorMap,
+        size: "max"
+      }]
+    },
     options: {
-      indexAxis: "y",
       responsive: true,
       maintainAspectRatio: true,
-      aspectRatio: 5,
+      aspectRatio: 2.5,
       animation: false,
-      transitions: __chartTransitionsOff,
-      scales: {
-        x: {
-          grid: { color: "rgba(51,65,85,0.5)" },
-          ticks: {
-            color: "#94a3b8",
-            callback: function(v) {
-              if (v >= 1e9) return (v / 1e9).toFixed(1) + "B";
-              if (v >= 1e6) return (v / 1e6).toFixed(0) + "M";
-              if (v >= 1e3) return (v / 1e3).toFixed(0) + "K";
-              return String(v);
-            }
-          },
-          title: { display: true, text: xLabel, color: "#64748b", font: { size: 11 } }
-        },
-        y: {
-          grid: { display: false },
-          ticks: { color: "#e2e8f0", font: { family: "monospace", weight: "bold" } }
-        }
-      },
       plugins: {
-        legend: { labels: { color: "#cbd5e1" } },
+        legend: { display: false },
         tooltip: {
           callbacks: {
             label: function(ctx) {
-              var range = ctx.raw;
-              var val = range[1] - range[0];
-              var pct = displayTotal > 0 ? Math.round(val / displayTotal * 1000) / 10 : 0;
-              var tokVal = ctx.dataset._tokens || val;
-              var fmtVal = val >= 1e9 ? (val / 1e9).toFixed(2) + "B" : val >= 1e6 ? (val / 1e6).toFixed(2) + "M" : (val / 1e3).toFixed(0) + "K";
-              var fmtTok = tokVal >= 1e9 ? (tokVal / 1e9).toFixed(2) + "B" : tokVal >= 1e6 ? (tokVal / 1e6).toFixed(2) + "M" : (tokVal / 1e3).toFixed(0) + "K";
-              if (isCost) return ctx.dataset.label.split(" (")[0] + ": " + fmtVal + " weighted (" + pct + "%) \u00B7 " + fmtTok + " tokens";
-              return ctx.dataset.label.split(" (")[0] + ": " + fmtVal + " tokens (" + pct + "%)";
+              var item = ctx.dataset.data[ctx.dataIndex];
+              return item.from + " \u2192 " + item.to + ": " + fmtTok(item.flow);
             }
           }
         }
