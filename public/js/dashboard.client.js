@@ -4647,19 +4647,67 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
   } else if (__budgetFlowMode === "api") {
     var apiN = "Claude API";
     var youN = t("budgetWfYou") + " (" + fmtTok(totalVal) + ")";
-    if (src.out > 0) { rows.push([apiN, nOut, w]); rows.push([nOut, youN, w]); }
-    if (src.inp > 0) { rows.push([apiN, nInp, w]); rows.push([nInp, youN, w]); }
-    if (src.cr > 0)  { rows.push([apiN, nCr,  w]); rows.push([nCr,  youN, w]); }
-    if (src.cc > 0)  { rows.push([apiN, nCc,  w]); rows.push([nCc,  youN, w]); }
+    if (hostKeys.length > 1) {
+      // Claude API → Workers → Token Types → You
+      for (var hi2 = 0; hi2 < hostKeys.length; hi2++) {
+        var hk2 = hostKeys[hi2];
+        var hd2 = hostTotals[hk2];
+        var hLabel2 = hk2 + " (" + fmtTok(hd2.total) + ")";
+        rows.push([apiN, hLabel2, w]);
+        var hsrc2 = isCost ? {
+          out: hd2.output * __quotaWeights.output,
+          inp: hd2.input * __quotaWeights.input,
+          cr: hd2.cache_read * __quotaWeights.cache_read,
+          cc: hd2.cache_creation * __quotaWeights.cache_creation
+        } : { out: hd2.output, inp: hd2.input, cr: hd2.cache_read, cc: hd2.cache_creation };
+        if (hsrc2.out > 0) rows.push([hLabel2, nOut, w]);
+        if (hsrc2.inp > 0) rows.push([hLabel2, nInp, w]);
+        if (hsrc2.cr > 0)  rows.push([hLabel2, nCr,  w]);
+        if (hsrc2.cc > 0)  rows.push([hLabel2, nCc,  w]);
+      }
+    } else {
+      if (src.out > 0) rows.push([apiN, nOut, w]);
+      if (src.inp > 0) rows.push([apiN, nInp, w]);
+      if (src.cr > 0)  rows.push([apiN, nCr,  w]);
+      if (src.cc > 0)  rows.push([apiN, nCc,  w]);
+    }
+    if (src.out > 0) rows.push([nOut, youN, w]);
+    if (src.inp > 0) rows.push([nInp, youN, w]);
+    if (src.cr > 0)  rows.push([nCr,  youN, w]);
+    if (src.cc > 0)  rows.push([nCc,  youN, w]);
   } else {
+    // User Flow: You → Workers → Token Types → Total Usage
     var youN2  = t("budgetWfYou");
-    var apiN2  = "Claude API";
     var resN   = t("budgetWfResult") + " (" + fmtTok(totalVal) + ")";
-    rows.push([youN2, apiN2, w * 4]);
-    if (src.out > 0) { rows.push([apiN2, nOut, w]); rows.push([nOut, resN, w]); }
-    if (src.inp > 0) { rows.push([apiN2, nInp, w]); rows.push([nInp, resN, w]); }
-    if (src.cr > 0)  { rows.push([apiN2, nCr,  w]); rows.push([nCr,  resN, w]); }
-    if (src.cc > 0)  { rows.push([apiN2, nCc,  w]); rows.push([nCc,  resN, w]); }
+    if (hostKeys.length > 1) {
+      for (var hi3 = 0; hi3 < hostKeys.length; hi3++) {
+        var hk3 = hostKeys[hi3];
+        var hd3 = hostTotals[hk3];
+        var hLabel3 = hk3 + " (" + fmtTok(hd3.total) + ")";
+        rows.push([youN2, hLabel3, w]);
+        var hsrc3 = isCost ? {
+          out: hd3.output * __quotaWeights.output,
+          inp: hd3.input * __quotaWeights.input,
+          cr: hd3.cache_read * __quotaWeights.cache_read,
+          cc: hd3.cache_creation * __quotaWeights.cache_creation
+        } : { out: hd3.output, inp: hd3.input, cr: hd3.cache_read, cc: hd3.cache_creation };
+        if (hsrc3.out > 0) rows.push([hLabel3, nOut, w]);
+        if (hsrc3.inp > 0) rows.push([hLabel3, nInp, w]);
+        if (hsrc3.cr > 0)  rows.push([hLabel3, nCr,  w]);
+        if (hsrc3.cc > 0)  rows.push([hLabel3, nCc,  w]);
+      }
+    } else {
+      var apiN2 = "Claude API";
+      rows.push([youN2, apiN2, w * 4]);
+      if (src.out > 0) rows.push([apiN2, nOut, w]);
+      if (src.inp > 0) rows.push([apiN2, nInp, w]);
+      if (src.cr > 0)  rows.push([apiN2, nCr,  w]);
+      if (src.cc > 0)  rows.push([apiN2, nCc,  w]);
+    }
+    if (src.out > 0) rows.push([nOut, resN, w]);
+    if (src.inp > 0) rows.push([nInp, resN, w]);
+    if (src.cr > 0)  rows.push([nCr,  resN, w]);
+    if (src.cc > 0)  rows.push([nCc,  resN, w]);
   }
 
   if (!rows.length) {
