@@ -204,12 +204,14 @@
 <div class="report-modal-head">
 <h3 id="report-modal-title">Forensic Report</h3>
 <div class="report-modal-actions">
+<button type="button" id="report-expand-all" class="report-idx-btn">Expand All</button>
+<button type="button" id="report-collapse-all" class="report-idx-btn">Collapse All</button>
 <button type="button" id="report-copy-btn">Copy</button>
 <button type="button" class="primary" id="report-download-btn">Download .md</button>
 <button type="button" id="report-close-btn">✕</button>
 </div>
 </div>
-<div class="report-modal-body"><pre id="report-content"></pre></div>
+<div class="report-modal-body"><div id="report-content"></div></div>
 </div>
 </div>
 
@@ -366,6 +368,7 @@
 <script>window.__I18N_BUNDLES=__I18N_PLACEHOLDER__;</script>
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js" integrity="sha384-b0GXujLkk9eYYSmcSfoyZbfyElGAQnDyY0skCHSG6w3JgTMFnz11ggrTAr7seu9f" crossorigin="anonymous"></script>
 <script defer src="https://www.gstatic.com/charts/loader.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js" crossorigin="anonymous"></script>
 <script defer src="/assets/dashboard.client.js"></script>
 </body>
 </html>

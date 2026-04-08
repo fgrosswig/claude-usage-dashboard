@@ -3708,6 +3708,94 @@ function generateForensicReportMd(data) {
     md.push("");
   }
 
+  // ─── Budget Efficiency ───
+  var proxy = data.proxy || {};
+  var pdays = proxy.proxy_days || [];
+  var lastPd = pdays.length > 0 ? pdays[pdays.length - 1] : null;
+  if (lastPd) {
+    md.push("## " + (isDE ? "Budget-Effizienz" : "Budget Efficiency"));
+    md.push("");
+    var rl = lastPd.rate_limit || {};
+    var q5r = rl["anthropic-ratelimit-unified-5h-utilization"];
+    var q7r = rl["anthropic-ratelimit-unified-7d-utilization"];
+    var fbr = rl["anthropic-ratelimit-unified-fallback-percentage"];
+    var ovr = rl["anthropic-ratelimit-unified-overage-status"];
+    var ovrR = rl["anthropic-ratelimit-unified-overage-disabled-reason"];
+    var clm = rl["anthropic-ratelimit-unified-representative-claim"];
+
+    md.push("| " + (isDE ? "Metrik" : "Metric") + " | " + (isDE ? "Wert" : "Value") + " | " + (isDE ? "Bewertung" : "Assessment") + " |");
+    md.push("|--------|-------|------------|");
+    if (q5r != null) {
+      var q5v = Math.round(parseFloat(q5r) * 1000) / 10;
+      md.push("| 5h Quota | " + q5v + "% | " + (q5v > 80 ? "\u26a0 HIGH" : q5v > 50 ? "\u26a0 MODERATE" : "\u2705 OK") + " |");
+    }
+    if (q7r != null) {
+      var q7v = Math.round(parseFloat(q7r) * 1000) / 10;
+      md.push("| 7d Quota | " + q7v + "% | " + (q7v > 80 ? "\u26a0 HIGH" : "\u2705 OK") + " |");
+    }
+    if (fbr != null) {
+      var fbv = Math.round(parseFloat(fbr) * 100);
+      md.push("| Fallback % | " + fbv + "% | " + (fbv < 100 ? "\u274c REDUCED \u2014 effective budget is " + fbv + "% of maximum" : "\u2705 FULL") + " |");
+    }
+    if (ovr) md.push("| Overage | " + ovr + " | " + (ovr === "rejected" ? "\u274c Hard cutoff \u2014 no buffer" : "\u2705 " + ovr) + " |");
+    if (ovrR) md.push("| Overage Reason | " + ovrR + " | |");
+    if (clm) md.push("| Binding Limit | " + clm.replace(/_/g, " ") + " | " + (clm === "five_hour" ? "5h window is active constraint" : clm) + " |");
+
+    // Plan
+    var planLabel = typeof getSelectedPlanLabel === "function" ? getSelectedPlanLabel() : "?";
+    md.push("| Plan | " + planLabel + " | " + (isDE ? "manuell gew\u00e4hlt" : "manually selected") + " |");
+
+    // Visible tokens per %
+    if (lastPd.visible_tokens_per_pct) {
+      md.push("| Tokens/1% | " + fmt(lastPd.visible_tokens_per_pct) + " | " + (isDE ? "sichtbare Tokens pro 1% Quota" : "visible tokens per 1% quota") + " |");
+    }
+    md.push("");
+
+    // Totals
+    var totOut = 0, totAll = 0, totCr = 0, totCc = 0, totRetries = 0, totInterrupts = 0, totTrunc = 0, totOutageH = 0;
+    for (var bi = 0; bi < days.length; bi++) {
+      var bd = days[bi];
+      totOut += bd.output || 0;
+      totAll += bd.total || 0;
+      totCr += bd.cache_read || 0;
+      totCc += bd.cache_creation || 0;
+      var bss = bd.session_signals || {};
+      totRetries += bss.retry || 0;
+      totInterrupts += bss.interrupt || 0;
+      totTrunc += bss.truncated || 0;
+      totOutageH += bd.outage_hours || 0;
+    }
+    var bOverhead = totOut > 0 ? (totAll / totOut).toFixed(1) : "?";
+    var bOutputPct = totAll > 0 ? Math.round(totOut / totAll * 100) : 0;
+    var bCmr = (totCc + totCr) > 0 ? Math.round(totCc / (totCc + totCr) * 100) : 0;
+
+    md.push("| " + (isDE ? "Metrik" : "Metric") + " | " + (isDE ? "Wert" : "Value") + " |");
+    md.push("|--------|-------|");
+    md.push("| Effective Output | " + bOutputPct + "% |");
+    md.push("| Overhead Factor | " + bOverhead + "x |");
+    md.push("| Cache Miss Rate | " + bCmr + "% |");
+    md.push("| Retries | " + totRetries + " |");
+    md.push("| Interrupts | " + totInterrupts + " |");
+    md.push("| Tool Bloat (truncated) | " + totTrunc + " |");
+    md.push("| Outage Loss | " + totOutageH.toFixed(1) + "h |");
+    md.push("");
+  }
+
+  // ─── Release Stability ───
+  if (data.release_stability && data.release_stability.summary) {
+    var rs = data.release_stability.summary;
+    md.push("## " + (isDE ? "Release-Stabilit\u00e4t" : "Release Stability"));
+    md.push("");
+    md.push("| " + (isDE ? "Metrik" : "Metric") + " | " + (isDE ? "Wert" : "Value") + " |");
+    md.push("|--------|-------|");
+    md.push("| Releases | " + rs.total + " (" + rs.daysSpan + (isDE ? " Tage" : " days") + ") |");
+    md.push("| " + (isDE ? "Kadenz" : "Cadence") + " | ~" + rs.cadenceDays + (isDE ? " Tage" : " days") + " |");
+    md.push("| " + (isDE ? "\u00dcbersprungen" : "Skipped") + " | " + rs.totalSkipped + " |");
+    md.push("| Hotfixes | " + rs.hotfixCount + " |");
+    md.push("| Regressions | " + rs.regressionCount + " |");
+    md.push("");
+  }
+
   // ─── Thinking-Token Hinweis ───
   md.push("> "+(isDE?"\u26a0 **Hinweis:** Thinking-Tokens (internes Reasoning) erscheinen nicht in der API-Antwort und werden nicht gez\u00e4hlt. Sie belasten wahrscheinlich das Session-Budget.":"\u26a0 **Note:** Thinking tokens (internal reasoning) do not appear in the API response and are not counted here. They likely count against the session budget."));
   md.push("");
@@ -3718,10 +3806,75 @@ function generateForensicReportMd(data) {
   return md.join("\n");
 }
 
+var __lastReportMd = "";
 function openReportModal(){
   if(!__lastUsageData||!__lastUsageData.days||!__lastUsageData.days.length)return;
-  var md=generateForensicReportMd(__lastUsageData);
-  document.getElementById("report-content").textContent=md;
+  __lastReportMd=generateForensicReportMd(__lastUsageData);
+  var el=document.getElementById("report-content");
+  if(typeof marked !== "undefined" && marked.parse) {
+    // Render full markdown to HTML first
+    el.innerHTML = marked.parse(__lastReportMd);
+
+    // Post-process: wrap each <h2> + siblings in <details>
+    var h2s = el.querySelectorAll("h2");
+    for (var si = h2s.length - 1; si >= 0; si--) {
+      var h2 = h2s[si];
+      var details = document.createElement("details");
+      details.className = "report-section";
+      details.id = "rpt-s" + (si + 1);
+      // All sections start collapsed
+      var summary = document.createElement("summary");
+      summary.className = "report-section-head";
+      summary.innerHTML = h2.innerHTML;
+      details.appendChild(summary);
+      // Move all siblings after h2 until next h2 or h1 into details
+      var next = h2.nextElementSibling;
+      while (next && next.tagName !== "H2" && next.tagName !== "H1" && !next.classList.contains("report-section")) {
+        var move = next;
+        next = next.nextElementSibling;
+        details.appendChild(move);
+      }
+      h2.parentNode.replaceChild(details, h2);
+    }
+
+    // Build index from sections
+    var secs = el.querySelectorAll(".report-section");
+    if (secs.length > 0) {
+      var nav = document.createElement("nav");
+      nav.className = "report-index";
+      nav.innerHTML = "<strong>Contents</strong>";
+      var ol = document.createElement("ol");
+      for (var ni = 0; ni < secs.length; ni++) {
+        var li = document.createElement("li");
+        var a = document.createElement("a");
+        a.href = "#";
+        a.textContent = secs[ni].querySelector(".report-section-head").textContent.replace(/^\d+\.\s*/, "");
+        a.dataset.rptIdx = String(ni);
+        li.appendChild(a);
+        ol.appendChild(li);
+      }
+      nav.appendChild(ol);
+      el.insertBefore(nav, el.firstChild);
+
+      // Click handler for index — toggle section open/closed
+      ol.addEventListener("click", function(e) {
+        var link = e.target.tagName === "A" ? e.target : e.target.closest("a");
+        if (!link) link = e.target.parentElement;
+        if (!link || !link.dataset || link.dataset.rptIdx == null) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var idx = parseInt(link.dataset.rptIdx, 10);
+        var allSecs = document.getElementById("report-content").querySelectorAll(".report-section");
+        if (allSecs[idx]) {
+          var wasOpen = allSecs[idx].open;
+          allSecs[idx].open = !wasOpen;
+          if (!wasOpen) setTimeout(function() { allSecs[idx].scrollIntoView({ block: "nearest" }); }, 50);
+        }
+      });
+    }
+  } else {
+    el.textContent=__lastReportMd;
+  }
   document.getElementById("report-modal-title").textContent=t("reportTitle");
   document.getElementById("report-copy-btn").textContent=t("reportCopy");
   document.getElementById("report-download-btn").textContent=t("reportDownload");
@@ -3731,7 +3884,7 @@ function closeReportModal(){
   document.getElementById("report-modal-overlay").classList.remove("open");
 }
 function downloadReport(){
-  var text=document.getElementById("report-content").textContent;
+  var text=__lastReportMd;
   var blob=new Blob([text],{type:"text/markdown;charset=utf-8"});
   var url=URL.createObjectURL(blob);
   var a=document.createElement("a");
@@ -3739,7 +3892,7 @@ function downloadReport(){
   document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
 }
 function copyReport(){
-  var text=document.getElementById("report-content").textContent;
+  var text=__lastReportMd;
   navigator.clipboard.writeText(text).then(function(){
     var btn=document.getElementById("report-copy-btn");
     var orig=btn.textContent;btn.textContent=t("reportCopied");
@@ -3817,6 +3970,10 @@ function copyReport(){
   if(rdl){rdl.addEventListener("click",downloadReport);}
   var rcp=document.getElementById("report-copy-btn");
   if(rcp){rcp.addEventListener("click",copyReport);}
+  var rea=document.getElementById("report-expand-all");
+  if(rea){rea.addEventListener("click",function(){document.querySelectorAll("#report-content .report-section").forEach(function(s){s.open=true;});});}
+  var rca=document.getElementById("report-collapse-all");
+  if(rca){rca.addEventListener("click",function(){document.querySelectorAll("#report-content .report-section").forEach(function(s){s.open=false;});});}
   var rov=document.getElementById("report-modal-overlay");
   if(rov){rov.addEventListener("click",function(e){if(e.target===rov)closeReportModal();});}
 })();
