@@ -4557,19 +4557,17 @@ function renderBudgetWaterfall(tot, quota) {
     blurb.textContent = blurbText;
   }
 
-  // Log-scaled flows: extreme compression of dominant flows
-  // log(98.7)=4.6, log(1.1)=2.4, log(0.1)=1 → ratio ~5:1 instead of 980:1
-  var logScale = function(v) { return v > 0 ? 1 + Math.log10(1 + v) : 0; };
-  var pOut = logScale(pctOf(src.out));
-  var pInp = logScale(pctOf(src.inp));
-  var pCr  = logScale(pctOf(src.cr));
-  var pCc  = logScale(pctOf(src.cc));
+  // Equal-width bands: all flows get same width, real values in labels/tooltips
+  var pOut = src.out > 0 ? 1 : 0;
+  var pInp = src.inp > 0 ? 1 : 0;
+  var pCr  = src.cr > 0 ? 1 : 0;
+  var pCc  = src.cc > 0 ? 1 : 0;
 
   // Token type nodes (shared across all flow modes)
-  var nOutput = t("budgetWfOutput") + " (" + fmtTok(raw.out) + ")";
-  var nInput  = t("budgetWfInput") + " (" + fmtTok(raw.inp) + ")";
-  var nCacheR = t("budgetWfCacheRead") + " (" + fmtTok(raw.cr) + ")";
-  var nCacheC = t("budgetWfCacheCreate") + " (" + fmtTok(raw.cc) + ")";
+  var nOutput = t("budgetWfOutput") + " " + pctOf(src.out) + "% (" + fmtTok(raw.out) + ")";
+  var nInput  = t("budgetWfInput") + " " + pctOf(src.inp) + "% (" + fmtTok(raw.inp) + ")";
+  var nCacheR = t("budgetWfCacheRead") + " " + pctOf(src.cr) + "% (" + fmtTok(raw.cr) + ")";
+  var nCacheC = t("budgetWfCacheCreate") + " " + pctOf(src.cc) + "% (" + fmtTok(raw.cc) + ")";
 
   // Node colors
   var nodeColors = {};
@@ -4677,7 +4675,7 @@ function renderBudgetWaterfall(tot, quota) {
     options: {
       responsive: true,
       maintainAspectRatio: true,
-      aspectRatio: 3.5,
+      aspectRatio: 2.8,
       animation: false,
       layout: { padding: { right: 10 } },
       plugins: {
