@@ -3813,6 +3813,8 @@ function copyReport(){
 
 // ── User Profile Charts ──────────────────────────────────────────────────
 var _userCharts = { versions: null, entrypoints: null };
+var __userVersionSort = "anomalies"; // anomalies | newest | calls
+var __userVersionFilter = []; // empty = all
 
 var __userProfileColors = [
   "rgba(59,130,246,0.8)",   // blue
@@ -3825,6 +3827,101 @@ var __userProfileColors = [
   "rgba(168,85,247,0.8)"    // purple
 ];
 
+var __versionHealthMetrics = [
+  { key: "hit_limit",  label: "userDSHitLimit",  color: "rgba(248,113,113,0.85)" },
+  { key: "retry",      label: "userDSRetry",     color: "rgba(251,146,60,0.85)" },
+  { key: "interrupt",  label: "userDSInterrupt",  color: "rgba(250,204,21,0.85)" },
+  { key: "truncated",  label: "userDSTruncated",  color: "rgba(34,211,238,0.85)" },
+  { key: "api_error",  label: "userDSApiError",   color: "rgba(236,72,153,0.85)" }
+];
+
+function semverCmpDesc(a, b) {
+  var pa = a.split(".").map(Number);
+  var pb = b.split(".").map(Number);
+  for (var i = 0; i < 3; i++) {
+    var da = pa[i] || 0, db = pb[i] || 0;
+    if (da !== db) return db - da;
+  }
+  return 0;
+}
+
+function aggregateVersionStats(days) {
+  var merged = {};
+  for (var di = 0; di < days.length; di++) {
+    var vs = days[di].version_stats || {};
+    var vk = Object.keys(vs);
+    for (var vi = 0; vi < vk.length; vi++) {
+      var ver = vk[vi];
+      if (!merged[ver]) merged[ver] = { calls: 0, output: 0, cache_read: 0, hit_limit: 0, retry: 0, interrupt: 0, continue: 0, resume: 0, truncated: 0, api_error: 0 };
+      var src = vs[ver];
+      var tgt = merged[ver];
+      var fk = Object.keys(src);
+      for (var fi = 0; fi < fk.length; fi++) {
+        tgt[fk[fi]] = (tgt[fk[fi]] || 0) + (src[fk[fi]] || 0);
+      }
+    }
+  }
+  return merged;
+}
+
+function versionAnomalyTotal(s) {
+  return (s.hit_limit || 0) + (s.retry || 0) + (s.interrupt || 0) + (s.truncated || 0) + (s.api_error || 0);
+}
+
+function sortVersionKeys(keys, stats, mode) {
+  var arr = keys.slice();
+  if (mode === "newest") {
+    arr.sort(semverCmpDesc);
+  } else if (mode === "calls") {
+    arr.sort(function(a, b) { return (stats[b].calls || 0) - (stats[a].calls || 0); });
+  } else {
+    arr.sort(function(a, b) { return versionAnomalyTotal(stats[b]) - versionAnomalyTotal(stats[a]); });
+  }
+  return arr;
+}
+
+function initUserVersionControls(stats, days) {
+  var sortEl = document.getElementById("user-version-sort");
+  var filterEl = document.getElementById("user-version-filter");
+  if (sortEl && !sortEl.options.length) {
+    var opts = [
+      { val: "anomalies", lbl: t("userSortAnomalies") },
+      { val: "newest", lbl: t("userSortNewest") },
+      { val: "calls", lbl: t("userSortCalls") }
+    ];
+    for (var oi = 0; oi < opts.length; oi++) {
+      var o = document.createElement("option");
+      o.value = opts[oi].val;
+      o.textContent = opts[oi].lbl;
+      if (opts[oi].val === __userVersionSort) o.selected = true;
+      sortEl.appendChild(o);
+    }
+    sortEl.addEventListener("change", function() {
+      __userVersionSort = sortEl.value;
+      renderUserProfileCharts(days);
+    });
+  }
+  if (filterEl) {
+    var allVers = Object.keys(stats).sort(semverCmpDesc);
+    filterEl.innerHTML = "";
+    for (var fi = 0; fi < allVers.length; fi++) {
+      var fo = document.createElement("option");
+      fo.value = allVers[fi];
+      fo.textContent = allVers[fi];
+      fo.selected = !__userVersionFilter.length || __userVersionFilter.indexOf(allVers[fi]) >= 0;
+      filterEl.appendChild(fo);
+    }
+    filterEl.onchange = function() {
+      var sel = [];
+      for (var si = 0; si < filterEl.options.length; si++) {
+        if (filterEl.options[si].selected) sel.push(filterEl.options[si].value);
+      }
+      __userVersionFilter = sel.length === allVers.length ? [] : sel;
+      renderUserProfileCharts(days);
+    };
+  }
+}
+
 function renderUserProfileCharts(days) {
   var sumEl = document.getElementById("user-profile-summary-line");
   var cardsEl = document.getElementById("user-profile-cards");
@@ -3836,21 +3933,30 @@ function renderUserProfileCharts(days) {
     return;
   }
 
-  // Collect all unique versions and entrypoints across days
-  var allVersions = {};
-  var allEntrypoints = {};
-  for (var di = 0; di < days.length; di++) {
-    var dv = days[di].versions || {};
-    var de = days[di].entrypoints || {};
-    var vk = Object.keys(dv);
-    for (var vi = 0; vi < vk.length; vi++) allVersions[vk[vi]] = true;
-    var ek = Object.keys(de);
-    for (var ei = 0; ei < ek.length; ei++) allEntrypoints[ek[ei]] = true;
+  // Aggregate version_stats across all filtered days
+  var stats = aggregateVersionStats(days);
+  var allVers = Object.keys(stats);
+  if (!allVers.length) {
+    // Fallback: use versions counter if version_stats not yet populated
+    var fallbackVers = {};
+    for (var fdi = 0; fdi < days.length; fdi++) {
+      var fv = days[fdi].versions || {};
+      var fvk = Object.keys(fv);
+      for (var fvi = 0; fvi < fvk.length; fvi++) fallbackVers[fvk[fvi]] = true;
+    }
+    allVers = Object.keys(fallbackVers);
   }
-  var versionKeys = Object.keys(allVersions).sort();
+
+  // Collect entrypoints
+  var allEntrypoints = {};
+  for (var dei = 0; dei < days.length; dei++) {
+    var de = days[dei].entrypoints || {};
+    var dek = Object.keys(de);
+    for (var deki = 0; deki < dek.length; deki++) allEntrypoints[dek[deki]] = true;
+  }
   var entrypointKeys = Object.keys(allEntrypoints).sort();
 
-  // Summary line: latest day's dominant version + entrypoint
+  // Latest day summary
   var lastDay = days[days.length - 1];
   var topVersion = "";
   var topVersionCount = 0;
@@ -3866,15 +3972,42 @@ function renderUserProfileCharts(days) {
   for (var tei = 0; tei < lek.length; tei++) {
     if (le[lek[tei]] > topEpCount) { topEntrypoint = lek[tei]; topEpCount = le[lek[tei]]; }
   }
+
+  // Anomaly rate
+  var totalCalls = 0;
+  var totalAnomalies = 0;
+  for (var ai = 0; ai < allVers.length; ai++) {
+    var sv = stats[allVers[ai]];
+    if (sv) {
+      totalCalls += sv.calls || 0;
+      totalAnomalies += versionAnomalyTotal(sv);
+    }
+  }
+  var anomalyRate = totalCalls > 0 ? Math.round(totalAnomalies / totalCalls * 100) : 0;
+
   sumEl.textContent = t("userProfileSummary")
     .replace("{version}", topVersion || "?")
-    .replace("{entrypoint}", topEntrypoint || "?");
+    .replace("{entrypoint}", topEntrypoint || "?")
+    .replace("{rate}", String(anomalyRate));
+
+  // Worst version
+  var worstVer = "";
+  var worstAnomaly = 0;
+  for (var wi = 0; wi < allVers.length; wi++) {
+    var wv = stats[allVers[wi]];
+    if (wv) {
+      var wa = versionAnomalyTotal(wv);
+      if (wa > worstAnomaly) { worstAnomaly = wa; worstVer = allVers[wi]; }
+    }
+  }
 
   // Cards
   if (cardsEl) {
     var cards = [];
-    if (topVersion) {
-      cards.push('<div class="card"><div class="label">' + t("userProfileCardVersion") + '</div><div class="value">' + topVersion + '</div><div class="sub">' + versionKeys.length + ' Version' + (versionKeys.length !== 1 ? 'en' : '') + '</div></div>');
+    cards.push('<div class="card"><div class="label">' + t("userProfileCardVersion") + '</div><div class="value">' + (topVersion || "?") + '</div><div class="sub">' + allVers.length + ' Version' + (allVers.length !== 1 ? 'en' : '') + '</div></div>');
+    cards.push('<div class="card"><div class="label">' + t("userProfileCardAnomalyRate") + '</div><div class="value">' + anomalyRate + '%</div><div class="sub">' + totalAnomalies + ' / ' + totalCalls + ' Calls</div></div>');
+    if (worstVer) {
+      cards.push('<div class="card' + (worstAnomaly > 0 ? ' warn' : '') + '"><div class="label">' + t("userProfileCardWorstVer") + '</div><div class="value">' + worstVer + '</div><div class="sub">' + worstAnomaly + ' Anomalien</div></div>');
     }
     if (topEntrypoint) {
       cards.push('<div class="card"><div class="label">' + t("userProfileCardEntrypoint") + '</div><div class="value">' + topEntrypoint + '</div><div class="sub">' + entrypointKeys.length + ' Client' + (entrypointKeys.length !== 1 ? 's' : '') + '</div></div>');
@@ -3882,45 +4015,63 @@ function renderUserProfileCharts(days) {
     cardsEl.innerHTML = cards.join("");
   }
 
-  // X-axis labels (dates)
-  var labels = [];
-  for (var li = 0; li < days.length; li++) labels.push(days[li].date || "");
+  // Init sort/filter controls
+  initUserVersionControls(stats, days);
 
-  // ── Versions Chart ──
+  // ── Version Health Chart (horizontal bar) ──
   var elV = document.getElementById("c-user-versions");
   var h3V = document.getElementById("user-version-h3");
-  if (h3V) h3V.textContent = t("userVersionChartTitle");
-  if (elV && versionKeys.length) {
+  if (h3V) h3V.textContent = t("userVersionHealthTitle");
+  if (elV && allVers.length) {
     if (_userCharts.versions) { _userCharts.versions.destroy(); _userCharts.versions = null; }
-    var vDatasets = [];
-    for (var vdi = 0; vdi < versionKeys.length; vdi++) {
-      var vKey = versionKeys[vdi];
-      var vData = [];
-      for (var vdd = 0; vdd < days.length; vdd++) {
-        vData.push((days[vdd].versions || {})[vKey] || 0);
+
+    // Sort + filter
+    var filteredVers = __userVersionFilter.length
+      ? allVers.filter(function(v) { return __userVersionFilter.indexOf(v) >= 0; })
+      : allVers;
+    var sortedVers = sortVersionKeys(filteredVers, stats, __userVersionSort);
+
+    var datasets = [];
+    for (var mi = 0; mi < __versionHealthMetrics.length; mi++) {
+      var m = __versionHealthMetrics[mi];
+      var mData = [];
+      for (var mvi = 0; mvi < sortedVers.length; mvi++) {
+        var sv2 = stats[sortedVers[mvi]];
+        mData.push(sv2 ? (sv2[m.key] || 0) : 0);
       }
-      vDatasets.push({
-        label: vKey,
-        data: vData,
-        backgroundColor: __userProfileColors[vdi % __userProfileColors.length],
-        stack: "ver"
+      datasets.push({
+        label: t(m.label),
+        data: mData,
+        backgroundColor: m.color
       });
     }
+
     _userCharts.versions = new Chart(elV, {
       type: "bar",
-      data: { labels: labels, datasets: vDatasets },
+      data: { labels: sortedVers, datasets: datasets },
       options: {
+        indexAxis: "y",
         responsive: true,
         animation: false,
         transitions: __chartTransitionsOff,
         interaction: { mode: "index", intersect: false },
         scales: {
-          x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8" } },
-          y: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8", precision: 0 }, title: { display: true, text: "Calls", color: "#94a3b8" } }
+          x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8", precision: 0 } },
+          y: { stacked: true, grid: { color: "rgba(51,65,85,0.3)" }, ticks: { color: "#e2e8f0", font: { family: "monospace" } } }
         },
         plugins: {
           legend: { labels: { color: "#cbd5e1" } },
-          tooltip: { callbacks: { label: function(c) { return c.dataset.label + ": " + c.raw; } } }
+          tooltip: {
+            callbacks: {
+              afterBody: function(items) {
+                if (!items.length) return "";
+                var ver = sortedVers[items[0].dataIndex];
+                var s = stats[ver];
+                if (!s) return "";
+                return t("userProfileCardVersion") + ": " + ver + " | Calls: " + (s.calls || 0) + " | Output: " + (s.output || 0);
+              }
+            }
+          }
         }
       }
     });
@@ -3932,12 +4083,14 @@ function renderUserProfileCharts(days) {
   if (h3E) h3E.textContent = t("userEntrypointChartTitle");
   if (elE && entrypointKeys.length) {
     if (_userCharts.entrypoints) { _userCharts.entrypoints.destroy(); _userCharts.entrypoints = null; }
-    var eDatasets = [];
     var epColors = {
       "claude-vscode": "rgba(59,130,246,0.8)",
       "cli": "rgba(34,197,94,0.8)",
       "claude-jetbrains": "rgba(245,158,11,0.8)"
     };
+    var labels = [];
+    for (var li = 0; li < days.length; li++) labels.push(days[li].date || "");
+    var eDatasets = [];
     for (var edi = 0; edi < entrypointKeys.length; edi++) {
       var eKey = entrypointKeys[edi];
       var eData = [];
