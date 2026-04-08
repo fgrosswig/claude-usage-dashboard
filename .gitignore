@@ -22,6 +22,11 @@
 
 !/scripts/
 !/scripts/**/*
+# Lokale Hooks + tx-log (nicht ins Repo / GitHub)
+/scripts/hooks/
+/scripts/update-tx-log.js
+/scripts/generate-release-notes.js
+/logs/
 
 !/tpl/
 !/tpl/**/*
