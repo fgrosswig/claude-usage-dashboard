@@ -1,10 +1,9 @@
-# Wie GRO/SCHUFA .woodpecker/app.yml: nur platform → Docker-Agent .220 (Kaniko + kurze Image-Namen).
-# backend: kubernetes würde Job-Pods auf .171 erzeugen (Hub/poc-Pull anders als auf .220).
+# Dev-Build: Push auf feat/**/fix/** → Container bauen + Deploy, KEIN SonarQube
+# Prod-Build: Push auf main          → SonarQube + Container + Deploy (+ GitHub-Mirror bei Tag)
 when:
   - event: push
-    branch: main
+    branch: [main, "feat/**", "fix/**"]
   - event: manual
-
 
 labels:
   platform: linux/amd64
@@ -17,9 +16,16 @@ steps:
         BASE_VER=$(awk -F'"' '/base_image/{print $4}' version.json)
         echo "Base image tag: $BASE_VER"
         sed "s|^ARG BASE_TAG=.*|ARG BASE_TAG=$BASE_VER|" Dockerfile > Dockerfile.ci
+        if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+          echo "==> PROD BUILD (main) — SonarQube + latest tag"
+        else
+          echo "==> DEV BUILD ($CI_COMMIT_BRANCH) — skip SonarQube, dev-tag only"
+        fi
 
   - name: sonar-scan
     image: sonarsource/sonar-scanner-cli
+    when:
+      branch: main
     commands:
       - sonar-scanner -Dsonar.host.url=$SONAR_URL -Dsonar.token=$SONAR_TOKEN
     environment:
@@ -28,8 +34,51 @@ steps:
       SONAR_TOKEN:
         from_secret: sonar_token
 
-  - name: build-push
+  - name: sonar-quality-gate
+    image: alpine
+    when:
+      branch: main
+    commands:
+      - |
+        apk add --no-cache curl jq
+        echo "Waiting 10s for SonarQube to process analysis..."
+        sleep 10
+        STATUS=$(curl -sf -u "$SONAR_TOKEN:" "$SONAR_URL/api/qualitygates/project_status?projectKey=claude-usage-dashboard" | jq -r '.projectStatus.status')
+        echo "Quality Gate: $STATUS"
+        if [ "$STATUS" != "OK" ]; then
+          echo "FAILED: Quality Gate not passed — aborting pipeline."
+          exit 1
+        fi
+        echo "Quality Gate passed."
+    environment:
+      SONAR_URL:
+        from_secret: sonar_url
+      SONAR_TOKEN:
+        from_secret: sonar_token
+
+  - name: build-push-dev
     image: plugins/kaniko
+    when:
+      branch:
+        exclude: main
+    settings:
+      repo: harbor.grosswig-it.de/claude/claude-usage-dashboard
+      registry: harbor.grosswig-it.de
+      dockerfile: Dockerfile.ci
+      tags: dev-${CI_COMMIT_SHA:0:8}
+      build_args:
+        - CI_COMMIT_SHORT_SHA=${CI_COMMIT_SHA:0:8}
+        - CI_COMMIT_REF_NAME=${CI_COMMIT_BRANCH}
+        - APP_VERSION=dev-${CI_COMMIT_SHA:0:8}
+      username:
+        from_secret: harbor_user
+      password:
+        from_secret: harbor_password
+
+  - name: build-push-prod
+    image: plugins/kaniko
+    when:
+      branch: main
     settings:
       repo: harbor.grosswig-it.de/claude/claude-usage-dashboard
       registry: harbor.grosswig-it.de
@@ -45,12 +94,10 @@ steps:
         from_secret: harbor_password
 
   - name: deploy
-    # Kein :1.31 — auf Docker Hub fehlt der Kurz-Tag oft (manifest unknown); wie SCHUFA ohne Tag = rolling latest
     image: bitnami/kubectl
     commands:
       - |
         set -eux
-        # Ohne --request-timeout kann kubectl bei API/Netz hängen (rollout --timeout begrenzt nur den Watch).
         K="kubectl --server=$KUBE_URL --token=$KUBE_TOKEN --insecure-skip-tls-verify --request-timeout=120s"
         $K apply -k k8s/overlays/dev
         if ! $K get secret harbor-pull -n claude >/dev/null 2>&1; then
@@ -58,7 +105,13 @@ steps:
           echo "Siehe k8s/README.md (Pull-Secret aus Harbor-Robot). Beispiel: kubectl create secret docker-registry harbor-pull -n claude --docker-server=harbor.grosswig-it.de ..."
           exit 1
         fi
-        $K set image deployment/claude-app app=harbor.grosswig-it.de/claude/claude-usage-dashboard:${CI_COMMIT_SHA:0:8} -n claude
+        # Dev-Build: dev-<sha>, Prod-Build: <sha>
+        if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+          TAG="${CI_COMMIT_SHA:0:8}"
+        else
+          TAG="dev-${CI_COMMIT_SHA:0:8}"
+        fi
+        $K set image deployment/claude-app app=harbor.grosswig-it.de/claude/claude-usage-dashboard:$TAG -n claude
         $K rollout status deployment/claude-app -n claude --timeout=3m
     environment:
       KUBE_URL:
@@ -76,13 +129,21 @@ steps:
     commands:
       - |
         apk add --no-cache curl jq
-        KEEP=2
         API="https://harbor.grosswig-it.de/api/v2.0/projects/claude/repositories/claude-usage-dashboard/artifacts"
-        TAGS=$(curl -s -u "$HARBOR_USER:$HARBOR_PASS" "$API?page_size=50&sort=-push_time" | jq -r '.[].tags[]?.name // empty' 2>/dev/null | grep -v latest)
+        # Prod: keep 2 SHA-tags + latest
+        # Dev: keep only 1 dev-* tag (latest dev build)
+        if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+          KEEP=2
+          TAGS=$(curl -s -u "$HARBOR_USER:$HARBOR_PASS" "$API?page_size=50&sort=-push_time" | jq -r '.[].tags[]?.name // empty' 2>/dev/null | grep -v latest | grep -v '^dev-')
+        else
+          KEEP=1
+          TAGS=$(curl -s -u "$HARBOR_USER:$HARBOR_PASS" "$API?page_size=50&sort=-push_time" | jq -r '.[].tags[]?.name // empty' 2>/dev/null | grep '^dev-')
+        fi
         COUNT=0
         echo "$TAGS" | while read TAG; do
           COUNT=$((COUNT+1))
           if [ $COUNT -gt $KEEP ]; then
+            echo "Deleting old tag: $TAG"
             curl -s -X DELETE -u "$HARBOR_USER:$HARBOR_PASS" "$API/$TAG" || true
           fi
         done
