@@ -3865,6 +3865,7 @@ function aggregateVersionStats(days) {
 }
 
 function versionAnomalyTotal(s) {
+  if (!s) return 0;
   return (s.hit_limit || 0) + (s.retry || 0) + (s.interrupt || 0) + (s.truncated || 0) + (s.api_error || 0);
 }
 
@@ -3873,7 +3874,7 @@ function sortVersionKeys(keys, stats, mode) {
   if (mode === "newest") {
     arr.sort(semverCmpDesc);
   } else if (mode === "calls") {
-    arr.sort(function(a, b) { return (stats[b].calls || 0) - (stats[a].calls || 0); });
+    arr.sort(function(a, b) { return ((stats[b] || {}).calls || 0) - ((stats[a] || {}).calls || 0); });
   } else {
     arr.sort(function(a, b) { return versionAnomalyTotal(stats[b]) - versionAnomalyTotal(stats[a]); });
   }
