@@ -34,6 +34,28 @@ steps:
       SONAR_TOKEN:
         from_secret: sonar_token
 
+  - name: sonar-quality-gate
+    image: alpine
+    when:
+      branch: main
+    commands:
+      - |
+        apk add --no-cache curl jq
+        echo "Waiting 10s for SonarQube to process analysis..."
+        sleep 10
+        STATUS=$(curl -sf -u "$SONAR_TOKEN:" "$SONAR_URL/api/qualitygates/project_status?projectKey=claude-usage-dashboard" | jq -r '.projectStatus.status')
+        echo "Quality Gate: $STATUS"
+        if [ "$STATUS" != "OK" ]; then
+          echo "FAILED: Quality Gate not passed — aborting pipeline."
+          exit 1
+        fi
+        echo "Quality Gate passed."
+    environment:
+      SONAR_URL:
+        from_secret: sonar_url
+      SONAR_TOKEN:
+        from_secret: sonar_token
+
   - name: build-push-dev
     image: plugins/kaniko
     when:
