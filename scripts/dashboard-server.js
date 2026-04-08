@@ -91,7 +91,7 @@ process.argv.forEach(function(a) {
 serviceLog.refreshFromEnv();
 
 // Vor-Tage als ein JSON (unter ~/.claude); JSONL wird nur noch für den lokalen Kalendertag „heute” voll geparst.
-var USAGE_DAY_CACHE_VERSION = 5;
+var USAGE_DAY_CACHE_VERSION = 6; // bumped: version_stats + entrypoints added
 var USAGE_DAY_CACHE_FILE = path.join(HOME, '.claude', 'usage-dashboard-days.json');
 /** Pro-Datei-Beitrag zum lokalen „heute“ (mtime+size): vermeidet 300+ JSONL bei jedem Refresh. */
 var JSONL_TODAY_INDEX_VERSION = 1;
