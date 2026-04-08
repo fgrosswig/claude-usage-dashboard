@@ -241,7 +241,7 @@
   "timelineDS_work": "Arbeitszeit",
   "timelineDS_outage": "Ausfall (status.claude.com)",
   "timelineAxisHour": "Tageszeit (UTC)",
-  "userProfileSummary": "User Profile — {version} · {entrypoint} · Anomalie-Rate {rate}%",
+  "userProfileSummary": "User Profile — {version} · {entrypoint} · {verCount} Versionen · Anomalie-Rate {rate}% ({anomalies}/{calls}) · Problematischste: {worst} ({worstCount})",
   "userProfileNoData": "User Profile — keine Daten",
   "userVersionHealthTitle": "Version Health",
   "userEntrypointChartTitle": "Client-Typ (Timeline)",

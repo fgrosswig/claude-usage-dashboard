@@ -3881,9 +3881,10 @@ function sortVersionKeys(keys, stats, mode) {
   return arr;
 }
 
+var __userFilterDdOpen = false;
+
 function initUserVersionControls(stats, days) {
   var sortEl = document.getElementById("user-version-sort");
-  var filterEl = document.getElementById("user-version-filter");
   if (sortEl && !sortEl.options.length) {
     var opts = [
       { val: "anomalies", lbl: t("userSortAnomalies") },
@@ -3902,35 +3903,84 @@ function initUserVersionControls(stats, days) {
       renderUserProfileCharts(days);
     });
   }
-  if (filterEl) {
-    var allVers = Object.keys(stats).sort(semverCmpDesc);
-    filterEl.innerHTML = "";
-    for (var fi = 0; fi < allVers.length; fi++) {
-      var fo = document.createElement("option");
-      fo.value = allVers[fi];
-      fo.textContent = allVers[fi];
-      fo.selected = !__userVersionFilter.length || __userVersionFilter.indexOf(allVers[fi]) >= 0;
-      filterEl.appendChild(fo);
-    }
-    filterEl.onchange = function() {
-      var sel = [];
-      for (var si = 0; si < filterEl.options.length; si++) {
-        if (filterEl.options[si].selected) sel.push(filterEl.options[si].value);
-      }
-      __userVersionFilter = sel.length === allVers.length ? [] : sel;
-      renderUserProfileCharts(days);
-    };
+
+  // Checkbox dropdown filter
+  var btn = document.getElementById("user-version-filter-btn");
+  var dd = document.getElementById("user-version-filter-dd");
+  var countEl = document.getElementById("user-version-filter-count");
+  if (!btn || !dd) return;
+
+  var allVers = Object.keys(stats).sort(semverCmpDesc);
+
+  // Update count badge
+  function updateCount() {
+    var n = __userVersionFilter.length;
+    countEl.textContent = n ? "(" + n + "/" + allVers.length + ")" : "(" + allVers.length + ")";
   }
+
+  // Build checkbox list
+  var html = "";
+  for (var fi = 0; fi < allVers.length; fi++) {
+    var v = allVers[fi];
+    var checked = !__userVersionFilter.length || __userVersionFilter.indexOf(v) >= 0;
+    var anomalies = versionAnomalyTotal(stats[v]);
+    var calls = stats[v] ? stats[v].calls || 0 : 0;
+    var badge = anomalies > 0 ? " (" + anomalies + "!)" : calls > 0 ? " (" + calls + ")" : "";
+    html += '<label><input type="checkbox" value="' + v + '"' + (checked ? ' checked' : '') + '>' + v + '<span style="color:#64748b;font-size:.65rem">' + badge + '</span></label>';
+  }
+  html += '<div class="user-filter-actions"><button id="user-ver-all">Alle</button><button id="user-ver-none">Keine</button></div>';
+  dd.innerHTML = html;
+  updateCount();
+
+  // Toggle dropdown
+  btn.onclick = function(e) {
+    e.stopPropagation();
+    __userFilterDdOpen = !__userFilterDdOpen;
+    dd.classList.toggle("open", __userFilterDdOpen);
+  };
+
+  // Close on outside click
+  document.addEventListener("click", function(e) {
+    if (__userFilterDdOpen && !dd.contains(e.target) && e.target !== btn) {
+      __userFilterDdOpen = false;
+      dd.classList.remove("open");
+    }
+  });
+
+  // Checkbox changes
+  var cbs = dd.querySelectorAll('input[type=checkbox]');
+  function applyFilter() {
+    var sel = [];
+    for (var ci = 0; ci < cbs.length; ci++) {
+      if (cbs[ci].checked) sel.push(cbs[ci].value);
+    }
+    __userVersionFilter = sel.length === allVers.length ? [] : sel;
+    updateCount();
+    renderUserProfileCharts(days);
+  }
+  for (var ci = 0; ci < cbs.length; ci++) {
+    cbs[ci].addEventListener("change", applyFilter);
+  }
+
+  // All / None buttons
+  var allBtn = document.getElementById("user-ver-all");
+  var noneBtn = document.getElementById("user-ver-none");
+  if (allBtn) allBtn.onclick = function() {
+    for (var ai = 0; ai < cbs.length; ai++) cbs[ai].checked = true;
+    applyFilter();
+  };
+  if (noneBtn) noneBtn.onclick = function() {
+    for (var ni = 0; ni < cbs.length; ni++) cbs[ni].checked = false;
+    applyFilter();
+  };
 }
 
 function renderUserProfileCharts(days) {
   var sumEl = document.getElementById("user-profile-summary-line");
-  var cardsEl = document.getElementById("user-profile-cards");
   if (!sumEl) return;
 
   if (!days || !days.length) {
     sumEl.textContent = t("userProfileNoData");
-    if (cardsEl) cardsEl.innerHTML = "";
     return;
   }
 
@@ -3986,11 +4036,6 @@ function renderUserProfileCharts(days) {
   }
   var anomalyRate = totalCalls > 0 ? Math.round(totalAnomalies / totalCalls * 100) : 0;
 
-  sumEl.textContent = t("userProfileSummary")
-    .replace("{version}", topVersion || "?")
-    .replace("{entrypoint}", topEntrypoint || "?")
-    .replace("{rate}", String(anomalyRate));
-
   // Worst version
   var worstVer = "";
   var worstAnomaly = 0;
@@ -4002,19 +4047,15 @@ function renderUserProfileCharts(days) {
     }
   }
 
-  // Cards
-  if (cardsEl) {
-    var cards = [];
-    cards.push('<div class="card"><div class="label">' + t("userProfileCardVersion") + '</div><div class="value">' + (topVersion || "?") + '</div><div class="sub">' + allVers.length + ' Version' + (allVers.length !== 1 ? 'en' : '') + '</div></div>');
-    cards.push('<div class="card"><div class="label">' + t("userProfileCardAnomalyRate") + '</div><div class="value">' + anomalyRate + '%</div><div class="sub">' + totalAnomalies + ' / ' + totalCalls + ' Calls</div></div>');
-    if (worstVer) {
-      cards.push('<div class="card' + (worstAnomaly > 0 ? ' warn' : '') + '"><div class="label">' + t("userProfileCardWorstVer") + '</div><div class="value">' + worstVer + '</div><div class="sub">' + worstAnomaly + ' Anomalien</div></div>');
-    }
-    if (topEntrypoint) {
-      cards.push('<div class="card"><div class="label">' + t("userProfileCardEntrypoint") + '</div><div class="value">' + topEntrypoint + '</div><div class="sub">' + entrypointKeys.length + ' Client' + (entrypointKeys.length !== 1 ? 's' : '') + '</div></div>');
-    }
-    cardsEl.innerHTML = cards.join("");
-  }
+  sumEl.textContent = t("userProfileSummary")
+    .replace("{version}", topVersion || "?")
+    .replace("{entrypoint}", topEntrypoint || "?")
+    .replace("{verCount}", String(allVers.length))
+    .replace("{rate}", String(anomalyRate))
+    .replace("{anomalies}", String(totalAnomalies))
+    .replace("{calls}", String(totalCalls))
+    .replace("{worst}", worstVer || "-")
+    .replace("{worstCount}", String(worstAnomaly));
 
   // Init sort/filter controls
   initUserVersionControls(stats, days);
