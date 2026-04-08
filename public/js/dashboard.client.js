@@ -1810,6 +1810,7 @@ function renderDashboardCore(data) {
     devSync.textContent = "Last: " + ts.toLocaleTimeString() + (data.dev_source ? " · " + (data.days || []).length + "d" : "");
   }
   renderProxyAnalysis(data);
+  renderBudgetEfficiency(data);
   __releaseStabilityData = data.release_stability || null;
   renderUserProfileCharts(getFilteredDays(data.days));
   updateMetaDetailsSummary(data);
@@ -4313,6 +4314,267 @@ function renderReleaseStabilityChart(sortedVers, releaseData) {
               if (m.skippedPatches > 0) lines.push(t("releaseStabilitySkipped") + ": " + m.skippedPatches);
               if (m.matchedKeywords && m.matchedKeywords.length) lines.push("Keywords: " + m.matchedKeywords.join(", "));
               return lines.join("\n");
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Budget Efficiency Section ─────────────────────────────────────────────
+var _budgetCharts = { waterfall: null, trend: null };
+
+function renderBudgetEfficiency(data) {
+  var sumEl = document.getElementById("budget-summary-line");
+  var cardsEl = document.getElementById("budget-cards");
+  if (!sumEl) return;
+
+  var days = getFilteredDays(data.days);
+  if (!days || !days.length) {
+    sumEl.textContent = t("budgetNoData");
+    if (cardsEl) cardsEl.innerHTML = "";
+    if (_budgetCharts.waterfall) { _budgetCharts.waterfall.destroy(); _budgetCharts.waterfall = null; }
+    if (_budgetCharts.trend) { _budgetCharts.trend.destroy(); _budgetCharts.trend = null; }
+    return;
+  }
+
+  // Aggregate across all filtered days
+  var tot = { input: 0, output: 0, cache_read: 0, cache_creation: 0, total: 0,
+              retries: 0, interrupts: 0, api_errors: 0, hit_limits: 0, calls: 0, active_hours: 0 };
+  var dailyTrend = [];
+
+  for (var di = 0; di < days.length; di++) {
+    var d = days[di];
+    tot.input += d.input || 0;
+    tot.output += d.output || 0;
+    tot.cache_read += d.cache_read || 0;
+    tot.cache_creation += d.cache_creation || 0;
+    tot.total += d.total || 0;
+    tot.calls += d.calls || 0;
+    tot.active_hours += d.active_hours || 0;
+    var ss = d.session_signals || {};
+    tot.retries += ss.retry || 0;
+    tot.interrupts += ss.interrupt || 0;
+    tot.api_errors += ss.api_error || 0;
+    tot.hit_limits += d.hit_limit || 0;
+
+    var dayTotal = d.total || 0;
+    var dayOutput = d.output || 0;
+    dailyTrend.push({
+      date: d.date,
+      overhead: dayOutput > 0 ? Math.round(dayTotal / dayOutput * 10) / 10 : 0,
+      output_pct: dayTotal > 0 ? Math.round(dayOutput / dayTotal * 100) : 0,
+      cache_miss_rate: (d.cache_creation || 0) + (d.cache_read || 0) > 0
+        ? Math.round((d.cache_creation || 0) / ((d.cache_creation || 0) + (d.cache_read || 0)) * 100)
+        : 0
+    });
+  }
+
+  // Compute metrics
+  var outputPct = tot.total > 0 ? Math.round(tot.output / tot.total * 100) : 0;
+  var overheadFactor = tot.output > 0 ? Math.round(tot.total / tot.output * 10) / 10 : 0;
+  var cacheMissRate = (tot.cache_creation + tot.cache_read) > 0
+    ? Math.round(tot.cache_creation / (tot.cache_creation + tot.cache_read) * 100) : 0;
+  var lostSignals = tot.retries + tot.interrupts + tot.api_errors;
+
+  // Summary line
+  sumEl.textContent = t("budgetSummary")
+    .replace("{overhead}", String(overheadFactor))
+    .replace("{outputPct}", String(outputPct))
+    .replace("{cmr}", String(cacheMissRate))
+    .replace("{retries}", String(tot.retries))
+    .replace("{interrupts}", String(tot.interrupts));
+
+  // KPI Cards
+  if (cardsEl) {
+    var cards = [
+      { label: t("budgetCardOutput"), value: outputPct + "%", sub: t("budgetCardOutputSub"), cls: outputPct < 25 ? "warn" : "" },
+      { label: t("budgetCardOverhead"), value: overheadFactor + "x", sub: t("budgetCardOverheadSub"), cls: overheadFactor > 4 ? "warn" : "" },
+      { label: t("budgetCardCacheMiss"), value: cacheMissRate + "%", sub: t("budgetCardCacheMissSub"), cls: cacheMissRate > 40 ? "warn" : "" },
+      { label: t("budgetCardLost"), value: String(lostSignals), sub: t("budgetCardLostSub").replace("{r}", String(tot.retries)).replace("{i}", String(tot.interrupts)).replace("{e}", String(tot.api_errors)), cls: lostSignals > 5 ? "warn" : "" }
+    ];
+    var ch = "";
+    cards.forEach(function(c) {
+      ch += "<div class=\"card " + c.cls + "\"><div class=\"label\">" + escHtml(c.label) + "</div><div class=\"value\">" + escHtml(c.value) + "</div><div class=\"sub\">" + escHtml(c.sub) + "</div></div>";
+    });
+    cardsEl.innerHTML = ch;
+  }
+
+  // Waterfall Chart
+  renderBudgetWaterfall(tot);
+
+  // Trend Chart
+  renderBudgetTrend(dailyTrend);
+}
+
+function renderBudgetWaterfall(tot) {
+  var el = document.getElementById("c-budget-waterfall");
+  var h3 = document.getElementById("budget-waterfall-h3");
+  if (h3) h3.textContent = t("budgetWaterfallTitle");
+  var blurb = document.getElementById("budget-waterfall-blurb");
+  if (blurb) blurb.textContent = t("budgetWaterfallBlurb");
+  if (!el) return;
+  if (_budgetCharts.waterfall) { _budgetCharts.waterfall.destroy(); _budgetCharts.waterfall = null; }
+  if (tot.total <= 0) return;
+
+  // Waterfall segments: each starts where the previous ended
+  var segments = [
+    { key: "output",         value: tot.output,         color: "rgba(34,197,94,0.85)",  label: t("budgetWfOutput") },
+    { key: "cache_read",     value: tot.cache_read,     color: "rgba(34,211,238,0.8)",  label: t("budgetWfCacheRead") },
+    { key: "input",          value: tot.input,          color: "rgba(59,130,246,0.8)",   label: t("budgetWfInput") },
+    { key: "cache_creation", value: tot.cache_creation, color: "rgba(245,158,11,0.85)", label: t("budgetWfCacheCreate") }
+  ];
+
+  var labels = [];
+  var datasets = [];
+  var runningStart = 0;
+
+  // Build floating bar data: each bar = [start, end]
+  var barData = [];
+  var bgColors = [];
+  for (var si = 0; si < segments.length; si++) {
+    var seg = segments[si];
+    var pct = Math.round(seg.value / tot.total * 1000) / 10;
+    labels.push(seg.label + " (" + pct + "%)");
+    barData.push([runningStart, runningStart + seg.value]);
+    bgColors.push(seg.color);
+    runningStart += seg.value;
+  }
+
+  datasets.push({
+    data: barData,
+    backgroundColor: bgColors,
+    borderSkipped: false
+  });
+
+  _budgetCharts.waterfall = new Chart(el, {
+    type: "bar",
+    data: { labels: labels, datasets: datasets },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 3,
+      animation: false,
+      transitions: __chartTransitionsOff,
+      scales: {
+        x: {
+          grid: { color: "rgba(51,65,85,0.5)" },
+          ticks: {
+            color: "#94a3b8",
+            callback: function(v) { return (v / 1e6).toFixed(1) + "M"; }
+          },
+          title: { display: true, text: t("budgetWfXAxis"), color: "#64748b", font: { size: 11 } }
+        },
+        y: {
+          grid: { color: "rgba(51,65,85,0.18)" },
+          ticks: { color: "#e2e8f0", font: { family: "monospace" } }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              var range = ctx.raw;
+              var val = range[1] - range[0];
+              return (val / 1e6).toFixed(2) + "M tokens (" + Math.round(val / tot.total * 100) + "%)";
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderBudgetTrend(dailyTrend) {
+  var el = document.getElementById("c-budget-trend");
+  var h3 = document.getElementById("budget-trend-h3");
+  if (h3) h3.textContent = t("budgetTrendTitle");
+  var blurb = document.getElementById("budget-trend-blurb");
+  if (blurb) blurb.textContent = t("budgetTrendBlurb");
+  if (!el) return;
+  if (_budgetCharts.trend) { _budgetCharts.trend.destroy(); _budgetCharts.trend = null; }
+  if (!dailyTrend.length) return;
+
+  var labels = dailyTrend.map(function(d) { return d.date; });
+  var overheadData = dailyTrend.map(function(d) { return d.overhead; });
+  var outputPctData = dailyTrend.map(function(d) { return d.output_pct; });
+  var cacheMissData = dailyTrend.map(function(d) { return d.cache_miss_rate; });
+
+  _budgetCharts.trend = new Chart(el, {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: t("budgetTrendOverhead"),
+          data: overheadData,
+          borderColor: "rgba(248,113,113,0.9)",
+          backgroundColor: "rgba(248,113,113,0.1)",
+          yAxisID: "y",
+          tension: 0.3,
+          fill: false,
+          pointRadius: 3
+        },
+        {
+          label: t("budgetTrendOutputPct"),
+          data: outputPctData,
+          borderColor: "rgba(34,197,94,0.9)",
+          backgroundColor: "rgba(34,197,94,0.15)",
+          yAxisID: "y1",
+          tension: 0.3,
+          fill: true,
+          pointRadius: 3
+        },
+        {
+          label: t("budgetTrendCacheMiss"),
+          data: cacheMissData,
+          borderColor: "rgba(245,158,11,0.8)",
+          backgroundColor: "transparent",
+          yAxisID: "y1",
+          tension: 0.3,
+          fill: false,
+          borderDash: [5, 3],
+          pointRadius: 2
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 3,
+      animation: false,
+      transitions: __chartTransitionsOff,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: {
+          grid: { color: "rgba(51,65,85,0.3)" },
+          ticks: { color: "#94a3b8", maxRotation: 45 }
+        },
+        y: {
+          position: "left",
+          grid: { color: "rgba(51,65,85,0.5)" },
+          ticks: { color: "#f87171" },
+          title: { display: true, text: t("budgetTrendYOverhead"), color: "#f87171", font: { size: 11 } }
+        },
+        y1: {
+          position: "right",
+          grid: { drawOnChartArea: false },
+          ticks: { color: "#22c55e", callback: function(v) { return v + "%"; } },
+          title: { display: true, text: t("budgetTrendYPct"), color: "#22c55e", font: { size: 11 } },
+          min: 0,
+          max: 100
+        }
+      },
+      plugins: {
+        legend: { labels: { color: "#cbd5e1" } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              if (ctx.datasetIndex === 0) return ctx.dataset.label + ": " + ctx.raw + "x";
+              return ctx.dataset.label + ": " + ctx.raw + "%";
             }
           }
         }
