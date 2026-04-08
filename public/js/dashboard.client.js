@@ -4450,21 +4450,67 @@ var __quotaWeights = {
   cache_read: 0.03
 };
 var __budgetViewMode = "volume"; // "volume" | "cost"
+var __budgetFlowMode = "budget"; // "budget" | "api" | "user"
 var __budgetSankeyState = null;
+var __budgetSwitchesWired = false;
+
+function __buildBudgetSwitches() {
+  if (__budgetSwitchesWired) return;
+  __budgetSwitchesWired = true;
+
+  var flowGrp = document.getElementById("budget-flow-group");
+  var weightGrp = document.getElementById("budget-weight-group");
+  if (!flowGrp || !weightGrp) return;
+
+  var flowModes = [
+    { key: "budget", label: t("budgetFlowBudget") },
+    { key: "api",    label: t("budgetFlowApi") },
+    { key: "user",   label: t("budgetFlowUser") }
+  ];
+  var weightModes = [
+    { key: "volume", label: t("budgetWfVolume") },
+    { key: "cost",   label: t("budgetWfCost") }
+  ];
+
+  function renderGroup(el, modes, current, setter) {
+    el.innerHTML = "";
+    for (var i = 0; i < modes.length; i++) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = modes[i].label;
+      btn.dataset.key = modes[i].key;
+      if (modes[i].key === current) btn.className = "active";
+      btn.addEventListener("click", (function(k) {
+        return function() {
+          setter(k);
+          if (__budgetSankeyState) renderBudgetWaterfall(__budgetSankeyState.tot, __budgetSankeyState.quota);
+        };
+      })(modes[i].key));
+      el.appendChild(btn);
+    }
+  }
+
+  renderGroup(flowGrp, flowModes, __budgetFlowMode, function(k) { __budgetFlowMode = k; });
+  renderGroup(weightGrp, weightModes, __budgetViewMode, function(k) { __budgetViewMode = k; });
+}
+
+function __updateBudgetSwitchActive() {
+  var flowGrp = document.getElementById("budget-flow-group");
+  var weightGrp = document.getElementById("budget-weight-group");
+  if (flowGrp) {
+    var btns = flowGrp.querySelectorAll("button");
+    for (var i = 0; i < btns.length; i++) btns[i].className = btns[i].dataset.key === __budgetFlowMode ? "active" : "";
+  }
+  if (weightGrp) {
+    var btns2 = weightGrp.querySelectorAll("button");
+    for (var j = 0; j < btns2.length; j++) btns2[j].className = btns2[j].dataset.key === __budgetViewMode ? "active" : "";
+  }
+}
 
 function renderBudgetWaterfall(tot, quota) {
   __budgetSankeyState = { tot: tot, quota: quota };
-
-  // Wire toggle button (once)
-  var toggleBtn = document.getElementById("budget-view-toggle");
-  if (toggleBtn && !toggleBtn.__wired) {
-    toggleBtn.__wired = true;
-    toggleBtn.addEventListener("click", function() {
-      __budgetViewMode = __budgetViewMode === "volume" ? "cost" : "volume";
-      if (__budgetSankeyState) renderBudgetWaterfall(__budgetSankeyState.tot, __budgetSankeyState.quota);
-    });
-  }
-  if (toggleBtn) toggleBtn.textContent = __budgetViewMode === "volume" ? t("budgetWfVolume") : t("budgetWfCost");
+  __buildBudgetSwitches();
+  __updateBudgetSwitchActive();
 
   var el = document.getElementById("c-budget-waterfall");
   var h3 = document.getElementById("budget-waterfall-h3");
@@ -4509,51 +4555,71 @@ function renderBudgetWaterfall(tot, quota) {
   var pCr  = logScale(pctOf(src.cr));
   var pCc  = logScale(pctOf(src.cc));
 
-  // Node labels
-  var nBudget = t("budgetWfBudget");
+  // Token type nodes (shared across all flow modes)
   var nOutput = t("budgetWfOutput") + " (" + fmtTok(raw.out) + ")";
   var nInput  = t("budgetWfInput") + " (" + fmtTok(raw.inp) + ")";
   var nCacheR = t("budgetWfCacheRead") + " (" + fmtTok(raw.cr) + ")";
   var nCacheC = t("budgetWfCacheCreate") + " (" + fmtTok(raw.cc) + ")";
-  var nProd   = t("budgetWfProductive") + " (" + pctOf(src.out) + "%)";
-  var nOver   = t("budgetWfOverhead") + " (" + (100 - pctOf(src.out)) + "%)";
 
-  // Label display map (node key → display text)
-  var labelMap = {};
-  labelMap[nBudget] = nBudget;
-  labelMap[nOutput] = nOutput;
-  labelMap[nInput]  = nInput;
-  labelMap[nCacheR] = nCacheR;
-  labelMap[nCacheC] = nCacheC;
-  labelMap[nProd]   = nProd;
-  labelMap[nOver]   = nOver;
-
-  // Color map for nodes
+  // Node colors
   var nodeColors = {};
-  nodeColors[nBudget] = "#94a3b8";
   nodeColors[nOutput] = "#22c55e";
   nodeColors[nInput]  = "#3b82f6";
   nodeColors[nCacheR] = "#22d3ee";
   nodeColors[nCacheC] = "#f59e0b";
-  nodeColors[nProd]   = "#22c55e";
-  nodeColors[nOver]   = "#f87171";
 
-  // Raw token values for tooltips
+  // Raw values for tooltips
   var rawMap = {};
-  rawMap[nOutput] = raw.out;
-  rawMap[nInput]  = raw.inp;
-  rawMap[nCacheR] = raw.cr;
-  rawMap[nCacheC] = raw.cc;
+  rawMap[nOutput] = raw.out; rawMap[nInput] = raw.inp;
+  rawMap[nCacheR] = raw.cr; rawMap[nCacheC] = raw.cc;
 
   var flows = [];
-  if (pOut > 0) flows.push({ from: nBudget, to: nOutput, flow: pOut });
-  if (pInp > 0) flows.push({ from: nBudget, to: nInput,  flow: pInp });
-  if (pCr > 0)  flows.push({ from: nBudget, to: nCacheR, flow: pCr });
-  if (pCc > 0)  flows.push({ from: nBudget, to: nCacheC, flow: pCc });
-  if (pOut > 0) flows.push({ from: nOutput, to: nProd,   flow: pOut });
-  if (pInp > 0) flows.push({ from: nInput,  to: nOver,   flow: pInp });
-  if (pCr > 0)  flows.push({ from: nCacheR, to: nOver,   flow: pCr });
-  if (pCc > 0)  flows.push({ from: nCacheC, to: nOver,   flow: pCc });
+  var labelMap = {};
+  labelMap[nOutput] = nOutput; labelMap[nInput] = nInput;
+  labelMap[nCacheR] = nCacheR; labelMap[nCacheC] = nCacheC;
+
+  if (__budgetFlowMode === "budget") {
+    // Budget → Token Types → Productive/Overhead
+    var nBudget = "MAX5 Budget";
+    var nProd = t("budgetWfProductive") + " (" + pctOf(src.out) + "%)";
+    var nOver = t("budgetWfOverhead") + " (" + (100 - pctOf(src.out)) + "%)";
+    nodeColors[nBudget] = "#94a3b8"; nodeColors[nProd] = "#22c55e"; nodeColors[nOver] = "#f87171";
+    labelMap[nBudget] = nBudget; labelMap[nProd] = nProd; labelMap[nOver] = nOver;
+    if (pOut > 0) flows.push({ from: nBudget, to: nOutput, flow: pOut });
+    if (pInp > 0) flows.push({ from: nBudget, to: nInput,  flow: pInp });
+    if (pCr > 0)  flows.push({ from: nBudget, to: nCacheR, flow: pCr });
+    if (pCc > 0)  flows.push({ from: nBudget, to: nCacheC, flow: pCc });
+    if (pOut > 0) flows.push({ from: nOutput, to: nProd,  flow: pOut });
+    if (pInp > 0) flows.push({ from: nInput,  to: nOver,  flow: pInp });
+    if (pCr > 0)  flows.push({ from: nCacheR, to: nOver,  flow: pCr });
+    if (pCc > 0)  flows.push({ from: nCacheC, to: nOver,  flow: pCc });
+  } else if (__budgetFlowMode === "api") {
+    // Claude API → Token Types → User
+    var nApi  = "Claude API";
+    var nUser = t("budgetWfYou");
+    nodeColors[nApi] = "#a855f7"; nodeColors[nUser] = "#22c55e";
+    labelMap[nApi] = nApi; labelMap[nUser] = nUser;
+    if (pOut > 0) flows.push({ from: nApi, to: nOutput, flow: pOut });
+    if (pInp > 0) flows.push({ from: nApi, to: nInput,  flow: pInp });
+    if (pCr > 0)  flows.push({ from: nApi, to: nCacheR, flow: pCr });
+    if (pCc > 0)  flows.push({ from: nApi, to: nCacheC, flow: pCc });
+    if (pOut > 0) flows.push({ from: nOutput, to: nUser, flow: pOut });
+    if (pInp > 0) flows.push({ from: nInput,  to: nUser, flow: pInp });
+    if (pCr > 0)  flows.push({ from: nCacheR, to: nUser, flow: pCr });
+    if (pCc > 0)  flows.push({ from: nCacheC, to: nUser, flow: pCc });
+  } else {
+    // User → API → Token Types
+    var nYou = t("budgetWfYou");
+    var nApi2 = "Claude API";
+    nodeColors[nYou] = "#22c55e"; nodeColors[nApi2] = "#a855f7";
+    labelMap[nYou] = nYou; labelMap[nApi2] = nApi2;
+    var totalFlow = pOut + pInp + pCr + pCc;
+    if (totalFlow > 0) flows.push({ from: nYou, to: nApi2, flow: totalFlow });
+    if (pOut > 0) flows.push({ from: nApi2, to: nOutput, flow: pOut });
+    if (pInp > 0) flows.push({ from: nApi2, to: nInput,  flow: pInp });
+    if (pCr > 0)  flows.push({ from: nApi2, to: nCacheR, flow: pCr });
+    if (pCc > 0)  flows.push({ from: nApi2, to: nCacheC, flow: pCc });
+  }
 
   _budgetCharts.waterfall = new Chart(el, {
     type: "sankey",
