@@ -13,6 +13,8 @@
 - **Measured background (proxy idea):** **[Claude Code Hidden Problem Analysis](https://github.com/ArkNill/claude-code-hidden-problem-analysis)** by **ArkNill** — write-ups on cache bugs, **5h/7d quota**, and proxy-captured headers (similar in spirit to **cc-relay**-style capture). **This codebase implements** the proxy/NDJSON approach in the dashboard; **deep evidence** stays in **his** repo.
 - **GitHub issue discussion (Claude Code):** **[anthropics/claude-code#38335](https://github.com/anthropics/claude-code/issues/38335)** — e.g. **Max / session limits** draining much faster than expected (discussion around Mar 2026). **fgrosswig** participated with **forensics/measurements**; **all linked comments, issues, and cross-threads** belong to the **same broad topic** (usage, regressions, community data) and are **reading references** — listing every URL here would not scale.
 
+**Direct URLs:** [https://github.com/anthropics/claude-code/issues/38335](https://github.com/anthropics/claude-code/issues/38335) · [https://github.com/ArkNill/claude-code-hidden-problem-analysis](https://github.com/ArkNill/claude-code-hidden-problem-analysis)
+
 See **[Documentation](docs/README.md)** for architecture, env vars, and API.
 
 ### Documentation

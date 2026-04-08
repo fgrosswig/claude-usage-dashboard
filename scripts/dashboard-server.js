@@ -506,6 +506,12 @@ function extractCliVersion(rec) {
   return normalizeCliSemver(cand);
 }
 
+/** Entrypoint aus JSONL-Zeile (Top-Level-Feld in system/assistant-Records). */
+function extractEntrypoint(rec) {
+  if (!rec || typeof rec !== 'object') return '';
+  return rec.entrypoint || '';
+}
+
 /** Liefert Map: normalisierte Version "2.1.87" -> { tag, date, highlights } */
 function getReleasesMap() {
   if (!releasesCache.releases || releasesCache.releases.length === 0) {
@@ -1540,6 +1546,7 @@ function emptyDailyBucket() {
     hour_signals: {},
     models: {},
     versions: {},
+    entrypoints: {},
     hit_limit: 0,
     hosts: {},
     session_signals: emptySessionSignals(),
@@ -1629,6 +1636,11 @@ function mergeDayBucketInto(target, src) {
   for (var vi = 0; vi < vk.length; vi++) {
     var v = vk[vi];
     target.versions[v] = (target.versions[v] || 0) + (src.versions[v] || 0);
+  }
+  var ek = Object.keys(src.entrypoints || {});
+  for (var ei = 0; ei < ek.length; ei++) {
+    var e = ek[ei];
+    target.entrypoints[e] = (target.entrypoints[e] || 0) + (src.entrypoints[e] || 0);
   }
 }
 
@@ -1729,6 +1741,7 @@ function rowToDailyEntry(row) {
     hour_signals: hourSigRow,
     models: row.models && typeof row.models === 'object' ? row.models : {},
     versions: versNorm,
+    entrypoints: row.entrypoints && typeof row.entrypoints === 'object' ? row.entrypoints : {},
     hit_limit: row.hit_limit || 0,
     hosts: hosts,
     session_signals: sigRow,
@@ -1881,6 +1894,8 @@ function processJsonlFile(fileRef, daily, onlyDate, isolateTodayFrag, fileTodayF
       dd.stop_reasons[stopR] = (dd.stop_reasons[stopR] || 0) + 1;
       var cliVer = extractCliVersion(rec);
       if (cliVer) dd.versions[cliVer] = (dd.versions[cliVer] || 0) + 1;
+      var ep = extractEntrypoint(rec);
+      if (ep) dd.entrypoints[ep] = (dd.entrypoints[ep] || 0) + 1;
       if (fileTodayFrag && todayYmdForFrag && day === todayYmdForFrag) {
         if (!fileTodayFrag.hosts) fileTodayFrag.hosts = {};
         if (!fileTodayFrag.hosts[hostLabel]) fileTodayFrag.hosts[hostLabel] = emptyHostSlice();
@@ -1910,6 +1925,7 @@ function processJsonlFile(fileRef, daily, onlyDate, isolateTodayFrag, fileTodayF
         fileTodayFrag.models[model].output += outTok;
         fileTodayFrag.models[model].cache_read += crTok;
         if (cliVer) fileTodayFrag.versions[cliVer] = (fileTodayFrag.versions[cliVer] || 0) + 1;
+        if (ep) fileTodayFrag.entrypoints[ep] = (fileTodayFrag.entrypoints[ep] || 0) + 1;
       }
     });
   } catch (e) {
@@ -1983,6 +1999,7 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
       hit_limit: r.hit_limit || 0,
       models: r.models,
       versions: r.versions || {},
+      entrypoints: r.entrypoints || {},
       hours: r.hours,
       hour_signals: r.hour_signals || {},
       hosts: hostsApi,

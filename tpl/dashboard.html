@@ -243,6 +243,21 @@
 </div>
 </div>
 </details>
+<!-- User Profile -->
+<details class="forensic-details user-profile-details" id="user-profile-collapse">
+<summary class="forensic-summary forensic-summary--bar">
+<div class="forensic-summary-row">
+<p id="user-profile-summary-line" class="forensic-summary-metrics">User Profile</p>
+</div>
+</summary>
+<div class="forensic-inner">
+<div class="grid" id="user-profile-cards"></div>
+<div class="charts" id="user-profile-charts">
+<div class="chart-box"><h3 id="user-version-h3"></h3><canvas id="c-user-versions"></canvas></div>
+<div class="chart-box"><h3 id="user-entrypoint-h3"></h3><canvas id="c-user-entrypoints"></canvas></div>
+</div>
+</div>
+</details>
 <!-- Proxy Analytics -->
 <details class="forensic-details proxy-details" id="proxy-collapse">
 <summary class="forensic-summary forensic-summary--bar proxy-summary">
@@ -300,7 +315,7 @@
 </div>
 </div>
 <script>window.__I18N_BUNDLES=__I18N_PLACEHOLDER__;</script>
-<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js" integrity="sha384-b0GXujLkk9eYYSmcSfoyZbfyElGAQnDyY0skCHSG6w3JgTMFnz11ggrTAr7seu9f" crossorigin="anonymous"></script>
 <script defer src="/assets/dashboard.client.js"></script>
 </body>
 </html>

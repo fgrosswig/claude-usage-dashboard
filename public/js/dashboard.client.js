@@ -1804,6 +1804,7 @@ function renderDashboardCore(data) {
     devSync.textContent = "Last: " + ts.toLocaleTimeString() + (data.dev_source ? " · " + (data.days || []).length + "d" : "");
   }
   renderProxyAnalysis(data);
+  renderUserProfileCharts(getFilteredDays(data.days));
   updateMetaDetailsSummary(data);
   var days = getFilteredDays(data.days);
   if(!days.length){
@@ -3809,6 +3810,167 @@ function copyReport(){
   var rov=document.getElementById("report-modal-overlay");
   if(rov){rov.addEventListener("click",function(e){if(e.target===rov)closeReportModal();});}
 })();
+
+// ── User Profile Charts ──────────────────────────────────────────────────
+var _userCharts = { versions: null, entrypoints: null };
+
+var __userProfileColors = [
+  "rgba(59,130,246,0.8)",   // blue
+  "rgba(139,92,246,0.8)",   // violet
+  "rgba(34,197,94,0.8)",    // green
+  "rgba(245,158,11,0.8)",   // amber
+  "rgba(236,72,153,0.8)",   // pink
+  "rgba(6,182,212,0.8)",    // cyan
+  "rgba(249,115,22,0.8)",   // orange
+  "rgba(168,85,247,0.8)"    // purple
+];
+
+function renderUserProfileCharts(days) {
+  var sumEl = document.getElementById("user-profile-summary-line");
+  var cardsEl = document.getElementById("user-profile-cards");
+  if (!sumEl) return;
+
+  if (!days || !days.length) {
+    sumEl.textContent = t("userProfileNoData");
+    if (cardsEl) cardsEl.innerHTML = "";
+    return;
+  }
+
+  // Collect all unique versions and entrypoints across days
+  var allVersions = {};
+  var allEntrypoints = {};
+  for (var di = 0; di < days.length; di++) {
+    var dv = days[di].versions || {};
+    var de = days[di].entrypoints || {};
+    var vk = Object.keys(dv);
+    for (var vi = 0; vi < vk.length; vi++) allVersions[vk[vi]] = true;
+    var ek = Object.keys(de);
+    for (var ei = 0; ei < ek.length; ei++) allEntrypoints[ek[ei]] = true;
+  }
+  var versionKeys = Object.keys(allVersions).sort();
+  var entrypointKeys = Object.keys(allEntrypoints).sort();
+
+  // Summary line: latest day's dominant version + entrypoint
+  var lastDay = days[days.length - 1];
+  var topVersion = "";
+  var topVersionCount = 0;
+  var lv = lastDay.versions || {};
+  var lvk = Object.keys(lv);
+  for (var tvi = 0; tvi < lvk.length; tvi++) {
+    if (lv[lvk[tvi]] > topVersionCount) { topVersion = lvk[tvi]; topVersionCount = lv[lvk[tvi]]; }
+  }
+  var topEntrypoint = "";
+  var topEpCount = 0;
+  var le = lastDay.entrypoints || {};
+  var lek = Object.keys(le);
+  for (var tei = 0; tei < lek.length; tei++) {
+    if (le[lek[tei]] > topEpCount) { topEntrypoint = lek[tei]; topEpCount = le[lek[tei]]; }
+  }
+  sumEl.textContent = t("userProfileSummary")
+    .replace("{version}", topVersion || "?")
+    .replace("{entrypoint}", topEntrypoint || "?");
+
+  // Cards
+  if (cardsEl) {
+    var cards = [];
+    if (topVersion) {
+      cards.push('<div class="card"><div class="label">' + t("userProfileCardVersion") + '</div><div class="value">' + topVersion + '</div><div class="sub">' + versionKeys.length + ' Version' + (versionKeys.length !== 1 ? 'en' : '') + '</div></div>');
+    }
+    if (topEntrypoint) {
+      cards.push('<div class="card"><div class="label">' + t("userProfileCardEntrypoint") + '</div><div class="value">' + topEntrypoint + '</div><div class="sub">' + entrypointKeys.length + ' Client' + (entrypointKeys.length !== 1 ? 's' : '') + '</div></div>');
+    }
+    cardsEl.innerHTML = cards.join("");
+  }
+
+  // X-axis labels (dates)
+  var labels = [];
+  for (var li = 0; li < days.length; li++) labels.push(days[li].date || "");
+
+  // ── Versions Chart ──
+  var elV = document.getElementById("c-user-versions");
+  var h3V = document.getElementById("user-version-h3");
+  if (h3V) h3V.textContent = t("userVersionChartTitle");
+  if (elV && versionKeys.length) {
+    if (_userCharts.versions) { _userCharts.versions.destroy(); _userCharts.versions = null; }
+    var vDatasets = [];
+    for (var vdi = 0; vdi < versionKeys.length; vdi++) {
+      var vKey = versionKeys[vdi];
+      var vData = [];
+      for (var vdd = 0; vdd < days.length; vdd++) {
+        vData.push((days[vdd].versions || {})[vKey] || 0);
+      }
+      vDatasets.push({
+        label: vKey,
+        data: vData,
+        backgroundColor: __userProfileColors[vdi % __userProfileColors.length],
+        stack: "ver"
+      });
+    }
+    _userCharts.versions = new Chart(elV, {
+      type: "bar",
+      data: { labels: labels, datasets: vDatasets },
+      options: {
+        responsive: true,
+        animation: false,
+        transitions: __chartTransitionsOff,
+        interaction: { mode: "index", intersect: false },
+        scales: {
+          x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8" } },
+          y: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8", precision: 0 }, title: { display: true, text: "Calls", color: "#94a3b8" } }
+        },
+        plugins: {
+          legend: { labels: { color: "#cbd5e1" } },
+          tooltip: { callbacks: { label: function(c) { return c.dataset.label + ": " + c.raw; } } }
+        }
+      }
+    });
+  }
+
+  // ── Entrypoints Chart ──
+  var elE = document.getElementById("c-user-entrypoints");
+  var h3E = document.getElementById("user-entrypoint-h3");
+  if (h3E) h3E.textContent = t("userEntrypointChartTitle");
+  if (elE && entrypointKeys.length) {
+    if (_userCharts.entrypoints) { _userCharts.entrypoints.destroy(); _userCharts.entrypoints = null; }
+    var eDatasets = [];
+    var epColors = {
+      "claude-vscode": "rgba(59,130,246,0.8)",
+      "cli": "rgba(34,197,94,0.8)",
+      "claude-jetbrains": "rgba(245,158,11,0.8)"
+    };
+    for (var edi = 0; edi < entrypointKeys.length; edi++) {
+      var eKey = entrypointKeys[edi];
+      var eData = [];
+      for (var edd = 0; edd < days.length; edd++) {
+        eData.push((days[edd].entrypoints || {})[eKey] || 0);
+      }
+      eDatasets.push({
+        label: eKey,
+        data: eData,
+        backgroundColor: epColors[eKey] || __userProfileColors[edi % __userProfileColors.length],
+        stack: "ep"
+      });
+    }
+    _userCharts.entrypoints = new Chart(elE, {
+      type: "bar",
+      data: { labels: labels, datasets: eDatasets },
+      options: {
+        responsive: true,
+        animation: false,
+        transitions: __chartTransitionsOff,
+        interaction: { mode: "index", intersect: false },
+        scales: {
+          x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8" } },
+          y: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8", precision: 0 }, title: { display: true, text: "Calls", color: "#94a3b8" } }
+        },
+        plugins: {
+          legend: { labels: { color: "#cbd5e1" } },
+          tooltip: { callbacks: { label: function(c) { return c.dataset.label + ": " + c.raw; } } }
+        }
+      }
+    });
+  }
+}
 
 // ── Proxy Analytics Panel ─────────────────────────────────────────────────
 var _proxyCharts = { tokens: null, latency: null };
