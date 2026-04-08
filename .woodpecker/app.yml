@@ -91,6 +91,8 @@ steps:
         fi
         $K set image deployment/claude-app app=harbor.grosswig-it.de/claude/claude-usage-dashboard:$TAG -n claude
         $K rollout status deployment/claude-app -n claude --timeout=3m
+        # Day-Cache invalidieren damit neue Felder (version_stats, entrypoints) beim naechsten Scan befuellt werden
+        $K exec deployment/claude-app -n claude -- rm -f /root/.claude/usage-dashboard-days.json || true
     environment:
       KUBE_URL:
         from_secret: kube_url
