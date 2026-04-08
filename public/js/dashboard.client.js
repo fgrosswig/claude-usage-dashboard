@@ -4501,19 +4501,13 @@ function renderBudgetWaterfall(tot, quota) {
     blurb.textContent = blurbText;
   }
 
-  // Square-root scaled flows: compresses dominant flows, amplifies small ones
-  // This keeps relative ordering but makes all bands visible as distinct flows
-  var sqrtScale = function(v) { return v > 0 ? Math.sqrt(v) : 0; };
-  var pOut = sqrtScale(pctOf(src.out));
-  var pInp = sqrtScale(pctOf(src.inp));
-  var pCr  = sqrtScale(pctOf(src.cr));
-  var pCc  = sqrtScale(pctOf(src.cc));
-  // Min band width for visibility
-  var minFlow = 0.4;
-  if (pOut > 0 && pOut < minFlow) pOut = minFlow;
-  if (pInp > 0 && pInp < minFlow) pInp = minFlow;
-  if (pCr > 0 && pCr < minFlow) pCr = minFlow;
-  if (pCc > 0 && pCc < minFlow) pCc = minFlow;
+  // Log-scaled flows: extreme compression of dominant flows
+  // log(98.7)=4.6, log(1.1)=2.4, log(0.1)=1 → ratio ~5:1 instead of 980:1
+  var logScale = function(v) { return v > 0 ? 1 + Math.log10(1 + v) : 0; };
+  var pOut = logScale(pctOf(src.out));
+  var pInp = logScale(pctOf(src.inp));
+  var pCr  = logScale(pctOf(src.cr));
+  var pCc  = logScale(pctOf(src.cc));
 
   // Node labels
   var nBudget = t("budgetWfBudget");
