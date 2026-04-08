@@ -3100,15 +3100,28 @@ var __devSource = (process.env.DEV_PROXY_SOURCE || '').trim();
 var __devMode = (process.env.DEV_MODE || '').trim().toLowerCase(); // "proxy" | "full"
 var __devProxyPending = !!__devSource && (__devMode === 'proxy' || __devMode === 'full');
 
-function devFetchRemoteUsage(cb) {
+function devFetchRemoteUsage(cb, retryCount) {
   if (!__devSource) return cb();
+  retryCount = retryCount || 0;
+  var maxRetries = 3;
+  var retryDelayMs = 5000;
   var url = __devSource.replace(/\/+$/, '') + '/api/debug/proxy-logs';
-  serviceLog.info('dev', 'fetching remote data from ' + url);
+  if (retryCount === 0) serviceLog.info('dev', 'fetching remote data from ' + url);
   var proto = url.startsWith('https') ? require('https') : require('http');
   proto.get(url, function (resp) {
     var body = '';
     resp.on('data', function (chunk) { body += chunk; });
     resp.on('end', function () {
+      // Non-200: retry on 502/503/504 (server restarting after cache-reset)
+      if (resp.statusCode >= 500 && retryCount < maxRetries) {
+        serviceLog.warn('dev', 'remote returned ' + resp.statusCode + ' — retry ' + (retryCount + 1) + '/' + maxRetries + ' in ' + (retryDelayMs / 1000) + 's');
+        setTimeout(function () { devFetchRemoteUsage(cb, retryCount + 1); }, retryDelayMs);
+        return;
+      }
+      if (resp.statusCode !== 200) {
+        serviceLog.error('dev', 'remote returned ' + resp.statusCode + ': ' + body.slice(0, 200));
+        return cb();
+      }
       try {
         var parsed = JSON.parse(body);
         var remote = parsed.usage || null;
@@ -3140,7 +3153,12 @@ function devFetchRemoteUsage(cb) {
       cb();
     });
   }).on('error', function (e) {
-    serviceLog.error('dev', 'remote data fetch failed: ' + (e.message || e));
+    if (retryCount < maxRetries) {
+      serviceLog.warn('dev', 'remote fetch error: ' + (e.message || e) + ' — retry ' + (retryCount + 1) + '/' + maxRetries + ' in ' + (retryDelayMs / 1000) + 's');
+      setTimeout(function () { devFetchRemoteUsage(cb, retryCount + 1); }, retryDelayMs);
+      return;
+    }
+    serviceLog.error('dev', 'remote data fetch failed after ' + maxRetries + ' retries: ' + (e.message || e));
     cb();
   });
 }
