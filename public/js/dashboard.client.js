@@ -4340,24 +4340,32 @@ function renderBudgetEfficiency(data) {
   }
 
   // Aggregate across all filtered days
+  // Respect host filter from top bar
+  var filteredHost = typeof getFilterHost === "function" ? getFilterHost() : "";
+
   var tot = { input: 0, output: 0, cache_read: 0, cache_creation: 0, total: 0,
               retries: 0, interrupts: 0, api_errors: 0, hit_limits: 0, calls: 0, active_hours: 0 };
   var dailyTrend = [];
 
   for (var di = 0; di < days.length; di++) {
     var d = days[di];
-    tot.input += d.input || 0;
-    tot.output += d.output || 0;
-    tot.cache_read += d.cache_read || 0;
-    tot.cache_creation += d.cache_creation || 0;
-    tot.total += d.total || 0;
-    tot.calls += d.calls || 0;
-    tot.active_hours += d.active_hours || 0;
-    var ss = d.session_signals || {};
+    // If host filter active, use per-host data
+    var src_d = d;
+    if (filteredHost && d.hosts && d.hosts[filteredHost]) {
+      src_d = d.hosts[filteredHost];
+    }
+    tot.input += src_d.input || 0;
+    tot.output += src_d.output || 0;
+    tot.cache_read += src_d.cache_read || 0;
+    tot.cache_creation += src_d.cache_creation || 0;
+    tot.total += (src_d.total != null ? src_d.total : ((src_d.input || 0) + (src_d.output || 0) + (src_d.cache_read || 0) + (src_d.cache_creation || 0)));
+    tot.calls += src_d.calls || 0;
+    tot.active_hours += src_d.active_hours || 0;
+    var ss = src_d.session_signals || d.session_signals || {};
     tot.retries += ss.retry || 0;
     tot.interrupts += ss.interrupt || 0;
     tot.api_errors += ss.api_error || 0;
-    tot.hit_limits += d.hit_limit || 0;
+    tot.hit_limits += (src_d.hit_limit != null ? src_d.hit_limit : d.hit_limit) || 0;
 
     var dayTotal = d.total || 0;
     var dayOutput = d.output || 0;
@@ -4579,16 +4587,17 @@ function renderBudgetWaterfall(tot, quota) {
   labelMap[nCacheR] = nCacheR; labelMap[nCacheC] = nCacheC;
 
   if (__budgetFlowMode === "budget") {
-    // Budget → Token Types → Productive/Overhead
-    var nBudget = "MAX5 Budget";
+    // Source → Token Types → Productive/Overhead
+    var srcLabel = filteredHost ? filteredHost : "MAX5 Budget";
     var nProd = t("budgetWfProductive") + " (" + pctOf(src.out) + "%)";
     var nOver = t("budgetWfOverhead") + " (" + (100 - pctOf(src.out)) + "%)";
-    nodeColors[nBudget] = "#94a3b8"; nodeColors[nProd] = "#22c55e"; nodeColors[nOver] = "#f87171";
-    labelMap[nBudget] = nBudget; labelMap[nProd] = nProd; labelMap[nOver] = nOver;
-    if (pOut > 0) flows.push({ from: nBudget, to: nOutput, flow: pOut });
-    if (pInp > 0) flows.push({ from: nBudget, to: nInput,  flow: pInp });
-    if (pCr > 0)  flows.push({ from: nBudget, to: nCacheR, flow: pCr });
-    if (pCc > 0)  flows.push({ from: nBudget, to: nCacheC, flow: pCc });
+    nodeColors[srcLabel] = filteredHost ? "#8b5cf6" : "#94a3b8";
+    nodeColors[nProd] = "#22c55e"; nodeColors[nOver] = "#f87171";
+    labelMap[srcLabel] = srcLabel; labelMap[nProd] = nProd; labelMap[nOver] = nOver;
+    if (pOut > 0) flows.push({ from: srcLabel, to: nOutput, flow: pOut });
+    if (pInp > 0) flows.push({ from: srcLabel, to: nInput,  flow: pInp });
+    if (pCr > 0)  flows.push({ from: srcLabel, to: nCacheR, flow: pCr });
+    if (pCc > 0)  flows.push({ from: srcLabel, to: nCacheC, flow: pCc });
     if (pOut > 0) flows.push({ from: nOutput, to: nProd,  flow: pOut });
     if (pInp > 0) flows.push({ from: nInput,  to: nOver,  flow: pInp });
     if (pCr > 0)  flows.push({ from: nCacheR, to: nOver,  flow: pCr });
