@@ -4331,8 +4331,8 @@ function renderProxyAnalysis(data) {
 
   renderProxyTokenChart(data);
   renderProxyLatencyChart(data);
-  renderProxyHourlyHeatmap(pd);
-  renderProxyModelChart(pd);
+  renderProxyHourlyHeatmap(data);
+  renderProxyModelChart(data);
   renderProxyInvisibleCost(pd);
   // i18n for new chart headings
   var h3hr = document.getElementById("proxy-hourly-h3");
@@ -4344,8 +4344,10 @@ function renderProxyAnalysis(data) {
   var blurbMod = document.getElementById("proxy-model-blurb");
   if (blurbMod) blurbMod.textContent = t("proxyModelBlurb");
   renderProxyColdStart(pd);
-  renderProxyJsonlComparison(data);
-  renderProxyHourlyLatency(pd);
+  renderProxyHourlyLatency(data);
+  renderProxyErrorTrend(data);
+  renderProxyCacheTrend(data);
+  renderProxyEfficiencyTrend(data);
   var h3hl = document.getElementById("proxy-hourly-latency-h3");
   if (h3hl) h3hl.textContent = t("proxyHourlyLatencyTitle");
   var blurbHl = document.getElementById("proxy-hourly-latency-blurb");
@@ -4511,20 +4513,32 @@ function renderProxyInvisibleCost(pd) {
 }
 
 // ── Phase 4: Hourly Request Heatmap ───────────────────────────────────────
-function renderProxyHourlyHeatmap(pd) {
+function renderProxyHourlyHeatmap(data) {
   if (typeof Chart === "undefined") return;
   var el = document.getElementById("c-proxy-hourly");
   if (!el) return;
-  var hours = pd.hours || {};
+  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  // Aggregate hours across all proxy days
+  var totals = {};
+  for (var di = 0; di < proxyDays.length; di++) {
+    var dh = proxyDays[di].hours || {};
+    for (var hk in dh) {
+      if (Object.hasOwn(dh, hk)) totals[hk] = (totals[hk] || 0) + (dh[hk] || 0);
+    }
+  }
   var labels = [];
   var values = [];
   var bgColors = [];
+  var maxVal = 0;
   for (var h = 0; h <= 23; h++) {
-    labels.push(String(h).length < 2 ? "0" + h : String(h));
-    var v = hours[String(h)] || 0;
+    var v = totals[String(h)] || 0;
+    if (v > maxVal) maxVal = v;
     values.push(v);
-    var intensity = v === 0 ? 0 : Math.min(1, v / 80);
-    bgColors.push(v === 0 ? "rgba(51,65,85,.2)" : "rgba(59,130,246," + (0.2 + intensity * 0.7).toFixed(2) + ")");
+    labels.push(String(h).length < 2 ? "0" + h : String(h));
+  }
+  for (var hi = 0; hi < values.length; hi++) {
+    var intensity = maxVal > 0 ? Math.min(1, values[hi] / maxVal) : 0;
+    bgColors.push(values[hi] === 0 ? "rgba(51,65,85,.2)" : "rgba(59,130,246," + (0.2 + intensity * 0.7).toFixed(2) + ")");
   }
 
   chartShellSetLoading("c-proxy-hourly", false);
@@ -4561,7 +4575,7 @@ function renderProxyHourlyHeatmap(pd) {
         tooltip: {
           callbacks: {
             title: function (ctx) { return ctx[0].label + ":00 UTC"; },
-            label: function (ctx) { return ctx.parsed.y + " requests"; }
+            label: function (ctx) { return ctx.parsed.y + " requests (" + proxyDays.length + " days)"; }
           }
         }
       }
@@ -4571,35 +4585,38 @@ function renderProxyHourlyHeatmap(pd) {
 
 
 // ── Phase 5: Model Breakdown ──────────────────────────────────────────────
-function renderProxyModelChart(pd) {
+function renderProxyModelChart(data) {
   if (typeof Chart === "undefined") return;
   var el = document.getElementById("c-proxy-models");
   if (!el) return;
-  var models = pd.models || {};
-  var labels = [];
-  var reqData = [];
-  var latData = [];
+  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  if (!proxyDays.length) return;
   var colors = ["#8b5cf6", "#3b82f6", "#06b6d4", "#22c55e", "#f59e0b", "#ef4444", "#ec4899"];
-  var ci = 0;
-  var bgColors = [];
-  for (var mk in models) {
-    if (!Object.prototype.hasOwnProperty.call(models, mk)) continue;
-    var m = models[mk];
-    var short = mk.replace("claude-", "").replace(/-\d{8}$/, "");
-    labels.push(short);
-    reqData.push(m.requests || 0);
-    latData.push(m.avg_duration_ms || 0);
-    bgColors.push(colors[ci % colors.length]);
-    ci++;
+  // Collect all model keys across all days
+  var allModels = {};
+  for (var di = 0; di < proxyDays.length; di++) {
+    var dm = proxyDays[di].models || {};
+    for (var mk in dm) { if (Object.hasOwn(dm, mk)) allModels[mk] = true; }
   }
+  var modelKeys = Object.keys(allModels).sort(function(a, b) { return a.localeCompare(b); });
+  var labels = proxyDays.map(function(d) { return d.date ? d.date.slice(5) : "?"; });
+  // Build stacked bar datasets per model + latency line
+  var datasets = [];
+  for (var mi = 0; mi < modelKeys.length; mi++) {
+    var mKey = modelKeys[mi];
+    var short = mKey.replace("claude-", "").replace(/-\d{8}$/, "");
+    var mData = proxyDays.map(function(d) { return d.models && d.models[mKey] ? (d.models[mKey].requests || 0) : 0; });
+    datasets.push({ label: short, data: mData, backgroundColor: colors[mi % colors.length], stack: "models", yAxisID: "y", borderRadius: 2 });
+  }
+  // Avg latency line across all models per day
+  var latData = proxyDays.map(function(d) { return d.avg_duration_ms || 0; });
+  datasets.push({ label: t("proxyDSModelLatency"), data: latData, type: "line", borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.15)", yAxisID: "y1", tension: 0.3, pointRadius: 3 });
 
   chartShellSetLoading("c-proxy-models", false);
-  if (!labels.length) return;
 
   if (_proxyCharts.models) {
     _proxyCharts.models.data.labels = labels;
-    _proxyCharts.models.data.datasets[0].data = reqData;
-    _proxyCharts.models.data.datasets[1].data = latData;
+    _proxyCharts.models.data.datasets = datasets;
     freezeChartNoAnim(_proxyCharts.models);
     _proxyCharts.models.update("none");
     return;
@@ -4607,21 +4624,15 @@ function renderProxyModelChart(pd) {
 
   _proxyCharts.models = new Chart(el.getContext("2d"), {
     type: "bar",
-    data: {
-      labels: labels,
-      datasets: [
-        { label: t("proxyDSModelRequests"), data: reqData, backgroundColor: bgColors, yAxisID: "y", borderRadius: 3 },
-        { label: t("proxyDSModelLatency"), data: latData, type: "line", borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.15)", yAxisID: "y1", tension: 0.3, pointRadius: 4 }
-      ]
-    },
+    data: { labels: labels, datasets: datasets },
     options: {
       responsive: true,
       animation: false,
       transitions: __chartTransitionsOff,
       interaction: { mode: "index", intersect: false },
       scales: {
-        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { position: "left", ticks: { color: "#94a3b8" }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, title: { display: true, text: "Requests", color: "#94a3b8", font: { size: 10 } } },
+        x: { stacked: true, ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
+        y: { stacked: true, position: "left", ticks: { color: "#94a3b8" }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, title: { display: true, text: "Requests", color: "#94a3b8", font: { size: 10 } } },
         y1: { position: "right", ticks: { color: "#f59e0b", callback: function (v) { return v >= 1000 ? (v / 1000).toFixed(1) + "s" : v + "ms"; } }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: "Latency", color: "#f59e0b", font: { size: 10 } } }
       },
       plugins: {
@@ -4629,7 +4640,7 @@ function renderProxyModelChart(pd) {
         tooltip: {
           callbacks: {
             label: function (ctx) {
-              if (ctx.datasetIndex === 1) return ctx.dataset.label + ": " + (ctx.parsed.y >= 1000 ? (ctx.parsed.y / 1000).toFixed(1) + "s" : Math.round(ctx.parsed.y) + "ms");
+              if (ctx.dataset.yAxisID === "y1") return ctx.dataset.label + ": " + (ctx.parsed.y >= 1000 ? (ctx.parsed.y / 1000).toFixed(1) + "s" : Math.round(ctx.parsed.y) + "ms");
               return ctx.dataset.label + ": " + ctx.parsed.y;
             }
           }
@@ -4698,20 +4709,34 @@ function renderProxyJsonlComparison(data) {
 }
 
 // ── Per-Hour Latency Heatmap ──────────────────────────────────────────────
-function renderProxyHourlyLatency(pd) {
+function renderProxyHourlyLatency(data) {
   if (typeof Chart === "undefined") return;
   var el = document.getElementById("c-proxy-hourly-latency");
   if (!el) return;
-  var phl = pd.per_hour_latency || {};
+  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  // Aggregate per_hour_latency across all days
+  var agg = {};
+  for (var di = 0; di < proxyDays.length; di++) {
+    var phl = proxyDays[di].per_hour_latency || {};
+    for (var hk in phl) {
+      if (!Object.hasOwn(phl, hk)) continue;
+      var hl = phl[hk];
+      if (!hl || !hl.count) continue;
+      if (!agg[hk]) agg[hk] = { sum: 0, count: 0, max: 0 };
+      agg[hk].sum += hl.sum;
+      agg[hk].count += hl.count;
+      if (hl.max > agg[hk].max) agg[hk].max = hl.max;
+    }
+  }
   var labels = [];
   var avgData = [];
   var maxData = [];
   for (var h = 0; h <= 23; h++) {
     labels.push(String(h).length < 2 ? "0" + h : String(h));
-    var hl = phl[String(h)] || phl[h];
-    if (hl && hl.count > 0) {
-      avgData.push(Math.round(hl.sum / hl.count));
-      maxData.push(hl.max);
+    var a = agg[String(h)];
+    if (a && a.count > 0) {
+      avgData.push(Math.round(a.sum / a.count));
+      maxData.push(a.max);
     } else {
       avgData.push(0);
       maxData.push(0);
@@ -4751,6 +4776,196 @@ function renderProxyHourlyLatency(pd) {
         tooltip: {
           callbacks: {
             label: function(ctx) { return ctx.dataset.label + ": " + (ctx.parsed.y >= 1000 ? (ctx.parsed.y/1000).toFixed(1)+"s" : ctx.parsed.y+"ms"); }
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Error/429 Rate Trend ─────────────────────────────────────────────────
+function renderProxyErrorTrend(data) {
+  if (typeof Chart === "undefined") return;
+  var el = document.getElementById("c-proxy-error-trend");
+  if (!el) return;
+  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  if (proxyDays.length < 2) return;
+  var labels = proxyDays.map(function(d) { return d.date ? d.date.slice(5) : "?"; });
+  var errRate = proxyDays.map(function(d) { return d.error_rate || 0; });
+  var f429 = proxyDays.map(function(d) { return d.requests > 0 ? Math.round((d.false_429s || 0) / d.requests * 100 * 10) / 10 : 0; });
+
+  chartShellSetLoading("c-proxy-error-trend", false);
+  var h3 = document.getElementById("proxy-error-trend-h3");
+  if (h3) h3.textContent = t("proxyErrorTrendTitle");
+  var blurb = document.getElementById("proxy-error-trend-blurb");
+  if (blurb) blurb.textContent = t("proxyErrorTrendBlurb");
+
+  if (_proxyCharts.errorTrend) {
+    _proxyCharts.errorTrend.data.labels = labels;
+    _proxyCharts.errorTrend.data.datasets[0].data = errRate;
+    _proxyCharts.errorTrend.data.datasets[1].data = f429;
+    freezeChartNoAnim(_proxyCharts.errorTrend);
+    _proxyCharts.errorTrend.update("none");
+    return;
+  }
+
+  _proxyCharts.errorTrend = new Chart(el.getContext("2d"), {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [
+        { label: t("proxyDSErrorRate"), data: errRate, borderColor: "#ef4444", backgroundColor: "rgba(239,68,68,.1)", fill: true, tension: 0.3, pointRadius: 3 },
+        { label: t("proxyDSFalse429Rate"), data: f429, borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.1)", fill: true, tension: 0.3, pointRadius: 3 }
+      ]
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      transitions: __chartTransitionsOff,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
+        y: { ticks: { color: "#94a3b8", callback: function(v) { return v + "%"; } }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true }
+      },
+      plugins: {
+        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: function(ctx) { return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(1) + "%"; } } }
+      }
+    }
+  });
+}
+
+// ── Cache Quality Trend ──────────────────────────────────────────────────
+function renderProxyCacheTrend(data) {
+  if (typeof Chart === "undefined") return;
+  var el = document.getElementById("c-proxy-cache-trend");
+  if (!el) return;
+  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  if (proxyDays.length < 2) return;
+  var labels = proxyDays.map(function(d) { return d.date ? d.date.slice(5) : "?"; });
+  var ratio = proxyDays.map(function(d) { return d.cache_read_ratio != null ? Math.round(d.cache_read_ratio * 100 * 10) / 10 : 0; });
+  var coldStarts = proxyDays.map(function(d) { return d.cold_starts || 0; });
+
+  chartShellSetLoading("c-proxy-cache-trend", false);
+  var h3 = document.getElementById("proxy-cache-trend-h3");
+  if (h3) h3.textContent = t("proxyCacheTrendTitle");
+  var blurb = document.getElementById("proxy-cache-trend-blurb");
+  if (blurb) blurb.textContent = t("proxyCacheTrendBlurb");
+
+  if (_proxyCharts.cacheTrend) {
+    _proxyCharts.cacheTrend.data.labels = labels;
+    _proxyCharts.cacheTrend.data.datasets[0].data = ratio;
+    _proxyCharts.cacheTrend.data.datasets[1].data = coldStarts;
+    freezeChartNoAnim(_proxyCharts.cacheTrend);
+    _proxyCharts.cacheTrend.update("none");
+    return;
+  }
+
+  _proxyCharts.cacheTrend = new Chart(el.getContext("2d"), {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [
+        { label: t("proxyDSCacheRatio"), data: ratio, borderColor: "#22c55e", backgroundColor: "rgba(34,197,94,.1)", fill: true, tension: 0.3, pointRadius: 3, yAxisID: "y" },
+        { label: t("proxyDSColdStarts"), data: coldStarts, type: "bar", backgroundColor: "rgba(59,130,246,.5)", borderRadius: 2, yAxisID: "y1" }
+      ]
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      transitions: __chartTransitionsOff,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
+        y: { position: "left", ticks: { color: "#22c55e", callback: function(v) { return v + "%"; } }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, max: 100, title: { display: true, text: "Cache Ratio", color: "#22c55e", font: { size: 10 } } },
+        y1: { position: "right", ticks: { color: "#3b82f6" }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: "Cold Starts", color: "#3b82f6", font: { size: 10 } } }
+      },
+      plugins: {
+        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              if (ctx.dataset.yAxisID === "y") return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(1) + "%";
+              return ctx.dataset.label + ": " + ctx.parsed.y;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Efficiency Trend (JSONL Ratio + Visible/1%) ─────────────────────────
+function renderProxyEfficiencyTrend(data) {
+  if (typeof Chart === "undefined") return;
+  var el = document.getElementById("c-proxy-efficiency-trend");
+  if (!el) return;
+  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  var mainDays = data.days || [];
+  if (proxyDays.length < 2) return;
+  // Build proxy lookup by date
+  var proxyByDate = {};
+  for (var pi = 0; pi < proxyDays.length; pi++) proxyByDate[proxyDays[pi].date] = proxyDays[pi];
+  // Build JSONL token totals by date
+  var jsonlByDate = {};
+  for (var di = 0; di < mainDays.length; di++) {
+    var md = mainDays[di];
+    if (md.date) jsonlByDate[md.date] = (md.input || 0) + (md.output || 0) + (md.cache_read || 0) + (md.cache_creation || 0);
+  }
+
+  var labels = [];
+  var ratioData = [];
+  var visPerPctData = [];
+  for (var qi = 0; qi < proxyDays.length; qi++) {
+    var pd = proxyDays[qi];
+    labels.push(pd.date ? pd.date.slice(5) : "?");
+    var proxyTotal = pd.total_tokens || 0;
+    var jsonlTotal = jsonlByDate[pd.date] || 0;
+    ratioData.push(proxyTotal > 0 ? Math.round(jsonlTotal / proxyTotal * 100) / 100 : 0);
+    visPerPctData.push(pd.visible_tokens_per_pct || 0);
+  }
+
+  var h3 = document.getElementById("proxy-efficiency-trend-h3");
+  if (h3) h3.textContent = t("proxyEfficiencyTrendTitle");
+  var blurb = document.getElementById("proxy-efficiency-trend-blurb");
+  if (blurb) blurb.textContent = t("proxyEfficiencyTrendBlurb");
+
+  if (_proxyCharts.efficiencyTrend) {
+    _proxyCharts.efficiencyTrend.data.labels = labels;
+    _proxyCharts.efficiencyTrend.data.datasets[0].data = ratioData;
+    _proxyCharts.efficiencyTrend.data.datasets[1].data = visPerPctData;
+    freezeChartNoAnim(_proxyCharts.efficiencyTrend);
+    _proxyCharts.efficiencyTrend.update("none");
+    return;
+  }
+
+  _proxyCharts.efficiencyTrend = new Chart(el.getContext("2d"), {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [
+        { label: t("proxyDSJsonlRatio"), data: ratioData, borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.1)", fill: true, tension: 0.3, pointRadius: 3, yAxisID: "y" },
+        { label: t("proxyDSVisPerPct"), data: visPerPctData, type: "bar", backgroundColor: "rgba(139,92,246,.5)", borderRadius: 2, yAxisID: "y1" }
+      ]
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      transitions: __chartTransitionsOff,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
+        y: { position: "left", ticks: { color: "#f59e0b" }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, title: { display: true, text: "JSONL/Proxy", color: "#f59e0b", font: { size: 10 } } },
+        y1: { position: "right", ticks: { color: "#8b5cf6" }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: "Vis/1%", color: "#8b5cf6", font: { size: 10 } } }
+      },
+      plugins: {
+        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              if (ctx.dataset.yAxisID === "y") return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(2) + "x";
+              return ctx.dataset.label + ": " + fmt(ctx.parsed.y);
+            }
           }
         }
       }
