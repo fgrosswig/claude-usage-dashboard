@@ -4463,6 +4463,24 @@ var __budgetFlowMode = "budget"; // "budget" | "api" | "user"
 var __budgetSankeyState = null;
 var __budgetFilteredHost = "";
 var __budgetSwitchesWired = false;
+var __googleChartsReady = false;
+
+// Load Google Charts Sankey package
+(function() {
+  if (typeof google !== "undefined" && google.charts) {
+    google.charts.load("current", { packages: ["sankey"] });
+    google.charts.setOnLoadCallback(function() { __googleChartsReady = true; });
+  } else {
+    // Wait for script to load
+    var iv = setInterval(function() {
+      if (typeof google !== "undefined" && google.charts) {
+        clearInterval(iv);
+        google.charts.load("current", { packages: ["sankey"] });
+        google.charts.setOnLoadCallback(function() { __googleChartsReady = true; });
+      }
+    }, 200);
+  }
+})();
 
 function __buildBudgetSwitches() {
   if (__budgetSwitchesWired) return;
@@ -4522,17 +4540,24 @@ function renderBudgetWaterfall(tot, quota) {
   __buildBudgetSwitches();
   __updateBudgetSwitchActive();
 
-  var el = document.getElementById("c-budget-waterfall");
+  var el = document.getElementById("c-budget-sankey");
   var h3 = document.getElementById("budget-waterfall-h3");
   if (h3) h3.textContent = t("budgetWaterfallTitle");
   var blurb = document.getElementById("budget-waterfall-blurb");
   if (!el) return;
-  if (_budgetCharts.waterfall) { _budgetCharts.waterfall.destroy(); _budgetCharts.waterfall = null; }
-  if (tot.total <= 0) return;
+
+  if (!__googleChartsReady || !window.google || !window.google.visualization) {
+    el.innerHTML = "<div style='text-align:center;padding:2rem;color:#94a3b8'>Loading Google Charts...</div>";
+    setTimeout(function() { if (__budgetSankeyState) renderBudgetWaterfall(tot, quota); }, 500);
+    return;
+  }
+
+  if (tot.total <= 0) {
+    el.innerHTML = "<div style='text-align:center;padding:2rem;color:#94a3b8'>" + t("budgetNoData") + "</div>";
+    return;
+  }
 
   var isCost = __budgetViewMode === "cost";
-
-  // Compute raw and weighted values
   var raw = { out: tot.output, inp: tot.input, cr: tot.cache_read, cc: tot.cache_creation };
   var weighted = {
     out: tot.output * __quotaWeights.output,
@@ -4551,132 +4576,70 @@ function renderBudgetWaterfall(tot, quota) {
   };
   var pctOf = function(v) { return totalVal > 0 ? Math.round(v / totalVal * 1000) / 10 : 0; };
 
-  // Blurb
   if (blurb) {
-    var blurbText = isCost ? t("budgetWaterfallBlurbCost") : t("budgetWaterfallBlurb");
-    blurb.textContent = blurbText;
+    blurb.textContent = isCost ? t("budgetWaterfallBlurbCost") : t("budgetWaterfallBlurb");
   }
 
-  // Equal-width bands: all flows get same width, real values in labels/tooltips
-  var pOut = src.out > 0 ? 1 : 0;
-  var pInp = src.inp > 0 ? 1 : 0;
-  var pCr  = src.cr > 0 ? 1 : 0;
-  var pCc  = src.cc > 0 ? 1 : 0;
+  // Build Google DataTable rows: [From, To, Weight]
+  var rows = [];
+  var nOut = t("budgetWfOutput") + " " + pctOf(src.out) + "%";
+  var nInp = t("budgetWfInput") + " " + pctOf(src.inp) + "%";
+  var nCr  = t("budgetWfCacheRead") + " " + pctOf(src.cr) + "%";
+  var nCc  = t("budgetWfCacheCreate") + " " + pctOf(src.cc) + "%";
 
-  // Token type nodes (shared across all flow modes)
-  var nOutput = t("budgetWfOutput") + " " + pctOf(src.out) + "% (" + fmtTok(raw.out) + ")";
-  var nInput  = t("budgetWfInput") + " " + pctOf(src.inp) + "% (" + fmtTok(raw.inp) + ")";
-  var nCacheR = t("budgetWfCacheRead") + " " + pctOf(src.cr) + "% (" + fmtTok(raw.cr) + ")";
-  var nCacheC = t("budgetWfCacheCreate") + " " + pctOf(src.cc) + "% (" + fmtTok(raw.cc) + ")";
-
-  // Node colors
-  var nodeColors = {};
-  nodeColors[nOutput] = "#22c55e";
-  nodeColors[nInput]  = "#3b82f6";
-  nodeColors[nCacheR] = "#22d3ee";
-  nodeColors[nCacheC] = "#f59e0b";
-
-  // Raw values for tooltips
-  var rawMap = {};
-  rawMap[nOutput] = raw.out; rawMap[nInput] = raw.inp;
-  rawMap[nCacheR] = raw.cr; rawMap[nCacheC] = raw.cc;
-
-  var flows = [];
-  var labelMap = {};
-  labelMap[nOutput] = nOutput; labelMap[nInput] = nInput;
-  labelMap[nCacheR] = nCacheR; labelMap[nCacheC] = nCacheC;
+  // Use equal weights for visual balance, real values in labels
+  var w = 1;
 
   if (__budgetFlowMode === "budget") {
-    // Source → Token Types → Productive/Overhead
-    var srcLabel = __budgetFilteredHost ? __budgetFilteredHost : "MAX5 Budget";
-    var nProd = t("budgetWfProductive") + " (" + pctOf(src.out) + "%)";
-    var nOver = t("budgetWfOverhead") + " (" + (100 - pctOf(src.out)) + "%)";
-    nodeColors[srcLabel] = __budgetFilteredHost ? "#8b5cf6" : "#94a3b8";
-    nodeColors[nProd] = "#22c55e"; nodeColors[nOver] = "#f87171";
-    labelMap[srcLabel] = srcLabel; labelMap[nProd] = nProd; labelMap[nOver] = nOver;
-    if (pOut > 0) flows.push({ from: srcLabel, to: nOutput, flow: pOut });
-    if (pInp > 0) flows.push({ from: srcLabel, to: nInput,  flow: pInp });
-    if (pCr > 0)  flows.push({ from: srcLabel, to: nCacheR, flow: pCr });
-    if (pCc > 0)  flows.push({ from: srcLabel, to: nCacheC, flow: pCc });
-    if (pOut > 0) flows.push({ from: nOutput, to: nProd,  flow: pOut });
-    if (pInp > 0) flows.push({ from: nInput,  to: nOver,  flow: pInp });
-    if (pCr > 0)  flows.push({ from: nCacheR, to: nOver,  flow: pCr });
-    if (pCc > 0)  flows.push({ from: nCacheC, to: nOver,  flow: pCc });
+    var srcN = __budgetFilteredHost || "MAX5 Budget";
+    var prodN = t("budgetWfProductive") + " (" + fmtTok(raw.out) + ")";
+    var overN = t("budgetWfOverhead") + " (" + fmtTok(raw.inp + raw.cr + raw.cc) + ")";
+    if (src.out > 0) { rows.push([srcN, nOut, w]); rows.push([nOut, prodN, w]); }
+    if (src.inp > 0) { rows.push([srcN, nInp, w]); rows.push([nInp, overN, w]); }
+    if (src.cr > 0)  { rows.push([srcN, nCr,  w]); rows.push([nCr,  overN, w]); }
+    if (src.cc > 0)  { rows.push([srcN, nCc,  w]); rows.push([nCc,  overN, w]); }
   } else if (__budgetFlowMode === "api") {
-    // Claude API → Token Types → User
-    var nApi  = "Claude API";
-    var nUser = t("budgetWfYou");
-    nodeColors[nApi] = "#a855f7"; nodeColors[nUser] = "#22c55e";
-    labelMap[nApi] = nApi; labelMap[nUser] = nUser;
-    if (pOut > 0) flows.push({ from: nApi, to: nOutput, flow: pOut });
-    if (pInp > 0) flows.push({ from: nApi, to: nInput,  flow: pInp });
-    if (pCr > 0)  flows.push({ from: nApi, to: nCacheR, flow: pCr });
-    if (pCc > 0)  flows.push({ from: nApi, to: nCacheC, flow: pCc });
-    if (pOut > 0) flows.push({ from: nOutput, to: nUser, flow: pOut });
-    if (pInp > 0) flows.push({ from: nInput,  to: nUser, flow: pInp });
-    if (pCr > 0)  flows.push({ from: nCacheR, to: nUser, flow: pCr });
-    if (pCc > 0)  flows.push({ from: nCacheC, to: nUser, flow: pCc });
+    var apiN = "Claude API";
+    var youN = t("budgetWfYou") + " (" + fmtTok(totalVal) + ")";
+    if (src.out > 0) { rows.push([apiN, nOut, w]); rows.push([nOut, youN, w]); }
+    if (src.inp > 0) { rows.push([apiN, nInp, w]); rows.push([nInp, youN, w]); }
+    if (src.cr > 0)  { rows.push([apiN, nCr,  w]); rows.push([nCr,  youN, w]); }
+    if (src.cc > 0)  { rows.push([apiN, nCc,  w]); rows.push([nCc,  youN, w]); }
   } else {
-    // User → API → Token Types → Result
-    var nYou = t("budgetWfYou");
-    var nApi2 = "Claude API";
-    var nResult = t("budgetWfResult");
-    nodeColors[nYou] = "#22c55e"; nodeColors[nApi2] = "#a855f7"; nodeColors[nResult] = "#94a3b8";
-    labelMap[nYou] = nYou; labelMap[nApi2] = nApi2; labelMap[nResult] = nResult;
-    var totalFlow = pOut + pInp + pCr + pCc;
-    if (totalFlow > 0) flows.push({ from: nYou, to: nApi2, flow: totalFlow });
-    if (pOut > 0) flows.push({ from: nApi2, to: nOutput, flow: pOut });
-    if (pInp > 0) flows.push({ from: nApi2, to: nInput,  flow: pInp });
-    if (pCr > 0)  flows.push({ from: nApi2, to: nCacheR, flow: pCr });
-    if (pCc > 0)  flows.push({ from: nApi2, to: nCacheC, flow: pCc });
-    if (pOut > 0) flows.push({ from: nOutput, to: nResult, flow: pOut });
-    if (pInp > 0) flows.push({ from: nInput,  to: nResult, flow: pInp });
-    if (pCr > 0)  flows.push({ from: nCacheR, to: nResult, flow: pCr });
-    if (pCc > 0)  flows.push({ from: nCacheC, to: nResult, flow: pCc });
+    var youN2  = t("budgetWfYou");
+    var apiN2  = "Claude API";
+    var resN   = t("budgetWfResult") + " (" + fmtTok(totalVal) + ")";
+    rows.push([youN2, apiN2, w * 4]);
+    if (src.out > 0) { rows.push([apiN2, nOut, w]); rows.push([nOut, resN, w]); }
+    if (src.inp > 0) { rows.push([apiN2, nInp, w]); rows.push([nInp, resN, w]); }
+    if (src.cr > 0)  { rows.push([apiN2, nCr,  w]); rows.push([nCr,  resN, w]); }
+    if (src.cc > 0)  { rows.push([apiN2, nCc,  w]); rows.push([nCc,  resN, w]); }
   }
 
-  _budgetCharts.waterfall = new Chart(el, {
-    type: "sankey",
-    data: {
-      datasets: [{
-        data: flows,
-        colorFrom: function(ctx) {
-          var d = ctx.dataset.data[ctx.dataIndex];
-          return d ? (nodeColors[d.from] || "#94a3b8") : "#94a3b8";
-        },
-        colorTo: function(ctx) {
-          var d = ctx.dataset.data[ctx.dataIndex];
-          return d ? (nodeColors[d.to] || "#94a3b8") : "#94a3b8";
-        },
-        colorMode: "gradient",
-        labels: labelMap,
-        size: "max",
-        nodeWidth: 20,
-        color: "#e2e8f0",
-        borderWidth: 0
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      aspectRatio: 2.8,
-      animation: false,
-      layout: { padding: { right: 10 } },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) {
-              var item = ctx.dataset.data[ctx.dataIndex];
-              if (!item) return "";
-              var tokVal = rawMap[item.to] || rawMap[item.from] || 0;
-              var line = item.from.split(" (")[0] + " \u2192 " + item.to.split(" (")[0];
-              line += ": " + item.flow.toFixed(1) + "%";
-              if (tokVal > 0) line += " (" + fmtTok(tokVal) + " tokens)";
-              return line;
-            }
-          }
-        }
+  if (!rows.length) {
+    el.innerHTML = "";
+    return;
+  }
+
+  var data = new google.visualization.DataTable();
+  data.addColumn("string", "From");
+  data.addColumn("string", "To");
+  data.addColumn("number", "Weight");
+  data.addRows(rows);
+
+  var chart = new google.visualization.Sankey(el);
+  chart.draw(data, {
+    height: Math.max(250, rows.length * 16),
+    sankey: {
+      node: {
+        label: { fontSize: 11, bold: true, color: "#e2e8f0" },
+        nodePadding: 14,
+        width: 18,
+        colors: ["#94a3b8", "#22c55e", "#3b82f6", "#22d3ee", "#f59e0b", "#f87171", "#a855f7", "#8b5cf6"]
+      },
+      link: {
+        color: { fill: "#94a3b8", fillOpacity: 0.18 },
+        colorMode: "gradient"
       }
     }
   });
