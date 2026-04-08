@@ -159,6 +159,9 @@ jobs:
               print("No Gitea releases found, skip")
               sys.exit(0)
 
+          # Oldest first — so the newest release becomes "Latest" on GitHub
+          releases.reverse()
+
           for rel in releases:
               tag = rel["tag_name"]
 
