@@ -382,5 +382,13 @@
   "userDSApiError": "API Error",
   "userSortAnomalies": "이상 많은 순",
   "userSortNewest": "최신 버전 순",
-  "userSortCalls": "호출 많은 순"
+  "userSortCalls": "호출 많은 순",
+  "releaseStabilityTitle": "릴리스 안정성",
+  "releaseStabilityBlurb": "{days}일 동안 {total}개 릴리스 (~{cadence}일 간격) · 건너뛴 패치 {skipped}개 · 당일 핫픽스 {hotfixes}개 · 회귀 수정 {regressions}개",
+  "releaseStabilityNoData": "릴리스 안정성 — 릴리스 데이터 없음",
+  "releaseStabilityStable": "안정",
+  "releaseStabilityRegression": "회귀 수정",
+  "releaseStabilityHotfix": "당일 핫픽스",
+  "releaseStabilitySkipped": "건너뛴 패치",
+  "releaseStabilityXAxis": "활성 일수"
 }

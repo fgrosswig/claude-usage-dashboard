@@ -1811,6 +1811,7 @@ function renderDashboardCore(data) {
   }
   renderProxyAnalysis(data);
   renderUserProfileCharts(getFilteredDays(data.days));
+  renderReleaseStabilityChart(data.release_stability);
   updateMetaDetailsSummary(data);
   var days = getFilteredDays(data.days);
   if(!days.length){
@@ -3820,7 +3821,7 @@ function copyReport(){
 })();
 
 // ── User Profile Charts ──────────────────────────────────────────────────
-var _userCharts = { versions: null, entrypoints: null };
+var _userCharts = { versions: null, entrypoints: null, releaseStability: null };
 var __userVersionSort = "anomalies"; // anomalies | newest | calls
 var __userVersionFilter = null; // null = all, [] = none selected
 
@@ -4172,6 +4173,127 @@ function renderEntrypointsChart(sortedVers, stats) {
       plugins: {
         legend: { labels: { color: "#cbd5e1" } },
         tooltip: { callbacks: { label: function(c) { return c.dataset.label + ": " + c.raw; } } }
+      }
+    }
+  });
+}
+
+// ── Release Stability Chart ──────────────────────────────────────────────
+function renderReleaseStabilityChart(releaseData) {
+  var el = document.getElementById("c-user-release-stability");
+  var h3 = document.getElementById("user-release-stability-h3");
+  if (h3) h3.textContent = t("releaseStabilityTitle");
+  var blurb = document.getElementById("user-release-stability-blurb");
+  if (!el) return;
+  if (_userCharts.releaseStability) { _userCharts.releaseStability.destroy(); _userCharts.releaseStability = null; }
+  if (!releaseData || !releaseData.releases || !releaseData.releases.length) {
+    if (blurb) blurb.textContent = t("releaseStabilityNoData");
+    return;
+  }
+
+  var sum = releaseData.summary || {};
+  if (blurb) blurb.textContent = t("releaseStabilityBlurb")
+    .replace("{total}", String(sum.total || 0))
+    .replace("{days}", String(sum.daysSpan || 0))
+    .replace("{cadence}", String(sum.cadenceDays || 0))
+    .replace("{skipped}", String(sum.totalSkipped || 0))
+    .replace("{hotfixes}", String(sum.hotfixCount || 0))
+    .replace("{regressions}", String(sum.regressionCount || 0));
+
+  var rels = releaseData.releases;
+
+  // Build labels + data arrays (newest first for readability)
+  var labels = [];
+  var stableDays = [];
+  var regressionDays = [];
+  var hotfixDays = [];
+  var bgColors = [];
+  var meta = []; // for tooltips
+
+  for (var i = rels.length - 1; i >= 0; i--) {
+    var r = rels[i];
+    labels.push(r.tag);
+    var d = r.daysActive || 0;
+
+    if (r.stability === "hotfix") {
+      stableDays.push(0);
+      regressionDays.push(0);
+      hotfixDays.push(Math.max(d, 0.3)); // min width for visibility
+      bgColors.push("rgba(248,113,113,0.85)");
+    } else if (r.stability === "regression") {
+      stableDays.push(0);
+      regressionDays.push(Math.max(d, 0.3));
+      hotfixDays.push(0);
+      bgColors.push("rgba(250,204,21,0.85)");
+    } else {
+      stableDays.push(d);
+      regressionDays.push(0);
+      hotfixDays.push(0);
+      bgColors.push("rgba(34,197,94,0.8)");
+    }
+    meta.push(r);
+  }
+
+  var datasets = [
+    {
+      label: t("releaseStabilityStable"),
+      data: stableDays,
+      backgroundColor: "rgba(34,197,94,0.8)",
+      stack: "days"
+    },
+    {
+      label: t("releaseStabilityRegression"),
+      data: regressionDays,
+      backgroundColor: "rgba(250,204,21,0.85)",
+      stack: "days"
+    },
+    {
+      label: t("releaseStabilityHotfix"),
+      data: hotfixDays,
+      backgroundColor: "rgba(248,113,113,0.85)",
+      stack: "days"
+    }
+  ];
+
+  _userCharts.releaseStability = new Chart(el, {
+    type: "bar",
+    data: { labels: labels, datasets: datasets },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      animation: false,
+      transitions: __chartTransitionsOff,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: {
+          stacked: true,
+          grid: { color: "rgba(51,65,85,0.5)" },
+          ticks: { color: "#94a3b8" },
+          title: { display: true, text: t("releaseStabilityXAxis"), color: "#64748b", font: { size: 11 } }
+        },
+        y: {
+          stacked: true,
+          grid: { color: "rgba(51,65,85,0.18)" },
+          ticks: { color: "#e2e8f0", font: { family: "monospace", size: 10 } }
+        }
+      },
+      plugins: {
+        legend: { labels: { color: "#cbd5e1" } },
+        tooltip: {
+          callbacks: {
+            afterBody: function(items) {
+              if (!items.length) return "";
+              var idx = items[0].dataIndex;
+              var m = meta[idx];
+              if (!m) return "";
+              var lines = [];
+              lines.push(m.date + " \u00B7 " + m.daysActive + "d active");
+              if (m.skippedPatches > 0) lines.push(t("releaseStabilitySkipped") + ": " + m.skippedPatches);
+              if (m.matchedKeywords && m.matchedKeywords.length) lines.push("Keywords: " + m.matchedKeywords.join(", "));
+              return lines.join("\n");
+            }
+          }
+        }
       }
     }
   });
