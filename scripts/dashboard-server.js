@@ -3336,8 +3336,8 @@ var server = http.createServer(function (req, res) {
     }));
   } else if (pathname === '/api/debug/cache-reset' && req.method === 'POST' && process.env.DEBUG_API === '1') {
     // Loescht Day-Cache + Today-Index und triggert Full-Rescan
-    try { fs.unlinkSync(USAGE_DAY_CACHE_FILE); } catch (_ignored) { /* file may not exist */ }
-    try { fs.unlinkSync(JSONL_TODAY_INDEX_FILE); } catch (_ignored) { /* file may not exist */ }
+    if (fs.existsSync(USAGE_DAY_CACHE_FILE)) fs.unlinkSync(USAGE_DAY_CACHE_FILE);
+    if (fs.existsSync(JSONL_TODAY_INDEX_FILE)) fs.unlinkSync(JSONL_TODAY_INDEX_FILE);
     serviceLog.info('cache', 'cache-reset via /api/debug/cache-reset — full rescan triggered');
     runScanAndBroadcast();
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
@@ -3360,7 +3360,7 @@ var server = http.createServer(function (req, res) {
 });
 
 function startupDevFull() {
-  try { getDashboardHtml(); } catch (_ignored) { /* template init */ }
+  try { getDashboardHtml(); } catch (error) { serviceLog.warn('dev', 'template init: ' + (error.message || error)); }
   serviceLog.info('dev', 'DEV_MODE=full — all data from ' + __devSource);
   if (process.env.CLAUDE_USAGE_NO_CACHE === '1') {
     serviceLog.info('dev', '--no-cache: sending POST /api/debug/cache-reset to ' + __devSource);

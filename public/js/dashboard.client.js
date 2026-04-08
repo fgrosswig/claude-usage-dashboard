@@ -337,12 +337,12 @@ function dayNumericForMainCharts(d, hostKey, field) {
 function dayRatioCacheOutForMainCharts(d, hostKey) {
   if (!hostKey) return d.cache_output_ratio || 0;
   var H = d.hosts?.[hostKey];
-  return H?.cache_output_ratio != null ? H.cache_output_ratio : 0;
+  return H?.cache_output_ratio ?? 0;
 }
 function dayOutputPerHourForMainCharts(d, hostKey) {
   if (!hostKey) return d.output_per_hour || 0;
   var H = d.hosts?.[hostKey];
-  return H?.output_per_hour != null ? H.output_per_hour : 0;
+  return H?.output_per_hour ?? 0;
 }
 function subCachePctForDayMainCharts(d, hostKey) {
   if (!hostKey) return d.sub_cache_pct != null ? d.sub_cache_pct : 0;
@@ -3853,23 +3853,25 @@ function semverCmpDesc(a, b) {
   return 0;
 }
 
+function mergeVersionEntry(tgt, src) {
+  for (const fk of Object.keys(src)) {
+    if (fk === 'entrypoints') {
+      for (const ek of Object.keys(src.entrypoints || {})) {
+        tgt.entrypoints[ek] = (tgt.entrypoints[ek] || 0) + (src.entrypoints[ek] || 0);
+      }
+    } else {
+      tgt[fk] = (tgt[fk] || 0) + (src[fk] || 0);
+    }
+  }
+}
+
 function aggregateVersionStats(days) {
   var merged = {};
   for (const day of days) {
     var vs = day.version_stats || {};
     for (const ver of Object.keys(vs)) {
       if (!merged[ver]) merged[ver] = { calls: 0, output: 0, cache_read: 0, hit_limit: 0, retry: 0, interrupt: 0, continue: 0, resume: 0, truncated: 0, api_error: 0, entrypoints: {} };
-      var src = vs[ver];
-      var tgt = merged[ver];
-      for (const fk of Object.keys(src)) {
-        if (fk === 'entrypoints') {
-          for (const ek of Object.keys(src.entrypoints || {})) {
-            tgt.entrypoints[ek] = (tgt.entrypoints[ek] || 0) + (src.entrypoints[ek] || 0);
-          }
-        } else {
-          tgt[fk] = (tgt[fk] || 0) + (src[fk] || 0);
-        }
-      }
+      mergeVersionEntry(merged[ver], vs[ver]);
     }
   }
   return merged;
@@ -4001,26 +4003,22 @@ function collectFallbackVersionKeys(days) {
   return Object.keys(fallbackVers);
 }
 
+function maxKeyByValue(obj) {
+  var best = "", bestVal = 0;
+  for (const k of Object.keys(obj)) {
+    if (obj[k] > bestVal) { best = k; bestVal = obj[k]; }
+  }
+  return best;
+}
+
 function findLatestDayTopEntries(days) {
-  var topVersion = "";
-  var topVersionCount = 0;
-  var topEntrypoint = "";
-  var topEpCount = 0;
   for (var ldi = days.length - 1; ldi >= 0; ldi--) {
-    var ld = days[ldi];
-    var ldv = ld.versions || {};
+    var ldv = days[ldi].versions || {};
     if (Object.keys(ldv).length) {
-      for (const vk of Object.keys(ldv)) {
-        if (ldv[vk] > topVersionCount) { topVersion = vk; topVersionCount = ldv[vk]; }
-      }
-      var lde = ld.entrypoints || {};
-      for (const ek of Object.keys(lde)) {
-        if (lde[ek] > topEpCount) { topEntrypoint = ek; topEpCount = lde[ek]; }
-      }
-      break;
+      return { topVersion: maxKeyByValue(ldv), topEntrypoint: maxKeyByValue(days[ldi].entrypoints || {}) };
     }
   }
-  return { topVersion: topVersion, topEntrypoint: topEntrypoint };
+  return { topVersion: "", topEntrypoint: "" };
 }
 
 function computeAnomalyStats(allVers, stats) {
@@ -4358,7 +4356,7 @@ function gaugeColor(pct) {
 
 function renderProxyTokenChart(data) {
   if (typeof Chart === "undefined") return;
-  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  var proxyDays = data.proxy?.proxy_days || [];
   if (!proxyDays.length) { chartShellSetLoading("c-proxy-tokens", false); return; }
 
   var labels = [];
@@ -4420,7 +4418,7 @@ function renderProxyTokenChart(data) {
 
 function renderProxyLatencyChart(data) {
   if (typeof Chart === "undefined") return;
-  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  var proxyDays = data.proxy?.proxy_days || [];
   if (!proxyDays.length) { chartShellSetLoading("c-proxy-latency", false); return; }
 
   var labels = [];
@@ -4502,39 +4500,40 @@ function renderProxyInvisibleCost(pd) {
 }
 
 // ── Phase 4: Hourly Request Heatmap ───────────────────────────────────────
-function renderProxyHourlyHeatmap(data) {
-  if (typeof Chart === "undefined") return;
-  var el = document.getElementById("c-proxy-hourly");
-  if (!el) return;
-  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
-  // Aggregate hours across all proxy days
+function aggregateHourlyTotals(proxyDays) {
   var totals = {};
-  for (var di = 0; di < proxyDays.length; di++) {
-    var dh = proxyDays[di].hours || {};
+  for (const pd of proxyDays) {
+    var dh = pd.hours || {};
     for (var hk in dh) {
       if (Object.hasOwn(dh, hk)) totals[hk] = (totals[hk] || 0) + (dh[hk] || 0);
     }
   }
-  var labels = [];
-  var values = [];
-  var bgColors = [];
-  var maxVal = 0;
+  var labels = [], values = [], maxVal = 0;
   for (var h = 0; h <= 23; h++) {
     var v = totals[String(h)] || 0;
     if (v > maxVal) maxVal = v;
     values.push(v);
     labels.push(String(h).length < 2 ? "0" + h : String(h));
   }
-  for (var hi = 0; hi < values.length; hi++) {
-    var intensity = maxVal > 0 ? Math.min(1, values[hi] / maxVal) : 0;
-    bgColors.push(values[hi] === 0 ? "rgba(51,65,85,.2)" : "rgba(59,130,246," + (0.2 + intensity * 0.7).toFixed(2) + ")");
-  }
+  var bgColors = values.map(function(val) {
+    var intensity = maxVal > 0 ? Math.min(1, val / maxVal) : 0;
+    return val === 0 ? "rgba(51,65,85,.2)" : "rgba(59,130,246," + (0.2 + intensity * 0.7).toFixed(2) + ")";
+  });
+  return { labels: labels, values: values, bgColors: bgColors };
+}
+
+function renderProxyHourlyHeatmap(data) {
+  if (typeof Chart === "undefined") return;
+  var el = document.getElementById("c-proxy-hourly");
+  if (!el) return;
+  var proxyDays = data.proxy?.proxy_days || [];
+  var hd = aggregateHourlyTotals(proxyDays);
 
   chartShellSetLoading("c-proxy-hourly", false);
 
   if (_proxyCharts.hourly) {
-    _proxyCharts.hourly.data.datasets[0].data = values;
-    _proxyCharts.hourly.data.datasets[0].backgroundColor = bgColors;
+    _proxyCharts.hourly.data.datasets[0].data = hd.values;
+    _proxyCharts.hourly.data.datasets[0].backgroundColor = hd.bgColors;
     freezeChartNoAnim(_proxyCharts.hourly);
     _proxyCharts.hourly.update("none");
     return;
@@ -4543,11 +4542,11 @@ function renderProxyHourlyHeatmap(data) {
   _proxyCharts.hourly = new Chart(el.getContext("2d"), {
     type: "bar",
     data: {
-      labels: labels,
+      labels: hd.labels,
       datasets: [{
         label: t("proxyDSRequestsPerHour"),
-        data: values,
-        backgroundColor: bgColors,
+        data: hd.values,
+        backgroundColor: hd.bgColors,
         borderRadius: 3
       }]
     },
@@ -4578,13 +4577,13 @@ function renderProxyModelChart(data) {
   if (typeof Chart === "undefined") return;
   var el = document.getElementById("c-proxy-models");
   if (!el) return;
-  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  var proxyDays = data.proxy?.proxy_days || [];
   if (!proxyDays.length) return;
   var colors = ["#8b5cf6", "#3b82f6", "#06b6d4", "#22c55e", "#f59e0b", "#ef4444", "#ec4899"];
   // Collect all model keys across all days
   var allModels = {};
-  for (var di = 0; di < proxyDays.length; di++) {
-    var dm = proxyDays[di].models || {};
+  for (const pd of proxyDays) {
+    var dm = pd.models || {};
     for (var mk in dm) { if (Object.hasOwn(dm, mk)) allModels[mk] = true; }
   }
   var modelKeys = Object.keys(allModels).sort(function(a, b) { return a.localeCompare(b); });
@@ -4594,7 +4593,7 @@ function renderProxyModelChart(data) {
   for (var mi = 0; mi < modelKeys.length; mi++) {
     var mKey = modelKeys[mi];
     var short = mKey.replace("claude-", "").replace(/-\d{8}$/, "");
-    var mData = proxyDays.map(function(d) { return d.models && d.models[mKey] ? (d.models[mKey].requests || 0) : 0; });
+    var mData = proxyDays.map(function(d) { return d.models?.[mKey]?.requests || 0; });
     datasets.push({ label: short, data: mData, backgroundColor: colors[mi % colors.length], stack: "models", yAxisID: "y", borderRadius: 2 });
   }
   // Avg latency line across all models per day
@@ -4666,7 +4665,7 @@ function renderProxyJsonlComparison(data) {
   var el = document.getElementById("proxy-jsonl-compare");
   if (!el) return;
   var days = data.days || [];
-  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  var proxyDays = data.proxy?.proxy_days || [];
   if (!days.length || !proxyDays.length) {
     el.textContent = days.length ? "" : t("proxyJsonlNoData");
     return;
@@ -4698,45 +4697,42 @@ function renderProxyJsonlComparison(data) {
 }
 
 // ── Per-Hour Latency Heatmap ──────────────────────────────────────────────
-function renderProxyHourlyLatency(data) {
-  if (typeof Chart === "undefined") return;
-  var el = document.getElementById("c-proxy-hourly-latency");
-  if (!el) return;
-  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
-  // Aggregate per_hour_latency across all days
+function aggregateHourlyLatency(proxyDays) {
   var agg = {};
-  for (var di = 0; di < proxyDays.length; di++) {
-    var phl = proxyDays[di].per_hour_latency || {};
+  for (const pd of proxyDays) {
+    var phl = pd.per_hour_latency || {};
     for (var hk in phl) {
       if (!Object.hasOwn(phl, hk)) continue;
       var hl = phl[hk];
-      if (!hl || !hl.count) continue;
+      if (!hl?.count) continue;
       if (!agg[hk]) agg[hk] = { sum: 0, count: 0, max: 0 };
       agg[hk].sum += hl.sum;
       agg[hk].count += hl.count;
       if (hl.max > agg[hk].max) agg[hk].max = hl.max;
     }
   }
-  var labels = [];
-  var avgData = [];
-  var maxData = [];
+  var labels = [], avgData = [], maxData = [];
   for (var h = 0; h <= 23; h++) {
     labels.push(String(h).length < 2 ? "0" + h : String(h));
     var a = agg[String(h)];
-    if (a && a.count > 0) {
-      avgData.push(Math.round(a.sum / a.count));
-      maxData.push(a.max);
-    } else {
-      avgData.push(0);
-      maxData.push(0);
-    }
+    avgData.push(a?.count > 0 ? Math.round(a.sum / a.count) : 0);
+    maxData.push(a?.max || 0);
   }
+  return { labels: labels, avgData: avgData, maxData: maxData };
+}
+
+function renderProxyHourlyLatency(data) {
+  if (typeof Chart === "undefined") return;
+  var el = document.getElementById("c-proxy-hourly-latency");
+  if (!el) return;
+  var proxyDays = data.proxy?.proxy_days || [];
+  var ld = aggregateHourlyLatency(proxyDays);
 
   chartShellSetLoading("c-proxy-hourly-latency", false);
 
   if (_proxyCharts.hourlyLatency) {
-    _proxyCharts.hourlyLatency.data.datasets[0].data = avgData;
-    _proxyCharts.hourlyLatency.data.datasets[1].data = maxData;
+    _proxyCharts.hourlyLatency.data.datasets[0].data = ld.avgData;
+    _proxyCharts.hourlyLatency.data.datasets[1].data = ld.maxData;
     freezeChartNoAnim(_proxyCharts.hourlyLatency);
     _proxyCharts.hourlyLatency.update("none");
     return;
@@ -4745,10 +4741,10 @@ function renderProxyHourlyLatency(data) {
   _proxyCharts.hourlyLatency = new Chart(el.getContext("2d"), {
     type: "bar",
     data: {
-      labels: labels,
+      labels: ld.labels,
       datasets: [
-        { label: t("proxyDSAvgLatency"), data: avgData, backgroundColor: "rgba(59,130,246,.6)", borderRadius: 2 },
-        { label: t("proxyDSMaxLatency"), data: maxData, backgroundColor: "rgba(239,68,68,.35)", borderRadius: 2 }
+        { label: t("proxyDSAvgLatency"), data: ld.avgData, backgroundColor: "rgba(59,130,246,.6)", borderRadius: 2 },
+        { label: t("proxyDSMaxLatency"), data: ld.maxData, backgroundColor: "rgba(239,68,68,.35)", borderRadius: 2 }
       ]
     },
     options: {
@@ -4777,7 +4773,7 @@ function renderProxyErrorTrend(data) {
   if (typeof Chart === "undefined") return;
   var el = document.getElementById("c-proxy-error-trend");
   if (!el) return;
-  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  var proxyDays = data.proxy?.proxy_days || [];
   if (proxyDays.length < 2) return;
   var labels = proxyDays.map(function(d) { return d.date ? d.date.slice(5) : "?"; });
   var errRate = proxyDays.map(function(d) { return d.error_rate || 0; });
@@ -4829,10 +4825,10 @@ function renderProxyCacheTrend(data) {
   if (typeof Chart === "undefined") return;
   var el = document.getElementById("c-proxy-cache-trend");
   if (!el) return;
-  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  var proxyDays = data.proxy?.proxy_days || [];
   if (proxyDays.length < 2) return;
   var labels = proxyDays.map(function(d) { return d.date ? d.date.slice(5) : "?"; });
-  var ratio = proxyDays.map(function(d) { return d.cache_read_ratio != null ? Math.round(d.cache_read_ratio * 100 * 10) / 10 : 0; });
+  var ratio = proxyDays.map(function(d) { return d.cache_read_ratio == null ? 0 : Math.round(d.cache_read_ratio * 100 * 10) / 10; });
   var coldStarts = proxyDays.map(function(d) { return d.cold_starts || 0; });
 
   chartShellSetLoading("c-proxy-cache-trend", false);
@@ -4885,34 +4881,29 @@ function renderProxyCacheTrend(data) {
 }
 
 // ── Efficiency Trend (JSONL Ratio + Visible/1%) ─────────────────────────
-function renderProxyEfficiencyTrend(data) {
-  if (typeof Chart === "undefined") return;
-  var el = document.getElementById("c-proxy-efficiency-trend");
-  if (!el) return;
-  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
-  var mainDays = data.days || [];
-  if (proxyDays.length < 2) return;
-  // Build proxy lookup by date
-  var proxyByDate = {};
-  for (var pi = 0; pi < proxyDays.length; pi++) proxyByDate[proxyDays[pi].date] = proxyDays[pi];
-  // Build JSONL token totals by date
+function buildEfficiencyData(proxyDays, mainDays) {
   var jsonlByDate = {};
-  for (var di = 0; di < mainDays.length; di++) {
-    var md = mainDays[di];
+  for (const md of mainDays) {
     if (md.date) jsonlByDate[md.date] = (md.input || 0) + (md.output || 0) + (md.cache_read || 0) + (md.cache_creation || 0);
   }
-
-  var labels = [];
-  var ratioData = [];
-  var visPerPctData = [];
-  for (var qi = 0; qi < proxyDays.length; qi++) {
-    var pd = proxyDays[qi];
+  var labels = [], ratioData = [], visPerPctData = [];
+  for (const pd of proxyDays) {
     labels.push(pd.date ? pd.date.slice(5) : "?");
     var proxyTotal = pd.total_tokens || 0;
     var jsonlTotal = jsonlByDate[pd.date] || 0;
     ratioData.push(proxyTotal > 0 ? Math.round(jsonlTotal / proxyTotal * 100) / 100 : 0);
     visPerPctData.push(pd.visible_tokens_per_pct || 0);
   }
+  return { labels: labels, ratioData: ratioData, visPerPctData: visPerPctData };
+}
+
+function renderProxyEfficiencyTrend(data) {
+  if (typeof Chart === "undefined") return;
+  var el = document.getElementById("c-proxy-efficiency-trend");
+  if (!el) return;
+  var proxyDays = data.proxy?.proxy_days || [];
+  if (proxyDays.length < 2) return;
+  var ed = buildEfficiencyData(proxyDays, data.days || []);
 
   var h3 = document.getElementById("proxy-efficiency-trend-h3");
   if (h3) h3.textContent = t("proxyEfficiencyTrendTitle");
@@ -4920,9 +4911,9 @@ function renderProxyEfficiencyTrend(data) {
   if (blurb) blurb.textContent = t("proxyEfficiencyTrendBlurb");
 
   if (_proxyCharts.efficiencyTrend) {
-    _proxyCharts.efficiencyTrend.data.labels = labels;
-    _proxyCharts.efficiencyTrend.data.datasets[0].data = ratioData;
-    _proxyCharts.efficiencyTrend.data.datasets[1].data = visPerPctData;
+    _proxyCharts.efficiencyTrend.data.labels = ed.labels;
+    _proxyCharts.efficiencyTrend.data.datasets[0].data = ed.ratioData;
+    _proxyCharts.efficiencyTrend.data.datasets[1].data = ed.visPerPctData;
     freezeChartNoAnim(_proxyCharts.efficiencyTrend);
     _proxyCharts.efficiencyTrend.update("none");
     return;
@@ -4931,10 +4922,10 @@ function renderProxyEfficiencyTrend(data) {
   _proxyCharts.efficiencyTrend = new Chart(el.getContext("2d"), {
     type: "line",
     data: {
-      labels: labels,
+      labels: ed.labels,
       datasets: [
-        { label: t("proxyDSJsonlRatio"), data: ratioData, borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.1)", fill: true, tension: 0.3, pointRadius: 3, yAxisID: "y" },
-        { label: t("proxyDSVisPerPct"), data: visPerPctData, type: "bar", backgroundColor: "rgba(139,92,246,.5)", borderRadius: 2, yAxisID: "y1" }
+        { label: t("proxyDSJsonlRatio"), data: ed.ratioData, borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.1)", fill: true, tension: 0.3, pointRadius: 3, yAxisID: "y" },
+        { label: t("proxyDSVisPerPct"), data: ed.visPerPctData, type: "bar", backgroundColor: "rgba(139,92,246,.5)", borderRadius: 2, yAxisID: "y1" }
       ]
     },
     options: {
@@ -5002,7 +4993,7 @@ function computeHealthIndicators(data) {
   var thinkingGap = 0;
   if (pd && days.length) {
     // Try matching proxy days from newest to oldest until we find one with JSONL data
-    var pdAll = (data.proxy && data.proxy.proxy_days) || [];
+    var pdAll = data.proxy?.proxy_days || [];
     for (var tgi = pdAll.length - 1; tgi >= 0; tgi--) {
       var tgPd = pdAll[tgi];
       if (!(tgPd.total_tokens > 0)) continue;
@@ -5276,7 +5267,7 @@ function renderKeyFindings(data) {
   __lastFindingsFingerprint = fp;
 
   var days = data.days || [];
-  var pdays = (data.proxy && data.proxy.proxy_days) || [];
+  var pdays = data.proxy?.proxy_days || [];
   if (!days.length && !pdays.length) {
     if (headerEl) headerEl.textContent = t("findingsNoData");
     el.innerHTML = "";
@@ -5472,7 +5463,7 @@ function computeHealthScoreForDay(dayData, proxyDay) {
 
 function buildHealthScoreHistory(data) {
   var days = getFilteredDays(data.days || []);
-  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  var proxyDays = data.proxy?.proxy_days || [];
   var proxyByDate = {};
   for (var pi = 0; pi < proxyDays.length; pi++) proxyByDate[proxyDays[pi].date] = proxyDays[pi];
   var scores = [];
@@ -6577,7 +6568,7 @@ function inlineMd(s) {
   };
 
   var TERMS = Object.keys(GLOSSARY).sort(function (a, b) { return b.length - a.length; });
-  var RE = new RegExp("(" + TERMS.map(function (t) { return t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }).join("|") + ")", "g");
+  var RE = new RegExp("(" + TERMS.map(function (t) { return t.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`); }).join("|") + ")", "g");
   var SKIP_TAGS = { SCRIPT: 1, STYLE: 1, INPUT: 1, SELECT: 1, TEXTAREA: 1, CODE: 1 };
   var observer = null;
   var debounceTimer = null;
@@ -6646,21 +6637,20 @@ function inlineMd(s) {
       acceptNode: function (node) {
         var p = node.parentNode;
         if (!p) return NodeFilter.FILTER_REJECT;
-        if (p.classList && p.classList.contains("tt")) return NodeFilter.FILTER_REJECT;
+        if (p.classList?.contains("tt")) return NodeFilter.FILTER_REJECT;
         if (SKIP_TAGS[p.tagName]) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
       }
     });
     var nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
-    for (var i = 0; i < nodes.length; i++) wrapTextNode(nodes[i]);
+    for (const n of nodes) wrapTextNode(n);
   }
 
   function removeAllTips() {
     hidePop();
     var tips = document.querySelectorAll(".tt");
-    for (var i = 0; i < tips.length; i++) {
-      var span = tips[i];
+    for (const span of tips) {
       span.removeEventListener("mouseenter", showPop);
       span.removeEventListener("mousemove", movePop);
       span.removeEventListener("mouseleave", hidePop);
@@ -6683,8 +6673,8 @@ function inlineMd(s) {
   function startObserver() {
     if (observer) return;
     observer = new MutationObserver(function (mutations) {
-      for (var i = 0; i < mutations.length; i++) {
-        if (mutations[i].addedNodes.length || mutations[i].type === "characterData") {
+      for (const mut of mutations) {
+        if (mut.addedNodes.length || mut.type === "characterData") {
           debouncedScan();
           break;
         }
