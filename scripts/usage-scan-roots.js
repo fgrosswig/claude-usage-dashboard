@@ -70,7 +70,7 @@ function getScanRoots() {
     if (!chunk) continue;
     var abs = expandUserPath(chunk);
     if (!abs) continue;
-    var baseName = path.basename(abs.replace(/[\/\\]+$/, ''));
+    var baseName = path.basename(abs.replace(/[/\\]$/, ''));
     var label = baseName || 'extra-' + roots.length;
     roots.push({ path: abs, label: label });
   }

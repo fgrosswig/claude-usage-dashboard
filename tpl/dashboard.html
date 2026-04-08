@@ -14,6 +14,7 @@
 <span id="lang-switch-label" class="lang-switch-label"></span>
 <button type="button" class="lang-btn" id="lang-de" data-lang="de" aria-pressed="false">DE</button>
 <button type="button" class="lang-btn" id="lang-en" data-lang="en" aria-pressed="false">EN</button>
+<button type="button" class="lang-btn" id="lang-ko" data-lang="ko" aria-pressed="false">KO</button>
 </div>
 <div class="live-pop" id="live-pop" tabindex="-1">
 <div class="refresh" id="live-trigger" tabindex="0" role="button" aria-expanded="false" aria-haspopup="true" aria-controls="live-files-panel" title="">
@@ -142,7 +143,7 @@
 <p class="forensic-host-filter-hint" id="forensic-host-filter-hint" style="display:none;font-size:.7rem;color:#64748b;margin:8px 0 0;line-height:1.45" aria-live="polite"></p>
 </summary>
 <div class="forensic-inner">
-<p class="forensic-note-p" id="forensic-note"></p>
+<p class="user-chart-blurb" id="forensic-note"></p>
 <div class="grid" id="forensic-cards"></div>
 <div class="forensic-charts-stack" id="forensic-charts-stack">
 <div class="forensic-charts-host-scope">
@@ -251,10 +252,10 @@
 </div>
 </summary>
 <div class="forensic-inner">
-<div class="grid" id="user-profile-cards"></div>
+<div class="user-chart-controls"><select id="user-version-sort" class="user-chart-select"></select><div class="user-filter-wrap" id="user-version-filter-wrap"><button type="button" class="user-filter-btn" id="user-version-filter-btn">Versions <span id="user-version-filter-count"></span></button><div class="user-filter-dropdown" id="user-version-filter-dd"></div></div></div>
 <div class="charts" id="user-profile-charts">
-<div class="chart-box"><h3 id="user-version-h3"></h3><div class="user-chart-controls"><select id="user-version-sort" class="user-chart-select"></select><select id="user-version-filter" class="user-chart-select" multiple></select></div><canvas id="c-user-versions"></canvas></div>
-<div class="chart-box"><h3 id="user-entrypoint-h3"></h3><canvas id="c-user-entrypoints"></canvas></div>
+<div class="chart-box"><h3 id="user-version-h3"></h3><p class="user-chart-blurb" id="user-version-blurb"></p><canvas id="c-user-versions"></canvas></div>
+<div class="chart-box"><h3 id="user-entrypoint-h3"></h3><p class="user-chart-blurb" id="user-entrypoint-blurb"></p><canvas id="c-user-entrypoints"></canvas></div>
 </div>
 </div>
 </details>
@@ -266,18 +267,24 @@
 </div>
 </summary>
 <div class="forensic-inner proxy-inner">
-<p class="forensic-note-p" id="proxy-note"></p>
+<p class="user-chart-blurb" id="proxy-note"></p>
 <div class="grid" id="proxy-cards"></div>
 <!-- Row 1: Token Cost + Model Breakdown + Hourly Heatmap (3-col) -->
 <div class="proxy-charts-grid-3">
-<div class="chart-box"><h3 id="proxy-token-chart-h3"></h3><p id="proxy-token-blurb" class="proxy-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-tokens"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-tokens"></canvas></div></div>
-<div class="chart-box"><h3 id="proxy-model-h3"></h3><p id="proxy-model-blurb" class="proxy-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-models"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-models"></canvas></div></div>
-<div class="chart-box"><h3 id="proxy-hourly-h3"></h3><p id="proxy-hourly-blurb" class="proxy-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-hourly"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-hourly"></canvas></div></div>
+<div class="chart-box"><h3 id="proxy-token-chart-h3"></h3><p id="proxy-token-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-tokens"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-tokens"></canvas></div></div>
+<div class="chart-box"><h3 id="proxy-model-h3"></h3><p id="proxy-model-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-models"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-models"></canvas></div></div>
+<div class="chart-box"><h3 id="proxy-hourly-h3"></h3><p id="proxy-hourly-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-hourly"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-hourly"></canvas></div></div>
 </div>
 <!-- Row 2: API Latency + Hourly Latency (2-col) -->
 <div class="proxy-charts-grid">
-<div class="chart-box"><h3 id="proxy-latency-chart-h3"></h3><p id="proxy-latency-blurb" class="proxy-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-latency"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-latency"></canvas></div></div>
-<div class="chart-box"><h3 id="proxy-hourly-latency-h3"></h3><p id="proxy-hourly-latency-blurb" class="proxy-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-hourly-latency"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-hourly-latency"></canvas></div></div>
+<div class="chart-box"><h3 id="proxy-latency-chart-h3"></h3><p id="proxy-latency-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-latency"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-latency"></canvas></div></div>
+<div class="chart-box"><h3 id="proxy-hourly-latency-h3"></h3><p id="proxy-hourly-latency-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-hourly-latency"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-hourly-latency"></canvas></div></div>
+</div>
+<!-- Row 3: Trend Charts (3-col) -->
+<div class="proxy-charts-grid-3">
+<div class="chart-box"><h3 id="proxy-error-trend-h3"></h3><p id="proxy-error-trend-blurb" class="user-chart-blurb"></p><canvas id="c-proxy-error-trend"></canvas></div>
+<div class="chart-box"><h3 id="proxy-cache-trend-h3"></h3><p id="proxy-cache-trend-blurb" class="user-chart-blurb"></p><canvas id="c-proxy-cache-trend"></canvas></div>
+<div class="chart-box"><h3 id="proxy-efficiency-trend-h3"></h3><p id="proxy-efficiency-trend-blurb" class="user-chart-blurb"></p><canvas id="c-proxy-efficiency-trend"></canvas></div>
 </div>
 <!-- Info line -->
 <div class="proxy-info-row">

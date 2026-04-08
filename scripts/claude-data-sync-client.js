@@ -92,7 +92,7 @@ tr.on('close', function (code) {
 
   var u;
   try {
-    u = new URL(urlStr.indexOf('://') < 0 ? 'http://' + urlStr : urlStr);
+    u = new URL(urlStr.indexOf('://') < 0 ? 'https://' + urlStr : urlStr);
   } catch (e5) {
     console.error('claude-data-sync-client: bad URL');
     process.exit(1);

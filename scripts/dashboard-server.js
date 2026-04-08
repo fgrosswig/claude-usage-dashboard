@@ -1,5 +1,5 @@
 // Claude Code Token Usage Dashboard — standalone, zero dependencies (lädt Submodule aus diesem Ordner)
-// Usage: node server.js [--port=3333] [--refresh=SEK]   oder   node start.js dashboard
+// Usage: node server.js [--port=3333] [--refresh=SEK] [--no-cache]   oder   node start.js dashboard [--no-cache]
 // --refresh = voller Daten-Scan + SSE (Standard 180s, Minimum 60s). Kurze Werte lesen alle JSONL unnötig oft neu ein.
 // CLAUDE_USAGE_WALK_SLICE=N (5–500): größer = schnellere Projektbaum-Ermittlung, kleiner = responsiver direkt nach Start (Default 40 readdir/Tick).
 // Tages-Cache: ~/.claude/usage-dashboard-days.json (Vortage). Bei passender jsonl-Anzahl nur noch „heute“ aus JSONL.
@@ -87,11 +87,12 @@ process.argv.forEach(function(a) {
   if (lv) process.env.CLAUDE_USAGE_LOG_LEVEL = lv[1].trim();
   var lf = a.match(/--log-file=(.+)$/);
   if (lf) process.env.CLAUDE_USAGE_LOG_FILE = lf[1].trim();
+  if (a === '--no-cache') process.env.CLAUDE_USAGE_NO_CACHE = '1';
 });
 serviceLog.refreshFromEnv();
 
 // Vor-Tage als ein JSON (unter ~/.claude); JSONL wird nur noch für den lokalen Kalendertag „heute” voll geparst.
-var USAGE_DAY_CACHE_VERSION = 5;
+var USAGE_DAY_CACHE_VERSION = 7; // bumped: entrypoints per version in version_stats
 var USAGE_DAY_CACHE_FILE = path.join(HOME, '.claude', 'usage-dashboard-days.json');
 /** Pro-Datei-Beitrag zum lokalen „heute“ (mtime+size): vermeidet 300+ JSONL bei jedem Refresh. */
 var JSONL_TODAY_INDEX_VERSION = 1;
@@ -425,7 +426,7 @@ function maybeRefreshReleasesCacheOnStartup() {
 /** "v2.1.87", "2.1.87", "…2.1.87…" -> "2.1.87" (GitHub-Release-Keys) */
 function normalizeCliSemver(s) {
   if (s == null || s === '') return '';
-  var m = String(s).match(/\d+\.\d+\.\d+/);
+  var m = String(s).match(/\d{1,10}\.\d{1,10}\.\d{1,10}/);
   return m ? m[0] : '';
 }
 
@@ -476,12 +477,12 @@ function extractReleaseHighlights(body) {
   var highlights = [];
   var lines = slice.split('\n');
   for (var li = 0; li < lines.length && li < 140 && highlights.length < 12; li++) {
-    var ln = lines[li].replace(/^[\s>*\-•]+/, '').trim();
+    var ln = lines[li].replace(/^[ \t>*\-•]+/, '').trim();
     if (!ln || ln.length < 6) continue;
     if (/^#{1,6}\s/.test(ln)) break;
     if (/^---+(\s|$)|^\*{3,}(\s|$)/.test(ln)) continue;
     if (/^(full changelog|see also)\b/i.test(ln)) continue;
-    if (/^assets\s*\d*\s*$/i.test(ln)) continue;
+    if (/^assets[\s\d]*$/i.test(ln)) continue;
     highlights.push(ln.slice(0, 220));
   }
   return highlights;
@@ -1512,14 +1513,14 @@ function classifyJsonlSessionSignals(line, rec) {
     add('truncated');
   }
   // API error (system records with subtype api_error or error field)
-  if (rec && rec.type === 'system' && rec.subtype === 'api_error') {
+  if (rec?.type === 'system' && rec?.subtype === 'api_error') {
     add('api_error');
   }
   return tags;
 }
 
 function emptyVersionStats() {
-  return { calls: 0, output: 0, cache_read: 0, hit_limit: 0, retry: 0, interrupt: 0, continue: 0, resume: 0, truncated: 0, api_error: 0 };
+  return { calls: 0, output: 0, cache_read: 0, hit_limit: 0, retry: 0, interrupt: 0, continue: 0, resume: 0, truncated: 0, api_error: 0, entrypoints: {} };
 }
 
 function emptyHostSlice() {
@@ -1646,22 +1647,32 @@ function mergeDayBucketInto(target, src) {
     var v = vk[vi];
     target.versions[v] = (target.versions[v] || 0) + (src.versions[v] || 0);
   }
-  var ek = Object.keys(src.entrypoints || {});
-  for (var ei = 0; ei < ek.length; ei++) {
-    var e = ek[ei];
+  for (var e of Object.keys(src.entrypoints || {})) {
     target.entrypoints[e] = (target.entrypoints[e] || 0) + (src.entrypoints[e] || 0);
   }
-  var vsk = Object.keys(src.version_stats || {});
-  for (var vsi = 0; vsi < vsk.length; vsi++) {
-    var vsKey = vsk[vsi];
-    if (!target.version_stats) target.version_stats = {};
+  mergeVersionStatsInto(target, src.version_stats);
+}
+
+function mergeEntrypointsInto(tgt, srcEntrypoints) {
+  if (!tgt.entrypoints) tgt.entrypoints = {};
+  for (var ek of Object.keys(srcEntrypoints || {})) {
+    tgt.entrypoints[ek] = (tgt.entrypoints[ek] || 0) + (srcEntrypoints[ek] || 0);
+  }
+}
+
+function mergeVersionStatsInto(target, srcVersionStats) {
+  if (!srcVersionStats) return;
+  if (!target.version_stats) target.version_stats = {};
+  for (var vsKey of Object.keys(srcVersionStats)) {
     if (!target.version_stats[vsKey]) target.version_stats[vsKey] = emptyVersionStats();
     var tgt = target.version_stats[vsKey];
-    var srcVs = src.version_stats[vsKey];
-    var vsFields = Object.keys(srcVs);
-    for (var vsfi = 0; vsfi < vsFields.length; vsfi++) {
-      var f = vsFields[vsfi];
-      tgt[f] = (tgt[f] || 0) + (srcVs[f] || 0);
+    var srcVs = srcVersionStats[vsKey];
+    for (var f of Object.keys(srcVs)) {
+      if (f === 'entrypoints') {
+        mergeEntrypointsInto(tgt, srcVs.entrypoints);
+      } else {
+        tgt[f] = (tgt[f] || 0) + (srcVs[f] || 0);
+      }
     }
   }
 }
@@ -1830,8 +1841,7 @@ function processJsonlFile(fileRef, daily, onlyDate, isolateTodayFrag, fileTodayF
               if (!dSig.version_stats) dSig.version_stats = {};
               if (!dSig.version_stats[sigVer]) dSig.version_stats[sigVer] = emptyVersionStats();
               var svs = dSig.version_stats[sigVer];
-              for (var sti = 0; sti < sigTags.length; sti++) {
-                var st = sigTags[sti];
+              for (var st of sigTags) {
                 if (svs[st] != null) svs[st]++;
               }
             }
@@ -1939,6 +1949,8 @@ function processJsonlFile(fileRef, daily, onlyDate, isolateTodayFrag, fileTodayF
         vs.calls++;
         vs.output += outTok;
         vs.cache_read += crTok;
+        var vsEp = extractEntrypoint(rec);
+        if (vsEp) vs.entrypoints[vsEp] = (vs.entrypoints[vsEp] || 0) + 1;
       }
       var ep = extractEntrypoint(rec);
       if (ep) dd.entrypoints[ep] = (dd.entrypoints[ep] || 0) + 1;
@@ -2527,13 +2539,15 @@ function loadUiTpl(lang) {
 function buildI18nBundles() {
   var mde = getUiTplMtimeMs('de');
   var men = getUiTplMtimeMs('en');
+  var mko = getUiTplMtimeMs('ko');
   var c = __i18nPageCache;
-  if (c.bundles && c.mde === mde && c.men === men) {
+  if (c.bundles && c.mde === mde && c.men === men && c.mko === mko) {
     return c.bundles;
   }
-  c.bundles = { de: loadUiTpl('de'), en: loadUiTpl('en') };
+  c.bundles = { de: loadUiTpl('de'), en: loadUiTpl('en'), ko: loadUiTpl('ko') };
   c.mde = mde;
   c.men = men;
+  c.mko = mko;
   c.inlineJson = '';
   c.fullHtml = null;
   return c.bundles;
@@ -2554,6 +2568,7 @@ function getDashboardHtml() {
   var c = __i18nPageCache;
   var mde = getUiTplMtimeMs('de');
   var men = getUiTplMtimeMs('en');
+  var mko = getUiTplMtimeMs('ko');
   var md = getPathMtimeMs(DASHBOARD_TPL_FILE);
   var mc = getPathMtimeMs(DASHBOARD_CSS_FILE);
   var mj = getPathMtimeMs(DASHBOARD_CLIENT_JS_FILE);
@@ -2561,6 +2576,7 @@ function getDashboardHtml() {
     c.fullHtml &&
     c.mde === mde &&
     c.men === men &&
+    c.mko === mko &&
     c.mdashboard === md &&
     c.mcss === mc &&
     c.mjs === mj
@@ -3084,15 +3100,28 @@ var __devSource = (process.env.DEV_PROXY_SOURCE || '').trim();
 var __devMode = (process.env.DEV_MODE || '').trim().toLowerCase(); // "proxy" | "full"
 var __devProxyPending = !!__devSource && (__devMode === 'proxy' || __devMode === 'full');
 
-function devFetchRemoteUsage(cb) {
+function devFetchRemoteUsage(cb, retryCount) {
   if (!__devSource) return cb();
-  var url = __devSource.replace(/\/+$/, '') + '/api/debug/proxy-logs';
-  serviceLog.info('dev', 'fetching remote data from ' + url);
+  retryCount = retryCount || 0;
+  var maxRetries = 3;
+  var retryDelayMs = 5000;
+  var url = __devSource.replace(/\/$/, '') + '/api/debug/proxy-logs';
+  if (retryCount === 0) serviceLog.info('dev', 'fetching remote data from ' + url);
   var proto = url.startsWith('https') ? require('https') : require('http');
   proto.get(url, function (resp) {
     var body = '';
     resp.on('data', function (chunk) { body += chunk; });
     resp.on('end', function () {
+      // Non-200: retry on 502/503/504 (server restarting after cache-reset)
+      if (resp.statusCode >= 500 && retryCount < maxRetries) {
+        serviceLog.warn('dev', 'remote returned ' + resp.statusCode + ' — retry ' + (retryCount + 1) + '/' + maxRetries + ' in ' + (retryDelayMs / 1000) + 's');
+        setTimeout(function () { devFetchRemoteUsage(cb, retryCount + 1); }, retryDelayMs);
+        return;
+      }
+      if (resp.statusCode !== 200) {
+        serviceLog.error('dev', 'remote returned ' + resp.statusCode + ': ' + body.slice(0, 200));
+        return cb();
+      }
       try {
         var parsed = JSON.parse(body);
         var remote = parsed.usage || null;
@@ -3124,7 +3153,12 @@ function devFetchRemoteUsage(cb) {
       cb();
     });
   }).on('error', function (e) {
-    serviceLog.error('dev', 'remote data fetch failed: ' + (e.message || e));
+    if (retryCount < maxRetries) {
+      serviceLog.warn('dev', 'remote fetch error: ' + (e.message || e) + ' — retry ' + (retryCount + 1) + '/' + maxRetries + ' in ' + (retryDelayMs / 1000) + 's');
+      setTimeout(function () { devFetchRemoteUsage(cb, retryCount + 1); }, retryDelayMs);
+      return;
+    }
+    serviceLog.error('dev', 'remote data fetch failed after ' + maxRetries + ' retries: ' + (e.message || e));
     cb();
   });
 }
@@ -3137,7 +3171,7 @@ function devFetchProxyLogs(cb) {
   if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
   process.env.ANTHROPIC_PROXY_LOG_DIR = logDir;
 
-  var url = source.replace(/\/+$/, '') + '/api/debug/proxy-logs';
+  var url = source.replace(/\/$/, '') + '/api/debug/proxy-logs';
   serviceLog.info('dev', 'fetching proxy logs from ' + url);
   var proto = url.startsWith('https') ? require('https') : require('http');
   proto.get(url, function (resp) {
@@ -3300,6 +3334,14 @@ var server = http.createServer(function (req, res) {
       refresh_sec: REFRESH_SEC,
       version: __appVersion
     }));
+  } else if (pathname === '/api/debug/cache-reset' && req.method === 'POST' && process.env.DEBUG_API === '1') {
+    // Loescht Day-Cache + Today-Index und triggert Full-Rescan
+    if (fs.existsSync(USAGE_DAY_CACHE_FILE)) fs.unlinkSync(USAGE_DAY_CACHE_FILE);
+    if (fs.existsSync(JSONL_TODAY_INDEX_FILE)) fs.unlinkSync(JSONL_TODAY_INDEX_FILE);
+    serviceLog.info('cache', 'cache-reset via /api/debug/cache-reset — full rescan triggered');
+    runScanAndBroadcast();
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({ ok: true, message: 'Day cache deleted, full rescan started' }));
   } else if (pathname === '/api/proxy-usage') {
     if (!__proxyCache.data) refreshProxyCache();
     res.writeHead(200, {
@@ -3316,6 +3358,48 @@ var server = http.createServer(function (req, res) {
     res.end(getDashboardHtml());
   }
 });
+
+function startupDevFull() {
+  try { getDashboardHtml(); } catch (error) { serviceLog.warn('dev', 'template init: ' + (error.message || error)); }
+  serviceLog.info('dev', 'DEV_MODE=full — all data from ' + __devSource);
+  if (process.env.CLAUDE_USAGE_NO_CACHE === '1') {
+    serviceLog.info('dev', '--no-cache: sending POST /api/debug/cache-reset to ' + __devSource);
+    try {
+      var resetUrl = new URL('/api/debug/cache-reset', __devSource);
+      var resetMod = resetUrl.protocol === 'https:' ? https : http;
+      var resetReq = resetMod.request(resetUrl, { method: 'POST', timeout: 10000 }, function(r) {
+        var b = '';
+        r.on('data', function(c) { b += c; });
+        r.on('end', function() { serviceLog.info('dev', 'remote cache-reset response: ' + r.statusCode + ' ' + b.slice(0, 200)); });
+      });
+      resetReq.on('error', function(e) { serviceLog.warn('dev', 'remote cache-reset failed: ' + (e.message || e)); });
+      resetReq.end();
+    } catch (e) { serviceLog.warn('dev', 'remote cache-reset error: ' + (e.message || e)); }
+  }
+  devFetchRemoteUsage(function () { __devProxyPending = false; });
+  setInterval(function () { devFetchRemoteUsage(function () {}); }, REFRESH_SEC * 1000);
+}
+
+function startupDevProxy() {
+  serviceLog.info('dev', 'DEV_MODE=proxy — local JSONL + remote proxy from ' + __devSource);
+  primeDashboardAndScheduleFirstScan();
+  devFetchProxyLogs(function () {
+    __devProxyPending = false;
+    setTimeout(function () {
+      refreshProxyCache();
+      if (__proxyCache.data && cachedData) { cachedData.proxy = __proxyCache.data; broadcastSse(); }
+    }, 3000);
+  });
+  setInterval(function () {
+    devFetchProxyLogs(function () {
+      refreshProxyCache();
+      if (__proxyCache.data && cachedData) { cachedData.proxy = __proxyCache.data; broadcastSse(); }
+    });
+  }, REFRESH_SEC * 1000);
+  setTimeout(refreshOutageCache, 400);
+  setTimeout(maybeRefreshReleasesCacheOnStartup, 1400);
+  setTimeout(refreshMarketplaceExtensionCache, 2400);
+}
 
 server.listen(PORT, function () {
   console.log('Claude Code Usage Dashboard running at http://localhost:' + PORT);
@@ -3339,33 +3423,10 @@ server.listen(PORT, function () {
       (process.env.CLAUDE_USAGE_LOG_FILE ? ' log_file=' + process.env.CLAUDE_USAGE_LOG_FILE : '')
   );
   if (__devMode === 'full' && __devSource) {
-    // Dev full: fetch usage + proxy from remote, no local scan
-    try { getDashboardHtml(); } catch (e) {}
-    serviceLog.info('dev', 'DEV_MODE=full — all data from ' + __devSource);
-    devFetchRemoteUsage(function () { __devProxyPending = false; });
-    setInterval(function () { devFetchRemoteUsage(function () {}); }, REFRESH_SEC * 1000);
+    startupDevFull();
   } else if (__devMode === 'proxy' && __devSource) {
-    // Dev proxy: local JSONL scan + proxy data from remote
-    serviceLog.info('dev', 'DEV_MODE=proxy — local JSONL + remote proxy from ' + __devSource);
-    primeDashboardAndScheduleFirstScan();
-    devFetchProxyLogs(function () {
-      __devProxyPending = false;
-      setTimeout(function () {
-        refreshProxyCache();
-        if (__proxyCache.data && cachedData) { cachedData.proxy = __proxyCache.data; broadcastSse(); }
-      }, 3000);
-    });
-    setInterval(function () {
-      devFetchProxyLogs(function () {
-        refreshProxyCache();
-        if (__proxyCache.data && cachedData) { cachedData.proxy = __proxyCache.data; broadcastSse(); }
-      });
-    }, REFRESH_SEC * 1000);
-    setTimeout(refreshOutageCache, 400);
-    setTimeout(maybeRefreshReleasesCacheOnStartup, 1400);
-    setTimeout(refreshMarketplaceExtensionCache, 2400);
+    startupDevProxy();
   } else {
-    // Production: normal local scan
     primeDashboardAndScheduleFirstScan();
     setTimeout(refreshOutageCache, 400);
     setTimeout(maybeRefreshReleasesCacheOnStartup, 1400);
