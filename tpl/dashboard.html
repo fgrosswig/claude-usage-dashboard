@@ -16,6 +16,15 @@
 <button type="button" class="lang-btn" id="lang-en" data-lang="en" aria-pressed="false">EN</button>
 <button type="button" class="lang-btn" id="lang-ko" data-lang="ko" aria-pressed="false">KO</button>
 </div>
+<div class="plan-switch" id="plan-switch-wrap">
+<select id="plan-select" class="plan-select">
+<option value="max5">MAX 5</option>
+<option value="max20">MAX 20</option>
+<option value="pro">Pro</option>
+<option value="free">Free</option>
+<option value="api">API</option>
+</select>
+</div>
 <div class="live-pop" id="live-pop" tabindex="-1">
 <div class="refresh" id="live-trigger" tabindex="0" role="button" aria-expanded="false" aria-haspopup="true" aria-controls="live-files-panel" title="">
 <span id="live-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:6px;animation:pulse 2s infinite;vertical-align:middle"></span><span id="live-label">Live</span>
@@ -91,6 +100,7 @@
 </div>
 </header>
 <div class="filter-bar" id="filter-bar">
+<span class="filter-bar-title" id="filter-bar-title"></span>
 <div class="filter-group">
 <label class="filter-label" id="filter-date-label"></label>
 <select id="filter-date-start" class="filter-input filter-day-select"></select>
@@ -194,12 +204,14 @@
 <div class="report-modal-head">
 <h3 id="report-modal-title">Forensic Report</h3>
 <div class="report-modal-actions">
+<button type="button" id="report-expand-all" class="report-idx-btn">Expand All</button>
+<button type="button" id="report-collapse-all" class="report-idx-btn">Collapse All</button>
 <button type="button" id="report-copy-btn">Copy</button>
 <button type="button" class="primary" id="report-download-btn">Download .md</button>
 <button type="button" id="report-close-btn">✕</button>
 </div>
 </div>
-<div class="report-modal-body"><pre id="report-content"></pre></div>
+<div class="report-modal-body"><div id="report-content"></div></div>
 </div>
 </div>
 
@@ -253,9 +265,41 @@
 </summary>
 <div class="forensic-inner">
 <div class="user-chart-controls"><select id="user-version-sort" class="user-chart-select"></select><div class="user-filter-wrap" id="user-version-filter-wrap"><button type="button" class="user-filter-btn" id="user-version-filter-btn">Versions <span id="user-version-filter-count"></span></button><div class="user-filter-dropdown" id="user-version-filter-dd"></div></div></div>
-<div class="charts" id="user-profile-charts">
+<div class="charts has-session-row" id="user-profile-charts">
 <div class="chart-box"><h3 id="user-version-h3"></h3><p class="user-chart-blurb" id="user-version-blurb"></p><canvas id="c-user-versions"></canvas></div>
 <div class="chart-box"><h3 id="user-entrypoint-h3"></h3><p class="user-chart-blurb" id="user-entrypoint-blurb"></p><canvas id="c-user-entrypoints"></canvas></div>
+<div class="chart-box"><h3 id="user-release-stability-h3"></h3><p class="user-chart-blurb" id="user-release-stability-blurb"></p><canvas id="c-user-release-stability"></canvas></div>
+</div>
+</div>
+</details>
+<!-- Budget Efficiency -->
+<details class="forensic-details budget-details" id="budget-collapse">
+<summary class="forensic-summary forensic-summary--bar">
+<div class="forensic-summary-row">
+<p id="budget-summary-line" class="forensic-summary-metrics">Budget Efficiency</p>
+</div>
+</summary>
+<div class="forensic-inner">
+<div id="budget-alert" class="budget-alert" style="display:none"></div>
+<div id="budget-fuel" class="budget-fuel" style="display:none"></div>
+<div class="grid" id="budget-cards"></div>
+<details class="budget-sub-details" open>
+<summary class="budget-sub-summary" id="budget-sankey-summary">Token Budget Breakdown</summary>
+<div class="charts full" id="budget-charts">
+<div class="chart-box">
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+<h3 id="budget-waterfall-h3" style="margin:0"></h3>
+<div class="budget-switch-group" id="budget-flow-group"></div>
+<div class="budget-switch-group" id="budget-weight-group"></div>
+</div>
+<p class="user-chart-blurb" id="budget-waterfall-blurb"></p>
+<div id="c-budget-sankey"></div>
+</div>
+</div>
+</details>
+<div class="charts" id="budget-trend-row">
+<div class="chart-box"><h3 id="budget-trend-h3"></h3><p class="user-chart-blurb" id="budget-trend-blurb"></p><canvas id="c-budget-trend"></canvas></div>
+<div class="chart-box"><h3 id="budget-quota-h3"></h3><p class="user-chart-blurb" id="budget-quota-blurb"></p><canvas id="c-budget-quota"></canvas></div>
 </div>
 </div>
 </details>
@@ -323,6 +367,8 @@
 </div>
 <script>window.__I18N_BUNDLES=__I18N_PLACEHOLDER__;</script>
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js" integrity="sha384-b0GXujLkk9eYYSmcSfoyZbfyElGAQnDyY0skCHSG6w3JgTMFnz11ggrTAr7seu9f" crossorigin="anonymous"></script>
+<script defer src="https://www.gstatic.com/charts/loader.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js" crossorigin="anonymous"></script>
 <script defer src="/assets/dashboard.client.js"></script>
 </body>
 </html>
