@@ -289,6 +289,7 @@
   "budgetWfProductive": "Productive",
   "budgetWfOverhead": "Overhead",
   "budgetWfYou": "You",
+  "budgetWfResult": "Total Usage",
   "budgetFlowBudget": "Budget Flow",
   "budgetFlowApi": "API Flow",
   "budgetFlowUser": "User Flow",

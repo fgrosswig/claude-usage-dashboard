@@ -413,6 +413,7 @@
   "budgetWfProductive": "생산적",
   "budgetWfOverhead": "오버헤드",
   "budgetWfYou": "사용자",
+  "budgetWfResult": "총 사용량",
   "budgetFlowBudget": "예산 흐름",
   "budgetFlowApi": "API 흐름",
   "budgetFlowUser": "사용자 흐름",

@@ -4608,17 +4608,22 @@ function renderBudgetWaterfall(tot, quota) {
     if (pCr > 0)  flows.push({ from: nCacheR, to: nUser, flow: pCr });
     if (pCc > 0)  flows.push({ from: nCacheC, to: nUser, flow: pCc });
   } else {
-    // User → API → Token Types
+    // User → API → Token Types → Result
     var nYou = t("budgetWfYou");
     var nApi2 = "Claude API";
-    nodeColors[nYou] = "#22c55e"; nodeColors[nApi2] = "#a855f7";
-    labelMap[nYou] = nYou; labelMap[nApi2] = nApi2;
+    var nResult = t("budgetWfResult");
+    nodeColors[nYou] = "#22c55e"; nodeColors[nApi2] = "#a855f7"; nodeColors[nResult] = "#94a3b8";
+    labelMap[nYou] = nYou; labelMap[nApi2] = nApi2; labelMap[nResult] = nResult;
     var totalFlow = pOut + pInp + pCr + pCc;
     if (totalFlow > 0) flows.push({ from: nYou, to: nApi2, flow: totalFlow });
     if (pOut > 0) flows.push({ from: nApi2, to: nOutput, flow: pOut });
     if (pInp > 0) flows.push({ from: nApi2, to: nInput,  flow: pInp });
     if (pCr > 0)  flows.push({ from: nApi2, to: nCacheR, flow: pCr });
     if (pCc > 0)  flows.push({ from: nApi2, to: nCacheC, flow: pCc });
+    if (pOut > 0) flows.push({ from: nOutput, to: nResult, flow: pOut });
+    if (pInp > 0) flows.push({ from: nInput,  to: nResult, flow: pInp });
+    if (pCr > 0)  flows.push({ from: nCacheR, to: nResult, flow: pCr });
+    if (pCc > 0)  flows.push({ from: nCacheC, to: nResult, flow: pCc });
   }
 
   _budgetCharts.waterfall = new Chart(el, {
@@ -4637,7 +4642,7 @@ function renderBudgetWaterfall(tot, quota) {
         colorMode: "gradient",
         labels: labelMap,
         size: "max",
-        nodeWidth: 14,
+        nodeWidth: 26,
         color: "#e2e8f0",
         borderWidth: 0
       }]
