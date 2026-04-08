@@ -4133,27 +4133,38 @@ function renderUserProfileCharts(days) {
     });
   }
 
-  // ── Entrypoints Chart ──
+  // ── Entrypoints per Version Chart (horizontal bar) ──
   var elE = document.getElementById("c-user-entrypoints");
   var h3E = document.getElementById("user-entrypoint-h3");
   if (h3E) h3E.textContent = t("userEntrypointChartTitle");
-  if (elE && entrypointKeys.length) {
+  if (elE && sortedVers.length) {
     if (_userCharts.entrypoints) { _userCharts.entrypoints.destroy(); _userCharts.entrypoints = null; }
+
+    // Collect all entrypoint keys across versions
+    var allEp = {};
+    for (var epi = 0; epi < sortedVers.length; epi++) {
+      var evs = stats[sortedVers[epi]];
+      if (evs && evs.entrypoints) {
+        var epk = Object.keys(evs.entrypoints);
+        for (var epki = 0; epki < epk.length; epki++) allEp[epk[epki]] = true;
+      }
+    }
+    var epKeys = Object.keys(allEp).sort();
+
     var epColors = {
       "claude-vscode": "rgba(59,130,246,0.8)",
       "cli": "rgba(34,197,94,0.8)",
       "claude-jetbrains": "rgba(245,158,11,0.8)"
     };
-    var labels = [];
-    for (var li = 0; li < days.length; li++) labels.push(days[li].date || "");
-    var eDatasets = [];
-    for (var edi = 0; edi < entrypointKeys.length; edi++) {
-      var eKey = entrypointKeys[edi];
+    var epDatasets = [];
+    for (var edi = 0; edi < epKeys.length; edi++) {
+      var eKey = epKeys[edi];
       var eData = [];
-      for (var edd = 0; edd < days.length; edd++) {
-        eData.push((days[edd].entrypoints || {})[eKey] || 0);
+      for (var edd = 0; edd < sortedVers.length; edd++) {
+        var evs2 = stats[sortedVers[edd]];
+        eData.push(evs2 && evs2.entrypoints ? (evs2.entrypoints[eKey] || 0) : 0);
       }
-      eDatasets.push({
+      epDatasets.push({
         label: eKey,
         data: eData,
         backgroundColor: epColors[eKey] || __userProfileColors[edi % __userProfileColors.length],
@@ -4162,15 +4173,16 @@ function renderUserProfileCharts(days) {
     }
     _userCharts.entrypoints = new Chart(elE, {
       type: "bar",
-      data: { labels: labels, datasets: eDatasets },
+      data: { labels: sortedVers, datasets: epDatasets },
       options: {
+        indexAxis: "y",
         responsive: true,
         animation: false,
         transitions: __chartTransitionsOff,
         interaction: { mode: "index", intersect: false },
         scales: {
-          x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8" } },
-          y: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8", precision: 0 }, title: { display: true, text: "Calls", color: "#94a3b8" } }
+          x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8", precision: 0 } },
+          y: { stacked: true, grid: { color: "rgba(51,65,85,0.3)" }, ticks: { color: "#e2e8f0", font: { family: "monospace" } } }
         },
         plugins: {
           legend: { labels: { color: "#cbd5e1" } },

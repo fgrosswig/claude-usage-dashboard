@@ -92,7 +92,7 @@ process.argv.forEach(function(a) {
 serviceLog.refreshFromEnv();
 
 // Vor-Tage als ein JSON (unter ~/.claude); JSONL wird nur noch für den lokalen Kalendertag „heute” voll geparst.
-var USAGE_DAY_CACHE_VERSION = 6; // bumped: version_stats + entrypoints added
+var USAGE_DAY_CACHE_VERSION = 7; // bumped: entrypoints per version in version_stats
 var USAGE_DAY_CACHE_FILE = path.join(HOME, '.claude', 'usage-dashboard-days.json');
 /** Pro-Datei-Beitrag zum lokalen „heute“ (mtime+size): vermeidet 300+ JSONL bei jedem Refresh. */
 var JSONL_TODAY_INDEX_VERSION = 1;
@@ -1520,7 +1520,7 @@ function classifyJsonlSessionSignals(line, rec) {
 }
 
 function emptyVersionStats() {
-  return { calls: 0, output: 0, cache_read: 0, hit_limit: 0, retry: 0, interrupt: 0, continue: 0, resume: 0, truncated: 0, api_error: 0 };
+  return { calls: 0, output: 0, cache_read: 0, hit_limit: 0, retry: 0, interrupt: 0, continue: 0, resume: 0, truncated: 0, api_error: 0, entrypoints: {} };
 }
 
 function emptyHostSlice() {
@@ -1662,7 +1662,16 @@ function mergeDayBucketInto(target, src) {
     var vsFields = Object.keys(srcVs);
     for (var vsfi = 0; vsfi < vsFields.length; vsfi++) {
       var f = vsFields[vsfi];
-      tgt[f] = (tgt[f] || 0) + (srcVs[f] || 0);
+      if (f === 'entrypoints') {
+        if (!tgt.entrypoints) tgt.entrypoints = {};
+        var sep = srcVs.entrypoints || {};
+        var sepk = Object.keys(sep);
+        for (var sepi = 0; sepi < sepk.length; sepi++) {
+          tgt.entrypoints[sepk[sepi]] = (tgt.entrypoints[sepk[sepi]] || 0) + (sep[sepk[sepi]] || 0);
+        }
+      } else {
+        tgt[f] = (tgt[f] || 0) + (srcVs[f] || 0);
+      }
     }
   }
 }
@@ -1940,6 +1949,8 @@ function processJsonlFile(fileRef, daily, onlyDate, isolateTodayFrag, fileTodayF
         vs.calls++;
         vs.output += outTok;
         vs.cache_read += crTok;
+        var vsEp = extractEntrypoint(rec);
+        if (vsEp) vs.entrypoints[vsEp] = (vs.entrypoints[vsEp] || 0) + 1;
       }
       var ep = extractEntrypoint(rec);
       if (ep) dd.entrypoints[ep] = (dd.entrypoints[ep] || 0) + 1;
