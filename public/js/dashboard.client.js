@@ -4323,7 +4323,7 @@ function renderReleaseStabilityChart(sortedVers, releaseData) {
 }
 
 // ── Budget Efficiency Section ─────────────────────────────────────────────
-var _budgetCharts = { waterfall: null, trend: null };
+var _budgetCharts = { waterfall: null, trend: null, quota: null };
 
 function renderBudgetEfficiency(data) {
   var sumEl = document.getElementById("budget-summary-line");
@@ -4397,11 +4397,45 @@ function renderBudgetEfficiency(data) {
 
   // KPI Cards
   if (cardsEl) {
+    // Compute outage hours from days
+    var totalOutageH = 0;
+    for (var oi = 0; oi < days.length; oi++) {
+      totalOutageH += days[oi].outage_hours || 0;
+    }
+
+    // Compute tool result bloat from days (truncated signals = proxy for bloat)
+    var totalTruncated = 0;
+    for (var ti2 = 0; ti2 < days.length; ti2++) {
+      var ss2 = days[ti2].session_signals || {};
+      totalTruncated += ss2.truncated || 0;
+    }
+
+    // Quota forecast: estimate hours remaining based on consumption rate
+    var forecastStr = "?";
+    var forecastCls = "";
+    if (data.proxy && data.proxy.proxy_days && data.proxy.proxy_days.length >= 2) {
+      var pds = data.proxy.proxy_days;
+      var latest = pds[pds.length - 1];
+      var latestRl = latest.rate_limit || {};
+      var q5now = parseFloat(latestRl["anthropic-ratelimit-unified-5h-utilization"] || 0);
+      if (q5now > 0 && latest.active_hours > 0) {
+        // Rate: quota % per active hour
+        var pctPerHour = q5now * 100 / latest.active_hours;
+        var remaining = (1 - q5now) * 100;
+        var hoursLeft = pctPerHour > 0 ? remaining / pctPerHour : 99;
+        forecastStr = hoursLeft.toFixed(1) + "h";
+        forecastCls = hoursLeft < 1 ? "warn" : "";
+      }
+    }
+
     var cards = [
       { label: t("budgetCardOutput"), value: outputPct + "%", sub: t("budgetCardOutputSub"), cls: outputPct < 25 ? "warn" : "" },
       { label: t("budgetCardOverhead"), value: overheadFactor + "x", sub: t("budgetCardOverheadSub"), cls: overheadFactor > 4 ? "warn" : "" },
       { label: t("budgetCardCacheMiss"), value: cacheMissRate + "%", sub: t("budgetCardCacheMissSub"), cls: cacheMissRate > 40 ? "warn" : "" },
-      { label: t("budgetCardLost"), value: String(lostSignals), sub: t("budgetCardLostSub").replace("{r}", String(tot.retries)).replace("{i}", String(tot.interrupts)).replace("{e}", String(tot.api_errors)), cls: lostSignals > 5 ? "warn" : "" }
+      { label: t("budgetCardLost"), value: String(lostSignals), sub: t("budgetCardLostSub").replace("{r}", String(tot.retries)).replace("{i}", String(tot.interrupts)).replace("{e}", String(tot.api_errors)), cls: lostSignals > 5 ? "warn" : "" },
+      // Forecast now shown in fuel gauge above
+      { label: t("budgetCardOutage"), value: totalOutageH.toFixed(1) + "h", sub: t("budgetCardOutageSub"), cls: totalOutageH > 2 ? "warn" : "" },
+      { label: t("budgetCardTruncated"), value: String(totalTruncated), sub: t("budgetCardTruncatedSub"), cls: totalTruncated > 50 ? "warn" : "" }
     ];
     var ch = "";
     cards.forEach(function(c) {
@@ -4410,17 +4444,93 @@ function renderBudgetEfficiency(data) {
     cardsEl.innerHTML = ch;
   }
 
-  // Extract quota info from proxy data
-  var quota = { pct_5h: null, pct_7d: null, visible_tokens_per_pct: 0 };
+  // Extract quota info from proxy data (latest snapshot)
+  var quota = { pct_5h: null, pct_7d: null, visible_tokens_per_pct: 0,
+                fallback_pct: null, overage_status: null, overage_reason: null, representative_claim: null };
   if (data.proxy && data.proxy.proxy_days && data.proxy.proxy_days.length) {
     var lastPd = data.proxy.proxy_days[data.proxy.proxy_days.length - 1];
     if (lastPd.rate_limit) {
-      var q5 = lastPd.rate_limit["anthropic-ratelimit-unified-5h-utilization"];
-      var q7 = lastPd.rate_limit["anthropic-ratelimit-unified-7d-utilization"];
+      var rl = lastPd.rate_limit;
+      var q5 = rl["anthropic-ratelimit-unified-5h-utilization"];
+      var q7 = rl["anthropic-ratelimit-unified-7d-utilization"];
       if (q5 != null) quota.pct_5h = parseFloat(q5) * 100;
       if (q7 != null) quota.pct_7d = parseFloat(q7) * 100;
+      var fb = rl["anthropic-ratelimit-unified-fallback-percentage"];
+      if (fb != null) quota.fallback_pct = parseFloat(fb);
+      var ov = rl["anthropic-ratelimit-unified-overage-status"];
+      if (ov) quota.overage_status = ov;
+      var ovr = rl["anthropic-ratelimit-unified-overage-disabled-reason"];
+      if (ovr) quota.overage_reason = ovr;
+      var rc = rl["anthropic-ratelimit-unified-representative-claim"];
+      if (rc) quota.representative_claim = rc;
     }
     if (lastPd.visible_tokens_per_pct) quota.visible_tokens_per_pct = lastPd.visible_tokens_per_pct;
+  }
+
+  // Fuel gauges for 5h/7d quota
+  var fuelEl = document.getElementById("budget-fuel");
+  if (fuelEl && quota.pct_5h != null) {
+    // Gradient: green (0%) → yellow (50%) → red (100%)
+    var fuelColor = function(pct) {
+      var p = Math.min(100, Math.max(0, pct)) / 100;
+      var r = Math.round(p < 0.5 ? p * 2 * 245 : 245);
+      var g = Math.round(p < 0.5 ? 197 : (1 - p) * 2 * 197);
+      return "rgb(" + r + "," + g + ",20)";
+    };
+    var fuelRows = [];
+
+    // 5h gauge
+    var pct5 = Math.min(quota.pct_5h, 100);
+    var left5 = (100 - pct5);
+    var hrs5 = quota.pct_5h > 0 && tot.active_hours > 0
+      ? (left5 / quota.pct_5h * tot.active_hours).toFixed(1) : "?";
+    fuelRows.push(
+      "<div class=\"fuel-row\"><span class=\"fuel-label\">5h Window</span>" +
+      "<div class=\"fuel-bar\"><div class=\"fuel-fill\" style=\"width:" + pct5 + "%;background:" + fuelColor(pct5) + "\"></div>" +
+      "<span class=\"fuel-text\">" + pct5.toFixed(0) + "% used \u00B7 ~" + hrs5 + "h left</span></div></div>"
+    );
+
+    // 7d gauge
+    if (quota.pct_7d != null) {
+      var pct7 = Math.min(quota.pct_7d, 100);
+      var left7 = (100 - pct7);
+      fuelRows.push(
+        "<div class=\"fuel-row\"><span class=\"fuel-label\">7d Window</span>" +
+        "<div class=\"fuel-bar\"><div class=\"fuel-fill\" style=\"width:" + pct7 + "%;background:" + fuelColor(pct7) + "\"></div>" +
+        "<span class=\"fuel-text\">" + pct7.toFixed(0) + "% used</span></div></div>"
+      );
+    }
+
+    // Fallback gauge
+    if (quota.fallback_pct != null) {
+      var fbPctG = Math.round(quota.fallback_pct * 100);
+      fuelRows.push(
+        "<div class=\"fuel-row\"><span class=\"fuel-label\">" + t("budgetCardFallback") + "</span>" +
+        "<div class=\"fuel-bar\"><div class=\"fuel-fill\" style=\"width:" + fbPctG + "%;background:" + fuelColor(100 - fbPctG) + "\"></div>" +
+        "<span class=\"fuel-text\">" + fbPctG + "% " + t("budgetWfOfQuota") + "</span></div></div>"
+      );
+    }
+
+    fuelEl.innerHTML = fuelRows.join("");
+    fuelEl.style.display = "flex";
+  } else if (fuelEl) {
+    fuelEl.style.display = "none";
+  }
+
+  // Alert banner for capacity reduction
+  var alertEl = document.getElementById("budget-alert");
+  if (alertEl) {
+    if (quota.fallback_pct != null && quota.fallback_pct < 1.0) {
+      var fbPctAlert = Math.round(quota.fallback_pct * 100);
+      var alertParts = ["<strong>" + t("budgetAlertTitle") + "</strong> "];
+      alertParts.push(t("budgetAlertFallback").split("{pct}").join(String(fbPctAlert)));
+      if (quota.overage_status === "rejected") alertParts.push(" · " + t("budgetAlertOverage"));
+      if (quota.representative_claim) alertParts.push(" · " + t("budgetAlertClaim").replace("{claim}", quota.representative_claim.replace(/_/g, " ")));
+      alertEl.innerHTML = alertParts.join("");
+      alertEl.style.display = "block";
+    } else {
+      alertEl.style.display = "none";
+    }
   }
 
   // Aggregate per-host totals for Sankey worker nodes
@@ -4440,8 +4550,8 @@ function renderBudgetEfficiency(data) {
     }
   }
 
-  // Waterfall Chart — pass hostTotals via data bag
-  renderBudgetWaterfall(tot, quota, hostTotals);
+  // Waterfall Chart — if host filter active, skip multi-host view
+  renderBudgetWaterfall(tot, quota, filteredHost ? {} : hostTotals);
 
   // Trend Chart — merge proxy quota history into daily trend
   var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
@@ -4451,10 +4561,12 @@ function renderBudgetEfficiency(data) {
     if (pd.date && pd.rate_limit) {
       var q5 = pd.rate_limit["anthropic-ratelimit-unified-5h-utilization"];
       var q7 = pd.rate_limit["anthropic-ratelimit-unified-7d-utilization"];
+      var fb = pd.rate_limit["anthropic-ratelimit-unified-fallback-percentage"];
       quotaByDate[pd.date] = {
         pct_5h: q5 != null ? Math.round(parseFloat(q5) * 1000) / 10 : null,
         pct_7d: q7 != null ? Math.round(parseFloat(q7) * 1000) / 10 : null,
-        vis_per_pct: pd.visible_tokens_per_pct || 0
+        vis_per_pct: pd.visible_tokens_per_pct || 0,
+        fallback_pct: fb != null ? Math.round(parseFloat(fb) * 100) : null
       };
     }
   }
@@ -4463,6 +4575,7 @@ function renderBudgetEfficiency(data) {
     dailyTrend[ti].quota_5h = qd ? qd.pct_5h : null;
     dailyTrend[ti].quota_7d = qd ? qd.pct_7d : null;
     dailyTrend[ti].vis_per_pct = qd ? qd.vis_per_pct : 0;
+    dailyTrend[ti].fallback_pct = qd ? qd.fallback_pct : null;
   }
 
   renderBudgetTrend(dailyTrend);
@@ -4604,77 +4717,90 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
   var nCr  = t("budgetWfCacheRead") + " " + pctOf(src.cr) + "%";
   var nCc  = t("budgetWfCacheCreate") + " " + pctOf(src.cc) + "%";
 
-  // Use equal weights for visual balance, real values in labels
-  var w = 1;
+  // Compressed weights: log-scaled with minimum band width
+  // Ensures overhead (small flows) stays visible next to cache (huge flows)
+  // Max ratio capped at ~4:1 so no flow disappears
+  var allVals = [src.out, src.inp, src.cr, src.cc].filter(function(v) { return v > 0; });
+  var maxLog = 0;
+  for (var ai = 0; ai < allVals.length; ai++) {
+    var l = Math.log10(1 + allVals[ai]);
+    if (l > maxLog) maxLog = l;
+  }
+  var wOf = function(v) {
+    if (v <= 0) return 0;
+    var logV = Math.log10(1 + v);
+    // Normalize to 1-4 range: smallest visible flow = 1, largest = 4
+    var normalized = maxLog > 0 ? (logV / maxLog) : 1;
+    return Math.max(1, Math.round(1 + normalized * 3));
+  };
+  var wOut = wOf(src.out);
+  var wInp = wOf(src.inp);
+  var wCr  = wOf(src.cr);
+  var wCc  = wOf(src.cc);
 
   // Aggregate per-host data for worker nodes
   var hostKeys = Object.keys(hostTotals || {}).sort();
 
   if (__budgetFlowMode === "budget") {
-    var srcN = "MAX5 Budget";
+    var srcN = getSelectedPlanLabel() + " Budget";
     var prodN = t("budgetWfProductive") + " (" + fmtTok(raw.out) + ")";
     var overN = t("budgetWfOverhead") + " (" + fmtTok(raw.inp + raw.cr + raw.cc) + ")";
 
     if (hostKeys.length > 1) {
-      // MAX5 → Workers → Token Types → Productive/Overhead
       for (var hi = 0; hi < hostKeys.length; hi++) {
         var hk = hostKeys[hi];
         var hd = hostTotals[hk];
         var hLabel = hk + " (" + fmtTok(hd.total) + ")";
-        rows.push([srcN, hLabel, w]);
         var hsrc = isCost ? {
-          out: hd.output * __quotaWeights.output,
-          inp: hd.input * __quotaWeights.input,
-          cr: hd.cache_read * __quotaWeights.cache_read,
-          cc: hd.cache_creation * __quotaWeights.cache_creation
+          out: hd.output * __quotaWeights.output, inp: hd.input * __quotaWeights.input,
+          cr: hd.cache_read * __quotaWeights.cache_read, cc: hd.cache_creation * __quotaWeights.cache_creation
         } : { out: hd.output, inp: hd.input, cr: hd.cache_read, cc: hd.cache_creation };
-        if (hsrc.out > 0) rows.push([hLabel, nOut, w]);
-        if (hsrc.inp > 0) rows.push([hLabel, nInp, w]);
-        if (hsrc.cr > 0)  rows.push([hLabel, nCr,  w]);
-        if (hsrc.cc > 0)  rows.push([hLabel, nCc,  w]);
+        var hTotal = hsrc.out + hsrc.inp + hsrc.cr + hsrc.cc;
+        rows.push([srcN, hLabel, wOf(hTotal)]);
+        if (hsrc.out > 0) rows.push([hLabel, nOut, wOf(hsrc.out)]);
+        if (hsrc.inp > 0) rows.push([hLabel, nInp, wOf(hsrc.inp)]);
+        if (hsrc.cr > 0)  rows.push([hLabel, nCr,  wOf(hsrc.cr)]);
+        if (hsrc.cc > 0)  rows.push([hLabel, nCc,  wOf(hsrc.cc)]);
       }
     } else {
-      // Single host: MAX5 → Token Types directly
-      if (src.out > 0) rows.push([srcN, nOut, w]);
-      if (src.inp > 0) rows.push([srcN, nInp, w]);
-      if (src.cr > 0)  rows.push([srcN, nCr,  w]);
-      if (src.cc > 0)  rows.push([srcN, nCc,  w]);
+      if (src.out > 0) rows.push([srcN, nOut, wOut]);
+      if (src.inp > 0) rows.push([srcN, nInp, wInp]);
+      if (src.cr > 0)  rows.push([srcN, nCr,  wCr]);
+      if (src.cc > 0)  rows.push([srcN, nCc,  wCc]);
     }
-    if (src.out > 0) rows.push([nOut, prodN, w]);
-    if (src.inp > 0) rows.push([nInp, overN, w]);
-    if (src.cr > 0)  rows.push([nCr,  overN, w]);
-    if (src.cc > 0)  rows.push([nCc,  overN, w]);
+    if (src.out > 0) rows.push([nOut, prodN, wOut]);
+    if (src.inp > 0) rows.push([nInp, overN, wInp]);
+    if (src.cr > 0)  rows.push([nCr,  overN, wCr]);
+    if (src.cc > 0)  rows.push([nCc,  overN, wCc]);
   } else if (__budgetFlowMode === "api") {
     var apiN = "Claude API";
     var youN = t("budgetWfYou") + " (" + fmtTok(totalVal) + ")";
     if (hostKeys.length > 1) {
-      // Claude API → Workers → Token Types → You
       for (var hi2 = 0; hi2 < hostKeys.length; hi2++) {
         var hk2 = hostKeys[hi2];
         var hd2 = hostTotals[hk2];
         var hLabel2 = hk2 + " (" + fmtTok(hd2.total) + ")";
-        rows.push([apiN, hLabel2, w]);
         var hsrc2 = isCost ? {
-          out: hd2.output * __quotaWeights.output,
-          inp: hd2.input * __quotaWeights.input,
-          cr: hd2.cache_read * __quotaWeights.cache_read,
-          cc: hd2.cache_creation * __quotaWeights.cache_creation
+          out: hd2.output * __quotaWeights.output, inp: hd2.input * __quotaWeights.input,
+          cr: hd2.cache_read * __quotaWeights.cache_read, cc: hd2.cache_creation * __quotaWeights.cache_creation
         } : { out: hd2.output, inp: hd2.input, cr: hd2.cache_read, cc: hd2.cache_creation };
-        if (hsrc2.out > 0) rows.push([hLabel2, nOut, w]);
-        if (hsrc2.inp > 0) rows.push([hLabel2, nInp, w]);
-        if (hsrc2.cr > 0)  rows.push([hLabel2, nCr,  w]);
-        if (hsrc2.cc > 0)  rows.push([hLabel2, nCc,  w]);
+        var hTot2 = hsrc2.out + hsrc2.inp + hsrc2.cr + hsrc2.cc;
+        rows.push([apiN, hLabel2, wOf(hTot2)]);
+        if (hsrc2.out > 0) rows.push([hLabel2, nOut, wOf(hsrc2.out)]);
+        if (hsrc2.inp > 0) rows.push([hLabel2, nInp, wOf(hsrc2.inp)]);
+        if (hsrc2.cr > 0)  rows.push([hLabel2, nCr,  wOf(hsrc2.cr)]);
+        if (hsrc2.cc > 0)  rows.push([hLabel2, nCc,  wOf(hsrc2.cc)]);
       }
     } else {
-      if (src.out > 0) rows.push([apiN, nOut, w]);
-      if (src.inp > 0) rows.push([apiN, nInp, w]);
-      if (src.cr > 0)  rows.push([apiN, nCr,  w]);
-      if (src.cc > 0)  rows.push([apiN, nCc,  w]);
+      if (src.out > 0) rows.push([apiN, nOut, wOut]);
+      if (src.inp > 0) rows.push([apiN, nInp, wInp]);
+      if (src.cr > 0)  rows.push([apiN, nCr,  wCr]);
+      if (src.cc > 0)  rows.push([apiN, nCc,  wCc]);
     }
-    if (src.out > 0) rows.push([nOut, youN, w]);
-    if (src.inp > 0) rows.push([nInp, youN, w]);
-    if (src.cr > 0)  rows.push([nCr,  youN, w]);
-    if (src.cc > 0)  rows.push([nCc,  youN, w]);
+    if (src.out > 0) rows.push([nOut, youN, wOut]);
+    if (src.inp > 0) rows.push([nInp, youN, wInp]);
+    if (src.cr > 0)  rows.push([nCr,  youN, wCr]);
+    if (src.cc > 0)  rows.push([nCc,  youN, wCc]);
   } else {
     // User Flow: You → Workers → Token Types → Total Usage
     var youN2  = t("budgetWfYou");
@@ -4684,30 +4810,29 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
         var hk3 = hostKeys[hi3];
         var hd3 = hostTotals[hk3];
         var hLabel3 = hk3 + " (" + fmtTok(hd3.total) + ")";
-        rows.push([youN2, hLabel3, w]);
         var hsrc3 = isCost ? {
-          out: hd3.output * __quotaWeights.output,
-          inp: hd3.input * __quotaWeights.input,
-          cr: hd3.cache_read * __quotaWeights.cache_read,
-          cc: hd3.cache_creation * __quotaWeights.cache_creation
+          out: hd3.output * __quotaWeights.output, inp: hd3.input * __quotaWeights.input,
+          cr: hd3.cache_read * __quotaWeights.cache_read, cc: hd3.cache_creation * __quotaWeights.cache_creation
         } : { out: hd3.output, inp: hd3.input, cr: hd3.cache_read, cc: hd3.cache_creation };
-        if (hsrc3.out > 0) rows.push([hLabel3, nOut, w]);
-        if (hsrc3.inp > 0) rows.push([hLabel3, nInp, w]);
-        if (hsrc3.cr > 0)  rows.push([hLabel3, nCr,  w]);
-        if (hsrc3.cc > 0)  rows.push([hLabel3, nCc,  w]);
+        var hTot3 = hsrc3.out + hsrc3.inp + hsrc3.cr + hsrc3.cc;
+        rows.push([youN2, hLabel3, wOf(hTot3)]);
+        if (hsrc3.out > 0) rows.push([hLabel3, nOut, wOf(hsrc3.out)]);
+        if (hsrc3.inp > 0) rows.push([hLabel3, nInp, wOf(hsrc3.inp)]);
+        if (hsrc3.cr > 0)  rows.push([hLabel3, nCr,  wOf(hsrc3.cr)]);
+        if (hsrc3.cc > 0)  rows.push([hLabel3, nCc,  wOf(hsrc3.cc)]);
       }
     } else {
       var apiN2 = "Claude API";
-      rows.push([youN2, apiN2, w * 4]);
-      if (src.out > 0) rows.push([apiN2, nOut, w]);
-      if (src.inp > 0) rows.push([apiN2, nInp, w]);
-      if (src.cr > 0)  rows.push([apiN2, nCr,  w]);
-      if (src.cc > 0)  rows.push([apiN2, nCc,  w]);
+      rows.push([youN2, apiN2, wOut + wInp + wCr + wCc]);
+      if (src.out > 0) rows.push([apiN2, nOut, wOut]);
+      if (src.inp > 0) rows.push([apiN2, nInp, wInp]);
+      if (src.cr > 0)  rows.push([apiN2, nCr,  wCr]);
+      if (src.cc > 0)  rows.push([apiN2, nCc,  wCc]);
     }
-    if (src.out > 0) rows.push([nOut, resN, w]);
-    if (src.inp > 0) rows.push([nInp, resN, w]);
-    if (src.cr > 0)  rows.push([nCr,  resN, w]);
-    if (src.cc > 0)  rows.push([nCc,  resN, w]);
+    if (src.out > 0) rows.push([nOut, resN, wOut]);
+    if (src.inp > 0) rows.push([nInp, resN, wInp]);
+    if (src.cr > 0)  rows.push([nCr,  resN, wCr]);
+    if (src.cc > 0)  rows.push([nCc,  resN, wCc]);
   }
 
   if (!rows.length) {
@@ -4740,121 +4865,187 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
 }
 
 function renderBudgetTrend(dailyTrend) {
+  if (_budgetCharts.trend) { _budgetCharts.trend.destroy(); _budgetCharts.trend = null; }
+  if (_budgetCharts.quota) { _budgetCharts.quota.destroy(); _budgetCharts.quota = null; }
+
+  var labels = dailyTrend.map(function(d) { return d.date; });
+
+  // ── Left chart: Efficiency (Output up, Overhead down) ──
   var el = document.getElementById("c-budget-trend");
   var h3 = document.getElementById("budget-trend-h3");
   if (h3) h3.textContent = t("budgetTrendTitle");
   var blurb = document.getElementById("budget-trend-blurb");
   if (blurb) blurb.textContent = t("budgetTrendBlurb");
-  if (!el) return;
-  if (_budgetCharts.trend) { _budgetCharts.trend.destroy(); _budgetCharts.trend = null; }
-  if (!dailyTrend.length) return;
 
-  var labels = dailyTrend.map(function(d) { return d.date; });
-  var overheadData = dailyTrend.map(function(d) { return d.overhead; });
-  var outputPctData = dailyTrend.map(function(d) { return d.output_pct; });
-  var quota5hData = dailyTrend.map(function(d) { return d.quota_5h; });
-  var quota7dData = dailyTrend.map(function(d) { return d.quota_7d; });
+  if (el && dailyTrend.length) {
+    var outputPctData = dailyTrend.map(function(d) { return d.output_pct; });
+    // Overhead inverted: shown as negative values below zero line
+    var overheadInvData = dailyTrend.map(function(d) { return d.overhead > 0 ? -Math.min(d.overhead, 100) : 0; });
+    var cacheMissData = dailyTrend.map(function(d) { return d.cache_miss_rate; });
 
-  // Check if we have any quota data
-  var hasQuota = quota5hData.some(function(v) { return v != null; });
-
-  var datasets = [
-    {
-      label: t("budgetTrendOverhead"),
-      data: overheadData,
-      borderColor: "rgba(248,113,113,0.9)",
-      backgroundColor: "rgba(248,113,113,0.1)",
-      yAxisID: "y",
-      tension: 0.3,
-      fill: false,
-      pointRadius: 3
-    },
-    {
-      label: t("budgetTrendOutputPct"),
-      data: outputPctData,
-      borderColor: "rgba(34,197,94,0.9)",
-      backgroundColor: "rgba(34,197,94,0.15)",
-      yAxisID: "y1",
-      tension: 0.3,
-      fill: true,
-      pointRadius: 3
-    }
-  ];
-
-  if (hasQuota) {
-    datasets.push({
-      label: t("budgetTrendQuota5h"),
-      data: quota5hData,
-      borderColor: "rgba(168,85,247,0.9)",
-      backgroundColor: "rgba(168,85,247,0.1)",
-      yAxisID: "y1",
-      tension: 0.3,
-      fill: true,
-      pointRadius: 4,
-      pointStyle: "rectRounded",
-      borderWidth: 2,
-      spanGaps: true
-    });
-    datasets.push({
-      label: t("budgetTrendQuota7d"),
-      data: quota7dData,
-      borderColor: "rgba(236,72,153,0.8)",
-      backgroundColor: "transparent",
-      yAxisID: "y1",
-      tension: 0.3,
-      fill: false,
-      borderDash: [6, 3],
-      pointRadius: 3,
-      pointStyle: "triangle",
-      borderWidth: 2,
-      spanGaps: true
-    });
-  }
-
-  _budgetCharts.trend = new Chart(el, {
-    type: "line",
-    data: { labels: labels, datasets: datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      aspectRatio: 3,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: {
-          grid: { color: "rgba(51,65,85,0.3)" },
-          ticks: { color: "#94a3b8", maxRotation: 45 }
-        },
-        y: {
-          position: "left",
-          grid: { color: "rgba(51,65,85,0.5)" },
-          ticks: { color: "#f87171" },
-          title: { display: true, text: t("budgetTrendYOverhead"), color: "#f87171", font: { size: 11 } }
-        },
-        y1: {
-          position: "right",
-          grid: { drawOnChartArea: false },
-          ticks: { color: "#a855f7", callback: function(v) { return v + "%"; } },
-          title: { display: true, text: hasQuota ? t("budgetTrendYQuota") : t("budgetTrendYPct"), color: hasQuota ? "#a855f7" : "#22c55e", font: { size: 11 } },
-          min: 0,
-          suggestedMax: 100
-        }
+    _budgetCharts.trend = new Chart(el, {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: t("budgetTrendOutputPct"),
+            data: outputPctData,
+            borderColor: "rgba(34,197,94,0.9)",
+            backgroundColor: "rgba(34,197,94,0.15)",
+            tension: 0.3,
+            fill: "origin",
+            pointRadius: 3
+          },
+          {
+            label: t("budgetTrendOverhead"),
+            data: overheadInvData,
+            borderColor: "rgba(248,113,113,0.9)",
+            backgroundColor: "rgba(248,113,113,0.15)",
+            tension: 0.3,
+            fill: "origin",
+            pointRadius: 3
+          },
+          {
+            label: t("budgetTrendCacheMiss"),
+            data: cacheMissData,
+            borderColor: "rgba(245,158,11,0.8)",
+            backgroundColor: "transparent",
+            tension: 0.3,
+            fill: false,
+            borderDash: [5, 3],
+            pointRadius: 2
+          }
+        ]
       },
-      plugins: {
-        legend: { labels: { color: "#cbd5e1" } },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) {
-              if (ctx.raw == null) return null;
-              if (ctx.datasetIndex === 0) return ctx.dataset.label + ": " + ctx.raw + "x";
-              return ctx.dataset.label + ": " + ctx.raw + "%";
+      options: {
+        responsive: true,
+        animation: false,
+        transitions: __chartTransitionsOff,
+        interaction: { mode: "index", intersect: false },
+        scales: {
+          x: { grid: { color: "rgba(51,65,85,0.3)" }, ticks: { color: "#94a3b8", maxRotation: 45 } },
+          y: {
+            grid: { color: "rgba(51,65,85,0.3)" },
+            ticks: {
+              color: "#94a3b8",
+              callback: function(v) {
+                if (v >= 0) return v + "%";
+                return Math.abs(v) + "x";
+              }
+            },
+            suggestedMin: -20,
+            suggestedMax: 50
+          }
+        },
+        plugins: {
+          legend: { labels: { color: "#cbd5e1" } },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                if (ctx.raw == null) return null;
+                if (ctx.datasetIndex === 1) return ctx.dataset.label + ": " + Math.abs(ctx.raw) + "x";
+                return ctx.dataset.label + ": " + ctx.raw + "%";
+              }
             }
           }
         }
       }
+    });
+  }
+
+  // ── Right chart: Quota Usage ──
+  var el2 = document.getElementById("c-budget-quota");
+  var h32 = document.getElementById("budget-quota-h3");
+  if (h32) h32.textContent = t("budgetQuotaTitle");
+  var blurb2 = document.getElementById("budget-quota-blurb");
+  if (blurb2) blurb2.textContent = t("budgetQuotaBlurb");
+
+  if (el2 && dailyTrend.length) {
+    var quota5hData = dailyTrend.map(function(d) { return d.quota_5h; });
+    var quota7dData = dailyTrend.map(function(d) { return d.quota_7d; });
+    var fallbackData = dailyTrend.map(function(d) { return d.fallback_pct; });
+    var hasQuota = quota5hData.some(function(v) { return v != null; });
+    var hasFallback = fallbackData.some(function(v) { return v != null; });
+
+    var qDatasets = [];
+    if (hasQuota) {
+      qDatasets.push({
+        label: t("budgetTrendQuota5h"),
+        data: quota5hData,
+        borderColor: "rgba(168,85,247,0.9)",
+        backgroundColor: "rgba(168,85,247,0.1)",
+        tension: 0.3,
+        fill: true,
+        pointRadius: 4,
+        pointStyle: "rectRounded",
+        borderWidth: 2,
+        spanGaps: true
+      });
+      qDatasets.push({
+        label: t("budgetTrendQuota7d"),
+        data: quota7dData,
+        borderColor: "rgba(236,72,153,0.8)",
+        backgroundColor: "transparent",
+        tension: 0.3,
+        fill: false,
+        borderDash: [6, 3],
+        pointRadius: 3,
+        pointStyle: "triangle",
+        borderWidth: 2,
+        spanGaps: true
+      });
     }
-  });
+    if (hasFallback) {
+      qDatasets.push({
+        label: t("budgetTrendFallback"),
+        data: fallbackData,
+        borderColor: "rgba(239,68,68,1)",
+        backgroundColor: "rgba(239,68,68,0.12)",
+        tension: 0,
+        fill: true,
+        pointRadius: 5,
+        pointStyle: "star",
+        borderWidth: 3,
+        spanGaps: true
+      });
+    }
+
+    if (qDatasets.length) {
+      _budgetCharts.quota = new Chart(el2, {
+        type: "line",
+        data: { labels: labels, datasets: qDatasets },
+        options: {
+          responsive: true,
+          animation: false,
+          transitions: __chartTransitionsOff,
+          interaction: { mode: "index", intersect: false },
+          scales: {
+            x: { grid: { color: "rgba(51,65,85,0.3)" }, ticks: { color: "#94a3b8", maxRotation: 45 } },
+            y: {
+              grid: { color: "rgba(51,65,85,0.3)" },
+              ticks: { color: "#a855f7", callback: function(v) { return v + "%"; } },
+              min: 0,
+              suggestedMax: 100
+            }
+          },
+          plugins: {
+            legend: { labels: { color: "#cbd5e1" } },
+            tooltip: {
+              callbacks: {
+                label: function(ctx) {
+                  if (ctx.raw == null) return null;
+                  return ctx.dataset.label + ": " + ctx.raw + "%";
+                }
+              }
+            }
+          }
+        }
+      });
+    } else {
+      el2.parentElement.style.display = "none";
+    }
+  }
 }
 
 // ── Proxy Analytics Panel ─────────────────────────────────────────────────
@@ -5903,7 +6094,51 @@ function computeKeyFindings(data) {
     }
   }
 
-  // 6. Peak Day
+  // 6. Fallback Budget (from proxy headers)
+  if (pd) {
+    var rl6 = pd.rate_limit || {};
+    var fb = rl6["anthropic-ratelimit-unified-fallback-percentage"];
+    if (fb != null) {
+      var fbPct = Math.round(parseFloat(fb) * 100);
+      findings.push({
+        icon: fbPct < 100 ? "red" : "green",
+        title: t("findingFallback"),
+        value: fbPct + "%",
+        detail: tr("findingFallbackDetail", { pct: fbPct })
+      });
+    }
+  }
+
+  // 7. Overage Policy (from proxy headers)
+  if (pd) {
+    var rl7 = pd.rate_limit || {};
+    var ovStatus = rl7["anthropic-ratelimit-unified-overage-status"];
+    var ovReason = rl7["anthropic-ratelimit-unified-overage-disabled-reason"];
+    if (ovStatus) {
+      findings.push({
+        icon: ovStatus === "rejected" ? "red" : "green",
+        title: t("findingOveragePolicy"),
+        value: ovStatus,
+        detail: ovReason ? tr("findingOveragePolicyDetail", { status: ovStatus, reason: ovReason }) : ovStatus
+      });
+    }
+  }
+
+  // 8. Binding Window (from proxy headers)
+  if (pd) {
+    var rl8 = pd.rate_limit || {};
+    var claim = rl8["anthropic-ratelimit-unified-representative-claim"];
+    if (claim) {
+      findings.push({
+        icon: claim === "five_hour" ? "yellow" : "green",
+        title: t("findingClaim"),
+        value: claim.replace(/_/g, " "),
+        detail: t("findingClaimDetail")
+      });
+    }
+  }
+
+  // 9. Peak Day
   if (peakDay) {
     findings.push({
       icon: peakTotal > 2e9 ? "red" : peakTotal > 500e6 ? "yellow" : "green",
@@ -5913,7 +6148,7 @@ function computeKeyFindings(data) {
     });
   }
 
-  // 7. Retries
+  // 10. Retries
   if (totalRetries > 0) {
     var rpd = Math.round(totalRetries / numDays);
     findings.push({
@@ -5924,7 +6159,7 @@ function computeKeyFindings(data) {
     });
   }
 
-  // 8. Cache paradox
+  // 11. Cache paradox
   if (pd && pd.cache_read_ratio > 0.9 && totalHits > 100) {
     findings.push({
       icon: "yellow",
@@ -5984,6 +6219,9 @@ function initFilterBar(data) {
   var days = data.days || [];
   if (!days.length) return;
 
+  // Filter bar title
+  var ftitle = document.getElementById('filter-bar-title');
+  if (ftitle) ftitle.textContent = t('filterBarTitle');
   // Date labels
   var dlabel = document.getElementById('filter-date-label');
   if (dlabel) dlabel.textContent = t('filterDateRange');
@@ -6102,6 +6340,30 @@ function initFilterBar(data) {
 function onFilterDateChange() {
   if (__lastUsageData) renderDashboard(__lastUsageData, true);
 }
+
+// ── Plan Selector ───────────────────────────────────────────────────────
+var __planLabels = { max5: "MAX 5", max20: "MAX 20", pro: "Pro", free: "Free", api: "API" };
+
+function getSelectedPlan() {
+  var sel = document.getElementById("plan-select");
+  return sel ? sel.value : (localStorage.getItem("cud_plan") || "max5");
+}
+
+function getSelectedPlanLabel() {
+  return __planLabels[getSelectedPlan()] || "MAX 5";
+}
+
+(function initPlanSelector() {
+  var saved = localStorage.getItem("cud_plan") || "max5";
+  var sel = document.getElementById("plan-select");
+  if (sel) {
+    sel.value = saved;
+    sel.addEventListener("change", function() {
+      localStorage.setItem("cud_plan", sel.value);
+      if (__lastUsageData) renderDashboard(__lastUsageData, true);
+    });
+  }
+})();
 
 function getFilterDateRange() {
   var s = document.getElementById('filter-date-start');
@@ -7198,7 +7460,9 @@ function inlineMd(s) {
         '<button id="dev-sync-btn" style="background:#f59e0b;color:#0f172a;border:none;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:.75rem;font-weight:600">Sync Now</button>' +
         '<span id="dev-sync-status" style="color:#64748b;font-size:.7rem"></span>';
       document.body.prepend(bar);
-      document.body.style.paddingTop = (bar.offsetHeight) + "px";
+      var devH = bar.offsetHeight;
+      document.body.style.paddingTop = devH + "px";
+      document.documentElement.style.setProperty("--dev-bar-h", devH + "px");
       document.getElementById("dev-sync-btn").addEventListener("click", function () {
         var st = document.getElementById("dev-sync-status");
         st.textContent = "syncing...";

@@ -16,6 +16,15 @@
 <button type="button" class="lang-btn" id="lang-en" data-lang="en" aria-pressed="false">EN</button>
 <button type="button" class="lang-btn" id="lang-ko" data-lang="ko" aria-pressed="false">KO</button>
 </div>
+<div class="plan-switch" id="plan-switch-wrap">
+<select id="plan-select" class="plan-select">
+<option value="max5">MAX 5</option>
+<option value="max20">MAX 20</option>
+<option value="pro">Pro</option>
+<option value="free">Free</option>
+<option value="api">API</option>
+</select>
+</div>
 <div class="live-pop" id="live-pop" tabindex="-1">
 <div class="refresh" id="live-trigger" tabindex="0" role="button" aria-expanded="false" aria-haspopup="true" aria-controls="live-files-panel" title="">
 <span id="live-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:6px;animation:pulse 2s infinite;vertical-align:middle"></span><span id="live-label">Live</span>
@@ -91,6 +100,7 @@
 </div>
 </header>
 <div class="filter-bar" id="filter-bar">
+<span class="filter-bar-title" id="filter-bar-title"></span>
 <div class="filter-group">
 <label class="filter-label" id="filter-date-label"></label>
 <select id="filter-date-start" class="filter-input filter-day-select"></select>
@@ -268,7 +278,11 @@
 </div>
 </summary>
 <div class="forensic-inner">
+<div id="budget-alert" class="budget-alert" style="display:none"></div>
+<div id="budget-fuel" class="budget-fuel" style="display:none"></div>
 <div class="grid" id="budget-cards"></div>
+<details class="budget-sub-details" open>
+<summary class="budget-sub-summary" id="budget-sankey-summary">Token Budget Breakdown</summary>
 <div class="charts full" id="budget-charts">
 <div class="chart-box">
 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -280,8 +294,10 @@
 <div id="c-budget-sankey"></div>
 </div>
 </div>
-<div class="charts full" id="budget-trend-row">
+</details>
+<div class="charts" id="budget-trend-row">
 <div class="chart-box"><h3 id="budget-trend-h3"></h3><p class="user-chart-blurb" id="budget-trend-blurb"></p><canvas id="c-budget-trend"></canvas></div>
+<div class="chart-box"><h3 id="budget-quota-h3"></h3><p class="user-chart-blurb" id="budget-quota-blurb"></p><canvas id="c-budget-quota"></canvas></div>
 </div>
 </div>
 </details>
