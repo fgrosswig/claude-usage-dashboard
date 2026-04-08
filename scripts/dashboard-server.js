@@ -3301,6 +3301,14 @@ var server = http.createServer(function (req, res) {
       refresh_sec: REFRESH_SEC,
       version: __appVersion
     }));
+  } else if (pathname === '/api/cache-reset' && req.method === 'POST') {
+    // Loescht Day-Cache + Today-Index und triggert Full-Rescan
+    try { fs.unlinkSync(USAGE_DAY_CACHE_FILE); } catch (e) {}
+    try { fs.unlinkSync(JSONL_TODAY_INDEX_FILE); } catch (e) {}
+    serviceLog.info('cache', 'cache-reset via /api/cache-reset — full rescan triggered');
+    runScanAndBroadcast();
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({ ok: true, message: 'Day cache deleted, full rescan started' }));
   } else if (pathname === '/api/proxy-usage') {
     if (!__proxyCache.data) refreshProxyCache();
     res.writeHead(200, {
@@ -3343,6 +3351,20 @@ server.listen(PORT, function () {
     // Dev full: fetch usage + proxy from remote, no local scan
     try { getDashboardHtml(); } catch (e) {}
     serviceLog.info('dev', 'DEV_MODE=full — all data from ' + __devSource);
+    if (process.env.CLAUDE_USAGE_NO_CACHE === '1') {
+      serviceLog.info('dev', '--no-cache: sending POST /api/cache-reset to ' + __devSource);
+      try {
+        var resetUrl = new URL('/api/cache-reset', __devSource);
+        var resetMod = resetUrl.protocol === 'https:' ? https : http;
+        var resetReq = resetMod.request(resetUrl, { method: 'POST', timeout: 10000 }, function(r) {
+          var b = '';
+          r.on('data', function(c) { b += c; });
+          r.on('end', function() { serviceLog.info('dev', 'remote cache-reset response: ' + r.statusCode + ' ' + b.slice(0, 200)); });
+        });
+        resetReq.on('error', function(e) { serviceLog.warn('dev', 'remote cache-reset failed: ' + (e.message || e)); });
+        resetReq.end();
+      } catch (e) { serviceLog.warn('dev', 'remote cache-reset error: ' + (e.message || e)); }
+    }
     devFetchRemoteUsage(function () { __devProxyPending = false; });
     setInterval(function () { devFetchRemoteUsage(function () {}); }, REFRESH_SEC * 1000);
   } else if (__devMode === 'proxy' && __devSource) {
