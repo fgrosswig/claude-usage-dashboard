@@ -1,0 +1,39 @@
+# Dev SonarQube Scan — manuell triggerbar, kein Build/Deploy
+# Prueft ob der aktuelle Branch das Quality Gate besteht
+when:
+  - event: manual
+
+labels:
+  platform: linux/amd64
+
+steps:
+  - name: sonar-scan
+    image: sonarsource/sonar-scanner-cli
+    commands:
+      - sonar-scanner -Dsonar.host.url=$SONAR_URL -Dsonar.token=$SONAR_TOKEN
+    environment:
+      SONAR_URL:
+        from_secret: sonar_url
+      SONAR_TOKEN:
+        from_secret: sonar_token
+
+  - name: quality-gate
+    image: alpine
+    commands:
+      - |
+        apk add --no-cache curl jq
+        echo "Waiting 10s for SonarQube to process analysis..."
+        sleep 10
+        STATUS=$(curl -sf -u "$SONAR_TOKEN:" "$SONAR_URL/api/qualitygates/project_status?projectKey=claude-usage-dashboard" | jq -r '.projectStatus.status')
+        echo "Quality Gate: $STATUS"
+        if [ "$STATUS" != "OK" ]; then
+          echo "FAILED: Quality Gate not passed."
+          curl -sf -u "$SONAR_TOKEN:" "$SONAR_URL/api/qualitygates/project_status?projectKey=claude-usage-dashboard" | jq '.projectStatus.conditions[] | select(.status != "OK")'
+          exit 1
+        fi
+        echo "Quality Gate passed."
+    environment:
+      SONAR_URL:
+        from_secret: sonar_url
+      SONAR_TOKEN:
+        from_secret: sonar_token

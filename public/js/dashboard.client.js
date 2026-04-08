@@ -9,16 +9,16 @@ function fmt(n) {
   return String(n);
 }
 function pct(a,b){return b>0?(a/b*100).toFixed(1)+"%":"-";}
-function escHtml(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function escHtml(s){return String(s==null?"":s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll("\"","&quot;");}
 /** Stunden mit Arbeit (tokens) ∪ Stunden mit JSONL-Session-Signalen, nach Log-Zeitstempel. */
 function unionWorkHourKeys(sd) {
   var m = {};
   var k;
   var ho = sd.hours || {};
   var hs = sd.hour_signals || {};
-  for (k in ho) if (Object.prototype.hasOwnProperty.call(ho, k)) m[k] = true;
-  for (k in hs) if (Object.prototype.hasOwnProperty.call(hs, k)) m[k] = true;
-  return Object.keys(m).map(function (x) { return parseInt(x, 10); }).filter(function (n) { return !isNaN(n) && n >= 0 && n <= 23; });
+  for (k in ho) if (Object.hasOwn(ho, k)) m[k] = true;
+  for (k in hs) if (Object.hasOwn(hs, k)) m[k] = true;
+  return Object.keys(m).map(function (x) { return Number.parseInt(x, 10); }).filter(function (n) { return !Number.isNaN(n) && n >= 0 && n <= 23; });
 }
 function hourSignalsAt(sd, wh) {
   var hs = sd.hour_signals || {};
@@ -31,15 +31,30 @@ function hourHasTokenUsage(sd, wh) {
 function outageSpanHitsAtHour(spans, wh) {
   var hitSrv = false;
   var hitCli = false;
-  for (var oi = 0; oi < spans.length; oi++) {
-    if (wh >= Math.floor(spans[oi].from) && wh < Math.ceil(spans[oi].to)) {
-      if (spans[oi].kind === "server") hitSrv = true;
+  for (const span of spans) {
+    if (wh >= Math.floor(span.from) && wh < Math.ceil(span.to)) {
+      if (span.kind === "server") hitSrv = true;
       else hitCli = true;
     }
   }
   return { hitSrv: hitSrv, hitCli: hitCli };
 }
 /** Balken: nur Stunden mit echtem Token-Output zählen als betroffen/sauber (kein Aufblasen durch reine Session-Signale). */
+function classifyWorkHour(sd, spans, wh) {
+  var hasW = hourHasTokenUsage(sd, wh);
+  var hit = outageSpanHitsAtHour(spans, wh);
+  var sig = hourSignalsAt(sd, wh);
+  var ryH = sig.retry || 0;
+  var riH = sig.interrupt || 0;
+  if (hit.hitSrv && hasW) return "srv";
+  if (hit.hitCli && hasW) return "cli";
+  if (!hit.hitSrv && !hit.hitCli) {
+    if (hasW && ryH > 0) return "srv";
+    if (hasW && riH > 0) return "cli";
+    if (hasW) return "clean";
+  }
+  return "none";
+}
 function sumServiceImpactForDay(sd) {
   var wHrs = unionWorkHourKeys(sd);
   wHrs.sort(function (a, b) { return a - b; });
@@ -47,23 +62,14 @@ function sumServiceImpactForDay(sd) {
   var affSrv = 0;
   var affCli = 0;
   var cleanCount = 0;
-  for (var wi = 0; wi < wHrs.length; wi++) {
-    var wh = wHrs[wi];
-    var hasW = hourHasTokenUsage(sd, wh);
-    var hit = outageSpanHitsAtHour(spans, wh);
-    var sig = hourSignalsAt(sd, wh);
-    var ryH = sig.retry || 0;
-    var riH = sig.interrupt || 0;
-    if (hit.hitSrv && hasW) affSrv++;
-    else if (hit.hitCli && hasW) affCli++;
-    else if (!hit.hitSrv && !hit.hitCli) {
-      if (hasW && ryH > 0) affSrv++;
-      else if (hasW && riH > 0) affCli++;
-      else if (hasW) cleanCount++;
-    }
+  for (const wh of wHrs) {
+    var cls = classifyWorkHour(sd, spans, wh);
+    if (cls === "srv") affSrv++;
+    else if (cls === "cli") affCli++;
+    else if (cls === "clean") cleanCount++;
   }
   var outTotal = 0;
-  for (var oj = 0; oj < spans.length; oj++) outTotal += spans[oj].to - spans[oj].from;
+  for (const span of spans) outTotal += span.to - span.from;
   var outOnly = Math.max(0, Math.round((outTotal - affSrv - affCli) * 10) / 10);
   return { cleanWork: cleanCount, affSrv: affSrv, affCli: affCli, outOnly: outOnly };
 }
@@ -71,6 +77,18 @@ function sumServiceImpactForDay(sd) {
  *  Ausfallstunden als Balken: Höhe skaliert (Stunden vs. JSONL-Zähler), Tooltip zeigt echte h. Reihenfolge im Stack
  *  unten→oben = continue, resume, retry, interrupt, Ausfall (oben), damit Ausfall nicht unter großen Interrupt-Anteilen liegt.
  *  @param {string} [hostLabel] — wenn gesetzt: Signale + Cache Read nur aus days[].hosts[hostLabel]; outage_hours weiter Kalendertag (Anthropic). */
+function extractDaySignals(d, hostKey) {
+  if (hostKey) {
+    var H = d?.hosts?.[hostKey];
+    if (H) {
+      var sH = H.session_signals || {};
+      return { cont: sH.continue || 0, res: sH.resume || 0, retry: sH.retry || 0, intr: sH.interrupt || 0, cacheRead: H.cache_read != null ? Number(H.cache_read) || 0 : 0 };
+    }
+    return { cont: 0, res: 0, retry: 0, intr: 0, cacheRead: 0 };
+  }
+  var s = (d && d.session_signals) || {};
+  return { cont: s.continue || 0, res: s.resume || 0, retry: s.retry || 0, intr: s.interrupt || 0, cacheRead: d && d.cache_read != null ? Number(d.cache_read) || 0 : 0 };
+}
 function buildSessionSignalsStackedByDay(days, hostLabel) {
   var hostKey = hostLabel && String(hostLabel).trim() ? String(hostLabel).trim() : "";
   var cont = [];
@@ -79,34 +97,15 @@ function buildSessionSignalsStackedByDay(days, hostLabel) {
   var intr = [];
   var outageH = [];
   var cacheRead = [];
-  for (var di = 0; di < days.length; di++) {
-    var d = days[di];
-    var oh = d && d.outage_hours;
-    outageH.push(oh != null && !isNaN(Number(oh)) ? Number(oh) : 0);
-    if (hostKey) {
-      var H = d && d.hosts && d.hosts[hostKey];
-      if (H) {
-        var sH = H.session_signals || {};
-        cont.push(sH.continue || 0);
-        res.push(sH.resume || 0);
-        retry.push(sH.retry || 0);
-        intr.push(sH.interrupt || 0);
-        cacheRead.push(H.cache_read != null ? Number(H.cache_read) || 0 : 0);
-      } else {
-        cont.push(0);
-        res.push(0);
-        retry.push(0);
-        intr.push(0);
-        cacheRead.push(0);
-      }
-      continue;
-    }
-    var s = (d && d.session_signals) || {};
-    cont.push(s.continue || 0);
-    res.push(s.resume || 0);
-    retry.push(s.retry || 0);
-    intr.push(s.interrupt || 0);
-    cacheRead.push(d && d.cache_read != null ? Number(d.cache_read) || 0 : 0);
+  for (const d of days) {
+    var oh = d?.outage_hours;
+    outageH.push(oh != null && !Number.isNaN(Number(oh)) ? Number(oh) : 0);
+    var sig = extractDaySignals(d, hostKey);
+    cont.push(sig.cont);
+    res.push(sig.res);
+    retry.push(sig.retry);
+    intr.push(sig.intr);
+    cacheRead.push(sig.cacheRead);
   }
   var maxSig = 0;
   for (var si = 0; si < cont.length; si++) {
@@ -3847,7 +3846,7 @@ var __versionHealthMetrics = [
 function semverCmpDesc(a, b) {
   var pa = a.split(".").map(Number);
   var pb = b.split(".").map(Number);
-  for (var i = 0; i < 3; i++) {
+  for (const i of [0, 1, 2]) {
     var da = pa[i] || 0, db = pb[i] || 0;
     if (da !== db) return db - da;
   }
@@ -3856,17 +3855,14 @@ function semverCmpDesc(a, b) {
 
 function aggregateVersionStats(days) {
   var merged = {};
-  for (var di = 0; di < days.length; di++) {
-    var vs = days[di].version_stats || {};
-    var vk = Object.keys(vs);
-    for (var vi = 0; vi < vk.length; vi++) {
-      var ver = vk[vi];
+  for (const day of days) {
+    var vs = day.version_stats || {};
+    for (const ver of Object.keys(vs)) {
       if (!merged[ver]) merged[ver] = { calls: 0, output: 0, cache_read: 0, hit_limit: 0, retry: 0, interrupt: 0, continue: 0, resume: 0, truncated: 0, api_error: 0 };
       var src = vs[ver];
       var tgt = merged[ver];
-      var fk = Object.keys(src);
-      for (var fi = 0; fi < fk.length; fi++) {
-        tgt[fk[fi]] = (tgt[fk[fi]] || 0) + (src[fk[fi]] || 0);
+      for (const fk of Object.keys(src)) {
+        tgt[fk] = (tgt[fk] || 0) + (src[fk] || 0);
       }
     }
   }
@@ -3892,28 +3888,43 @@ function sortVersionKeys(keys, stats, mode) {
 
 var __userFilterDdOpen = false;
 
-function initUserVersionControls(stats, days) {
+function initVersionSortDropdown(days) {
   var sortEl = document.getElementById("user-version-sort");
-  if (sortEl && !sortEl.options.length) {
-    var opts = [
-      { val: "anomalies", lbl: t("userSortAnomalies") },
-      { val: "newest", lbl: t("userSortNewest") },
-      { val: "calls", lbl: t("userSortCalls") }
-    ];
-    for (var oi = 0; oi < opts.length; oi++) {
-      var o = document.createElement("option");
-      o.value = opts[oi].val;
-      o.textContent = opts[oi].lbl;
-      if (opts[oi].val === __userVersionSort) o.selected = true;
-      sortEl.appendChild(o);
-    }
-    sortEl.addEventListener("change", function() {
-      __userVersionSort = sortEl.value;
-      renderUserProfileCharts(days);
-    });
+  if (!sortEl || sortEl.options.length) return;
+  var opts = [
+    { val: "anomalies", lbl: t("userSortAnomalies") },
+    { val: "newest", lbl: t("userSortNewest") },
+    { val: "calls", lbl: t("userSortCalls") }
+  ];
+  for (const opt of opts) {
+    var o = document.createElement("option");
+    o.value = opt.val;
+    o.textContent = opt.lbl;
+    if (opt.val === __userVersionSort) o.selected = true;
+    sortEl.appendChild(o);
   }
+  sortEl.addEventListener("change", function() {
+    __userVersionSort = sortEl.value;
+    renderUserProfileCharts(days);
+  });
+}
 
-  // Checkbox dropdown filter
+function buildFilterCheckboxHtml(allVers, stats) {
+  var html = "";
+  for (const v of allVers) {
+    var checked = !__userVersionFilter.length || __userVersionFilter.includes(v);
+    var anomalies = versionAnomalyTotal(stats[v]);
+    var calls = stats[v] ? stats[v].calls || 0 : 0;
+    var badge = anomalies > 0 ? " (" + anomalies + "!)" : calls > 0 ? " (" + calls + ")" : "";
+    html += '<label><input type="checkbox" value="' + v + '"' + (checked ? ' checked' : '') + '>' + v + '<span style="color:#64748b;font-size:.65rem">' + badge + '</span></label>';
+  }
+  html += '<div class="user-filter-actions"><button id="user-ver-all">Alle</button><button id="user-ver-none">Keine</button></div>';
+  return html;
+}
+
+function initUserVersionControls(stats, days) {
+  initVersionSortDropdown(days);
+
   var btn = document.getElementById("user-version-filter-btn");
   var dd = document.getElementById("user-version-filter-dd");
   var countEl = document.getElementById("user-version-filter-count");
@@ -3921,34 +3932,20 @@ function initUserVersionControls(stats, days) {
 
   var allVers = Object.keys(stats).sort(semverCmpDesc);
 
-  // Update count badge
   function updateCount() {
     var n = __userVersionFilter.length;
-    countEl.textContent = n ? "(" + n + "/" + allVers.length + ")" : "(" + allVers.length + ")";
+    if (countEl) countEl.textContent = n ? "(" + n + "/" + allVers.length + ")" : "(" + allVers.length + ")";
   }
 
-  // Build checkbox list
-  var html = "";
-  for (var fi = 0; fi < allVers.length; fi++) {
-    var v = allVers[fi];
-    var checked = !__userVersionFilter.length || __userVersionFilter.indexOf(v) >= 0;
-    var anomalies = versionAnomalyTotal(stats[v]);
-    var calls = stats[v] ? stats[v].calls || 0 : 0;
-    var badge = anomalies > 0 ? " (" + anomalies + "!)" : calls > 0 ? " (" + calls + ")" : "";
-    html += '<label><input type="checkbox" value="' + v + '"' + (checked ? ' checked' : '') + '>' + v + '<span style="color:#64748b;font-size:.65rem">' + badge + '</span></label>';
-  }
-  html += '<div class="user-filter-actions"><button id="user-ver-all">Alle</button><button id="user-ver-none">Keine</button></div>';
-  dd.innerHTML = html;
+  dd.innerHTML = buildFilterCheckboxHtml(allVers, stats);
   updateCount();
 
-  // Toggle dropdown
   btn.onclick = function(e) {
     e.stopPropagation();
     __userFilterDdOpen = !__userFilterDdOpen;
     dd.classList.toggle("open", __userFilterDdOpen);
   };
 
-  // Close on outside click
   document.addEventListener("click", function(e) {
     if (__userFilterDdOpen && !dd.contains(e.target) && e.target !== btn) {
       __userFilterDdOpen = false;
@@ -3956,32 +3953,80 @@ function initUserVersionControls(stats, days) {
     }
   });
 
-  // Checkbox changes
   var cbs = dd.querySelectorAll('input[type=checkbox]');
   function applyFilter() {
     var sel = [];
-    for (var ci = 0; ci < cbs.length; ci++) {
-      if (cbs[ci].checked) sel.push(cbs[ci].value);
+    for (const cb of cbs) {
+      if (cb.checked) sel.push(cb.value);
     }
     __userVersionFilter = sel.length === allVers.length ? [] : sel;
     updateCount();
     renderUserProfileCharts(days);
   }
-  for (var ci = 0; ci < cbs.length; ci++) {
-    cbs[ci].addEventListener("change", applyFilter);
+  for (const cb of cbs) {
+    cb.addEventListener("change", applyFilter);
   }
 
-  // All / None buttons
   var allBtn = document.getElementById("user-ver-all");
   var noneBtn = document.getElementById("user-ver-none");
   if (allBtn) allBtn.onclick = function() {
-    for (var ai = 0; ai < cbs.length; ai++) cbs[ai].checked = true;
+    for (const cb of cbs) cb.checked = true;
     applyFilter();
   };
   if (noneBtn) noneBtn.onclick = function() {
-    for (var ni = 0; ni < cbs.length; ni++) cbs[ni].checked = false;
+    for (const cb of cbs) cb.checked = false;
     applyFilter();
   };
+}
+
+function collectAllVersionKeys(stats, days) {
+  var allVers = Object.keys(stats);
+  if (allVers.length) return allVers;
+  var fallbackVers = {};
+  for (const day of days) {
+    for (const fk of Object.keys(day.versions || {})) fallbackVers[fk] = true;
+  }
+  return Object.keys(fallbackVers);
+}
+
+function findLatestDayTopEntries(days) {
+  var topVersion = "";
+  var topVersionCount = 0;
+  var topEntrypoint = "";
+  var topEpCount = 0;
+  for (var ldi = days.length - 1; ldi >= 0; ldi--) {
+    var ld = days[ldi];
+    var ldv = ld.versions || {};
+    if (Object.keys(ldv).length) {
+      for (const vk of Object.keys(ldv)) {
+        if (ldv[vk] > topVersionCount) { topVersion = vk; topVersionCount = ldv[vk]; }
+      }
+      var lde = ld.entrypoints || {};
+      for (const ek of Object.keys(lde)) {
+        if (lde[ek] > topEpCount) { topEntrypoint = ek; topEpCount = lde[ek]; }
+      }
+      break;
+    }
+  }
+  return { topVersion: topVersion, topEntrypoint: topEntrypoint };
+}
+
+function computeAnomalyStats(allVers, stats) {
+  var totalCalls = 0;
+  var totalAnomalies = 0;
+  var worstVer = "";
+  var worstAnomaly = 0;
+  for (const ver of allVers) {
+    var sv = stats[ver];
+    if (sv) {
+      totalCalls += sv.calls || 0;
+      totalAnomalies += versionAnomalyTotal(sv);
+      var wa = versionAnomalyTotal(sv);
+      if (wa > worstAnomaly) { worstAnomaly = wa; worstVer = ver; }
+    }
+  }
+  var anomalyRate = totalCalls > 0 ? Math.round(totalAnomalies / totalCalls * 100) : 0;
+  return { totalCalls: totalCalls, totalAnomalies: totalAnomalies, anomalyRate: anomalyRate, worstVer: worstVer, worstAnomaly: worstAnomaly };
 }
 
 function renderUserProfileCharts(days) {
@@ -3993,83 +4038,27 @@ function renderUserProfileCharts(days) {
     return;
   }
 
-  // Aggregate version_stats across all filtered days
   var stats = aggregateVersionStats(days);
-  var allVers = Object.keys(stats);
-  if (!allVers.length) {
-    // Fallback: use versions counter if version_stats not yet populated
-    var fallbackVers = {};
-    for (var fdi = 0; fdi < days.length; fdi++) {
-      var fv = days[fdi].versions || {};
-      var fvk = Object.keys(fv);
-      for (var fvi = 0; fvi < fvk.length; fvi++) fallbackVers[fvk[fvi]] = true;
-    }
-    allVers = Object.keys(fallbackVers);
-  }
+  var allVers = collectAllVersionKeys(stats, days);
 
-  // Collect entrypoints
   var allEntrypoints = {};
-  for (var dei = 0; dei < days.length; dei++) {
-    var de = days[dei].entrypoints || {};
-    var dek = Object.keys(de);
-    for (var deki = 0; deki < dek.length; deki++) allEntrypoints[dek[deki]] = true;
+  for (const day of days) {
+    for (const ek of Object.keys(day.entrypoints || {})) allEntrypoints[ek] = true;
   }
-  var entrypointKeys = Object.keys(allEntrypoints).sort();
+  var entrypointKeys = Object.keys(allEntrypoints).sort(function(a, b) { return a.localeCompare(b); });
 
-  // Find latest day with actual data (skip days with 0 calls)
-  var topVersion = "";
-  var topVersionCount = 0;
-  var topEntrypoint = "";
-  var topEpCount = 0;
-  for (var ldi = days.length - 1; ldi >= 0; ldi--) {
-    var ld = days[ldi];
-    var ldv = ld.versions || {};
-    if (Object.keys(ldv).length) {
-      var ldvk = Object.keys(ldv);
-      for (var tvi = 0; tvi < ldvk.length; tvi++) {
-        if (ldv[ldvk[tvi]] > topVersionCount) { topVersion = ldvk[tvi]; topVersionCount = ldv[ldvk[tvi]]; }
-      }
-      var lde = ld.entrypoints || {};
-      var ldek = Object.keys(lde);
-      for (var tei = 0; tei < ldek.length; tei++) {
-        if (lde[ldek[tei]] > topEpCount) { topEntrypoint = ldek[tei]; topEpCount = lde[ldek[tei]]; }
-      }
-      break;
-    }
-  }
-
-  // Anomaly rate
-  var totalCalls = 0;
-  var totalAnomalies = 0;
-  for (var ai = 0; ai < allVers.length; ai++) {
-    var sv = stats[allVers[ai]];
-    if (sv) {
-      totalCalls += sv.calls || 0;
-      totalAnomalies += versionAnomalyTotal(sv);
-    }
-  }
-  var anomalyRate = totalCalls > 0 ? Math.round(totalAnomalies / totalCalls * 100) : 0;
-
-  // Worst version
-  var worstVer = "";
-  var worstAnomaly = 0;
-  for (var wi = 0; wi < allVers.length; wi++) {
-    var wv = stats[allVers[wi]];
-    if (wv) {
-      var wa = versionAnomalyTotal(wv);
-      if (wa > worstAnomaly) { worstAnomaly = wa; worstVer = allVers[wi]; }
-    }
-  }
+  var top = findLatestDayTopEntries(days);
+  var anom = computeAnomalyStats(allVers, stats);
 
   sumEl.textContent = t("userProfileSummary")
-    .replace("{version}", topVersion || "?")
-    .replace("{entrypoint}", topEntrypoint || "?")
+    .replace("{version}", top.topVersion || "?")
+    .replace("{entrypoint}", top.topEntrypoint || "?")
     .replace("{verCount}", String(allVers.length))
-    .replace("{rate}", String(anomalyRate))
-    .replace("{anomalies}", String(totalAnomalies))
-    .replace("{calls}", String(totalCalls))
-    .replace("{worst}", worstVer || "-")
-    .replace("{worstCount}", String(worstAnomaly));
+    .replace("{rate}", String(anom.anomalyRate))
+    .replace("{anomalies}", String(anom.totalAnomalies))
+    .replace("{calls}", String(anom.totalCalls))
+    .replace("{worst}", anom.worstVer || "-")
+    .replace("{worstCount}", String(anom.worstAnomaly));
 
   // Init sort/filter controls
   initUserVersionControls(stats, days);
@@ -4083,16 +4072,15 @@ function renderUserProfileCharts(days) {
 
     // Sort + filter
     var filteredVers = __userVersionFilter.length
-      ? allVers.filter(function(v) { return __userVersionFilter.indexOf(v) >= 0; })
+      ? allVers.filter(function(v) { return __userVersionFilter.includes(v); })
       : allVers;
     var sortedVers = sortVersionKeys(filteredVers, stats, __userVersionSort);
 
     var datasets = [];
-    for (var mi = 0; mi < __versionHealthMetrics.length; mi++) {
-      var m = __versionHealthMetrics[mi];
+    for (const m of __versionHealthMetrics) {
       var mData = [];
-      for (var mvi = 0; mvi < sortedVers.length; mvi++) {
-        var sv2 = stats[sortedVers[mvi]];
+      for (const sv of sortedVers) {
+        var sv2 = stats[sv];
         mData.push(sv2 ? (sv2[m.key] || 0) : 0);
       }
       datasets.push({
@@ -4142,14 +4130,13 @@ function renderUserProfileCharts(days) {
 
     // Collect all entrypoint keys across versions
     var allEp = {};
-    for (var epi = 0; epi < sortedVers.length; epi++) {
-      var evs = stats[sortedVers[epi]];
-      if (evs && evs.entrypoints) {
-        var epk = Object.keys(evs.entrypoints);
-        for (var epki = 0; epki < epk.length; epki++) allEp[epk[epki]] = true;
+    for (const sv of sortedVers) {
+      var evs = stats[sv];
+      if (evs?.entrypoints) {
+        for (const epk of Object.keys(evs.entrypoints)) allEp[epk] = true;
       }
     }
-    var epKeys = Object.keys(allEp).sort();
+    var epKeys = Object.keys(allEp).sort(function(a, b) { return a.localeCompare(b); });
 
     var epColors = {
       "claude-vscode": "rgba(59,130,246,0.8)",
@@ -4160,9 +4147,9 @@ function renderUserProfileCharts(days) {
     for (var edi = 0; edi < epKeys.length; edi++) {
       var eKey = epKeys[edi];
       var eData = [];
-      for (var edd = 0; edd < sortedVers.length; edd++) {
-        var evs2 = stats[sortedVers[edd]];
-        eData.push(evs2 && evs2.entrypoints ? (evs2.entrypoints[eKey] || 0) : 0);
+      for (const sv of sortedVers) {
+        var evs2 = stats[sv];
+        eData.push(evs2?.entrypoints ? (evs2.entrypoints[eKey] || 0) : 0);
       }
       epDatasets.push({
         label: eKey,

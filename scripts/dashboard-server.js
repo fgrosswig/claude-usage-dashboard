@@ -1513,7 +1513,7 @@ function classifyJsonlSessionSignals(line, rec) {
     add('truncated');
   }
   // API error (system records with subtype api_error or error field)
-  if (rec && rec.type === 'system' && rec.subtype === 'api_error') {
+  if (rec?.type === 'system' && rec?.subtype === 'api_error') {
     add('api_error');
   }
   return tags;
@@ -1647,27 +1647,24 @@ function mergeDayBucketInto(target, src) {
     var v = vk[vi];
     target.versions[v] = (target.versions[v] || 0) + (src.versions[v] || 0);
   }
-  var ek = Object.keys(src.entrypoints || {});
-  for (var ei = 0; ei < ek.length; ei++) {
-    var e = ek[ei];
+  for (var e of Object.keys(src.entrypoints || {})) {
     target.entrypoints[e] = (target.entrypoints[e] || 0) + (src.entrypoints[e] || 0);
   }
-  var vsk = Object.keys(src.version_stats || {});
-  for (var vsi = 0; vsi < vsk.length; vsi++) {
-    var vsKey = vsk[vsi];
-    if (!target.version_stats) target.version_stats = {};
+  mergeVersionStatsInto(target, src.version_stats);
+}
+
+function mergeVersionStatsInto(target, srcVersionStats) {
+  if (!srcVersionStats) return;
+  if (!target.version_stats) target.version_stats = {};
+  for (var vsKey of Object.keys(srcVersionStats)) {
     if (!target.version_stats[vsKey]) target.version_stats[vsKey] = emptyVersionStats();
     var tgt = target.version_stats[vsKey];
-    var srcVs = src.version_stats[vsKey];
-    var vsFields = Object.keys(srcVs);
-    for (var vsfi = 0; vsfi < vsFields.length; vsfi++) {
-      var f = vsFields[vsfi];
+    var srcVs = srcVersionStats[vsKey];
+    for (var f of Object.keys(srcVs)) {
       if (f === 'entrypoints') {
         if (!tgt.entrypoints) tgt.entrypoints = {};
-        var sep = srcVs.entrypoints || {};
-        var sepk = Object.keys(sep);
-        for (var sepi = 0; sepi < sepk.length; sepi++) {
-          tgt.entrypoints[sepk[sepi]] = (tgt.entrypoints[sepk[sepi]] || 0) + (sep[sepk[sepi]] || 0);
+        for (var ek of Object.keys(srcVs.entrypoints || {})) {
+          tgt.entrypoints[ek] = (tgt.entrypoints[ek] || 0) + (srcVs.entrypoints[ek] || 0);
         }
       } else {
         tgt[f] = (tgt[f] || 0) + (srcVs[f] || 0);
@@ -1840,8 +1837,7 @@ function processJsonlFile(fileRef, daily, onlyDate, isolateTodayFrag, fileTodayF
               if (!dSig.version_stats) dSig.version_stats = {};
               if (!dSig.version_stats[sigVer]) dSig.version_stats[sigVer] = emptyVersionStats();
               var svs = dSig.version_stats[sigVer];
-              for (var sti = 0; sti < sigTags.length; sti++) {
-                var st = sigTags[sti];
+              for (var st of sigTags) {
                 if (svs[st] != null) svs[st]++;
               }
             }
