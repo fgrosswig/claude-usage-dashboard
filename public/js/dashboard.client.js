@@ -4423,8 +4423,25 @@ function renderBudgetEfficiency(data) {
     if (lastPd.visible_tokens_per_pct) quota.visible_tokens_per_pct = lastPd.visible_tokens_per_pct;
   }
 
-  // Waterfall Chart
-  renderBudgetWaterfall(tot, quota);
+  // Aggregate per-host totals for Sankey worker nodes
+  var hostTotals = {};
+  for (var hi2 = 0; hi2 < days.length; hi2++) {
+    var dh = days[hi2].hosts || {};
+    var hk2 = Object.keys(dh);
+    for (var hj = 0; hj < hk2.length; hj++) {
+      var hl = hk2[hj];
+      var hv = dh[hl];
+      if (!hostTotals[hl]) hostTotals[hl] = { output: 0, input: 0, cache_read: 0, cache_creation: 0, total: 0 };
+      hostTotals[hl].output += hv.output || 0;
+      hostTotals[hl].input += hv.input || 0;
+      hostTotals[hl].cache_read += hv.cache_read || 0;
+      hostTotals[hl].cache_creation += hv.cache_creation || 0;
+      hostTotals[hl].total += hv.total || (hv.output || 0) + (hv.input || 0) + (hv.cache_read || 0) + (hv.cache_creation || 0);
+    }
+  }
+
+  // Waterfall Chart — pass hostTotals via data bag
+  renderBudgetWaterfall(tot, quota, hostTotals);
 
   // Trend Chart — merge proxy quota history into daily trend
   var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
@@ -4511,7 +4528,7 @@ function __buildBudgetSwitches() {
       btn.addEventListener("click", (function(k) {
         return function() {
           setter(k);
-          if (__budgetSankeyState) renderBudgetWaterfall(__budgetSankeyState.tot, __budgetSankeyState.quota);
+          if (__budgetSankeyState) renderBudgetWaterfall(__budgetSankeyState.tot, __budgetSankeyState.quota, __budgetSankeyState.hostTotals);
         };
       })(modes[i].key));
       el.appendChild(btn);
@@ -4535,8 +4552,8 @@ function __updateBudgetSwitchActive() {
   }
 }
 
-function renderBudgetWaterfall(tot, quota) {
-  __budgetSankeyState = { tot: tot, quota: quota };
+function renderBudgetWaterfall(tot, quota, hostTotals) {
+  __budgetSankeyState = { tot: tot, quota: quota, hostTotals: hostTotals || {} };
   __buildBudgetSwitches();
   __updateBudgetSwitchActive();
 
@@ -4548,7 +4565,7 @@ function renderBudgetWaterfall(tot, quota) {
 
   if (!__googleChartsReady || !window.google || !window.google.visualization) {
     el.innerHTML = "<div style='text-align:center;padding:2rem;color:#94a3b8'>Loading Google Charts...</div>";
-    setTimeout(function() { if (__budgetSankeyState) renderBudgetWaterfall(tot, quota); }, 500);
+    setTimeout(function() { if (__budgetSankeyState) renderBudgetWaterfall(__budgetSankeyState.tot, __budgetSankeyState.quota, __budgetSankeyState.hostTotals); }, 500);
     return;
   }
 
@@ -4590,14 +4607,43 @@ function renderBudgetWaterfall(tot, quota) {
   // Use equal weights for visual balance, real values in labels
   var w = 1;
 
+  // Aggregate per-host data for worker nodes
+  var hostKeys = Object.keys(hostTotals || {}).sort();
+
   if (__budgetFlowMode === "budget") {
-    var srcN = __budgetFilteredHost || "MAX5 Budget";
+    var srcN = "MAX5 Budget";
     var prodN = t("budgetWfProductive") + " (" + fmtTok(raw.out) + ")";
     var overN = t("budgetWfOverhead") + " (" + fmtTok(raw.inp + raw.cr + raw.cc) + ")";
-    if (src.out > 0) { rows.push([srcN, nOut, w]); rows.push([nOut, prodN, w]); }
-    if (src.inp > 0) { rows.push([srcN, nInp, w]); rows.push([nInp, overN, w]); }
-    if (src.cr > 0)  { rows.push([srcN, nCr,  w]); rows.push([nCr,  overN, w]); }
-    if (src.cc > 0)  { rows.push([srcN, nCc,  w]); rows.push([nCc,  overN, w]); }
+
+    if (hostKeys.length > 1) {
+      // MAX5 → Workers → Token Types → Productive/Overhead
+      for (var hi = 0; hi < hostKeys.length; hi++) {
+        var hk = hostKeys[hi];
+        var hd = hostTotals[hk];
+        var hLabel = hk + " (" + fmtTok(hd.total) + ")";
+        rows.push([srcN, hLabel, w]);
+        var hsrc = isCost ? {
+          out: hd.output * __quotaWeights.output,
+          inp: hd.input * __quotaWeights.input,
+          cr: hd.cache_read * __quotaWeights.cache_read,
+          cc: hd.cache_creation * __quotaWeights.cache_creation
+        } : { out: hd.output, inp: hd.input, cr: hd.cache_read, cc: hd.cache_creation };
+        if (hsrc.out > 0) rows.push([hLabel, nOut, w]);
+        if (hsrc.inp > 0) rows.push([hLabel, nInp, w]);
+        if (hsrc.cr > 0)  rows.push([hLabel, nCr,  w]);
+        if (hsrc.cc > 0)  rows.push([hLabel, nCc,  w]);
+      }
+    } else {
+      // Single host: MAX5 → Token Types directly
+      if (src.out > 0) rows.push([srcN, nOut, w]);
+      if (src.inp > 0) rows.push([srcN, nInp, w]);
+      if (src.cr > 0)  rows.push([srcN, nCr,  w]);
+      if (src.cc > 0)  rows.push([srcN, nCc,  w]);
+    }
+    if (src.out > 0) rows.push([nOut, prodN, w]);
+    if (src.inp > 0) rows.push([nInp, overN, w]);
+    if (src.cr > 0)  rows.push([nCr,  overN, w]);
+    if (src.cc > 0)  rows.push([nCc,  overN, w]);
   } else if (__budgetFlowMode === "api") {
     var apiN = "Claude API";
     var youN = t("budgetWfYou") + " (" + fmtTok(totalVal) + ")";
@@ -4632,7 +4678,7 @@ function renderBudgetWaterfall(tot, quota) {
     height: Math.max(250, rows.length * 16),
     sankey: {
       node: {
-        label: { fontSize: 11, bold: true, color: "#1e293b" },
+        label: { fontSize: 11, bold: true, color: "#e2e8f0" },
         nodePadding: 14,
         width: 18,
         colors: ["#94a3b8", "#22c55e", "#3b82f6", "#22d3ee", "#f59e0b", "#f87171", "#a855f7", "#8b5cf6"]
