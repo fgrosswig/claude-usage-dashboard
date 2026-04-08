@@ -1511,7 +1511,15 @@ function classifyJsonlSessionSignals(line, rec) {
   if (/["']is_truncated["']\s*:\s*true|["']truncated["']\s*:\s*true/.test(line)) {
     add('truncated');
   }
+  // API error (system records with subtype api_error or error field)
+  if (rec && rec.type === 'system' && rec.subtype === 'api_error') {
+    add('api_error');
+  }
   return tags;
+}
+
+function emptyVersionStats() {
+  return { calls: 0, output: 0, cache_read: 0, hit_limit: 0, retry: 0, interrupt: 0, continue: 0, resume: 0, truncated: 0, api_error: 0 };
 }
 
 function emptyHostSlice() {
@@ -1547,6 +1555,7 @@ function emptyDailyBucket() {
     models: {},
     versions: {},
     entrypoints: {},
+    version_stats: {},
     hit_limit: 0,
     hosts: {},
     session_signals: emptySessionSignals(),
@@ -1641,6 +1650,19 @@ function mergeDayBucketInto(target, src) {
   for (var ei = 0; ei < ek.length; ei++) {
     var e = ek[ei];
     target.entrypoints[e] = (target.entrypoints[e] || 0) + (src.entrypoints[e] || 0);
+  }
+  var vsk = Object.keys(src.version_stats || {});
+  for (var vsi = 0; vsi < vsk.length; vsi++) {
+    var vsKey = vsk[vsi];
+    if (!target.version_stats) target.version_stats = {};
+    if (!target.version_stats[vsKey]) target.version_stats[vsKey] = emptyVersionStats();
+    var tgt = target.version_stats[vsKey];
+    var srcVs = src.version_stats[vsKey];
+    var vsFields = Object.keys(srcVs);
+    for (var vsfi = 0; vsfi < vsFields.length; vsfi++) {
+      var f = vsFields[vsfi];
+      tgt[f] = (tgt[f] || 0) + (srcVs[f] || 0);
+    }
   }
 }
 
@@ -1742,6 +1764,7 @@ function rowToDailyEntry(row) {
     models: row.models && typeof row.models === 'object' ? row.models : {},
     versions: versNorm,
     entrypoints: row.entrypoints && typeof row.entrypoints === 'object' ? row.entrypoints : {},
+    version_stats: row.version_stats && typeof row.version_stats === 'object' ? row.version_stats : {},
     hit_limit: row.hit_limit || 0,
     hosts: hosts,
     session_signals: sigRow,
@@ -1802,6 +1825,16 @@ function processJsonlFile(fileRef, daily, onlyDate, isolateTodayFrag, fileTodayF
           if (sigTags.length) {
             var dSig = targetDayBucket(daily, daySig, onlyDate, isolateTodayFrag);
             bumpSessionSignals(dSig, sigTags);
+            var sigVer = extractCliVersion(rec);
+            if (sigVer) {
+              if (!dSig.version_stats) dSig.version_stats = {};
+              if (!dSig.version_stats[sigVer]) dSig.version_stats[sigVer] = emptyVersionStats();
+              var svs = dSig.version_stats[sigVer];
+              for (var sti = 0; sti < sigTags.length; sti++) {
+                var st = sigTags[sti];
+                if (svs[st] != null) svs[st]++;
+              }
+            }
             if (!dSig.hosts) dSig.hosts = {};
             if (!dSig.hosts[hostLabel]) dSig.hosts[hostLabel] = emptyHostSlice();
             bumpSessionSignals(dSig.hosts[hostLabel], sigTags);
@@ -1834,6 +1867,12 @@ function processJsonlFile(fileRef, daily, onlyDate, isolateTodayFrag, fileTodayF
         } else {
           var dLim = targetDayBucket(daily, dayLimit, onlyDate, isolateTodayFrag);
           dLim.hit_limit = (dLim.hit_limit || 0) + 1;
+          var limVer = extractCliVersion(rec);
+          if (limVer) {
+            if (!dLim.version_stats) dLim.version_stats = {};
+            if (!dLim.version_stats[limVer]) dLim.version_stats[limVer] = emptyVersionStats();
+            dLim.version_stats[limVer].hit_limit++;
+          }
           if (!dLim.hosts) dLim.hosts = {};
           if (!dLim.hosts[hostLabel]) dLim.hosts[hostLabel] = emptyHostSlice();
           var hl = dLim.hosts[hostLabel];
@@ -1893,7 +1932,14 @@ function processJsonlFile(fileRef, daily, onlyDate, isolateTodayFrag, fileTodayF
       var stopR = (rec.message && rec.message.stop_reason) || 'unknown';
       dd.stop_reasons[stopR] = (dd.stop_reasons[stopR] || 0) + 1;
       var cliVer = extractCliVersion(rec);
-      if (cliVer) dd.versions[cliVer] = (dd.versions[cliVer] || 0) + 1;
+      if (cliVer) {
+        dd.versions[cliVer] = (dd.versions[cliVer] || 0) + 1;
+        if (!dd.version_stats[cliVer]) dd.version_stats[cliVer] = emptyVersionStats();
+        var vs = dd.version_stats[cliVer];
+        vs.calls++;
+        vs.output += outTok;
+        vs.cache_read += crTok;
+      }
       var ep = extractEntrypoint(rec);
       if (ep) dd.entrypoints[ep] = (dd.entrypoints[ep] || 0) + 1;
       if (fileTodayFrag && todayYmdForFrag && day === todayYmdForFrag) {
@@ -2000,6 +2046,7 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
       models: r.models,
       versions: r.versions || {},
       entrypoints: r.entrypoints || {},
+      version_stats: r.version_stats || {},
       hours: r.hours,
       hour_signals: r.hour_signals || {},
       hosts: hostsApi,
