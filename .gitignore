@@ -11,6 +11,7 @@
 !/.gitignore
 !/README.md
 !/README.en.md
+!/README.ko.md
 !/server.js
 !/start.js
 !/anthropic-proxy.js
