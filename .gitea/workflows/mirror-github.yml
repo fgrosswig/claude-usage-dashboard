@@ -136,58 +136,85 @@ jobs:
           GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
         run: |
           set -eux
-          # Fetch latest Gitea release via internal API (not mirrored, .gitea/ excluded)
-          export RELEASE_JSON=$(curl -sf "https://gitea.grosswig-it.de/api/v1/repos/GRO/Claude-Usage-Dashboard/releases?limit=1" \
-            -H "Authorization: token ${GITEA_TOKEN}" || echo "[]")
-          TAG=$(echo "$RELEASE_JSON" | python3 -c "import json,sys; r=json.load(sys.stdin); print(r[0]['tag_name'] if r else '')")
-          [ -z "$TAG" ] && { echo "No Gitea release found, skip"; exit 0; }
-          # Skip pre-releases (rc, beta, alpha) — only mirror final releases to GitHub
-          IS_PRE=$(echo "$RELEASE_JSON" | python3 -c "import json,sys; r=json.load(sys.stdin); print('true' if r and r[0].get('prerelease') else 'false')")
-          [ "$IS_PRE" = "true" ] && { echo "Pre-release ${TAG}, skip GitHub mirror"; exit 0; }
-          # Check if GitHub already has this tag/release
-          HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer ${GH_MIRROR_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/fgrosswig/claude-usage-dashboard/releases/tags/${TAG}")
-          if [ "$HTTP" = "200" ]; then
-            echo "GitHub release ${TAG} exists, skip"
-            exit 0
-          fi
-          # Extract title + body, scrub internal refs from body
+          # Fetch all Gitea releases and mirror missing ones to GitHub
           python3 <<'PY'
           import json, os, re, sys, urllib.request
-          data = json.loads(os.environ.get("RELEASE_JSON", "[]"))
-          if not data:
-              sys.exit(0)
-          rel = data[0]
-          tag = rel["tag_name"]
-          title = rel["name"]
-          body = rel.get("body", "")
-          # Scrub internal hostnames from release body
-          body = re.sub(r"https?://gitea\.grosswig-it\.de[^\s)]*", "https://github.com/fgrosswig/claude-usage-dashboard", body)
-          body = re.sub(r"https?://ci\.grosswig-it\.de[^\s)]*", "", body)
-          body = re.sub(r"https?://claude-usage\.grosswig-it\.de[^\s)]*", "", body)
-          body = re.sub(r"https?://harbor\.grosswig-it\.de[^\s)]*", "", body)
-          token = os.environ["GH_MIRROR_TOKEN"]
-          payload = json.dumps({
-              "tag_name": tag,
-              "target_commitish": "main",
-              "name": title,
-              "body": body,
-              "draft": False,
-              "prerelease": False
-          }).encode()
+
+          gitea_token = os.environ["GITEA_TOKEN"]
+          gh_token = os.environ["GH_MIRROR_TOKEN"]
+
+          # Fetch all Gitea releases (up to 50)
           req = urllib.request.Request(
-              "https://api.github.com/repos/fgrosswig/claude-usage-dashboard/releases",
-              data=payload,
-              headers={
-                  "Authorization": "Bearer " + token,
-                  "Accept": "application/vnd.github+json",
-                  "Content-Type": "application/json"
-              },
-              method="POST"
+              "https://gitea.grosswig-it.de/api/v1/repos/GRO/Claude-Usage-Dashboard/releases?limit=50",
+              headers={"Authorization": "token " + gitea_token}
           )
-          with urllib.request.urlopen(req, timeout=30) as r:
-              result = json.load(r)
-              print("GitHub release created:", result.get("html_url", ""))
+          try:
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  releases = json.load(r)
+          except Exception as e:
+              print("Failed to fetch Gitea releases:", e)
+              sys.exit(0)
+
+          if not releases:
+              print("No Gitea releases found, skip")
+              sys.exit(0)
+
+          for rel in releases:
+              tag = rel["tag_name"]
+
+              # Skip pre-releases (rc, beta, alpha)
+              if rel.get("prerelease"):
+                  print(f"Pre-release {tag}, skip")
+                  continue
+
+              # Check if GitHub already has this release
+              check = urllib.request.Request(
+                  f"https://api.github.com/repos/fgrosswig/claude-usage-dashboard/releases/tags/{tag}",
+                  headers={
+                      "Authorization": "Bearer " + gh_token,
+                      "Accept": "application/vnd.github+json"
+                  }
+              )
+              try:
+                  urllib.request.urlopen(check, timeout=15)
+                  print(f"GitHub release {tag} exists, skip")
+                  continue
+              except urllib.error.HTTPError as e:
+                  if e.code != 404:
+                      print(f"GitHub API error for {tag}: {e.code}")
+                      continue
+
+              # Scrub internal hostnames from release body
+              body = rel.get("body", "")
+              body = re.sub(r"https?://gitea\.grosswig-it\.de[^\s)]*", "https://github.com/fgrosswig/claude-usage-dashboard", body)
+              body = re.sub(r"https?://ci\.grosswig-it\.de[^\s)]*", "", body)
+              body = re.sub(r"https?://claude-usage\.grosswig-it\.de[^\s)]*", "", body)
+              body = re.sub(r"https?://harbor\.grosswig-it\.de[^\s)]*", "", body)
+              body = re.sub(r"https?://sonar\.grosswig-it\.de[^\s)]*", "", body)
+
+              payload = json.dumps({
+                  "tag_name": tag,
+                  "target_commitish": "main",
+                  "name": rel["name"],
+                  "body": body,
+                  "draft": False,
+                  "prerelease": False
+              }).encode()
+
+              create = urllib.request.Request(
+                  "https://api.github.com/repos/fgrosswig/claude-usage-dashboard/releases",
+                  data=payload,
+                  headers={
+                      "Authorization": "Bearer " + gh_token,
+                      "Accept": "application/vnd.github+json",
+                      "Content-Type": "application/json"
+                  },
+                  method="POST"
+              )
+              try:
+                  with urllib.request.urlopen(create, timeout=30) as r:
+                      result = json.load(r)
+                      print(f"GitHub release created: {result.get('html_url', '')}")
+              except Exception as e:
+                  print(f"Failed to create GitHub release {tag}: {e}")
           PY
