@@ -1810,6 +1810,8 @@ function renderDashboardCore(data) {
     devSync.textContent = "Last: " + ts.toLocaleTimeString() + (data.dev_source ? " · " + (data.days || []).length + "d" : "");
   }
   renderProxyAnalysis(data);
+  renderBudgetEfficiency(data);
+  __releaseStabilityData = data.release_stability || null;
   renderUserProfileCharts(getFilteredDays(data.days));
   updateMetaDetailsSummary(data);
   var days = getFilteredDays(data.days);
@@ -3706,6 +3708,94 @@ function generateForensicReportMd(data) {
     md.push("");
   }
 
+  // ─── Budget Efficiency ───
+  var proxy = data.proxy || {};
+  var pdays = proxy.proxy_days || [];
+  var lastPd = pdays.length > 0 ? pdays[pdays.length - 1] : null;
+  if (lastPd) {
+    md.push("## " + (isDE ? "Budget-Effizienz" : "Budget Efficiency"));
+    md.push("");
+    var rl = lastPd.rate_limit || {};
+    var q5r = rl["anthropic-ratelimit-unified-5h-utilization"];
+    var q7r = rl["anthropic-ratelimit-unified-7d-utilization"];
+    var fbr = rl["anthropic-ratelimit-unified-fallback-percentage"];
+    var ovr = rl["anthropic-ratelimit-unified-overage-status"];
+    var ovrR = rl["anthropic-ratelimit-unified-overage-disabled-reason"];
+    var clm = rl["anthropic-ratelimit-unified-representative-claim"];
+
+    md.push("| " + (isDE ? "Metrik" : "Metric") + " | " + (isDE ? "Wert" : "Value") + " | " + (isDE ? "Bewertung" : "Assessment") + " |");
+    md.push("|--------|-------|------------|");
+    if (q5r != null) {
+      var q5v = Math.round(parseFloat(q5r) * 1000) / 10;
+      md.push("| 5h Quota | " + q5v + "% | " + (q5v > 80 ? "\u26a0 HIGH" : q5v > 50 ? "\u26a0 MODERATE" : "\u2705 OK") + " |");
+    }
+    if (q7r != null) {
+      var q7v = Math.round(parseFloat(q7r) * 1000) / 10;
+      md.push("| 7d Quota | " + q7v + "% | " + (q7v > 80 ? "\u26a0 HIGH" : "\u2705 OK") + " |");
+    }
+    if (fbr != null) {
+      var fbv = Math.round(parseFloat(fbr) * 100);
+      md.push("| Fallback % | " + fbv + "% | " + (fbv < 100 ? "\u274c REDUCED \u2014 effective budget is " + fbv + "% of maximum" : "\u2705 FULL") + " |");
+    }
+    if (ovr) md.push("| Overage | " + ovr + " | " + (ovr === "rejected" ? "\u274c Hard cutoff \u2014 no buffer" : "\u2705 " + ovr) + " |");
+    if (ovrR) md.push("| Overage Reason | " + ovrR + " | |");
+    if (clm) md.push("| Binding Limit | " + clm.replace(/_/g, " ") + " | " + (clm === "five_hour" ? "5h window is active constraint" : clm) + " |");
+
+    // Plan
+    var planLabel = typeof getSelectedPlanLabel === "function" ? getSelectedPlanLabel() : "?";
+    md.push("| Plan | " + planLabel + " | " + (isDE ? "manuell gew\u00e4hlt" : "manually selected") + " |");
+
+    // Visible tokens per %
+    if (lastPd.visible_tokens_per_pct) {
+      md.push("| Tokens/1% | " + fmt(lastPd.visible_tokens_per_pct) + " | " + (isDE ? "sichtbare Tokens pro 1% Quota" : "visible tokens per 1% quota") + " |");
+    }
+    md.push("");
+
+    // Totals
+    var totOut = 0, totAll = 0, totCr = 0, totCc = 0, totRetries = 0, totInterrupts = 0, totTrunc = 0, totOutageH = 0;
+    for (var bi = 0; bi < days.length; bi++) {
+      var bd = days[bi];
+      totOut += bd.output || 0;
+      totAll += bd.total || 0;
+      totCr += bd.cache_read || 0;
+      totCc += bd.cache_creation || 0;
+      var bss = bd.session_signals || {};
+      totRetries += bss.retry || 0;
+      totInterrupts += bss.interrupt || 0;
+      totTrunc += bss.truncated || 0;
+      totOutageH += bd.outage_hours || 0;
+    }
+    var bOverhead = totOut > 0 ? (totAll / totOut).toFixed(1) : "?";
+    var bOutputPct = totAll > 0 ? Math.round(totOut / totAll * 100) : 0;
+    var bCmr = (totCc + totCr) > 0 ? Math.round(totCc / (totCc + totCr) * 100) : 0;
+
+    md.push("| " + (isDE ? "Metrik" : "Metric") + " | " + (isDE ? "Wert" : "Value") + " |");
+    md.push("|--------|-------|");
+    md.push("| Effective Output | " + bOutputPct + "% |");
+    md.push("| Overhead Factor | " + bOverhead + "x |");
+    md.push("| Cache Miss Rate | " + bCmr + "% |");
+    md.push("| Retries | " + totRetries + " |");
+    md.push("| Interrupts | " + totInterrupts + " |");
+    md.push("| Tool Bloat (truncated) | " + totTrunc + " |");
+    md.push("| Outage Loss | " + totOutageH.toFixed(1) + "h |");
+    md.push("");
+  }
+
+  // ─── Release Stability ───
+  if (data.release_stability && data.release_stability.summary) {
+    var rs = data.release_stability.summary;
+    md.push("## " + (isDE ? "Release-Stabilit\u00e4t" : "Release Stability"));
+    md.push("");
+    md.push("| " + (isDE ? "Metrik" : "Metric") + " | " + (isDE ? "Wert" : "Value") + " |");
+    md.push("|--------|-------|");
+    md.push("| Releases | " + rs.total + " (" + rs.daysSpan + (isDE ? " Tage" : " days") + ") |");
+    md.push("| " + (isDE ? "Kadenz" : "Cadence") + " | ~" + rs.cadenceDays + (isDE ? " Tage" : " days") + " |");
+    md.push("| " + (isDE ? "\u00dcbersprungen" : "Skipped") + " | " + rs.totalSkipped + " |");
+    md.push("| Hotfixes | " + rs.hotfixCount + " |");
+    md.push("| Regressions | " + rs.regressionCount + " |");
+    md.push("");
+  }
+
   // ─── Thinking-Token Hinweis ───
   md.push("> "+(isDE?"\u26a0 **Hinweis:** Thinking-Tokens (internes Reasoning) erscheinen nicht in der API-Antwort und werden nicht gez\u00e4hlt. Sie belasten wahrscheinlich das Session-Budget.":"\u26a0 **Note:** Thinking tokens (internal reasoning) do not appear in the API response and are not counted here. They likely count against the session budget."));
   md.push("");
@@ -3716,10 +3806,75 @@ function generateForensicReportMd(data) {
   return md.join("\n");
 }
 
+var __lastReportMd = "";
 function openReportModal(){
   if(!__lastUsageData||!__lastUsageData.days||!__lastUsageData.days.length)return;
-  var md=generateForensicReportMd(__lastUsageData);
-  document.getElementById("report-content").textContent=md;
+  __lastReportMd=generateForensicReportMd(__lastUsageData);
+  var el=document.getElementById("report-content");
+  if(typeof marked !== "undefined" && marked.parse) {
+    // Render full markdown to HTML first
+    el.innerHTML = marked.parse(__lastReportMd);
+
+    // Post-process: wrap each <h2> + siblings in <details>
+    var h2s = el.querySelectorAll("h2");
+    for (var si = h2s.length - 1; si >= 0; si--) {
+      var h2 = h2s[si];
+      var details = document.createElement("details");
+      details.className = "report-section";
+      details.id = "rpt-s" + (si + 1);
+      // All sections start collapsed
+      var summary = document.createElement("summary");
+      summary.className = "report-section-head";
+      summary.innerHTML = h2.innerHTML;
+      details.appendChild(summary);
+      // Move all siblings after h2 until next h2 or h1 into details
+      var next = h2.nextElementSibling;
+      while (next && next.tagName !== "H2" && next.tagName !== "H1" && !next.classList.contains("report-section")) {
+        var move = next;
+        next = next.nextElementSibling;
+        details.appendChild(move);
+      }
+      h2.parentNode.replaceChild(details, h2);
+    }
+
+    // Build index from sections
+    var secs = el.querySelectorAll(".report-section");
+    if (secs.length > 0) {
+      var nav = document.createElement("nav");
+      nav.className = "report-index";
+      nav.innerHTML = "<strong>Contents</strong>";
+      var ol = document.createElement("ol");
+      for (var ni = 0; ni < secs.length; ni++) {
+        var li = document.createElement("li");
+        var a = document.createElement("a");
+        a.href = "#";
+        a.textContent = secs[ni].querySelector(".report-section-head").textContent.replace(/^\d+\.\s*/, "");
+        a.dataset.rptIdx = String(ni);
+        li.appendChild(a);
+        ol.appendChild(li);
+      }
+      nav.appendChild(ol);
+      el.insertBefore(nav, el.firstChild);
+
+      // Click handler for index — toggle section open/closed
+      ol.addEventListener("click", function(e) {
+        var link = e.target.tagName === "A" ? e.target : e.target.closest("a");
+        if (!link) link = e.target.parentElement;
+        if (!link || !link.dataset || link.dataset.rptIdx == null) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var idx = parseInt(link.dataset.rptIdx, 10);
+        var allSecs = document.getElementById("report-content").querySelectorAll(".report-section");
+        if (allSecs[idx]) {
+          var wasOpen = allSecs[idx].open;
+          allSecs[idx].open = !wasOpen;
+          if (!wasOpen) setTimeout(function() { allSecs[idx].scrollIntoView({ block: "nearest" }); }, 50);
+        }
+      });
+    }
+  } else {
+    el.textContent=__lastReportMd;
+  }
   document.getElementById("report-modal-title").textContent=t("reportTitle");
   document.getElementById("report-copy-btn").textContent=t("reportCopy");
   document.getElementById("report-download-btn").textContent=t("reportDownload");
@@ -3729,7 +3884,7 @@ function closeReportModal(){
   document.getElementById("report-modal-overlay").classList.remove("open");
 }
 function downloadReport(){
-  var text=document.getElementById("report-content").textContent;
+  var text=__lastReportMd;
   var blob=new Blob([text],{type:"text/markdown;charset=utf-8"});
   var url=URL.createObjectURL(blob);
   var a=document.createElement("a");
@@ -3737,7 +3892,7 @@ function downloadReport(){
   document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
 }
 function copyReport(){
-  var text=document.getElementById("report-content").textContent;
+  var text=__lastReportMd;
   navigator.clipboard.writeText(text).then(function(){
     var btn=document.getElementById("report-copy-btn");
     var orig=btn.textContent;btn.textContent=t("reportCopied");
@@ -3815,12 +3970,17 @@ function copyReport(){
   if(rdl){rdl.addEventListener("click",downloadReport);}
   var rcp=document.getElementById("report-copy-btn");
   if(rcp){rcp.addEventListener("click",copyReport);}
+  var rea=document.getElementById("report-expand-all");
+  if(rea){rea.addEventListener("click",function(){document.querySelectorAll("#report-content .report-section").forEach(function(s){s.open=true;});});}
+  var rca=document.getElementById("report-collapse-all");
+  if(rca){rca.addEventListener("click",function(){document.querySelectorAll("#report-content .report-section").forEach(function(s){s.open=false;});});}
   var rov=document.getElementById("report-modal-overlay");
   if(rov){rov.addEventListener("click",function(e){if(e.target===rov)closeReportModal();});}
 })();
 
 // ── User Profile Charts ──────────────────────────────────────────────────
-var _userCharts = { versions: null, entrypoints: null };
+var _userCharts = { versions: null, entrypoints: null, releaseStability: null };
+var __releaseStabilityData = null;
 var __userVersionSort = "anomalies"; // anomalies | newest | calls
 var __userVersionFilter = null; // null = all, [] = none selected
 
@@ -4073,8 +4233,16 @@ function renderUserProfileCharts(days) {
     : allVers;
   var sortedVers = sortVersionKeys(filteredVers, stats, __userVersionSort);
 
+  // Set consistent chart height for all 3 user-profile charts
+  var chartH = Math.max(180, sortedVers.length * 28 + 60);
+  var boxes = document.querySelectorAll("#user-profile-charts .chart-box canvas");
+  for (var bi = 0; bi < boxes.length; bi++) {
+    boxes[bi].parentElement.style.height = chartH + "px";
+  }
+
   renderVersionHealthChart(sortedVers, stats, allVers);
   renderEntrypointsChart(sortedVers, stats);
+  renderReleaseStabilityChart(sortedVers, __releaseStabilityData);
 }
 
 function renderVersionHealthChart(sortedVers, stats, allVers) {
@@ -4098,6 +4266,7 @@ function renderVersionHealthChart(sortedVers, stats, allVers) {
     options: {
       indexAxis: "y",
       responsive: true,
+      maintainAspectRatio: false,
       animation: false,
       transitions: __chartTransitionsOff,
       interaction: { mode: "index", intersect: false },
@@ -4162,6 +4331,7 @@ function renderEntrypointsChart(sortedVers, stats) {
     options: {
       indexAxis: "y",
       responsive: true,
+      maintainAspectRatio: false,
       animation: false,
       transitions: __chartTransitionsOff,
       interaction: { mode: "index", intersect: false },
@@ -4175,6 +4345,864 @@ function renderEntrypointsChart(sortedVers, stats) {
       }
     }
   });
+}
+
+// ── Release Stability Chart ──────────────────────────────────────────────
+// Build a lookup: version string (without "v" prefix) → release info
+function __buildReleaseLookup(releaseData) {
+  var map = {};
+  if (!releaseData || !releaseData.releases) return map;
+  for (var i = 0; i < releaseData.releases.length; i++) {
+    var r = releaseData.releases[i];
+    // Key without "v" prefix to match version_stats keys (e.g. "2.1.87")
+    var key = (r.tag || "").replace(/^v/, "");
+    map[key] = r;
+  }
+  return map;
+}
+
+function renderReleaseStabilityChart(sortedVers, releaseData) {
+  var el = document.getElementById("c-user-release-stability");
+  var h3 = document.getElementById("user-release-stability-h3");
+  if (h3) h3.textContent = t("releaseStabilityTitle");
+  var blurb = document.getElementById("user-release-stability-blurb");
+  if (!el) return;
+  if (_userCharts.releaseStability) { _userCharts.releaseStability.destroy(); _userCharts.releaseStability = null; }
+  if (!sortedVers || !sortedVers.length || !releaseData) {
+    if (blurb) blurb.textContent = t("releaseStabilityNoData");
+    return;
+  }
+
+  var lookup = __buildReleaseLookup(releaseData);
+
+  // Count matched stats for blurb
+  var matched = 0, stableN = 0, regN = 0, hotN = 0, unknownN = 0;
+  for (var ci = 0; ci < sortedVers.length; ci++) {
+    var info = lookup[sortedVers[ci]];
+    if (info) {
+      matched++;
+      if (info.stability === "hotfix") hotN++;
+      else if (info.stability === "regression") regN++;
+      else stableN++;
+    } else {
+      unknownN++;
+    }
+  }
+
+  if (blurb) blurb.textContent = t("releaseStabilityBlurb")
+    .replace("{total}", String(sortedVers.length))
+    .replace("{matched}", String(matched))
+    .replace("{stable}", String(stableN))
+    .replace("{hotfixes}", String(hotN))
+    .replace("{regressions}", String(regN));
+
+  // Build data arrays per version (same Y-axis as other charts)
+  var stableData = [];
+  var regressionData = [];
+  var hotfixData = [];
+  var unknownData = [];
+  var meta = [];
+
+  for (var vi = 0; vi < sortedVers.length; vi++) {
+    var ver = sortedVers[vi];
+    var r = lookup[ver];
+    if (!r) {
+      stableData.push(0);
+      regressionData.push(0);
+      hotfixData.push(0);
+      unknownData.push(1);
+      meta.push({ tag: ver, stability: "unknown", daysActive: 0, skippedPatches: 0, matchedKeywords: [] });
+      continue;
+    }
+    var d = Math.max(r.daysActive || 0, 0.3);
+    unknownData.push(0);
+    if (r.stability === "hotfix") {
+      stableData.push(0); regressionData.push(0); hotfixData.push(d);
+    } else if (r.stability === "regression") {
+      stableData.push(0); regressionData.push(d); hotfixData.push(0);
+    } else {
+      stableData.push(d); regressionData.push(0); hotfixData.push(0);
+    }
+    meta.push(r);
+  }
+
+  var datasets = [
+    { label: t("releaseStabilityStable"), data: stableData, backgroundColor: "rgba(34,197,94,0.8)", stack: "s" },
+    { label: t("releaseStabilityRegression"), data: regressionData, backgroundColor: "rgba(250,204,21,0.85)", stack: "s" },
+    { label: t("releaseStabilityHotfix"), data: hotfixData, backgroundColor: "rgba(248,113,113,0.85)", stack: "s" },
+    { label: t("releaseStabilityUnknown"), data: unknownData, backgroundColor: "rgba(100,116,139,0.4)", stack: "s" }
+  ];
+
+  _userCharts.releaseStability = new Chart(el, {
+    type: "bar",
+    data: { labels: sortedVers, datasets: datasets },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      transitions: __chartTransitionsOff,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: {
+          stacked: true,
+          grid: { color: "rgba(51,65,85,0.5)" },
+          ticks: { color: "#94a3b8" },
+          title: { display: true, text: t("releaseStabilityXAxis"), color: "#64748b", font: { size: 11 } }
+        },
+        y: {
+          stacked: true,
+          grid: { color: "rgba(51,65,85,0.18)" },
+          ticks: { color: "#e2e8f0", font: { family: "monospace" } }
+        }
+      },
+      plugins: {
+        legend: { labels: { color: "#cbd5e1" } },
+        tooltip: {
+          callbacks: {
+            afterBody: function(items) {
+              if (!items.length) return "";
+              var idx = items[0].dataIndex;
+              var m = meta[idx];
+              if (!m) return "";
+              var lines = [];
+              if (m.stability === "unknown") { lines.push(t("releaseStabilityNoRelease")); return lines.join("\n"); }
+              lines.push((m.date || "") + " \u00B7 " + (m.daysActive || 0) + "d active \u00B7 " + m.stability);
+              if (m.skippedPatches > 0) lines.push(t("releaseStabilitySkipped") + ": " + m.skippedPatches);
+              if (m.matchedKeywords && m.matchedKeywords.length) lines.push("Keywords: " + m.matchedKeywords.join(", "));
+              return lines.join("\n");
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Budget Efficiency Section ─────────────────────────────────────────────
+var _budgetCharts = { waterfall: null, trend: null, quota: null };
+
+function renderBudgetEfficiency(data) {
+  var sumEl = document.getElementById("budget-summary-line");
+  var cardsEl = document.getElementById("budget-cards");
+  if (!sumEl) return;
+
+  var days = getFilteredDays(data.days);
+  if (!days || !days.length) {
+    sumEl.textContent = t("budgetNoData");
+    if (cardsEl) cardsEl.innerHTML = "";
+    if (_budgetCharts.waterfall) { _budgetCharts.waterfall.destroy(); _budgetCharts.waterfall = null; }
+    if (_budgetCharts.trend) { _budgetCharts.trend.destroy(); _budgetCharts.trend = null; }
+    return;
+  }
+
+  // Aggregate across all filtered days
+  // Respect host filter from top bar
+  var filteredHost = typeof getFilterHost === "function" ? getFilterHost() : "";
+  __budgetFilteredHost = filteredHost;
+
+  var tot = { input: 0, output: 0, cache_read: 0, cache_creation: 0, total: 0,
+              retries: 0, interrupts: 0, api_errors: 0, hit_limits: 0, calls: 0, active_hours: 0 };
+  var dailyTrend = [];
+
+  for (var di = 0; di < days.length; di++) {
+    var d = days[di];
+    // If host filter active, use per-host data
+    var src_d = d;
+    if (filteredHost && d.hosts && d.hosts[filteredHost]) {
+      src_d = d.hosts[filteredHost];
+    }
+    tot.input += src_d.input || 0;
+    tot.output += src_d.output || 0;
+    tot.cache_read += src_d.cache_read || 0;
+    tot.cache_creation += src_d.cache_creation || 0;
+    tot.total += (src_d.total != null ? src_d.total : ((src_d.input || 0) + (src_d.output || 0) + (src_d.cache_read || 0) + (src_d.cache_creation || 0)));
+    tot.calls += src_d.calls || 0;
+    tot.active_hours += src_d.active_hours || 0;
+    var ss = src_d.session_signals || d.session_signals || {};
+    tot.retries += ss.retry || 0;
+    tot.interrupts += ss.interrupt || 0;
+    tot.api_errors += ss.api_error || 0;
+    tot.hit_limits += (src_d.hit_limit != null ? src_d.hit_limit : d.hit_limit) || 0;
+
+    var dayTotal = d.total || 0;
+    var dayOutput = d.output || 0;
+    dailyTrend.push({
+      date: d.date,
+      overhead: dayOutput > 0 ? Math.round(dayTotal / dayOutput * 10) / 10 : 0,
+      output_pct: dayTotal > 0 ? Math.round(dayOutput / dayTotal * 100) : 0,
+      cache_miss_rate: (d.cache_creation || 0) + (d.cache_read || 0) > 0
+        ? Math.round((d.cache_creation || 0) / ((d.cache_creation || 0) + (d.cache_read || 0)) * 100)
+        : 0
+    });
+  }
+
+  // Compute metrics
+  var outputPct = tot.total > 0 ? Math.round(tot.output / tot.total * 100) : 0;
+  var overheadFactor = tot.output > 0 ? Math.round(tot.total / tot.output * 10) / 10 : 0;
+  var cacheMissRate = (tot.cache_creation + tot.cache_read) > 0
+    ? Math.round(tot.cache_creation / (tot.cache_creation + tot.cache_read) * 100) : 0;
+  var lostSignals = tot.retries + tot.interrupts + tot.api_errors;
+
+  // Summary line
+  sumEl.textContent = t("budgetSummary")
+    .replace("{overhead}", String(overheadFactor))
+    .replace("{outputPct}", String(outputPct))
+    .replace("{cmr}", String(cacheMissRate))
+    .replace("{retries}", String(tot.retries))
+    .replace("{interrupts}", String(tot.interrupts));
+
+  // KPI Cards
+  if (cardsEl) {
+    // Compute outage hours from days
+    var totalOutageH = 0;
+    for (var oi = 0; oi < days.length; oi++) {
+      totalOutageH += days[oi].outage_hours || 0;
+    }
+
+    // Compute tool result bloat from days (truncated signals = proxy for bloat)
+    var totalTruncated = 0;
+    for (var ti2 = 0; ti2 < days.length; ti2++) {
+      var ss2 = days[ti2].session_signals || {};
+      totalTruncated += ss2.truncated || 0;
+    }
+
+    // Quota forecast: estimate hours remaining based on consumption rate
+    var forecastStr = "?";
+    var forecastCls = "";
+    if (data.proxy && data.proxy.proxy_days && data.proxy.proxy_days.length >= 2) {
+      var pds = data.proxy.proxy_days;
+      var latest = pds[pds.length - 1];
+      var latestRl = latest.rate_limit || {};
+      var q5now = parseFloat(latestRl["anthropic-ratelimit-unified-5h-utilization"] || 0);
+      if (q5now > 0 && latest.active_hours > 0) {
+        // Rate: quota % per active hour
+        var pctPerHour = q5now * 100 / latest.active_hours;
+        var remaining = (1 - q5now) * 100;
+        var hoursLeft = pctPerHour > 0 ? remaining / pctPerHour : 99;
+        forecastStr = hoursLeft.toFixed(1) + "h";
+        forecastCls = hoursLeft < 1 ? "warn" : "";
+      }
+    }
+
+    var cards = [
+      { label: t("budgetCardOutput"), value: outputPct + "%", sub: t("budgetCardOutputSub"), cls: outputPct < 25 ? "warn" : "" },
+      { label: t("budgetCardOverhead"), value: overheadFactor + "x", sub: t("budgetCardOverheadSub"), cls: overheadFactor > 4 ? "warn" : "" },
+      { label: t("budgetCardCacheMiss"), value: cacheMissRate + "%", sub: t("budgetCardCacheMissSub"), cls: cacheMissRate > 40 ? "warn" : "" },
+      { label: t("budgetCardLost"), value: String(lostSignals), sub: t("budgetCardLostSub").replace("{r}", String(tot.retries)).replace("{i}", String(tot.interrupts)).replace("{e}", String(tot.api_errors)), cls: lostSignals > 5 ? "warn" : "" },
+      // Forecast now shown in fuel gauge above
+      { label: t("budgetCardOutage"), value: totalOutageH.toFixed(1) + "h", sub: t("budgetCardOutageSub"), cls: totalOutageH > 2 ? "warn" : "" },
+      { label: t("budgetCardTruncated"), value: String(totalTruncated), sub: t("budgetCardTruncatedSub"), cls: totalTruncated > 50 ? "warn" : "" }
+    ];
+    var ch = "";
+    cards.forEach(function(c) {
+      ch += "<div class=\"card " + c.cls + "\"><div class=\"label\">" + escHtml(c.label) + "</div><div class=\"value\">" + escHtml(c.value) + "</div><div class=\"sub\">" + escHtml(c.sub) + "</div></div>";
+    });
+    cardsEl.innerHTML = ch;
+  }
+
+  // Extract quota info from proxy data (latest snapshot)
+  var quota = { pct_5h: null, pct_7d: null, visible_tokens_per_pct: 0,
+                fallback_pct: null, overage_status: null, overage_reason: null, representative_claim: null };
+  if (data.proxy && data.proxy.proxy_days && data.proxy.proxy_days.length) {
+    var lastPd = data.proxy.proxy_days[data.proxy.proxy_days.length - 1];
+    if (lastPd.rate_limit) {
+      var rl = lastPd.rate_limit;
+      var q5 = rl["anthropic-ratelimit-unified-5h-utilization"];
+      var q7 = rl["anthropic-ratelimit-unified-7d-utilization"];
+      if (q5 != null) quota.pct_5h = parseFloat(q5) * 100;
+      if (q7 != null) quota.pct_7d = parseFloat(q7) * 100;
+      var fb = rl["anthropic-ratelimit-unified-fallback-percentage"];
+      if (fb != null) quota.fallback_pct = parseFloat(fb);
+      var ov = rl["anthropic-ratelimit-unified-overage-status"];
+      if (ov) quota.overage_status = ov;
+      var ovr = rl["anthropic-ratelimit-unified-overage-disabled-reason"];
+      if (ovr) quota.overage_reason = ovr;
+      var rc = rl["anthropic-ratelimit-unified-representative-claim"];
+      if (rc) quota.representative_claim = rc;
+    }
+    if (lastPd.visible_tokens_per_pct) quota.visible_tokens_per_pct = lastPd.visible_tokens_per_pct;
+  }
+
+  // Fuel gauges for 5h/7d quota
+  var fuelEl = document.getElementById("budget-fuel");
+  if (fuelEl && quota.pct_5h != null) {
+    // Gradient: green (0%) → yellow (50%) → red (100%)
+    var fuelColor = function(pct) {
+      var p = Math.min(100, Math.max(0, pct)) / 100;
+      var r = Math.round(p < 0.5 ? p * 2 * 245 : 245);
+      var g = Math.round(p < 0.5 ? 197 : (1 - p) * 2 * 197);
+      return "rgb(" + r + "," + g + ",20)";
+    };
+    var fuelRows = [];
+
+    // 5h gauge
+    var pct5 = Math.min(quota.pct_5h, 100);
+    var left5 = (100 - pct5);
+    var hrs5 = quota.pct_5h > 0 && tot.active_hours > 0
+      ? (left5 / quota.pct_5h * tot.active_hours).toFixed(1) : "?";
+    fuelRows.push(
+      "<div class=\"fuel-row\"><span class=\"fuel-label\">5h Window</span>" +
+      "<div class=\"fuel-bar\"><div class=\"fuel-fill\" style=\"width:" + pct5 + "%;background:" + fuelColor(pct5) + "\"></div>" +
+      "<span class=\"fuel-text\">" + pct5.toFixed(0) + "% used \u00B7 ~" + hrs5 + "h left</span></div></div>"
+    );
+
+    // 7d gauge
+    if (quota.pct_7d != null) {
+      var pct7 = Math.min(quota.pct_7d, 100);
+      var left7 = (100 - pct7);
+      fuelRows.push(
+        "<div class=\"fuel-row\"><span class=\"fuel-label\">7d Window</span>" +
+        "<div class=\"fuel-bar\"><div class=\"fuel-fill\" style=\"width:" + pct7 + "%;background:" + fuelColor(pct7) + "\"></div>" +
+        "<span class=\"fuel-text\">" + pct7.toFixed(0) + "% used</span></div></div>"
+      );
+    }
+
+    // Fallback gauge
+    if (quota.fallback_pct != null) {
+      var fbPctG = Math.round(quota.fallback_pct * 100);
+      fuelRows.push(
+        "<div class=\"fuel-row\"><span class=\"fuel-label\">" + t("budgetCardFallback") + "</span>" +
+        "<div class=\"fuel-bar\"><div class=\"fuel-fill\" style=\"width:" + fbPctG + "%;background:" + fuelColor(100 - fbPctG) + "\"></div>" +
+        "<span class=\"fuel-text\">" + fbPctG + "% " + t("budgetWfOfQuota") + "</span></div></div>"
+      );
+    }
+
+    fuelEl.innerHTML = fuelRows.join("");
+    fuelEl.style.display = "flex";
+  } else if (fuelEl) {
+    fuelEl.style.display = "none";
+  }
+
+  // Alert banner for capacity reduction
+  var alertEl = document.getElementById("budget-alert");
+  if (alertEl) {
+    if (quota.fallback_pct != null && quota.fallback_pct < 1.0) {
+      var fbPctAlert = Math.round(quota.fallback_pct * 100);
+      var alertParts = ["<strong>" + t("budgetAlertTitle") + "</strong> "];
+      alertParts.push(t("budgetAlertFallback").split("{pct}").join(String(fbPctAlert)));
+      if (quota.overage_status === "rejected") alertParts.push(" · " + t("budgetAlertOverage"));
+      if (quota.representative_claim) alertParts.push(" · " + t("budgetAlertClaim").replace("{claim}", quota.representative_claim.replace(/_/g, " ")));
+      alertEl.innerHTML = alertParts.join("");
+      alertEl.style.display = "block";
+    } else {
+      alertEl.style.display = "none";
+    }
+  }
+
+  // Aggregate per-host totals for Sankey worker nodes
+  var hostTotals = {};
+  for (var hi2 = 0; hi2 < days.length; hi2++) {
+    var dh = days[hi2].hosts || {};
+    var hk2 = Object.keys(dh);
+    for (var hj = 0; hj < hk2.length; hj++) {
+      var hl = hk2[hj];
+      var hv = dh[hl];
+      if (!hostTotals[hl]) hostTotals[hl] = { output: 0, input: 0, cache_read: 0, cache_creation: 0, total: 0 };
+      hostTotals[hl].output += hv.output || 0;
+      hostTotals[hl].input += hv.input || 0;
+      hostTotals[hl].cache_read += hv.cache_read || 0;
+      hostTotals[hl].cache_creation += hv.cache_creation || 0;
+      hostTotals[hl].total += hv.total || (hv.output || 0) + (hv.input || 0) + (hv.cache_read || 0) + (hv.cache_creation || 0);
+    }
+  }
+
+  // Waterfall Chart — if host filter active, skip multi-host view
+  renderBudgetWaterfall(tot, quota, filteredHost ? {} : hostTotals);
+
+  // Trend Chart — merge proxy quota history into daily trend
+  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  var quotaByDate = {};
+  for (var pi = 0; pi < proxyDays.length; pi++) {
+    var pd = proxyDays[pi];
+    if (pd.date && pd.rate_limit) {
+      var q5 = pd.rate_limit["anthropic-ratelimit-unified-5h-utilization"];
+      var q7 = pd.rate_limit["anthropic-ratelimit-unified-7d-utilization"];
+      var fb = pd.rate_limit["anthropic-ratelimit-unified-fallback-percentage"];
+      quotaByDate[pd.date] = {
+        pct_5h: q5 != null ? Math.round(parseFloat(q5) * 1000) / 10 : null,
+        pct_7d: q7 != null ? Math.round(parseFloat(q7) * 1000) / 10 : null,
+        vis_per_pct: pd.visible_tokens_per_pct || 0,
+        fallback_pct: fb != null ? Math.round(parseFloat(fb) * 100) : null
+      };
+    }
+  }
+  for (var ti = 0; ti < dailyTrend.length; ti++) {
+    var qd = quotaByDate[dailyTrend[ti].date];
+    dailyTrend[ti].quota_5h = qd ? qd.pct_5h : null;
+    dailyTrend[ti].quota_7d = qd ? qd.pct_7d : null;
+    dailyTrend[ti].vis_per_pct = qd ? qd.vis_per_pct : 0;
+    dailyTrend[ti].fallback_pct = qd ? qd.fallback_pct : null;
+  }
+
+  renderBudgetTrend(dailyTrend);
+}
+
+// Approximate quota cost weights (relative to output=1.0)
+var __quotaWeights = {
+  output: 1.0,
+  input: 0.33,
+  cache_creation: 0.42,
+  cache_read: 0.03
+};
+var __budgetViewMode = "volume"; // "volume" | "cost"
+var __budgetFlowMode = "budget"; // "budget" | "api" | "user"
+var __budgetSankeyState = null;
+var __budgetFilteredHost = "";
+var __budgetSwitchesWired = false;
+var __googleChartsReady = false;
+
+// Load Google Charts Sankey package
+(function() {
+  if (typeof google !== "undefined" && google.charts) {
+    google.charts.load("current", { packages: ["sankey"] });
+    google.charts.setOnLoadCallback(function() { __googleChartsReady = true; });
+  } else {
+    // Wait for script to load
+    var iv = setInterval(function() {
+      if (typeof google !== "undefined" && google.charts) {
+        clearInterval(iv);
+        google.charts.load("current", { packages: ["sankey"] });
+        google.charts.setOnLoadCallback(function() { __googleChartsReady = true; });
+      }
+    }, 200);
+  }
+})();
+
+function __buildBudgetSwitches() {
+  if (__budgetSwitchesWired) return;
+  __budgetSwitchesWired = true;
+
+  var flowGrp = document.getElementById("budget-flow-group");
+  var weightGrp = document.getElementById("budget-weight-group");
+  if (!flowGrp || !weightGrp) return;
+
+  var flowModes = [
+    { key: "budget", label: t("budgetFlowBudget") },
+    { key: "api",    label: t("budgetFlowApi") },
+    { key: "user",   label: t("budgetFlowUser") }
+  ];
+  var weightModes = [
+    { key: "volume", label: t("budgetWfVolume") },
+    { key: "cost",   label: t("budgetWfCost") }
+  ];
+
+  function renderGroup(el, modes, current, setter) {
+    el.innerHTML = "";
+    for (var i = 0; i < modes.length; i++) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = modes[i].label;
+      btn.dataset.key = modes[i].key;
+      if (modes[i].key === current) btn.className = "active";
+      btn.addEventListener("click", (function(k) {
+        return function() {
+          setter(k);
+          if (__budgetSankeyState) renderBudgetWaterfall(__budgetSankeyState.tot, __budgetSankeyState.quota, __budgetSankeyState.hostTotals);
+        };
+      })(modes[i].key));
+      el.appendChild(btn);
+    }
+  }
+
+  renderGroup(flowGrp, flowModes, __budgetFlowMode, function(k) { __budgetFlowMode = k; });
+  renderGroup(weightGrp, weightModes, __budgetViewMode, function(k) { __budgetViewMode = k; });
+}
+
+function __updateBudgetSwitchActive() {
+  var flowGrp = document.getElementById("budget-flow-group");
+  var weightGrp = document.getElementById("budget-weight-group");
+  if (flowGrp) {
+    var btns = flowGrp.querySelectorAll("button");
+    for (var i = 0; i < btns.length; i++) btns[i].className = btns[i].dataset.key === __budgetFlowMode ? "active" : "";
+  }
+  if (weightGrp) {
+    var btns2 = weightGrp.querySelectorAll("button");
+    for (var j = 0; j < btns2.length; j++) btns2[j].className = btns2[j].dataset.key === __budgetViewMode ? "active" : "";
+  }
+}
+
+function renderBudgetWaterfall(tot, quota, hostTotals) {
+  __budgetSankeyState = { tot: tot, quota: quota, hostTotals: hostTotals || {} };
+  __buildBudgetSwitches();
+  __updateBudgetSwitchActive();
+
+  var el = document.getElementById("c-budget-sankey");
+  var h3 = document.getElementById("budget-waterfall-h3");
+  if (h3) h3.textContent = t("budgetWaterfallTitle");
+  var blurb = document.getElementById("budget-waterfall-blurb");
+  if (!el) return;
+
+  if (!__googleChartsReady || !window.google || !window.google.visualization) {
+    el.innerHTML = "<div style='text-align:center;padding:2rem;color:#94a3b8'>Loading Google Charts...</div>";
+    setTimeout(function() { if (__budgetSankeyState) renderBudgetWaterfall(__budgetSankeyState.tot, __budgetSankeyState.quota, __budgetSankeyState.hostTotals); }, 500);
+    return;
+  }
+
+  if (tot.total <= 0) {
+    el.innerHTML = "<div style='text-align:center;padding:2rem;color:#94a3b8'>" + t("budgetNoData") + "</div>";
+    return;
+  }
+
+  var isCost = __budgetViewMode === "cost";
+  var raw = { out: tot.output, inp: tot.input, cr: tot.cache_read, cc: tot.cache_creation };
+  var weighted = {
+    out: tot.output * __quotaWeights.output,
+    inp: tot.input * __quotaWeights.input,
+    cr:  tot.cache_read * __quotaWeights.cache_read,
+    cc:  tot.cache_creation * __quotaWeights.cache_creation
+  };
+  var src = isCost ? weighted : raw;
+  var totalVal = src.out + src.inp + src.cr + src.cc;
+
+  var fmtTok = function(v) {
+    if (v >= 1e9) return (v / 1e9).toFixed(1) + "B";
+    if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
+    if (v >= 1e3) return (v / 1e3).toFixed(0) + "K";
+    return String(Math.round(v));
+  };
+  var pctOf = function(v) { return totalVal > 0 ? Math.round(v / totalVal * 1000) / 10 : 0; };
+
+  if (blurb) {
+    blurb.textContent = isCost ? t("budgetWaterfallBlurbCost") : t("budgetWaterfallBlurb");
+  }
+
+  // Build Google DataTable rows: [From, To, Weight]
+  var rows = [];
+  var nOut = t("budgetWfOutput") + " " + pctOf(src.out) + "%";
+  var nInp = t("budgetWfInput") + " " + pctOf(src.inp) + "%";
+  var nCr  = t("budgetWfCacheRead") + " " + pctOf(src.cr) + "%";
+  var nCc  = t("budgetWfCacheCreate") + " " + pctOf(src.cc) + "%";
+
+  // Compressed weights: log-scaled with minimum band width
+  // Ensures overhead (small flows) stays visible next to cache (huge flows)
+  // Max ratio capped at ~4:1 so no flow disappears
+  var allVals = [src.out, src.inp, src.cr, src.cc].filter(function(v) { return v > 0; });
+  var maxLog = 0;
+  for (var ai = 0; ai < allVals.length; ai++) {
+    var l = Math.log10(1 + allVals[ai]);
+    if (l > maxLog) maxLog = l;
+  }
+  var wOf = function(v) {
+    if (v <= 0) return 0;
+    var logV = Math.log10(1 + v);
+    // Normalize to 1-4 range: smallest visible flow = 1, largest = 4
+    var normalized = maxLog > 0 ? (logV / maxLog) : 1;
+    return Math.max(1, Math.round(1 + normalized * 3));
+  };
+  var wOut = wOf(src.out);
+  var wInp = wOf(src.inp);
+  var wCr  = wOf(src.cr);
+  var wCc  = wOf(src.cc);
+
+  // Aggregate per-host data for worker nodes
+  var hostKeys = Object.keys(hostTotals || {}).sort();
+
+  if (__budgetFlowMode === "budget") {
+    var srcN = getSelectedPlanLabel() + " Budget";
+    var prodN = t("budgetWfProductive") + " (" + fmtTok(raw.out) + ")";
+    var overN = t("budgetWfOverhead") + " (" + fmtTok(raw.inp + raw.cr + raw.cc) + ")";
+
+    if (hostKeys.length > 1) {
+      for (var hi = 0; hi < hostKeys.length; hi++) {
+        var hk = hostKeys[hi];
+        var hd = hostTotals[hk];
+        var hLabel = hk + " (" + fmtTok(hd.total) + ")";
+        var hsrc = isCost ? {
+          out: hd.output * __quotaWeights.output, inp: hd.input * __quotaWeights.input,
+          cr: hd.cache_read * __quotaWeights.cache_read, cc: hd.cache_creation * __quotaWeights.cache_creation
+        } : { out: hd.output, inp: hd.input, cr: hd.cache_read, cc: hd.cache_creation };
+        var hTotal = hsrc.out + hsrc.inp + hsrc.cr + hsrc.cc;
+        rows.push([srcN, hLabel, wOf(hTotal)]);
+        if (hsrc.out > 0) rows.push([hLabel, nOut, wOf(hsrc.out)]);
+        if (hsrc.inp > 0) rows.push([hLabel, nInp, wOf(hsrc.inp)]);
+        if (hsrc.cr > 0)  rows.push([hLabel, nCr,  wOf(hsrc.cr)]);
+        if (hsrc.cc > 0)  rows.push([hLabel, nCc,  wOf(hsrc.cc)]);
+      }
+    } else {
+      if (src.out > 0) rows.push([srcN, nOut, wOut]);
+      if (src.inp > 0) rows.push([srcN, nInp, wInp]);
+      if (src.cr > 0)  rows.push([srcN, nCr,  wCr]);
+      if (src.cc > 0)  rows.push([srcN, nCc,  wCc]);
+    }
+    if (src.out > 0) rows.push([nOut, prodN, wOut]);
+    if (src.inp > 0) rows.push([nInp, overN, wInp]);
+    if (src.cr > 0)  rows.push([nCr,  overN, wCr]);
+    if (src.cc > 0)  rows.push([nCc,  overN, wCc]);
+  } else if (__budgetFlowMode === "api") {
+    var apiN = "Claude API";
+    var youN = t("budgetWfYou") + " (" + fmtTok(totalVal) + ")";
+    if (hostKeys.length > 1) {
+      for (var hi2 = 0; hi2 < hostKeys.length; hi2++) {
+        var hk2 = hostKeys[hi2];
+        var hd2 = hostTotals[hk2];
+        var hLabel2 = hk2 + " (" + fmtTok(hd2.total) + ")";
+        var hsrc2 = isCost ? {
+          out: hd2.output * __quotaWeights.output, inp: hd2.input * __quotaWeights.input,
+          cr: hd2.cache_read * __quotaWeights.cache_read, cc: hd2.cache_creation * __quotaWeights.cache_creation
+        } : { out: hd2.output, inp: hd2.input, cr: hd2.cache_read, cc: hd2.cache_creation };
+        var hTot2 = hsrc2.out + hsrc2.inp + hsrc2.cr + hsrc2.cc;
+        rows.push([apiN, hLabel2, wOf(hTot2)]);
+        if (hsrc2.out > 0) rows.push([hLabel2, nOut, wOf(hsrc2.out)]);
+        if (hsrc2.inp > 0) rows.push([hLabel2, nInp, wOf(hsrc2.inp)]);
+        if (hsrc2.cr > 0)  rows.push([hLabel2, nCr,  wOf(hsrc2.cr)]);
+        if (hsrc2.cc > 0)  rows.push([hLabel2, nCc,  wOf(hsrc2.cc)]);
+      }
+    } else {
+      if (src.out > 0) rows.push([apiN, nOut, wOut]);
+      if (src.inp > 0) rows.push([apiN, nInp, wInp]);
+      if (src.cr > 0)  rows.push([apiN, nCr,  wCr]);
+      if (src.cc > 0)  rows.push([apiN, nCc,  wCc]);
+    }
+    if (src.out > 0) rows.push([nOut, youN, wOut]);
+    if (src.inp > 0) rows.push([nInp, youN, wInp]);
+    if (src.cr > 0)  rows.push([nCr,  youN, wCr]);
+    if (src.cc > 0)  rows.push([nCc,  youN, wCc]);
+  } else {
+    // User Flow: You → Workers → Token Types → Total Usage
+    var youN2  = t("budgetWfYou");
+    var resN   = t("budgetWfResult") + " (" + fmtTok(totalVal) + ")";
+    if (hostKeys.length > 1) {
+      for (var hi3 = 0; hi3 < hostKeys.length; hi3++) {
+        var hk3 = hostKeys[hi3];
+        var hd3 = hostTotals[hk3];
+        var hLabel3 = hk3 + " (" + fmtTok(hd3.total) + ")";
+        var hsrc3 = isCost ? {
+          out: hd3.output * __quotaWeights.output, inp: hd3.input * __quotaWeights.input,
+          cr: hd3.cache_read * __quotaWeights.cache_read, cc: hd3.cache_creation * __quotaWeights.cache_creation
+        } : { out: hd3.output, inp: hd3.input, cr: hd3.cache_read, cc: hd3.cache_creation };
+        var hTot3 = hsrc3.out + hsrc3.inp + hsrc3.cr + hsrc3.cc;
+        rows.push([youN2, hLabel3, wOf(hTot3)]);
+        if (hsrc3.out > 0) rows.push([hLabel3, nOut, wOf(hsrc3.out)]);
+        if (hsrc3.inp > 0) rows.push([hLabel3, nInp, wOf(hsrc3.inp)]);
+        if (hsrc3.cr > 0)  rows.push([hLabel3, nCr,  wOf(hsrc3.cr)]);
+        if (hsrc3.cc > 0)  rows.push([hLabel3, nCc,  wOf(hsrc3.cc)]);
+      }
+    } else {
+      var apiN2 = "Claude API";
+      rows.push([youN2, apiN2, wOut + wInp + wCr + wCc]);
+      if (src.out > 0) rows.push([apiN2, nOut, wOut]);
+      if (src.inp > 0) rows.push([apiN2, nInp, wInp]);
+      if (src.cr > 0)  rows.push([apiN2, nCr,  wCr]);
+      if (src.cc > 0)  rows.push([apiN2, nCc,  wCc]);
+    }
+    if (src.out > 0) rows.push([nOut, resN, wOut]);
+    if (src.inp > 0) rows.push([nInp, resN, wInp]);
+    if (src.cr > 0)  rows.push([nCr,  resN, wCr]);
+    if (src.cc > 0)  rows.push([nCc,  resN, wCc]);
+  }
+
+  if (!rows.length) {
+    el.innerHTML = "";
+    return;
+  }
+
+  var data = new google.visualization.DataTable();
+  data.addColumn("string", "From");
+  data.addColumn("string", "To");
+  data.addColumn("number", "Weight");
+  data.addRows(rows);
+
+  var chart = new google.visualization.Sankey(el);
+  chart.draw(data, {
+    height: Math.max(250, rows.length * 16),
+    sankey: {
+      node: {
+        label: { fontSize: 11, bold: true, color: "#e2e8f0" },
+        nodePadding: 14,
+        width: 28,
+        colors: ["#94a3b8", "#22c55e", "#3b82f6", "#22d3ee", "#f59e0b", "#f87171", "#a855f7", "#8b5cf6"]
+      },
+      link: {
+        color: { fill: "#94a3b8", fillOpacity: 0.18 },
+        colorMode: "gradient"
+      }
+    }
+  });
+}
+
+function renderBudgetTrend(dailyTrend) {
+  if (_budgetCharts.trend) { _budgetCharts.trend.destroy(); _budgetCharts.trend = null; }
+  if (_budgetCharts.quota) { _budgetCharts.quota.destroy(); _budgetCharts.quota = null; }
+
+  var labels = dailyTrend.map(function(d) { return d.date; });
+
+  // ── Left chart: Efficiency (Output up, Overhead down) ──
+  var el = document.getElementById("c-budget-trend");
+  var h3 = document.getElementById("budget-trend-h3");
+  if (h3) h3.textContent = t("budgetTrendTitle");
+  var blurb = document.getElementById("budget-trend-blurb");
+  if (blurb) blurb.textContent = t("budgetTrendBlurb");
+
+  if (el && dailyTrend.length) {
+    var outputPctData = dailyTrend.map(function(d) { return d.output_pct; });
+    // Overhead inverted: shown as negative values below zero line
+    var overheadInvData = dailyTrend.map(function(d) { return d.overhead > 0 ? -Math.min(d.overhead, 100) : 0; });
+    var cacheMissData = dailyTrend.map(function(d) { return d.cache_miss_rate; });
+
+    _budgetCharts.trend = new Chart(el, {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: t("budgetTrendOutputPct"),
+            data: outputPctData,
+            borderColor: "rgba(34,197,94,0.9)",
+            backgroundColor: "rgba(34,197,94,0.15)",
+            tension: 0.3,
+            fill: "origin",
+            pointRadius: 3
+          },
+          {
+            label: t("budgetTrendOverhead"),
+            data: overheadInvData,
+            borderColor: "rgba(248,113,113,0.9)",
+            backgroundColor: "rgba(248,113,113,0.15)",
+            tension: 0.3,
+            fill: "origin",
+            pointRadius: 3
+          },
+          {
+            label: t("budgetTrendCacheMiss"),
+            data: cacheMissData,
+            borderColor: "rgba(245,158,11,0.8)",
+            backgroundColor: "transparent",
+            tension: 0.3,
+            fill: false,
+            borderDash: [5, 3],
+            pointRadius: 2
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        animation: false,
+        transitions: __chartTransitionsOff,
+        interaction: { mode: "index", intersect: false },
+        scales: {
+          x: { grid: { color: "rgba(51,65,85,0.3)" }, ticks: { color: "#94a3b8", maxRotation: 45 } },
+          y: {
+            grid: { color: "rgba(51,65,85,0.3)" },
+            ticks: {
+              color: "#94a3b8",
+              callback: function(v) {
+                if (v >= 0) return v + "%";
+                return Math.abs(v) + "x";
+              }
+            },
+            suggestedMin: -20,
+            suggestedMax: 50
+          }
+        },
+        plugins: {
+          legend: { labels: { color: "#cbd5e1" } },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                if (ctx.raw == null) return null;
+                if (ctx.datasetIndex === 1) return ctx.dataset.label + ": " + Math.abs(ctx.raw) + "x";
+                return ctx.dataset.label + ": " + ctx.raw + "%";
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // ── Right chart: Quota Usage ──
+  var el2 = document.getElementById("c-budget-quota");
+  var h32 = document.getElementById("budget-quota-h3");
+  if (h32) h32.textContent = t("budgetQuotaTitle");
+  var blurb2 = document.getElementById("budget-quota-blurb");
+  if (blurb2) blurb2.textContent = t("budgetQuotaBlurb");
+
+  if (el2 && dailyTrend.length) {
+    var quota5hData = dailyTrend.map(function(d) { return d.quota_5h; });
+    var quota7dData = dailyTrend.map(function(d) { return d.quota_7d; });
+    var fallbackData = dailyTrend.map(function(d) { return d.fallback_pct; });
+    var hasQuota = quota5hData.some(function(v) { return v != null; });
+    var hasFallback = fallbackData.some(function(v) { return v != null; });
+
+    var qDatasets = [];
+    if (hasQuota) {
+      qDatasets.push({
+        label: t("budgetTrendQuota5h"),
+        data: quota5hData,
+        borderColor: "rgba(168,85,247,0.9)",
+        backgroundColor: "rgba(168,85,247,0.1)",
+        tension: 0.3,
+        fill: true,
+        pointRadius: 4,
+        pointStyle: "rectRounded",
+        borderWidth: 2,
+        spanGaps: true
+      });
+      qDatasets.push({
+        label: t("budgetTrendQuota7d"),
+        data: quota7dData,
+        borderColor: "rgba(236,72,153,0.8)",
+        backgroundColor: "transparent",
+        tension: 0.3,
+        fill: false,
+        borderDash: [6, 3],
+        pointRadius: 3,
+        pointStyle: "triangle",
+        borderWidth: 2,
+        spanGaps: true
+      });
+    }
+    if (hasFallback) {
+      qDatasets.push({
+        label: t("budgetTrendFallback"),
+        data: fallbackData,
+        borderColor: "rgba(239,68,68,1)",
+        backgroundColor: "rgba(239,68,68,0.12)",
+        tension: 0,
+        fill: true,
+        pointRadius: 5,
+        pointStyle: "star",
+        borderWidth: 3,
+        spanGaps: true
+      });
+    }
+
+    if (qDatasets.length) {
+      _budgetCharts.quota = new Chart(el2, {
+        type: "line",
+        data: { labels: labels, datasets: qDatasets },
+        options: {
+          responsive: true,
+          animation: false,
+          transitions: __chartTransitionsOff,
+          interaction: { mode: "index", intersect: false },
+          scales: {
+            x: { grid: { color: "rgba(51,65,85,0.3)" }, ticks: { color: "#94a3b8", maxRotation: 45 } },
+            y: {
+              grid: { color: "rgba(51,65,85,0.3)" },
+              ticks: { color: "#a855f7", callback: function(v) { return v + "%"; } },
+              min: 0,
+              suggestedMax: 100
+            }
+          },
+          plugins: {
+            legend: { labels: { color: "#cbd5e1" } },
+            tooltip: {
+              callbacks: {
+                label: function(ctx) {
+                  if (ctx.raw == null) return null;
+                  return ctx.dataset.label + ": " + ctx.raw + "%";
+                }
+              }
+            }
+          }
+        }
+      });
+    } else {
+      el2.parentElement.style.display = "none";
+    }
+  }
 }
 
 // ── Proxy Analytics Panel ─────────────────────────────────────────────────
@@ -5223,7 +6251,51 @@ function computeKeyFindings(data) {
     }
   }
 
-  // 6. Peak Day
+  // 6. Fallback Budget (from proxy headers)
+  if (pd) {
+    var rl6 = pd.rate_limit || {};
+    var fb = rl6["anthropic-ratelimit-unified-fallback-percentage"];
+    if (fb != null) {
+      var fbPct = Math.round(parseFloat(fb) * 100);
+      findings.push({
+        icon: fbPct < 100 ? "red" : "green",
+        title: t("findingFallback"),
+        value: fbPct + "%",
+        detail: tr("findingFallbackDetail", { pct: fbPct })
+      });
+    }
+  }
+
+  // 7. Overage Policy (from proxy headers)
+  if (pd) {
+    var rl7 = pd.rate_limit || {};
+    var ovStatus = rl7["anthropic-ratelimit-unified-overage-status"];
+    var ovReason = rl7["anthropic-ratelimit-unified-overage-disabled-reason"];
+    if (ovStatus) {
+      findings.push({
+        icon: ovStatus === "rejected" ? "red" : "green",
+        title: t("findingOveragePolicy"),
+        value: ovStatus,
+        detail: ovReason ? tr("findingOveragePolicyDetail", { status: ovStatus, reason: ovReason }) : ovStatus
+      });
+    }
+  }
+
+  // 8. Binding Window (from proxy headers)
+  if (pd) {
+    var rl8 = pd.rate_limit || {};
+    var claim = rl8["anthropic-ratelimit-unified-representative-claim"];
+    if (claim) {
+      findings.push({
+        icon: claim === "five_hour" ? "yellow" : "green",
+        title: t("findingClaim"),
+        value: claim.replace(/_/g, " "),
+        detail: t("findingClaimDetail")
+      });
+    }
+  }
+
+  // 9. Peak Day
   if (peakDay) {
     findings.push({
       icon: peakTotal > 2e9 ? "red" : peakTotal > 500e6 ? "yellow" : "green",
@@ -5233,7 +6305,7 @@ function computeKeyFindings(data) {
     });
   }
 
-  // 7. Retries
+  // 10. Retries
   if (totalRetries > 0) {
     var rpd = Math.round(totalRetries / numDays);
     findings.push({
@@ -5244,7 +6316,7 @@ function computeKeyFindings(data) {
     });
   }
 
-  // 8. Cache paradox
+  // 11. Cache paradox
   if (pd && pd.cache_read_ratio > 0.9 && totalHits > 100) {
     findings.push({
       icon: "yellow",
@@ -5304,6 +6376,9 @@ function initFilterBar(data) {
   var days = data.days || [];
   if (!days.length) return;
 
+  // Filter bar title
+  var ftitle = document.getElementById('filter-bar-title');
+  if (ftitle) ftitle.textContent = t('filterBarTitle');
   // Date labels
   var dlabel = document.getElementById('filter-date-label');
   if (dlabel) dlabel.textContent = t('filterDateRange');
@@ -5422,6 +6497,30 @@ function initFilterBar(data) {
 function onFilterDateChange() {
   if (__lastUsageData) renderDashboard(__lastUsageData, true);
 }
+
+// ── Plan Selector ───────────────────────────────────────────────────────
+var __planLabels = { max5: "MAX 5", max20: "MAX 20", pro: "Pro", free: "Free", api: "API" };
+
+function getSelectedPlan() {
+  var sel = document.getElementById("plan-select");
+  return sel ? sel.value : (localStorage.getItem("cud_plan") || "max5");
+}
+
+function getSelectedPlanLabel() {
+  return __planLabels[getSelectedPlan()] || "MAX 5";
+}
+
+(function initPlanSelector() {
+  var saved = localStorage.getItem("cud_plan") || "max5";
+  var sel = document.getElementById("plan-select");
+  if (sel) {
+    sel.value = saved;
+    sel.addEventListener("change", function() {
+      localStorage.setItem("cud_plan", sel.value);
+      if (__lastUsageData) renderDashboard(__lastUsageData, true);
+    });
+  }
+})();
 
 function getFilterDateRange() {
   var s = document.getElementById('filter-date-start');
@@ -6518,7 +7617,9 @@ function inlineMd(s) {
         '<button id="dev-sync-btn" style="background:#f59e0b;color:#0f172a;border:none;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:.75rem;font-weight:600">Sync Now</button>' +
         '<span id="dev-sync-status" style="color:#64748b;font-size:.7rem"></span>';
       document.body.prepend(bar);
-      document.body.style.paddingTop = (bar.offsetHeight) + "px";
+      var devH = bar.offsetHeight;
+      document.body.style.paddingTop = devH + "px";
+      document.documentElement.style.setProperty("--dev-bar-h", devH + "px");
       document.getElementById("dev-sync-btn").addEventListener("click", function () {
         var st = document.getElementById("dev-sync-status");
         st.textContent = "syncing...";

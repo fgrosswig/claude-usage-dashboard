@@ -2022,6 +2022,121 @@ function hostSliceToApi(h) {
   };
 }
 
+// ── Release Stability Analysis ──────────────────────────────────────────
+var REVERT_KEYWORDS = ['revert', 'rollback', 'roll back', 'backed out', 'regression', 'hotfix'];
+
+function buildReleaseStabilityData() {
+  var rels = releasesCache.releases;
+  if (!rels || !rels.length) return null;
+
+  // Sort ascending by published_at
+  var sorted = rels.slice().sort(function(a, b) {
+    return (a.published_at || '').localeCompare(b.published_at || '');
+  });
+
+  // Parse into structured entries
+  var entries = [];
+  for (var i = 0; i < sorted.length; i++) {
+    var r = sorted[i];
+    var tag = (r.tag_name || '').replace(/^v/, '');
+    var parts = tag.split('.');
+    if (parts.length < 3) continue;
+    var major = parseInt(parts[0], 10) || 0;
+    var minor = parseInt(parts[1], 10) || 0;
+    var patch = parseInt(parts[2], 10) || 0;
+    var body = (r.body || '').toLowerCase();
+    var hasRegression = false;
+    var matchedKeywords = [];
+    for (var ki = 0; ki < REVERT_KEYWORDS.length; ki++) {
+      if (body.indexOf(REVERT_KEYWORDS[ki]) >= 0) {
+        hasRegression = true;
+        matchedKeywords.push(REVERT_KEYWORDS[ki]);
+      }
+    }
+    entries.push({
+      tag: r.tag_name || '',
+      date: (r.published_at || '').substring(0, 10),
+      major: major,
+      minor: minor,
+      patch: patch,
+      hasRegression: hasRegression,
+      matchedKeywords: matchedKeywords,
+      prerelease: !!r.prerelease
+    });
+  }
+
+  if (!entries.length) return null;
+
+  // Compute per-release metrics
+  var releases = [];
+  var totalSkipped = 0;
+  var hotfixCount = 0;
+  var regressionCount = 0;
+  for (var ri = 0; ri < entries.length; ri++) {
+    var cur = entries[ri];
+    var prev = ri > 0 ? entries[ri - 1] : null;
+
+    // Days active until next release
+    var daysActive = 0;
+    if (ri < entries.length - 1) {
+      var d1 = new Date(cur.date);
+      var d2 = new Date(entries[ri + 1].date);
+      daysActive = Math.max(0, Math.round((d2 - d1) / 86400000));
+    } else {
+      // Last release: days until today
+      var now = new Date();
+      var dLast = new Date(cur.date);
+      daysActive = Math.max(0, Math.round((now - dLast) / 86400000));
+    }
+
+    // Same-day hotfix detection
+    var isHotfix = prev ? (cur.date === prev.date) : false;
+    if (isHotfix) hotfixCount++;
+
+    // Skipped patches (only within same minor)
+    var skipped = 0;
+    if (prev && cur.minor === prev.minor) {
+      skipped = Math.max(0, cur.patch - prev.patch - 1);
+      totalSkipped += skipped;
+    }
+
+    if (cur.hasRegression) regressionCount++;
+
+    // Stability classification: hotfix > regression > stable
+    var stability = 'stable';
+    if (isHotfix) stability = 'hotfix';
+    else if (cur.hasRegression) stability = 'regression';
+
+    releases.push({
+      tag: cur.tag,
+      date: cur.date,
+      daysActive: daysActive,
+      stability: stability,
+      isHotfix: isHotfix,
+      hasRegression: cur.hasRegression,
+      matchedKeywords: cur.matchedKeywords,
+      skippedPatches: skipped
+    });
+  }
+
+  return {
+    releases: releases,
+    summary: {
+      total: releases.length,
+      totalSkipped: totalSkipped,
+      hotfixCount: hotfixCount,
+      regressionCount: regressionCount,
+      stableCount: releases.length - hotfixCount - regressionCount + (hotfixCount > 0 ? releases.filter(function(r) { return r.isHotfix && r.hasRegression; }).length : 0),
+      firstDate: entries[0].date,
+      lastDate: entries[entries.length - 1].date,
+      daysSpan: Math.round((new Date(entries[entries.length - 1].date) - new Date(entries[0].date)) / 86400000),
+      cadenceDays: entries.length > 1
+        ? Math.round((new Date(entries[entries.length - 1].date) - new Date(entries[0].date)) / 86400000 / (entries.length - 1) * 10) / 10
+        : 0
+    }
+  };
+}
+
 function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
   var days = Object.keys(daily).sort();
   var result = [];
@@ -2172,6 +2287,7 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
 
   return {
     days: result,
+    release_stability: buildReleaseStabilityData(),
     parsed_files: fileCount,
     scanned_files: scanned,
     scan_sources: scan_sources,
@@ -2697,6 +2813,7 @@ function runScanAndBroadcast() {
       cachedData = data;
       refreshProxyCache();
       if (__proxyCache.data) cachedData.proxy = __proxyCache.data;
+      cachedData.release_stability = buildReleaseStabilityData();
       scanOk = true;
     } catch (e) {
       serviceLog.error('scan', 'parse failed: ' + (e && e.message ? e.message : String(e)));
@@ -3145,6 +3262,7 @@ function devFetchRemoteUsage(cb, retryCount) {
           }
         }
         cachedData = remote;
+        cachedData.release_stability = buildReleaseStabilityData();
         serviceLog.info('dev', 'remote data fetched: ' + (remote.days || []).length + ' days, proxy_days=' + (remote.proxy && remote.proxy.proxy_days ? remote.proxy.proxy_days.length : 0));
         broadcastSse();
       } catch (e) {
