@@ -4632,7 +4632,7 @@ function renderBudgetWaterfall(tot, quota) {
     height: Math.max(250, rows.length * 16),
     sankey: {
       node: {
-        label: { fontSize: 11, bold: true, color: "#e2e8f0" },
+        label: { fontSize: 11, bold: true, color: "#1e293b" },
         nodePadding: 14,
         width: 18,
         colors: ["#94a3b8", "#22c55e", "#3b82f6", "#22d3ee", "#f59e0b", "#f87171", "#a855f7", "#8b5cf6"]
