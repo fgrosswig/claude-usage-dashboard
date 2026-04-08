@@ -4728,7 +4728,7 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
       node: {
         label: { fontSize: 11, bold: true, color: "#e2e8f0" },
         nodePadding: 14,
-        width: 18,
+        width: 28,
         colors: ["#94a3b8", "#22c55e", "#3b82f6", "#22d3ee", "#f59e0b", "#f87171", "#a855f7", "#8b5cf6"]
       },
       link: {
