@@ -421,5 +421,8 @@
   "budgetTrendOutputPct": "출력 %",
   "budgetTrendCacheMiss": "캐시 미스 %",
   "budgetTrendYOverhead": "오버헤드 배수",
-  "budgetTrendYPct": "백분율"
+  "budgetTrendYPct": "백분율",
+  "budgetTrendQuota5h": "쿼터 5h %",
+  "budgetTrendQuota7d": "쿼터 7d %",
+  "budgetTrendYQuota": "쿼터 / 출력 %"
 }

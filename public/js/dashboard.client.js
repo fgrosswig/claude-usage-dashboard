@@ -4417,7 +4417,28 @@ function renderBudgetEfficiency(data) {
   // Waterfall Chart
   renderBudgetWaterfall(tot, quota);
 
-  // Trend Chart
+  // Trend Chart — merge proxy quota history into daily trend
+  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  var quotaByDate = {};
+  for (var pi = 0; pi < proxyDays.length; pi++) {
+    var pd = proxyDays[pi];
+    if (pd.date && pd.rate_limit) {
+      var q5 = pd.rate_limit["anthropic-ratelimit-unified-5h-utilization"];
+      var q7 = pd.rate_limit["anthropic-ratelimit-unified-7d-utilization"];
+      quotaByDate[pd.date] = {
+        pct_5h: q5 != null ? Math.round(parseFloat(q5) * 1000) / 10 : null,
+        pct_7d: q7 != null ? Math.round(parseFloat(q7) * 1000) / 10 : null,
+        vis_per_pct: pd.visible_tokens_per_pct || 0
+      };
+    }
+  }
+  for (var ti = 0; ti < dailyTrend.length; ti++) {
+    var qd = quotaByDate[dailyTrend[ti].date];
+    dailyTrend[ti].quota_5h = qd ? qd.pct_5h : null;
+    dailyTrend[ti].quota_7d = qd ? qd.pct_7d : null;
+    dailyTrend[ti].vis_per_pct = qd ? qd.vis_per_pct : 0;
+  }
+
   renderBudgetTrend(dailyTrend);
 }
 
@@ -4564,46 +4585,68 @@ function renderBudgetTrend(dailyTrend) {
   var labels = dailyTrend.map(function(d) { return d.date; });
   var overheadData = dailyTrend.map(function(d) { return d.overhead; });
   var outputPctData = dailyTrend.map(function(d) { return d.output_pct; });
-  var cacheMissData = dailyTrend.map(function(d) { return d.cache_miss_rate; });
+  var quota5hData = dailyTrend.map(function(d) { return d.quota_5h; });
+  var quota7dData = dailyTrend.map(function(d) { return d.quota_7d; });
+
+  // Check if we have any quota data
+  var hasQuota = quota5hData.some(function(v) { return v != null; });
+
+  var datasets = [
+    {
+      label: t("budgetTrendOverhead"),
+      data: overheadData,
+      borderColor: "rgba(248,113,113,0.9)",
+      backgroundColor: "rgba(248,113,113,0.1)",
+      yAxisID: "y",
+      tension: 0.3,
+      fill: false,
+      pointRadius: 3
+    },
+    {
+      label: t("budgetTrendOutputPct"),
+      data: outputPctData,
+      borderColor: "rgba(34,197,94,0.9)",
+      backgroundColor: "rgba(34,197,94,0.15)",
+      yAxisID: "y1",
+      tension: 0.3,
+      fill: true,
+      pointRadius: 3
+    }
+  ];
+
+  if (hasQuota) {
+    datasets.push({
+      label: t("budgetTrendQuota5h"),
+      data: quota5hData,
+      borderColor: "rgba(168,85,247,0.9)",
+      backgroundColor: "rgba(168,85,247,0.1)",
+      yAxisID: "y1",
+      tension: 0.3,
+      fill: true,
+      pointRadius: 4,
+      pointStyle: "rectRounded",
+      borderWidth: 2,
+      spanGaps: true
+    });
+    datasets.push({
+      label: t("budgetTrendQuota7d"),
+      data: quota7dData,
+      borderColor: "rgba(236,72,153,0.8)",
+      backgroundColor: "transparent",
+      yAxisID: "y1",
+      tension: 0.3,
+      fill: false,
+      borderDash: [6, 3],
+      pointRadius: 3,
+      pointStyle: "triangle",
+      borderWidth: 2,
+      spanGaps: true
+    });
+  }
 
   _budgetCharts.trend = new Chart(el, {
     type: "line",
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: t("budgetTrendOverhead"),
-          data: overheadData,
-          borderColor: "rgba(248,113,113,0.9)",
-          backgroundColor: "rgba(248,113,113,0.1)",
-          yAxisID: "y",
-          tension: 0.3,
-          fill: false,
-          pointRadius: 3
-        },
-        {
-          label: t("budgetTrendOutputPct"),
-          data: outputPctData,
-          borderColor: "rgba(34,197,94,0.9)",
-          backgroundColor: "rgba(34,197,94,0.15)",
-          yAxisID: "y1",
-          tension: 0.3,
-          fill: true,
-          pointRadius: 3
-        },
-        {
-          label: t("budgetTrendCacheMiss"),
-          data: cacheMissData,
-          borderColor: "rgba(245,158,11,0.8)",
-          backgroundColor: "transparent",
-          yAxisID: "y1",
-          tension: 0.3,
-          fill: false,
-          borderDash: [5, 3],
-          pointRadius: 2
-        }
-      ]
-    },
+    data: { labels: labels, datasets: datasets },
     options: {
       responsive: true,
       maintainAspectRatio: true,
@@ -4625,10 +4668,10 @@ function renderBudgetTrend(dailyTrend) {
         y1: {
           position: "right",
           grid: { drawOnChartArea: false },
-          ticks: { color: "#22c55e", callback: function(v) { return v + "%"; } },
-          title: { display: true, text: t("budgetTrendYPct"), color: "#22c55e", font: { size: 11 } },
+          ticks: { color: "#a855f7", callback: function(v) { return v + "%"; } },
+          title: { display: true, text: hasQuota ? t("budgetTrendYQuota") : t("budgetTrendYPct"), color: hasQuota ? "#a855f7" : "#22c55e", font: { size: 11 } },
           min: 0,
-          max: 100
+          suggestedMax: 100
         }
       },
       plugins: {
@@ -4636,6 +4679,7 @@ function renderBudgetTrend(dailyTrend) {
         tooltip: {
           callbacks: {
             label: function(ctx) {
+              if (ctx.raw == null) return null;
               if (ctx.datasetIndex === 0) return ctx.dataset.label + ": " + ctx.raw + "x";
               return ctx.dataset.label + ": " + ctx.raw + "%";
             }
