@@ -4637,59 +4637,21 @@ function renderBudgetWaterfall(tot, quota) {
     if (pCc > 0)  flows.push({ from: nCacheC, to: nResult, flow: pCc });
   }
 
-  // Collect end-node keys (nodes with incoming but no outgoing flows)
+  // Force end-nodes to render as bars by adding tiny epsilon flows to a terminator
+  var termNode = " ";
+  labelMap[termNode] = " ";
+  nodeColors[termNode] = "rgba(0,0,0,0)";
   var outgoing = {};
   var incoming = {};
   for (var fi = 0; fi < flows.length; fi++) {
     outgoing[flows[fi].from] = true;
     incoming[flows[fi].to] = true;
   }
-  var endNodes = [];
   for (var nk in incoming) {
-    if (!outgoing[nk]) endNodes.push(nk);
-  }
-
-  // Plugin: draw right-side end bars after Sankey renders
-  var endBarPlugin = {
-    id: "sankeyEndBars",
-    afterDraw: function(chart) {
-      var meta = chart.getDatasetMeta(0);
-      if (!meta || !meta._parsed) return;
-      var ctx = chart.ctx;
-      var area = chart.chartArea;
-      // Find max X from all flow endpoints to position end bars
-      var nodes = meta.controller._nodes;
-      if (!nodes) return;
-      for (var nid in nodes) {
-        var found = false;
-        for (var ei = 0; ei < endNodes.length; ei++) {
-          if (nid === endNodes[ei]) { found = true; break; }
-        }
-        if (!found) continue;
-        var node = nodes[nid];
-        if (!node) continue;
-        var x = node.x != null ? node.x : (area.right - 30);
-        var y = node.y != null ? node.y : 0;
-        var h = node.height || node.h || 20;
-        var col = nodeColors[nid] || "#94a3b8";
-        ctx.save();
-        ctx.fillStyle = col;
-        ctx.globalAlpha = 0.85;
-        ctx.fillRect(x, y - h / 2, 30, h);
-        ctx.strokeStyle = "#e2e8f0";
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(x, y - h / 2, 30, h);
-        // Label
-        ctx.fillStyle = "#e2e8f0";
-        ctx.globalAlpha = 1;
-        ctx.font = "bold 10px monospace";
-        ctx.textAlign = "left";
-        ctx.textBaseline = "middle";
-        ctx.fillText(nid.split(" (")[0], x + 34, y);
-        ctx.restore();
-      }
+    if (!outgoing[nk]) {
+      flows.push({ from: nk, to: termNode, flow: 0.01 });
     }
-  };
+  }
 
   _budgetCharts.waterfall = new Chart(el, {
     type: "sankey",
@@ -4717,7 +4679,7 @@ function renderBudgetWaterfall(tot, quota) {
       maintainAspectRatio: true,
       aspectRatio: 3.5,
       animation: false,
-      layout: { padding: { right: 120 } },
+      layout: { padding: { right: 10 } },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -4734,8 +4696,7 @@ function renderBudgetWaterfall(tot, quota) {
           }
         }
       }
-    },
-    plugins: [endBarPlugin]
+    }
   });
 }
 
