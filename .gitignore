@@ -11,6 +11,7 @@
 !/.gitignore
 !/README.md
 !/README.en.md
+!/README.ko.md
 !/server.js
 !/start.js
 !/anthropic-proxy.js
@@ -62,6 +63,9 @@
 
 !/.woodpecker/
 !/.woodpecker/**/*
+# Woodpecker CLI/API Credentials — nie committen
+/.woodpecker/.api
+/.woodpecker/.cli
 
 # Lokale Secrets / Session-Token — explizit nie committen (Absicherung gegen spätere breitere !-Regeln)
 /.github_session_token

@@ -9,16 +9,16 @@ function fmt(n) {
   return String(n);
 }
 function pct(a,b){return b>0?(a/b*100).toFixed(1)+"%":"-";}
-function escHtml(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function escHtml(s){return String(s==null?"":s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll("\"","&quot;");}
 /** Stunden mit Arbeit (tokens) ∪ Stunden mit JSONL-Session-Signalen, nach Log-Zeitstempel. */
 function unionWorkHourKeys(sd) {
   var m = {};
   var k;
   var ho = sd.hours || {};
   var hs = sd.hour_signals || {};
-  for (k in ho) if (Object.prototype.hasOwnProperty.call(ho, k)) m[k] = true;
-  for (k in hs) if (Object.prototype.hasOwnProperty.call(hs, k)) m[k] = true;
-  return Object.keys(m).map(function (x) { return parseInt(x, 10); }).filter(function (n) { return !isNaN(n) && n >= 0 && n <= 23; });
+  for (k in ho) if (Object.hasOwn(ho, k)) m[k] = true;
+  for (k in hs) if (Object.hasOwn(hs, k)) m[k] = true;
+  return Object.keys(m).map(function (x) { return Number.parseInt(x, 10); }).filter(function (n) { return !Number.isNaN(n) && n >= 0 && n <= 23; });
 }
 function hourSignalsAt(sd, wh) {
   var hs = sd.hour_signals || {};
@@ -31,15 +31,30 @@ function hourHasTokenUsage(sd, wh) {
 function outageSpanHitsAtHour(spans, wh) {
   var hitSrv = false;
   var hitCli = false;
-  for (var oi = 0; oi < spans.length; oi++) {
-    if (wh >= Math.floor(spans[oi].from) && wh < Math.ceil(spans[oi].to)) {
-      if (spans[oi].kind === "server") hitSrv = true;
+  for (const span of spans) {
+    if (wh >= Math.floor(span.from) && wh < Math.ceil(span.to)) {
+      if (span.kind === "server") hitSrv = true;
       else hitCli = true;
     }
   }
   return { hitSrv: hitSrv, hitCli: hitCli };
 }
 /** Balken: nur Stunden mit echtem Token-Output zählen als betroffen/sauber (kein Aufblasen durch reine Session-Signale). */
+function classifyWorkHour(sd, spans, wh) {
+  var hasW = hourHasTokenUsage(sd, wh);
+  var hit = outageSpanHitsAtHour(spans, wh);
+  var sig = hourSignalsAt(sd, wh);
+  var ryH = sig.retry || 0;
+  var riH = sig.interrupt || 0;
+  if (hit.hitSrv && hasW) return "srv";
+  if (hit.hitCli && hasW) return "cli";
+  if (!hit.hitSrv && !hit.hitCli) {
+    if (hasW && ryH > 0) return "srv";
+    if (hasW && riH > 0) return "cli";
+    if (hasW) return "clean";
+  }
+  return "none";
+}
 function sumServiceImpactForDay(sd) {
   var wHrs = unionWorkHourKeys(sd);
   wHrs.sort(function (a, b) { return a - b; });
@@ -47,23 +62,14 @@ function sumServiceImpactForDay(sd) {
   var affSrv = 0;
   var affCli = 0;
   var cleanCount = 0;
-  for (var wi = 0; wi < wHrs.length; wi++) {
-    var wh = wHrs[wi];
-    var hasW = hourHasTokenUsage(sd, wh);
-    var hit = outageSpanHitsAtHour(spans, wh);
-    var sig = hourSignalsAt(sd, wh);
-    var ryH = sig.retry || 0;
-    var riH = sig.interrupt || 0;
-    if (hit.hitSrv && hasW) affSrv++;
-    else if (hit.hitCli && hasW) affCli++;
-    else if (!hit.hitSrv && !hit.hitCli) {
-      if (hasW && ryH > 0) affSrv++;
-      else if (hasW && riH > 0) affCli++;
-      else if (hasW) cleanCount++;
-    }
+  for (const wh of wHrs) {
+    var cls = classifyWorkHour(sd, spans, wh);
+    if (cls === "srv") affSrv++;
+    else if (cls === "cli") affCli++;
+    else if (cls === "clean") cleanCount++;
   }
   var outTotal = 0;
-  for (var oj = 0; oj < spans.length; oj++) outTotal += spans[oj].to - spans[oj].from;
+  for (const span of spans) outTotal += span.to - span.from;
   var outOnly = Math.max(0, Math.round((outTotal - affSrv - affCli) * 10) / 10);
   return { cleanWork: cleanCount, affSrv: affSrv, affCli: affCli, outOnly: outOnly };
 }
@@ -71,6 +77,18 @@ function sumServiceImpactForDay(sd) {
  *  Ausfallstunden als Balken: Höhe skaliert (Stunden vs. JSONL-Zähler), Tooltip zeigt echte h. Reihenfolge im Stack
  *  unten→oben = continue, resume, retry, interrupt, Ausfall (oben), damit Ausfall nicht unter großen Interrupt-Anteilen liegt.
  *  @param {string} [hostLabel] — wenn gesetzt: Signale + Cache Read nur aus days[].hosts[hostLabel]; outage_hours weiter Kalendertag (Anthropic). */
+function extractDaySignals(d, hostKey) {
+  if (hostKey) {
+    var H = d?.hosts?.[hostKey];
+    if (H) {
+      var sH = H.session_signals || {};
+      return { cont: sH.continue || 0, res: sH.resume || 0, retry: sH.retry || 0, intr: sH.interrupt || 0, cacheRead: H.cache_read == null ? 0 : Number(H.cache_read) || 0 };
+    }
+    return { cont: 0, res: 0, retry: 0, intr: 0, cacheRead: 0 };
+  }
+  var s = d?.session_signals || {};
+  return { cont: s.continue || 0, res: s.resume || 0, retry: s.retry || 0, intr: s.interrupt || 0, cacheRead: d?.cache_read == null ? 0 : Number(d.cache_read) || 0 };
+}
 function buildSessionSignalsStackedByDay(days, hostLabel) {
   var hostKey = hostLabel && String(hostLabel).trim() ? String(hostLabel).trim() : "";
   var cont = [];
@@ -79,34 +97,15 @@ function buildSessionSignalsStackedByDay(days, hostLabel) {
   var intr = [];
   var outageH = [];
   var cacheRead = [];
-  for (var di = 0; di < days.length; di++) {
-    var d = days[di];
-    var oh = d && d.outage_hours;
-    outageH.push(oh != null && !isNaN(Number(oh)) ? Number(oh) : 0);
-    if (hostKey) {
-      var H = d && d.hosts && d.hosts[hostKey];
-      if (H) {
-        var sH = H.session_signals || {};
-        cont.push(sH.continue || 0);
-        res.push(sH.resume || 0);
-        retry.push(sH.retry || 0);
-        intr.push(sH.interrupt || 0);
-        cacheRead.push(H.cache_read != null ? Number(H.cache_read) || 0 : 0);
-      } else {
-        cont.push(0);
-        res.push(0);
-        retry.push(0);
-        intr.push(0);
-        cacheRead.push(0);
-      }
-      continue;
-    }
-    var s = (d && d.session_signals) || {};
-    cont.push(s.continue || 0);
-    res.push(s.resume || 0);
-    retry.push(s.retry || 0);
-    intr.push(s.interrupt || 0);
-    cacheRead.push(d && d.cache_read != null ? Number(d.cache_read) || 0 : 0);
+  for (const d of days) {
+    var oh = d?.outage_hours;
+    outageH.push(oh != null && !Number.isNaN(Number(oh)) ? Number(oh) : 0);
+    var sig = extractDaySignals(d, hostKey);
+    cont.push(sig.cont);
+    res.push(sig.res);
+    retry.push(sig.retry);
+    intr.push(sig.intr);
+    cacheRead.push(sig.cacheRead);
   }
   var maxSig = 0;
   for (var si = 0; si < cont.length; si++) {
@@ -138,30 +137,32 @@ function buildSessionSignalsStackedByDay(days, hostLabel) {
 
 var I18N = (typeof __I18N_BUNDLES === "object" && __I18N_BUNDLES && __I18N_BUNDLES.de && __I18N_BUNDLES.en)
   ? __I18N_BUNDLES
-  : { de: {}, en: {} };
+  : { de: {}, en: {}, ko: {} };
 function detectLang() {
   try {
     var sv = localStorage.getItem("usageDashboardLang");
-    if (sv === "de" || sv === "en") return sv;
+    if (sv === "de" || sv === "en" || sv === "ko") return sv;
   } catch (e0) {}
   var langs = navigator.languages;
   if (langs && langs.length) {
     for (var li = 0; li < langs.length; li++) {
       var x = String(langs[li] || "").toLowerCase();
-      if (x.indexOf("de") === 0) return "de";
+      if (x.startsWith("ko")) return "ko";
+      if (x.startsWith("de")) return "de";
     }
   }
   var nav = String(navigator.language || "").toLowerCase();
-  if (nav.indexOf("de") === 0) return "de";
+  if (nav.startsWith("ko")) return "ko";
+  if (nav.startsWith("de")) return "de";
   return "en";
 }
 var __lang = detectLang();
 function getLang() { return __lang; }
 function setLang(code) {
-  if (code !== "de" && code !== "en") return;
+  if (code !== "de" && code !== "en" && code !== "ko") return;
   __lang = code;
   try { localStorage.setItem("usageDashboardLang", code); } catch (e1) {}
-  document.documentElement.lang = code === "de" ? "de" : "en";
+  document.documentElement.lang = code;
   updateLangButtons();
   applyStaticChrome();
   if (typeof __lastUsageData !== "undefined" && __lastUsageData) renderDashboard(__lastUsageData, true);
@@ -335,13 +336,13 @@ function dayNumericForMainCharts(d, hostKey, field) {
 }
 function dayRatioCacheOutForMainCharts(d, hostKey) {
   if (!hostKey) return d.cache_output_ratio || 0;
-  var H = d.hosts && d.hosts[hostKey];
-  return H && H.cache_output_ratio != null ? H.cache_output_ratio : 0;
+  var H = d.hosts?.[hostKey];
+  return H?.cache_output_ratio ?? 0;
 }
 function dayOutputPerHourForMainCharts(d, hostKey) {
   if (!hostKey) return d.output_per_hour || 0;
-  var H = d.hosts && d.hosts[hostKey];
-  return H && H.output_per_hour != null ? H.output_per_hour : 0;
+  var H = d.hosts?.[hostKey];
+  return H?.output_per_hour ?? 0;
 }
 function subCachePctForDayMainCharts(d, hostKey) {
   if (!hostKey) return d.sub_cache_pct != null ? d.sub_cache_pct : 0;
@@ -457,6 +458,7 @@ function syncMainChartsScopeUi() {
 function updateLangButtons() {
   var bde = document.getElementById("lang-de");
   var ben = document.getElementById("lang-en");
+  var bko = document.getElementById("lang-ko");
   if (bde) {
     bde.classList.toggle("active", __lang === "de");
     bde.setAttribute("aria-pressed", __lang === "de" ? "true" : "false");
@@ -464,6 +466,10 @@ function updateLangButtons() {
   if (ben) {
     ben.classList.toggle("active", __lang === "en");
     ben.setAttribute("aria-pressed", __lang === "en" ? "true" : "false");
+  }
+  if (bko) {
+    bko.classList.toggle("active", __lang === "ko");
+    bko.setAttribute("aria-pressed", __lang === "ko" ? "true" : "false");
   }
 }
 function apiNote(data, deKey, enKey) {
@@ -1139,7 +1145,7 @@ if (typeof Chart !== "undefined") {
   };
   Chart.defaults.responsive = true;
   Chart.defaults.resizeDelay = 300;
-  Chart.defaults.devicePixelRatio = window.devicePixelRatio || 1;
+  Chart.defaults.devicePixelRatio = Math.max(window.devicePixelRatio || 1, 2);
 
 }
 var __usageUpdatePluginRegistered = false;
@@ -3743,8 +3749,10 @@ function copyReport(){
 (function(){
   var bde=document.getElementById("lang-de");
   var ben=document.getElementById("lang-en");
+  var bko=document.getElementById("lang-ko");
   if(bde) bde.addEventListener("click",function(){ setLang("de"); });
   if(ben) ben.addEventListener("click",function(){ setLang("en"); });
+  if(bko) bko.addEventListener("click",function(){ setLang("ko"); });
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) return;
     updateGithubTokenPanelMode();
@@ -3814,7 +3822,7 @@ function copyReport(){
 // ── User Profile Charts ──────────────────────────────────────────────────
 var _userCharts = { versions: null, entrypoints: null };
 var __userVersionSort = "anomalies"; // anomalies | newest | calls
-var __userVersionFilter = []; // empty = all
+var __userVersionFilter = null; // null = all, [] = none selected
 
 var __userProfileColors = [
   "rgba(59,130,246,0.8)",   // blue
@@ -3838,33 +3846,39 @@ var __versionHealthMetrics = [
 function semverCmpDesc(a, b) {
   var pa = a.split(".").map(Number);
   var pb = b.split(".").map(Number);
-  for (var i = 0; i < 3; i++) {
+  for (const i of [0, 1, 2]) {
     var da = pa[i] || 0, db = pb[i] || 0;
     if (da !== db) return db - da;
   }
   return 0;
 }
 
+function mergeVersionEntry(tgt, src) {
+  for (const fk of Object.keys(src)) {
+    if (fk === 'entrypoints') {
+      for (const ek of Object.keys(src.entrypoints || {})) {
+        tgt.entrypoints[ek] = (tgt.entrypoints[ek] || 0) + (src.entrypoints[ek] || 0);
+      }
+    } else {
+      tgt[fk] = (tgt[fk] || 0) + (src[fk] || 0);
+    }
+  }
+}
+
 function aggregateVersionStats(days) {
   var merged = {};
-  for (var di = 0; di < days.length; di++) {
-    var vs = days[di].version_stats || {};
-    var vk = Object.keys(vs);
-    for (var vi = 0; vi < vk.length; vi++) {
-      var ver = vk[vi];
-      if (!merged[ver]) merged[ver] = { calls: 0, output: 0, cache_read: 0, hit_limit: 0, retry: 0, interrupt: 0, continue: 0, resume: 0, truncated: 0, api_error: 0 };
-      var src = vs[ver];
-      var tgt = merged[ver];
-      var fk = Object.keys(src);
-      for (var fi = 0; fi < fk.length; fi++) {
-        tgt[fk[fi]] = (tgt[fk[fi]] || 0) + (src[fk[fi]] || 0);
-      }
+  for (const day of days) {
+    var vs = day.version_stats || {};
+    for (const ver of Object.keys(vs)) {
+      if (!merged[ver]) merged[ver] = { calls: 0, output: 0, cache_read: 0, hit_limit: 0, retry: 0, interrupt: 0, continue: 0, resume: 0, truncated: 0, api_error: 0, entrypoints: {} };
+      mergeVersionEntry(merged[ver], vs[ver]);
     }
   }
   return merged;
 }
 
 function versionAnomalyTotal(s) {
+  if (!s) return 0;
   return (s.hit_limit || 0) + (s.retry || 0) + (s.interrupt || 0) + (s.truncated || 0) + (s.api_error || 0);
 }
 
@@ -3873,256 +3887,294 @@ function sortVersionKeys(keys, stats, mode) {
   if (mode === "newest") {
     arr.sort(semverCmpDesc);
   } else if (mode === "calls") {
-    arr.sort(function(a, b) { return (stats[b].calls || 0) - (stats[a].calls || 0); });
+    arr.sort(function(a, b) { return (stats[b]?.calls || 0) - (stats[a]?.calls || 0); });
   } else {
     arr.sort(function(a, b) { return versionAnomalyTotal(stats[b]) - versionAnomalyTotal(stats[a]); });
   }
   return arr;
 }
 
-function initUserVersionControls(stats, days) {
+var __userFilterDdOpen = false;
+
+function initVersionSortDropdown(days) {
   var sortEl = document.getElementById("user-version-sort");
-  var filterEl = document.getElementById("user-version-filter");
-  if (sortEl && !sortEl.options.length) {
-    var opts = [
-      { val: "anomalies", lbl: t("userSortAnomalies") },
-      { val: "newest", lbl: t("userSortNewest") },
-      { val: "calls", lbl: t("userSortCalls") }
-    ];
-    for (var oi = 0; oi < opts.length; oi++) {
-      var o = document.createElement("option");
-      o.value = opts[oi].val;
-      o.textContent = opts[oi].lbl;
-      if (opts[oi].val === __userVersionSort) o.selected = true;
-      sortEl.appendChild(o);
-    }
-    sortEl.addEventListener("change", function() {
-      __userVersionSort = sortEl.value;
-      renderUserProfileCharts(days);
-    });
+  if (!sortEl || sortEl.options.length) return;
+  var opts = [
+    { val: "anomalies", lbl: t("userSortAnomalies") },
+    { val: "newest", lbl: t("userSortNewest") },
+    { val: "calls", lbl: t("userSortCalls") }
+  ];
+  for (const opt of opts) {
+    var o = document.createElement("option");
+    o.value = opt.val;
+    o.textContent = opt.lbl;
+    if (opt.val === __userVersionSort) o.selected = true;
+    sortEl.appendChild(o);
   }
-  if (filterEl) {
-    var allVers = Object.keys(stats).sort(semverCmpDesc);
-    filterEl.innerHTML = "";
-    for (var fi = 0; fi < allVers.length; fi++) {
-      var fo = document.createElement("option");
-      fo.value = allVers[fi];
-      fo.textContent = allVers[fi];
-      fo.selected = !__userVersionFilter.length || __userVersionFilter.indexOf(allVers[fi]) >= 0;
-      filterEl.appendChild(fo);
-    }
-    filterEl.onchange = function() {
-      var sel = [];
-      for (var si = 0; si < filterEl.options.length; si++) {
-        if (filterEl.options[si].selected) sel.push(filterEl.options[si].value);
-      }
-      __userVersionFilter = sel.length === allVers.length ? [] : sel;
-      renderUserProfileCharts(days);
-    };
+  sortEl.addEventListener("change", function() {
+    __userVersionSort = sortEl.value;
+    renderUserProfileCharts(days);
+  });
+}
+
+function buildFilterCheckboxHtml(allVers, stats) {
+  var html = "";
+  for (const v of allVers) {
+    var checked = !__userVersionFilter || __userVersionFilter.includes(v);
+    var anomalies = versionAnomalyTotal(stats[v]);
+    var calls = stats[v]?.calls || 0;
+    var badge = "";
+    if (anomalies > 0) badge = " (" + anomalies + "!)";
+    else if (calls > 0) badge = " (" + calls + ")";
+    html += '<label><input type="checkbox" value="' + v + '"' + (checked ? ' checked' : '') + '>' + v + '<span style="color:#64748b;font-size:.65rem">' + badge + '</span></label>';
   }
+  html += '<div class="user-filter-actions"><button id="user-ver-all">Alle</button><button id="user-ver-none">Keine</button></div>';
+  return html;
+}
+
+function initUserVersionControls(stats, days) {
+  initVersionSortDropdown(days);
+
+  var btn = document.getElementById("user-version-filter-btn");
+  var dd = document.getElementById("user-version-filter-dd");
+  var countEl = document.getElementById("user-version-filter-count");
+  if (!btn || !dd) return;
+
+  var allVers = Object.keys(stats).sort(semverCmpDesc);
+
+  function updateCount() {
+    var n = __userVersionFilter ? __userVersionFilter.length : 0;
+    if (countEl) countEl.textContent = n ? "(" + n + "/" + allVers.length + ")" : "(" + allVers.length + ")";
+  }
+
+  dd.innerHTML = buildFilterCheckboxHtml(allVers, stats);
+  updateCount();
+
+  btn.onclick = function(e) {
+    e.stopPropagation();
+    __userFilterDdOpen = !__userFilterDdOpen;
+    dd.classList.toggle("open", __userFilterDdOpen);
+  };
+
+  document.addEventListener("click", function(e) {
+    if (__userFilterDdOpen && !dd.contains(e.target) && e.target !== btn) {
+      __userFilterDdOpen = false;
+      dd.classList.remove("open");
+    }
+  });
+
+  var cbs = dd.querySelectorAll('input[type=checkbox]');
+  function applyFilter() {
+    var sel = [];
+    for (const cb of cbs) {
+      if (cb.checked) sel.push(cb.value);
+    }
+    __userVersionFilter = sel.length === allVers.length ? null : sel;
+    updateCount();
+    renderUserProfileCharts(days);
+  }
+  for (const cb of cbs) {
+    cb.addEventListener("change", applyFilter);
+  }
+
+  var allBtn = document.getElementById("user-ver-all");
+  var noneBtn = document.getElementById("user-ver-none");
+  if (allBtn) allBtn.onclick = function() {
+    for (const cb of cbs) cb.checked = true;
+    applyFilter();
+  };
+  if (noneBtn) noneBtn.onclick = function() {
+    for (const cb of cbs) cb.checked = false;
+    applyFilter();
+  };
+}
+
+function collectAllVersionKeys(stats, days) {
+  var allVers = Object.keys(stats);
+  if (allVers.length) return allVers;
+  return collectFallbackVersionKeys(days);
+}
+
+function collectFallbackVersionKeys(days) {
+  var fallbackVers = {};
+  for (const day of days) {
+    for (const fk of Object.keys(day.versions || {})) fallbackVers[fk] = true;
+  }
+  return Object.keys(fallbackVers);
+}
+
+function maxKeyByValue(obj) {
+  var best = "", bestVal = 0;
+  for (const k of Object.keys(obj)) {
+    if (obj[k] > bestVal) { best = k; bestVal = obj[k]; }
+  }
+  return best;
+}
+
+function findLatestDayTopEntries(days) {
+  for (var ldi = days.length - 1; ldi >= 0; ldi--) {
+    var ldv = days[ldi].versions || {};
+    if (Object.keys(ldv).length) {
+      return { topVersion: maxKeyByValue(ldv), topEntrypoint: maxKeyByValue(days[ldi].entrypoints || {}) };
+    }
+  }
+  return { topVersion: "", topEntrypoint: "" };
+}
+
+function computeAnomalyStats(allVers, stats) {
+  var totalCalls = 0;
+  var totalAnomalies = 0;
+  var worstVer = "";
+  var worstAnomaly = 0;
+  for (const ver of allVers) {
+    var sv = stats[ver];
+    if (sv) {
+      totalCalls += sv.calls || 0;
+      totalAnomalies += versionAnomalyTotal(sv);
+      var wa = versionAnomalyTotal(sv);
+      if (wa > worstAnomaly) { worstAnomaly = wa; worstVer = ver; }
+    }
+  }
+  var anomalyRate = totalCalls > 0 ? Math.round(totalAnomalies / totalCalls * 100) : 0;
+  return { totalCalls: totalCalls, totalAnomalies: totalAnomalies, anomalyRate: anomalyRate, worstVer: worstVer, worstAnomaly: worstAnomaly };
 }
 
 function renderUserProfileCharts(days) {
   var sumEl = document.getElementById("user-profile-summary-line");
-  var cardsEl = document.getElementById("user-profile-cards");
   if (!sumEl) return;
 
   if (!days || !days.length) {
     sumEl.textContent = t("userProfileNoData");
-    if (cardsEl) cardsEl.innerHTML = "";
     return;
   }
 
-  // Aggregate version_stats across all filtered days
   var stats = aggregateVersionStats(days);
-  var allVers = Object.keys(stats);
-  if (!allVers.length) {
-    // Fallback: use versions counter if version_stats not yet populated
-    var fallbackVers = {};
-    for (var fdi = 0; fdi < days.length; fdi++) {
-      var fv = days[fdi].versions || {};
-      var fvk = Object.keys(fv);
-      for (var fvi = 0; fvi < fvk.length; fvi++) fallbackVers[fvk[fvi]] = true;
-    }
-    allVers = Object.keys(fallbackVers);
-  }
+  var allVers = collectAllVersionKeys(stats, days);
 
-  // Collect entrypoints
-  var allEntrypoints = {};
-  for (var dei = 0; dei < days.length; dei++) {
-    var de = days[dei].entrypoints || {};
-    var dek = Object.keys(de);
-    for (var deki = 0; deki < dek.length; deki++) allEntrypoints[dek[deki]] = true;
-  }
-  var entrypointKeys = Object.keys(allEntrypoints).sort();
-
-  // Latest day summary
-  var lastDay = days[days.length - 1];
-  var topVersion = "";
-  var topVersionCount = 0;
-  var lv = lastDay.versions || {};
-  var lvk = Object.keys(lv);
-  for (var tvi = 0; tvi < lvk.length; tvi++) {
-    if (lv[lvk[tvi]] > topVersionCount) { topVersion = lvk[tvi]; topVersionCount = lv[lvk[tvi]]; }
-  }
-  var topEntrypoint = "";
-  var topEpCount = 0;
-  var le = lastDay.entrypoints || {};
-  var lek = Object.keys(le);
-  for (var tei = 0; tei < lek.length; tei++) {
-    if (le[lek[tei]] > topEpCount) { topEntrypoint = lek[tei]; topEpCount = le[lek[tei]]; }
-  }
-
-  // Anomaly rate
-  var totalCalls = 0;
-  var totalAnomalies = 0;
-  for (var ai = 0; ai < allVers.length; ai++) {
-    var sv = stats[allVers[ai]];
-    if (sv) {
-      totalCalls += sv.calls || 0;
-      totalAnomalies += versionAnomalyTotal(sv);
-    }
-  }
-  var anomalyRate = totalCalls > 0 ? Math.round(totalAnomalies / totalCalls * 100) : 0;
+  var top = findLatestDayTopEntries(days);
+  var anom = computeAnomalyStats(allVers, stats);
 
   sumEl.textContent = t("userProfileSummary")
-    .replace("{version}", topVersion || "?")
-    .replace("{entrypoint}", topEntrypoint || "?")
-    .replace("{rate}", String(anomalyRate));
-
-  // Worst version
-  var worstVer = "";
-  var worstAnomaly = 0;
-  for (var wi = 0; wi < allVers.length; wi++) {
-    var wv = stats[allVers[wi]];
-    if (wv) {
-      var wa = versionAnomalyTotal(wv);
-      if (wa > worstAnomaly) { worstAnomaly = wa; worstVer = allVers[wi]; }
-    }
-  }
-
-  // Cards
-  if (cardsEl) {
-    var cards = [];
-    cards.push('<div class="card"><div class="label">' + t("userProfileCardVersion") + '</div><div class="value">' + (topVersion || "?") + '</div><div class="sub">' + allVers.length + ' Version' + (allVers.length !== 1 ? 'en' : '') + '</div></div>');
-    cards.push('<div class="card"><div class="label">' + t("userProfileCardAnomalyRate") + '</div><div class="value">' + anomalyRate + '%</div><div class="sub">' + totalAnomalies + ' / ' + totalCalls + ' Calls</div></div>');
-    if (worstVer) {
-      cards.push('<div class="card' + (worstAnomaly > 0 ? ' warn' : '') + '"><div class="label">' + t("userProfileCardWorstVer") + '</div><div class="value">' + worstVer + '</div><div class="sub">' + worstAnomaly + ' Anomalien</div></div>');
-    }
-    if (topEntrypoint) {
-      cards.push('<div class="card"><div class="label">' + t("userProfileCardEntrypoint") + '</div><div class="value">' + topEntrypoint + '</div><div class="sub">' + entrypointKeys.length + ' Client' + (entrypointKeys.length !== 1 ? 's' : '') + '</div></div>');
-    }
-    cardsEl.innerHTML = cards.join("");
-  }
+    .replace("{version}", top.topVersion || "?")
+    .replace("{entrypoint}", top.topEntrypoint || "?")
+    .replace("{verCount}", String(allVers.length))
+    .replace("{rate}", String(anom.anomalyRate))
+    .replace("{anomalies}", String(anom.totalAnomalies))
+    .replace("{calls}", String(anom.totalCalls))
+    .replace("{worst}", anom.worstVer || "-")
+    .replace("{worstCount}", String(anom.worstAnomaly));
 
   // Init sort/filter controls
   initUserVersionControls(stats, days);
 
-  // ── Version Health Chart (horizontal bar) ──
+  // Sort + filter (declared here so it's available for both charts)
+  var filteredVers = __userVersionFilter
+    ? allVers.filter(function(v) { return __userVersionFilter.includes(v); })
+    : allVers;
+  var sortedVers = sortVersionKeys(filteredVers, stats, __userVersionSort);
+
+  renderVersionHealthChart(sortedVers, stats, allVers);
+  renderEntrypointsChart(sortedVers, stats);
+}
+
+function renderVersionHealthChart(sortedVers, stats, allVers) {
   var elV = document.getElementById("c-user-versions");
   var h3V = document.getElementById("user-version-h3");
   if (h3V) h3V.textContent = t("userVersionHealthTitle");
-  if (elV && allVers.length) {
-    if (_userCharts.versions) { _userCharts.versions.destroy(); _userCharts.versions = null; }
+  var blurbV = document.getElementById("user-version-blurb");
+  if (blurbV) blurbV.textContent = t("userVersionHealthBlurb");
+  if (!elV || !allVers.length) return;
+  if (_userCharts.versions) { _userCharts.versions.destroy(); _userCharts.versions = null; }
 
-    // Sort + filter
-    var filteredVers = __userVersionFilter.length
-      ? allVers.filter(function(v) { return __userVersionFilter.indexOf(v) >= 0; })
-      : allVers;
-    var sortedVers = sortVersionKeys(filteredVers, stats, __userVersionSort);
+  var datasets = [];
+  for (const m of __versionHealthMetrics) {
+    var mData = sortedVers.map(function(sv) { return stats[sv] ? (stats[sv][m.key] || 0) : 0; });
+    datasets.push({ label: t(m.label), data: mData, backgroundColor: m.color });
+  }
 
-    var datasets = [];
-    for (var mi = 0; mi < __versionHealthMetrics.length; mi++) {
-      var m = __versionHealthMetrics[mi];
-      var mData = [];
-      for (var mvi = 0; mvi < sortedVers.length; mvi++) {
-        var sv2 = stats[sortedVers[mvi]];
-        mData.push(sv2 ? (sv2[m.key] || 0) : 0);
-      }
-      datasets.push({
-        label: t(m.label),
-        data: mData,
-        backgroundColor: m.color
-      });
-    }
-
-    _userCharts.versions = new Chart(elV, {
-      type: "bar",
-      data: { labels: sortedVers, datasets: datasets },
-      options: {
-        indexAxis: "y",
-        responsive: true,
-        animation: false,
-        transitions: __chartTransitionsOff,
-        interaction: { mode: "index", intersect: false },
-        scales: {
-          x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8", precision: 0 } },
-          y: { stacked: true, grid: { color: "rgba(51,65,85,0.3)" }, ticks: { color: "#e2e8f0", font: { family: "monospace" } } }
-        },
-        plugins: {
-          legend: { labels: { color: "#cbd5e1" } },
-          tooltip: {
-            callbacks: {
-              afterBody: function(items) {
-                if (!items.length) return "";
-                var ver = sortedVers[items[0].dataIndex];
-                var s = stats[ver];
-                if (!s) return "";
-                return t("userProfileCardVersion") + ": " + ver + " | Calls: " + (s.calls || 0) + " | Output: " + (s.output || 0);
-              }
+  _userCharts.versions = new Chart(elV, {
+    type: "bar",
+    data: { labels: sortedVers, datasets: datasets },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      animation: false,
+      transitions: __chartTransitionsOff,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8", precision: 0 } },
+        y: { stacked: true, grid: { color: "rgba(51,65,85,0.3)" }, ticks: { color: "#e2e8f0", font: { family: "monospace" } } }
+      },
+      plugins: {
+        legend: { labels: { color: "#cbd5e1" } },
+        tooltip: {
+          callbacks: {
+            afterBody: function(items) {
+              if (!items.length) return "";
+              var ver = sortedVers[items[0].dataIndex];
+              var s = stats[ver];
+              if (!s) return "";
+              return t("userProfileCardVersion") + ": " + ver + " | Calls: " + (s.calls || 0) + " | Output: " + (s.output || 0);
             }
           }
         }
       }
-    });
-  }
+    }
+  });
+}
 
-  // ── Entrypoints Chart ──
+function renderEntrypointsChart(sortedVers, stats) {
   var elE = document.getElementById("c-user-entrypoints");
   var h3E = document.getElementById("user-entrypoint-h3");
   if (h3E) h3E.textContent = t("userEntrypointChartTitle");
-  if (elE && entrypointKeys.length) {
-    if (_userCharts.entrypoints) { _userCharts.entrypoints.destroy(); _userCharts.entrypoints = null; }
-    var epColors = {
-      "claude-vscode": "rgba(59,130,246,0.8)",
-      "cli": "rgba(34,197,94,0.8)",
-      "claude-jetbrains": "rgba(245,158,11,0.8)"
-    };
-    var labels = [];
-    for (var li = 0; li < days.length; li++) labels.push(days[li].date || "");
-    var eDatasets = [];
-    for (var edi = 0; edi < entrypointKeys.length; edi++) {
-      var eKey = entrypointKeys[edi];
-      var eData = [];
-      for (var edd = 0; edd < days.length; edd++) {
-        eData.push((days[edd].entrypoints || {})[eKey] || 0);
-      }
-      eDatasets.push({
-        label: eKey,
-        data: eData,
-        backgroundColor: epColors[eKey] || __userProfileColors[edi % __userProfileColors.length],
-        stack: "ep"
-      });
+  var blurbE = document.getElementById("user-entrypoint-blurb");
+  if (blurbE) blurbE.textContent = t("userEntrypointBlurb");
+  if (!elE || !sortedVers.length) return;
+  if (_userCharts.entrypoints) { _userCharts.entrypoints.destroy(); _userCharts.entrypoints = null; }
+
+  var allEp = {};
+  for (const sv of sortedVers) {
+    if (stats[sv]?.entrypoints) {
+      for (const epk of Object.keys(stats[sv].entrypoints)) allEp[epk] = true;
     }
-    _userCharts.entrypoints = new Chart(elE, {
-      type: "bar",
-      data: { labels: labels, datasets: eDatasets },
-      options: {
-        responsive: true,
-        animation: false,
-        transitions: __chartTransitionsOff,
-        interaction: { mode: "index", intersect: false },
-        scales: {
-          x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8" } },
-          y: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8", precision: 0 }, title: { display: true, text: "Calls", color: "#94a3b8" } }
-        },
-        plugins: {
-          legend: { labels: { color: "#cbd5e1" } },
-          tooltip: { callbacks: { label: function(c) { return c.dataset.label + ": " + c.raw; } } }
-        }
-      }
+  }
+  var epKeys = Object.keys(allEp).sort(function(a, b) { return a.localeCompare(b); });
+
+  var epColors = {
+    "claude-vscode": "rgba(59,130,246,0.8)",
+    "cli": "rgba(34,197,94,0.8)",
+    "claude-jetbrains": "rgba(245,158,11,0.8)"
+  };
+  var epDatasets = [];
+  for (var edi = 0; edi < epKeys.length; edi++) {
+    var eKey = epKeys[edi];
+    var eData = sortedVers.map(function(sv) { return stats[sv]?.entrypoints ? (stats[sv].entrypoints[eKey] || 0) : 0; });
+    epDatasets.push({
+      label: eKey,
+      data: eData,
+      backgroundColor: epColors[eKey] || __userProfileColors[edi % __userProfileColors.length],
+      stack: "ep"
     });
   }
+  _userCharts.entrypoints = new Chart(elE, {
+    type: "bar",
+    data: { labels: sortedVers, datasets: epDatasets },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      animation: false,
+      transitions: __chartTransitionsOff,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8", precision: 0 } },
+        y: { stacked: true, grid: { color: "rgba(51,65,85,0.3)" }, ticks: { color: "#e2e8f0", font: { family: "monospace" } } }
+      },
+      plugins: {
+        legend: { labels: { color: "#cbd5e1" } },
+        tooltip: { callbacks: { label: function(c) { return c.dataset.label + ": " + c.raw; } } }
+      }
+    }
+  });
 }
 
 // ── Proxy Analytics Panel ─────────────────────────────────────────────────
@@ -4266,8 +4318,8 @@ function renderProxyAnalysis(data) {
 
   renderProxyTokenChart(data);
   renderProxyLatencyChart(data);
-  renderProxyHourlyHeatmap(pd);
-  renderProxyModelChart(pd);
+  renderProxyHourlyHeatmap(data);
+  renderProxyModelChart(data);
   renderProxyInvisibleCost(pd);
   // i18n for new chart headings
   var h3hr = document.getElementById("proxy-hourly-h3");
@@ -4279,8 +4331,10 @@ function renderProxyAnalysis(data) {
   var blurbMod = document.getElementById("proxy-model-blurb");
   if (blurbMod) blurbMod.textContent = t("proxyModelBlurb");
   renderProxyColdStart(pd);
-  renderProxyJsonlComparison(data);
-  renderProxyHourlyLatency(pd);
+  renderProxyHourlyLatency(data);
+  renderProxyErrorTrend(data);
+  renderProxyCacheTrend(data);
+  renderProxyEfficiencyTrend(data);
   var h3hl = document.getElementById("proxy-hourly-latency-h3");
   if (h3hl) h3hl.textContent = t("proxyHourlyLatencyTitle");
   var blurbHl = document.getElementById("proxy-hourly-latency-blurb");
@@ -4302,7 +4356,7 @@ function gaugeColor(pct) {
 
 function renderProxyTokenChart(data) {
   if (typeof Chart === "undefined") return;
-  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  var proxyDays = data.proxy?.proxy_days || [];
   if (!proxyDays.length) { chartShellSetLoading("c-proxy-tokens", false); return; }
 
   var labels = [];
@@ -4364,7 +4418,7 @@ function renderProxyTokenChart(data) {
 
 function renderProxyLatencyChart(data) {
   if (typeof Chart === "undefined") return;
-  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  var proxyDays = data.proxy?.proxy_days || [];
   if (!proxyDays.length) { chartShellSetLoading("c-proxy-latency", false); return; }
 
   var labels = [];
@@ -4446,27 +4500,40 @@ function renderProxyInvisibleCost(pd) {
 }
 
 // ── Phase 4: Hourly Request Heatmap ───────────────────────────────────────
-function renderProxyHourlyHeatmap(pd) {
+function aggregateHourlyTotals(proxyDays) {
+  var totals = {};
+  for (const pd of proxyDays) {
+    var dh = pd.hours || {};
+    for (var hk in dh) {
+      if (Object.hasOwn(dh, hk)) totals[hk] = (totals[hk] || 0) + (dh[hk] || 0);
+    }
+  }
+  var labels = [], values = [], maxVal = 0;
+  for (var h = 0; h <= 23; h++) {
+    var v = totals[String(h)] || 0;
+    if (v > maxVal) maxVal = v;
+    values.push(v);
+    labels.push(String(h).length < 2 ? "0" + h : String(h));
+  }
+  var bgColors = values.map(function(val) {
+    var intensity = maxVal > 0 ? Math.min(1, val / maxVal) : 0;
+    return val === 0 ? "rgba(51,65,85,.2)" : "rgba(59,130,246," + (0.2 + intensity * 0.7).toFixed(2) + ")";
+  });
+  return { labels: labels, values: values, bgColors: bgColors };
+}
+
+function renderProxyHourlyHeatmap(data) {
   if (typeof Chart === "undefined") return;
   var el = document.getElementById("c-proxy-hourly");
   if (!el) return;
-  var hours = pd.hours || {};
-  var labels = [];
-  var values = [];
-  var bgColors = [];
-  for (var h = 0; h <= 23; h++) {
-    labels.push(String(h).length < 2 ? "0" + h : String(h));
-    var v = hours[String(h)] || 0;
-    values.push(v);
-    var intensity = v === 0 ? 0 : Math.min(1, v / 80);
-    bgColors.push(v === 0 ? "rgba(51,65,85,.2)" : "rgba(59,130,246," + (0.2 + intensity * 0.7).toFixed(2) + ")");
-  }
+  var proxyDays = data.proxy?.proxy_days || [];
+  var hd = aggregateHourlyTotals(proxyDays);
 
   chartShellSetLoading("c-proxy-hourly", false);
 
   if (_proxyCharts.hourly) {
-    _proxyCharts.hourly.data.datasets[0].data = values;
-    _proxyCharts.hourly.data.datasets[0].backgroundColor = bgColors;
+    _proxyCharts.hourly.data.datasets[0].data = hd.values;
+    _proxyCharts.hourly.data.datasets[0].backgroundColor = hd.bgColors;
     freezeChartNoAnim(_proxyCharts.hourly);
     _proxyCharts.hourly.update("none");
     return;
@@ -4475,11 +4542,11 @@ function renderProxyHourlyHeatmap(pd) {
   _proxyCharts.hourly = new Chart(el.getContext("2d"), {
     type: "bar",
     data: {
-      labels: labels,
+      labels: hd.labels,
       datasets: [{
         label: t("proxyDSRequestsPerHour"),
-        data: values,
-        backgroundColor: bgColors,
+        data: hd.values,
+        backgroundColor: hd.bgColors,
         borderRadius: 3
       }]
     },
@@ -4496,7 +4563,7 @@ function renderProxyHourlyHeatmap(pd) {
         tooltip: {
           callbacks: {
             title: function (ctx) { return ctx[0].label + ":00 UTC"; },
-            label: function (ctx) { return ctx.parsed.y + " requests"; }
+            label: function (ctx) { return ctx.parsed.y + " requests (" + proxyDays.length + " days)"; }
           }
         }
       }
@@ -4506,35 +4573,38 @@ function renderProxyHourlyHeatmap(pd) {
 
 
 // ── Phase 5: Model Breakdown ──────────────────────────────────────────────
-function renderProxyModelChart(pd) {
+function renderProxyModelChart(data) {
   if (typeof Chart === "undefined") return;
   var el = document.getElementById("c-proxy-models");
   if (!el) return;
-  var models = pd.models || {};
-  var labels = [];
-  var reqData = [];
-  var latData = [];
+  var proxyDays = data.proxy?.proxy_days || [];
+  if (!proxyDays.length) return;
   var colors = ["#8b5cf6", "#3b82f6", "#06b6d4", "#22c55e", "#f59e0b", "#ef4444", "#ec4899"];
-  var ci = 0;
-  var bgColors = [];
-  for (var mk in models) {
-    if (!Object.prototype.hasOwnProperty.call(models, mk)) continue;
-    var m = models[mk];
-    var short = mk.replace("claude-", "").replace(/-\d{8}$/, "");
-    labels.push(short);
-    reqData.push(m.requests || 0);
-    latData.push(m.avg_duration_ms || 0);
-    bgColors.push(colors[ci % colors.length]);
-    ci++;
+  // Collect all model keys across all days
+  var allModels = {};
+  for (const pd of proxyDays) {
+    var dm = pd.models || {};
+    for (var mk in dm) { if (Object.hasOwn(dm, mk)) allModels[mk] = true; }
   }
+  var modelKeys = Object.keys(allModels).sort(function(a, b) { return a.localeCompare(b); });
+  var labels = proxyDays.map(function(d) { return d.date ? d.date.slice(5) : "?"; });
+  // Build stacked bar datasets per model + latency line
+  var datasets = [];
+  for (var mi = 0; mi < modelKeys.length; mi++) {
+    var mKey = modelKeys[mi];
+    var short = mKey.replace("claude-", "").replace(/-\d{8}$/, "");
+    var mData = proxyDays.map(function(d) { return d.models?.[mKey]?.requests || 0; });
+    datasets.push({ label: short, data: mData, backgroundColor: colors[mi % colors.length], stack: "models", yAxisID: "y", borderRadius: 2 });
+  }
+  // Avg latency line across all models per day
+  var latData = proxyDays.map(function(d) { return d.avg_duration_ms || 0; });
+  datasets.push({ label: t("proxyDSModelLatency"), data: latData, type: "line", borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.15)", yAxisID: "y1", tension: 0.3, pointRadius: 3 });
 
   chartShellSetLoading("c-proxy-models", false);
-  if (!labels.length) return;
 
   if (_proxyCharts.models) {
     _proxyCharts.models.data.labels = labels;
-    _proxyCharts.models.data.datasets[0].data = reqData;
-    _proxyCharts.models.data.datasets[1].data = latData;
+    _proxyCharts.models.data.datasets = datasets;
     freezeChartNoAnim(_proxyCharts.models);
     _proxyCharts.models.update("none");
     return;
@@ -4542,21 +4612,15 @@ function renderProxyModelChart(pd) {
 
   _proxyCharts.models = new Chart(el.getContext("2d"), {
     type: "bar",
-    data: {
-      labels: labels,
-      datasets: [
-        { label: t("proxyDSModelRequests"), data: reqData, backgroundColor: bgColors, yAxisID: "y", borderRadius: 3 },
-        { label: t("proxyDSModelLatency"), data: latData, type: "line", borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.15)", yAxisID: "y1", tension: 0.3, pointRadius: 4 }
-      ]
-    },
+    data: { labels: labels, datasets: datasets },
     options: {
       responsive: true,
       animation: false,
       transitions: __chartTransitionsOff,
       interaction: { mode: "index", intersect: false },
       scales: {
-        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { position: "left", ticks: { color: "#94a3b8" }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, title: { display: true, text: "Requests", color: "#94a3b8", font: { size: 10 } } },
+        x: { stacked: true, ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
+        y: { stacked: true, position: "left", ticks: { color: "#94a3b8" }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, title: { display: true, text: "Requests", color: "#94a3b8", font: { size: 10 } } },
         y1: { position: "right", ticks: { color: "#f59e0b", callback: function (v) { return v >= 1000 ? (v / 1000).toFixed(1) + "s" : v + "ms"; } }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: "Latency", color: "#f59e0b", font: { size: 10 } } }
       },
       plugins: {
@@ -4564,7 +4628,7 @@ function renderProxyModelChart(pd) {
         tooltip: {
           callbacks: {
             label: function (ctx) {
-              if (ctx.datasetIndex === 1) return ctx.dataset.label + ": " + (ctx.parsed.y >= 1000 ? (ctx.parsed.y / 1000).toFixed(1) + "s" : Math.round(ctx.parsed.y) + "ms");
+              if (ctx.dataset.yAxisID === "y1") return ctx.dataset.label + ": " + (ctx.parsed.y >= 1000 ? (ctx.parsed.y / 1000).toFixed(1) + "s" : Math.round(ctx.parsed.y) + "ms");
               return ctx.dataset.label + ": " + ctx.parsed.y;
             }
           }
@@ -4601,7 +4665,7 @@ function renderProxyJsonlComparison(data) {
   var el = document.getElementById("proxy-jsonl-compare");
   if (!el) return;
   var days = data.days || [];
-  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  var proxyDays = data.proxy?.proxy_days || [];
   if (!days.length || !proxyDays.length) {
     el.textContent = days.length ? "" : t("proxyJsonlNoData");
     return;
@@ -4633,31 +4697,42 @@ function renderProxyJsonlComparison(data) {
 }
 
 // ── Per-Hour Latency Heatmap ──────────────────────────────────────────────
-function renderProxyHourlyLatency(pd) {
+function aggregateHourlyLatency(proxyDays) {
+  var agg = {};
+  for (const pd of proxyDays) {
+    var phl = pd.per_hour_latency || {};
+    for (var hk in phl) {
+      if (!Object.hasOwn(phl, hk)) continue;
+      var hl = phl[hk];
+      if (!hl?.count) continue;
+      if (!agg[hk]) agg[hk] = { sum: 0, count: 0, max: 0 };
+      agg[hk].sum += hl.sum;
+      agg[hk].count += hl.count;
+      if (hl.max > agg[hk].max) agg[hk].max = hl.max;
+    }
+  }
+  var labels = [], avgData = [], maxData = [];
+  for (var h = 0; h <= 23; h++) {
+    labels.push(String(h).length < 2 ? "0" + h : String(h));
+    var a = agg[String(h)];
+    avgData.push(a?.count > 0 ? Math.round(a.sum / a.count) : 0);
+    maxData.push(a?.max || 0);
+  }
+  return { labels: labels, avgData: avgData, maxData: maxData };
+}
+
+function renderProxyHourlyLatency(data) {
   if (typeof Chart === "undefined") return;
   var el = document.getElementById("c-proxy-hourly-latency");
   if (!el) return;
-  var phl = pd.per_hour_latency || {};
-  var labels = [];
-  var avgData = [];
-  var maxData = [];
-  for (var h = 0; h <= 23; h++) {
-    labels.push(String(h).length < 2 ? "0" + h : String(h));
-    var hl = phl[String(h)] || phl[h];
-    if (hl && hl.count > 0) {
-      avgData.push(Math.round(hl.sum / hl.count));
-      maxData.push(hl.max);
-    } else {
-      avgData.push(0);
-      maxData.push(0);
-    }
-  }
+  var proxyDays = data.proxy?.proxy_days || [];
+  var ld = aggregateHourlyLatency(proxyDays);
 
   chartShellSetLoading("c-proxy-hourly-latency", false);
 
   if (_proxyCharts.hourlyLatency) {
-    _proxyCharts.hourlyLatency.data.datasets[0].data = avgData;
-    _proxyCharts.hourlyLatency.data.datasets[1].data = maxData;
+    _proxyCharts.hourlyLatency.data.datasets[0].data = ld.avgData;
+    _proxyCharts.hourlyLatency.data.datasets[1].data = ld.maxData;
     freezeChartNoAnim(_proxyCharts.hourlyLatency);
     _proxyCharts.hourlyLatency.update("none");
     return;
@@ -4666,10 +4741,10 @@ function renderProxyHourlyLatency(pd) {
   _proxyCharts.hourlyLatency = new Chart(el.getContext("2d"), {
     type: "bar",
     data: {
-      labels: labels,
+      labels: ld.labels,
       datasets: [
-        { label: t("proxyDSAvgLatency"), data: avgData, backgroundColor: "rgba(59,130,246,.6)", borderRadius: 2 },
-        { label: t("proxyDSMaxLatency"), data: maxData, backgroundColor: "rgba(239,68,68,.35)", borderRadius: 2 }
+        { label: t("proxyDSAvgLatency"), data: ld.avgData, backgroundColor: "rgba(59,130,246,.6)", borderRadius: 2 },
+        { label: t("proxyDSMaxLatency"), data: ld.maxData, backgroundColor: "rgba(239,68,68,.35)", borderRadius: 2 }
       ]
     },
     options: {
@@ -4686,6 +4761,191 @@ function renderProxyHourlyLatency(pd) {
         tooltip: {
           callbacks: {
             label: function(ctx) { return ctx.dataset.label + ": " + (ctx.parsed.y >= 1000 ? (ctx.parsed.y/1000).toFixed(1)+"s" : ctx.parsed.y+"ms"); }
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Error/429 Rate Trend ─────────────────────────────────────────────────
+function renderProxyErrorTrend(data) {
+  if (typeof Chart === "undefined") return;
+  var el = document.getElementById("c-proxy-error-trend");
+  if (!el) return;
+  var proxyDays = data.proxy?.proxy_days || [];
+  if (proxyDays.length < 2) return;
+  var labels = proxyDays.map(function(d) { return d.date ? d.date.slice(5) : "?"; });
+  var errRate = proxyDays.map(function(d) { return d.error_rate || 0; });
+  var f429 = proxyDays.map(function(d) { return d.requests > 0 ? Math.round((d.false_429s || 0) / d.requests * 100 * 10) / 10 : 0; });
+
+  chartShellSetLoading("c-proxy-error-trend", false);
+  var h3 = document.getElementById("proxy-error-trend-h3");
+  if (h3) h3.textContent = t("proxyErrorTrendTitle");
+  var blurb = document.getElementById("proxy-error-trend-blurb");
+  if (blurb) blurb.textContent = t("proxyErrorTrendBlurb");
+
+  if (_proxyCharts.errorTrend) {
+    _proxyCharts.errorTrend.data.labels = labels;
+    _proxyCharts.errorTrend.data.datasets[0].data = errRate;
+    _proxyCharts.errorTrend.data.datasets[1].data = f429;
+    freezeChartNoAnim(_proxyCharts.errorTrend);
+    _proxyCharts.errorTrend.update("none");
+    return;
+  }
+
+  _proxyCharts.errorTrend = new Chart(el.getContext("2d"), {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [
+        { label: t("proxyDSErrorRate"), data: errRate, borderColor: "#ef4444", backgroundColor: "rgba(239,68,68,.1)", fill: true, tension: 0.3, pointRadius: 3 },
+        { label: t("proxyDSFalse429Rate"), data: f429, borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.1)", fill: true, tension: 0.3, pointRadius: 3 }
+      ]
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      transitions: __chartTransitionsOff,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
+        y: { ticks: { color: "#94a3b8", callback: function(v) { return v + "%"; } }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true }
+      },
+      plugins: {
+        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: function(ctx) { return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(1) + "%"; } } }
+      }
+    }
+  });
+}
+
+// ── Cache Quality Trend ──────────────────────────────────────────────────
+function renderProxyCacheTrend(data) {
+  if (typeof Chart === "undefined") return;
+  var el = document.getElementById("c-proxy-cache-trend");
+  if (!el) return;
+  var proxyDays = data.proxy?.proxy_days || [];
+  if (proxyDays.length < 2) return;
+  var labels = proxyDays.map(function(d) { return d.date ? d.date.slice(5) : "?"; });
+  var ratio = proxyDays.map(function(d) { return d.cache_read_ratio == null ? 0 : Math.round(d.cache_read_ratio * 100 * 10) / 10; });
+  var coldStarts = proxyDays.map(function(d) { return d.cold_starts || 0; });
+
+  chartShellSetLoading("c-proxy-cache-trend", false);
+  var h3 = document.getElementById("proxy-cache-trend-h3");
+  if (h3) h3.textContent = t("proxyCacheTrendTitle");
+  var blurb = document.getElementById("proxy-cache-trend-blurb");
+  if (blurb) blurb.textContent = t("proxyCacheTrendBlurb");
+
+  if (_proxyCharts.cacheTrend) {
+    _proxyCharts.cacheTrend.data.labels = labels;
+    _proxyCharts.cacheTrend.data.datasets[0].data = ratio;
+    _proxyCharts.cacheTrend.data.datasets[1].data = coldStarts;
+    freezeChartNoAnim(_proxyCharts.cacheTrend);
+    _proxyCharts.cacheTrend.update("none");
+    return;
+  }
+
+  _proxyCharts.cacheTrend = new Chart(el.getContext("2d"), {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [
+        { label: t("proxyDSCacheRatio"), data: ratio, borderColor: "#22c55e", backgroundColor: "rgba(34,197,94,.1)", fill: true, tension: 0.3, pointRadius: 3, yAxisID: "y" },
+        { label: t("proxyDSColdStarts"), data: coldStarts, type: "bar", backgroundColor: "rgba(59,130,246,.5)", borderRadius: 2, yAxisID: "y1" }
+      ]
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      transitions: __chartTransitionsOff,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
+        y: { position: "left", ticks: { color: "#22c55e", callback: function(v) { return v + "%"; } }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, max: 100, title: { display: true, text: "Cache Ratio", color: "#22c55e", font: { size: 10 } } },
+        y1: { position: "right", ticks: { color: "#3b82f6" }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: "Cold Starts", color: "#3b82f6", font: { size: 10 } } }
+      },
+      plugins: {
+        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              if (ctx.dataset.yAxisID === "y") return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(1) + "%";
+              return ctx.dataset.label + ": " + ctx.parsed.y;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Efficiency Trend (JSONL Ratio + Visible/1%) ─────────────────────────
+function buildEfficiencyData(proxyDays, mainDays) {
+  var jsonlByDate = {};
+  for (const md of mainDays) {
+    if (md.date) jsonlByDate[md.date] = (md.input || 0) + (md.output || 0) + (md.cache_read || 0) + (md.cache_creation || 0);
+  }
+  var labels = [], ratioData = [], visPerPctData = [];
+  for (const pd of proxyDays) {
+    labels.push(pd.date ? pd.date.slice(5) : "?");
+    var proxyTotal = pd.total_tokens || 0;
+    var jsonlTotal = jsonlByDate[pd.date] || 0;
+    ratioData.push(proxyTotal > 0 ? Math.round(jsonlTotal / proxyTotal * 100) / 100 : 0);
+    visPerPctData.push(pd.visible_tokens_per_pct || 0);
+  }
+  return { labels: labels, ratioData: ratioData, visPerPctData: visPerPctData };
+}
+
+function renderProxyEfficiencyTrend(data) {
+  if (typeof Chart === "undefined") return;
+  var el = document.getElementById("c-proxy-efficiency-trend");
+  if (!el) return;
+  var proxyDays = data.proxy?.proxy_days || [];
+  if (proxyDays.length < 2) return;
+  var ed = buildEfficiencyData(proxyDays, data.days || []);
+
+  var h3 = document.getElementById("proxy-efficiency-trend-h3");
+  if (h3) h3.textContent = t("proxyEfficiencyTrendTitle");
+  var blurb = document.getElementById("proxy-efficiency-trend-blurb");
+  if (blurb) blurb.textContent = t("proxyEfficiencyTrendBlurb");
+
+  if (_proxyCharts.efficiencyTrend) {
+    _proxyCharts.efficiencyTrend.data.labels = ed.labels;
+    _proxyCharts.efficiencyTrend.data.datasets[0].data = ed.ratioData;
+    _proxyCharts.efficiencyTrend.data.datasets[1].data = ed.visPerPctData;
+    freezeChartNoAnim(_proxyCharts.efficiencyTrend);
+    _proxyCharts.efficiencyTrend.update("none");
+    return;
+  }
+
+  _proxyCharts.efficiencyTrend = new Chart(el.getContext("2d"), {
+    type: "line",
+    data: {
+      labels: ed.labels,
+      datasets: [
+        { label: t("proxyDSJsonlRatio"), data: ed.ratioData, borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.1)", fill: true, tension: 0.3, pointRadius: 3, yAxisID: "y" },
+        { label: t("proxyDSVisPerPct"), data: ed.visPerPctData, type: "bar", backgroundColor: "rgba(139,92,246,.5)", borderRadius: 2, yAxisID: "y1" }
+      ]
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      transitions: __chartTransitionsOff,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
+        y: { position: "left", ticks: { color: "#f59e0b" }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, title: { display: true, text: "JSONL/Proxy", color: "#f59e0b", font: { size: 10 } } },
+        y1: { position: "right", ticks: { color: "#8b5cf6" }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: "Vis/1%", color: "#8b5cf6", font: { size: 10 } } }
+      },
+      plugins: {
+        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              if (ctx.dataset.yAxisID === "y") return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(2) + "x";
+              return ctx.dataset.label + ": " + fmt(ctx.parsed.y);
+            }
           }
         }
       }
@@ -4733,7 +4993,7 @@ function computeHealthIndicators(data) {
   var thinkingGap = 0;
   if (pd && days.length) {
     // Try matching proxy days from newest to oldest until we find one with JSONL data
-    var pdAll = (data.proxy && data.proxy.proxy_days) || [];
+    var pdAll = data.proxy?.proxy_days || [];
     for (var tgi = pdAll.length - 1; tgi >= 0; tgi--) {
       var tgPd = pdAll[tgi];
       if (!(tgPd.total_tokens > 0)) continue;
@@ -5007,7 +5267,7 @@ function renderKeyFindings(data) {
   __lastFindingsFingerprint = fp;
 
   var days = data.days || [];
-  var pdays = (data.proxy && data.proxy.proxy_days) || [];
+  var pdays = data.proxy?.proxy_days || [];
   if (!days.length && !pdays.length) {
     if (headerEl) headerEl.textContent = t("findingsNoData");
     el.innerHTML = "";
@@ -5203,7 +5463,7 @@ function computeHealthScoreForDay(dayData, proxyDay) {
 
 function buildHealthScoreHistory(data) {
   var days = getFilteredDays(data.days || []);
-  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  var proxyDays = data.proxy?.proxy_days || [];
   var proxyByDate = {};
   for (var pi = 0; pi < proxyDays.length; pi++) proxyByDate[proxyDays[pi].date] = proxyDays[pi];
   var scores = [];
@@ -5949,7 +6209,7 @@ function renderAvailabilityKpis(data) {
   var rows = panel.querySelectorAll("[data-month]");
   for (var ri = 0; ri < rows.length; ri++) {
     rows[ri].addEventListener("click", function() {
-      var mk = this.getAttribute("data-month");
+      var mk = this.dataset.month;
       var newFilter;
       if (mk === "__all__") {
         newFilter = null;
@@ -5970,7 +6230,7 @@ function renderAvailabilityKpis(data) {
   var badges = panel.querySelectorAll("[data-impact]");
   for (var bi2 = 0; bi2 < badges.length; bi2++) {
     badges[bi2].addEventListener("click", function() {
-      var imp = this.getAttribute("data-impact");
+      var imp = this.dataset.impact;
       if (_outageImpactExclude[imp]) { delete _outageImpactExclude[imp]; } else { _outageImpactExclude[imp] = true; }
       renderUptimeChart(data);
       renderIncidentHistory(data);
@@ -5985,7 +6245,7 @@ function renderAvailabilityKpis(data) {
   var stBadges = panel.querySelectorAll("[data-status]");
   for (var sb = 0; sb < stBadges.length; sb++) {
     stBadges[sb].addEventListener("click", function() {
-      var sk = this.getAttribute("data-status");
+      var sk = this.dataset.status;
       if (_outageStatusExclude[sk]) { delete _outageStatusExclude[sk]; } else { _outageStatusExclude[sk] = true; }
       renderUptimeChart(data);
       renderAvailabilityKpis(data);
@@ -6147,8 +6407,7 @@ scheduleFetchExtensionTimeline(900);
 function miniMd(src) {
   var lines = (src || "").split("\n");
   var html = "", inList = false;
-  for (var i = 0; i < lines.length; i++) {
-    var ln = lines[i];
+  for (const ln of lines) {
     // Headings
     var hm = ln.match(/^(#{1,4})\s+(.*)/);
     if (hm) {
@@ -6178,7 +6437,7 @@ function miniMd(src) {
 }
 function inlineMd(s) {
   s = escHtml(s);
-  s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   s = s.replace(/`([^`]+)`/g, "<code style=\"background:#334155;padding:1px 4px;border-radius:3px;font-size:.9em\">$1</code>");
   s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "<a href=\"$2\" target=\"_blank\" rel=\"noopener\" style=\"color:#93c5fd\">$1</a>");
   return s;
@@ -6194,7 +6453,7 @@ function inlineMd(s) {
       var info = JSON.parse(xhr.responseText);
       // Show release version in Live panel — compact row
       var relRow = document.getElementById("live-release-row");
-      var ver = info.version && info.version !== "dev" ? info.version : null;
+      var ver = info.version?.length && info.version !== "dev" ? info.version : null;
       if (relRow) {
         if (ver) {
           relRow.innerHTML = '<span class="live-rel-badge live-rel-badge-ok">' + escHtml(ver) + '</span>' +
@@ -6224,12 +6483,12 @@ function inlineMd(s) {
                 var releases = JSON.parse(rlXhr.responseText);
                 if (!releases.length) { relBody.innerHTML = '<p style="color:#64748b;font-size:.75rem">No releases found</p>'; return; }
                 var rh = "";
-                for (var ri = 0; ri < releases.length; ri++) {
-                  var rel = releases[ri];
+                var isFirst = true;
+                for (const rel of releases) {
                   var rDate = rel.published_at ? rel.published_at.slice(0, 10) : "";
                   var rBody2 = (rel.body || "").replace(/^## .+\n?/m, "");
-                  var isFirst = ri === 0;
                   rh += "<details class=\"release-modal-item\"" + (isFirst ? " open" : "") + ">";
+                  isFirst = false;
                   rh += "<summary class=\"release-modal-item-head\">";
                   rh += "<span class=\"rel-tag\">" + escHtml(rel.tag_name) + "</span>";
                   rh += "<span class=\"rel-date\">" + escHtml(rDate) + "</span>";
@@ -6272,4 +6531,178 @@ function inlineMd(s) {
     } catch (e) {}
   };
   xhr.send();
+})();
+
+// ── Korean term tooltip system (ko locale only) ──────────────────────
+(function () {
+  var GLOSSARY = {
+    "Thinking Token": "AI 내부 추론에 사용되는 비공개 Token",
+    "Health Score": "종합 API 사용 건강 점수 (10점 만점)",
+    "Hit Limit": "API 사용 한도 도달",
+    "Rate Limit": "시간당 허용 요청 수 제한",
+    "Cold Start": "캐시 없이 시작하는 첫 요청",
+    "Cache Read": "캐시에서 재사용된 Token",
+    "Cache Create": "새로 캐시에 저장된 Token",
+    "Cache": "이전 대화를 재사용하여 비용을 줄이는 메커니즘",
+    "Token": "API 요청/응답의 기본 단위 (단어 조각)",
+    "Output": "AI가 생성한 응답 Token",
+    "Overhead": "Output 대비 전체 Token 사용 비율",
+    "Forensic": "사용 패턴 심층 분석",
+    "NDJSON": "줄 구분 JSON (Proxy 로그 형식)",
+    "JSONL": "줄 단위 JSON 로그 형식",
+    "SSE": "서버→브라우저 실시간 데이터 전송",
+    "Proxy": "API 요청을 중계하는 중간 서버",
+    "Subagent": "메인 에이전트가 생성한 하위 작업 에이전트",
+    "Quota": "일정 기간 내 허용된 총 사용량",
+    "Budget": "세션당 허용된 Token 총량",
+    "Latency": "API 요청~응답 사이 지연 시간",
+    "Interrupt": "사용자에 의한 세션 중단",
+    "Retry": "API 오류 후 자동 재시도",
+    "Incident": "Anthropic 서비스 장애 이벤트",
+    "Outage": "서비스 중단 기간",
+    "Extension": "VS Code 확장 프로그램",
+    "Peak": "최대 사용량을 기록한 시점",
+    "Context": "AI 대화의 전체 입력 맥락",
+    "Compaction": "긴 대화를 압축하여 Context 줄이기",
+    "PAT": "GitHub Personal Access Token (개인 인증 토큰)"
+  };
+
+  var TERMS = Object.keys(GLOSSARY).sort(function (a, b) { return b.length - a.length; });
+  var RE = new RegExp("(" + TERMS.map(function (t) { return t.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`); }).join("|") + ")", "g");
+  var SKIP_TAGS = { SCRIPT: 1, STYLE: 1, INPUT: 1, SELECT: 1, TEXTAREA: 1, CODE: 1 };
+  var observer = null;
+  var debounceTimer = null;
+
+  var pop = document.createElement("div");
+  pop.id = "tt-pop";
+  document.body.appendChild(pop);
+
+  function showPop(e) {
+    var tip = e.currentTarget.dataset.tip;
+    if (!tip) return;
+    pop.textContent = tip;
+    pop.style.opacity = "1";
+    positionPop(e);
+  }
+  function movePop(e) { positionPop(e); }
+  function hidePop() { pop.style.opacity = "0"; }
+  function positionPop(e) {
+    var x = e.clientX + 12;
+    var y = e.clientY - 8;
+    pop.style.left = "0px";
+    pop.style.top = "0px";
+    var pw = pop.offsetWidth;
+    var ph = pop.offsetHeight;
+    if (x + pw > window.innerWidth - 8) x = e.clientX - pw - 12;
+    if (y - ph < 4) y = e.clientY + 20;
+    else y = y - ph;
+    pop.style.left = x + "px";
+    pop.style.top = y + "px";
+  }
+
+  function wrapTextNode(node) {
+    var text = node.nodeValue;
+    if (!text || !RE.test(text)) return;
+    RE.lastIndex = 0;
+    var frag = document.createDocumentFragment();
+    var lastIdx = 0;
+    var parent = node.parentNode;
+    var parentSeen = parent.__ttSeen || (parent.__ttSeen = {});
+    var match;
+    RE.lastIndex = 0;
+    while ((match = RE.exec(text)) !== null) {
+      var term = match[1];
+      if (match.index > lastIdx) frag.appendChild(document.createTextNode(text.slice(lastIdx, match.index)));
+      if (parentSeen[term]) {
+        frag.appendChild(document.createTextNode(term));
+      } else {
+        var span = document.createElement("span");
+        span.className = "tt";
+        span.dataset.tip = GLOSSARY[term];
+        span.textContent = term;
+        span.addEventListener("mouseenter", showPop);
+        span.addEventListener("mousemove", movePop);
+        span.addEventListener("mouseleave", hidePop);
+        frag.appendChild(span);
+        parentSeen[term] = true;
+      }
+      lastIdx = RE.lastIndex;
+    }
+    if (lastIdx < text.length) frag.appendChild(document.createTextNode(text.slice(lastIdx)));
+    if (frag.childNodes.length) node.replaceWith(frag);
+  }
+
+  function scanElement(root) {
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: function (node) {
+        var p = node.parentNode;
+        if (!p) return NodeFilter.FILTER_REJECT;
+        if (p.classList?.contains("tt")) return NodeFilter.FILTER_REJECT;
+        if (SKIP_TAGS[p.tagName]) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    var nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    for (const n of nodes) wrapTextNode(n);
+  }
+
+  function removeAllTips() {
+    hidePop();
+    var tips = document.querySelectorAll(".tt");
+    for (const span of tips) {
+      span.removeEventListener("mouseenter", showPop);
+      span.removeEventListener("mousemove", movePop);
+      span.removeEventListener("mouseleave", hidePop);
+      var parent = span.parentNode;
+      if (parent) {
+        span.replaceWith(document.createTextNode(span.textContent));
+        parent.normalize();
+        if (parent.__ttSeen) parent.__ttSeen = {};
+      }
+    }
+  }
+
+  function debouncedScan() {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(function () {
+      if (getLang() === "ko") scanElement(document.body);
+    }, 200);
+  }
+
+  function startObserver() {
+    if (observer) return;
+    observer = new MutationObserver(function (mutations) {
+      for (const mut of mutations) {
+        if (mut.addedNodes.length || mut.type === "characterData") {
+          debouncedScan();
+          break;
+        }
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
+
+  function stopObserver() {
+    if (observer) { observer.disconnect(); observer = null; }
+    if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
+  }
+
+  var _origSetLang = setLang;
+  setLang = function (code) {
+    stopObserver();
+    removeAllTips();
+    _origSetLang(code);
+    if (code === "ko") {
+      scanElement(document.body);
+      startObserver();
+    }
+  };
+
+  if (getLang() === "ko") {
+    setTimeout(function () {
+      scanElement(document.body);
+      startObserver();
+    }, 500);
+  }
 })();
