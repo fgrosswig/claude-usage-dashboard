@@ -4075,6 +4075,13 @@ function renderUserProfileCharts(days) {
     : allVers;
   var sortedVers = sortVersionKeys(filteredVers, stats, __userVersionSort);
 
+  // Set consistent chart height for all 3 user-profile charts
+  var chartH = Math.max(180, sortedVers.length * 28 + 60);
+  var boxes = document.querySelectorAll("#user-profile-charts .chart-box canvas");
+  for (var bi = 0; bi < boxes.length; bi++) {
+    boxes[bi].parentElement.style.height = chartH + "px";
+  }
+
   renderVersionHealthChart(sortedVers, stats, allVers);
   renderEntrypointsChart(sortedVers, stats);
   renderReleaseStabilityChart(sortedVers, __releaseStabilityData);
@@ -4101,6 +4108,7 @@ function renderVersionHealthChart(sortedVers, stats, allVers) {
     options: {
       indexAxis: "y",
       responsive: true,
+      maintainAspectRatio: false,
       animation: false,
       transitions: __chartTransitionsOff,
       interaction: { mode: "index", intersect: false },
@@ -4165,6 +4173,7 @@ function renderEntrypointsChart(sortedVers, stats) {
     options: {
       indexAxis: "y",
       responsive: true,
+      maintainAspectRatio: false,
       animation: false,
       transitions: __chartTransitionsOff,
       interaction: { mode: "index", intersect: false },
@@ -4272,6 +4281,7 @@ function renderReleaseStabilityChart(sortedVers, releaseData) {
     options: {
       indexAxis: "y",
       responsive: true,
+      maintainAspectRatio: false,
       animation: false,
       transitions: __chartTransitionsOff,
       interaction: { mode: "index", intersect: false },
@@ -4285,7 +4295,7 @@ function renderReleaseStabilityChart(sortedVers, releaseData) {
         y: {
           stacked: true,
           grid: { color: "rgba(51,65,85,0.18)" },
-          ticks: { color: "#e2e8f0", font: { family: "monospace", size: 10 } }
+          ticks: { color: "#e2e8f0", font: { family: "monospace" } }
         }
       },
       plugins: {
