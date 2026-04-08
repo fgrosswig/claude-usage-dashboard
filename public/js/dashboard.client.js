@@ -1810,8 +1810,8 @@ function renderDashboardCore(data) {
     devSync.textContent = "Last: " + ts.toLocaleTimeString() + (data.dev_source ? " · " + (data.days || []).length + "d" : "");
   }
   renderProxyAnalysis(data);
+  __releaseStabilityData = data.release_stability || null;
   renderUserProfileCharts(getFilteredDays(data.days));
-  renderReleaseStabilityChart(data.release_stability);
   updateMetaDetailsSummary(data);
   var days = getFilteredDays(data.days);
   if(!days.length){
@@ -3822,6 +3822,7 @@ function copyReport(){
 
 // ── User Profile Charts ──────────────────────────────────────────────────
 var _userCharts = { versions: null, entrypoints: null, releaseStability: null };
+var __releaseStabilityData = null;
 var __userVersionSort = "anomalies"; // anomalies | newest | calls
 var __userVersionFilter = null; // null = all, [] = none selected
 
@@ -4076,6 +4077,7 @@ function renderUserProfileCharts(days) {
 
   renderVersionHealthChart(sortedVers, stats, allVers);
   renderEntrypointsChart(sortedVers, stats);
+  renderReleaseStabilityChart(sortedVers, __releaseStabilityData);
 }
 
 function renderVersionHealthChart(sortedVers, stats, allVers) {
@@ -4179,85 +4181,94 @@ function renderEntrypointsChart(sortedVers, stats) {
 }
 
 // ── Release Stability Chart ──────────────────────────────────────────────
-function renderReleaseStabilityChart(releaseData) {
+// Build a lookup: version string (without "v" prefix) → release info
+function __buildReleaseLookup(releaseData) {
+  var map = {};
+  if (!releaseData || !releaseData.releases) return map;
+  for (var i = 0; i < releaseData.releases.length; i++) {
+    var r = releaseData.releases[i];
+    // Key without "v" prefix to match version_stats keys (e.g. "2.1.87")
+    var key = (r.tag || "").replace(/^v/, "");
+    map[key] = r;
+  }
+  return map;
+}
+
+function renderReleaseStabilityChart(sortedVers, releaseData) {
   var el = document.getElementById("c-user-release-stability");
   var h3 = document.getElementById("user-release-stability-h3");
   if (h3) h3.textContent = t("releaseStabilityTitle");
   var blurb = document.getElementById("user-release-stability-blurb");
   if (!el) return;
   if (_userCharts.releaseStability) { _userCharts.releaseStability.destroy(); _userCharts.releaseStability = null; }
-  if (!releaseData || !releaseData.releases || !releaseData.releases.length) {
+  if (!sortedVers || !sortedVers.length || !releaseData) {
     if (blurb) blurb.textContent = t("releaseStabilityNoData");
     return;
   }
 
-  var sum = releaseData.summary || {};
-  if (blurb) blurb.textContent = t("releaseStabilityBlurb")
-    .replace("{total}", String(sum.total || 0))
-    .replace("{days}", String(sum.daysSpan || 0))
-    .replace("{cadence}", String(sum.cadenceDays || 0))
-    .replace("{skipped}", String(sum.totalSkipped || 0))
-    .replace("{hotfixes}", String(sum.hotfixCount || 0))
-    .replace("{regressions}", String(sum.regressionCount || 0));
+  var lookup = __buildReleaseLookup(releaseData);
 
-  var rels = releaseData.releases;
-
-  // Build labels + data arrays (newest first for readability)
-  var labels = [];
-  var stableDays = [];
-  var regressionDays = [];
-  var hotfixDays = [];
-  var bgColors = [];
-  var meta = []; // for tooltips
-
-  for (var i = rels.length - 1; i >= 0; i--) {
-    var r = rels[i];
-    labels.push(r.tag);
-    var d = r.daysActive || 0;
-
-    if (r.stability === "hotfix") {
-      stableDays.push(0);
-      regressionDays.push(0);
-      hotfixDays.push(Math.max(d, 0.3)); // min width for visibility
-      bgColors.push("rgba(248,113,113,0.85)");
-    } else if (r.stability === "regression") {
-      stableDays.push(0);
-      regressionDays.push(Math.max(d, 0.3));
-      hotfixDays.push(0);
-      bgColors.push("rgba(250,204,21,0.85)");
+  // Count matched stats for blurb
+  var matched = 0, stableN = 0, regN = 0, hotN = 0, unknownN = 0;
+  for (var ci = 0; ci < sortedVers.length; ci++) {
+    var info = lookup[sortedVers[ci]];
+    if (info) {
+      matched++;
+      if (info.stability === "hotfix") hotN++;
+      else if (info.stability === "regression") regN++;
+      else stableN++;
     } else {
-      stableDays.push(d);
-      regressionDays.push(0);
-      hotfixDays.push(0);
-      bgColors.push("rgba(34,197,94,0.8)");
+      unknownN++;
+    }
+  }
+
+  if (blurb) blurb.textContent = t("releaseStabilityBlurb")
+    .replace("{total}", String(sortedVers.length))
+    .replace("{matched}", String(matched))
+    .replace("{stable}", String(stableN))
+    .replace("{hotfixes}", String(hotN))
+    .replace("{regressions}", String(regN));
+
+  // Build data arrays per version (same Y-axis as other charts)
+  var stableData = [];
+  var regressionData = [];
+  var hotfixData = [];
+  var unknownData = [];
+  var meta = [];
+
+  for (var vi = 0; vi < sortedVers.length; vi++) {
+    var ver = sortedVers[vi];
+    var r = lookup[ver];
+    if (!r) {
+      stableData.push(0);
+      regressionData.push(0);
+      hotfixData.push(0);
+      unknownData.push(1);
+      meta.push({ tag: ver, stability: "unknown", daysActive: 0, skippedPatches: 0, matchedKeywords: [] });
+      continue;
+    }
+    var d = Math.max(r.daysActive || 0, 0.3);
+    unknownData.push(0);
+    if (r.stability === "hotfix") {
+      stableData.push(0); regressionData.push(0); hotfixData.push(d);
+    } else if (r.stability === "regression") {
+      stableData.push(0); regressionData.push(d); hotfixData.push(0);
+    } else {
+      stableData.push(d); regressionData.push(0); hotfixData.push(0);
     }
     meta.push(r);
   }
 
   var datasets = [
-    {
-      label: t("releaseStabilityStable"),
-      data: stableDays,
-      backgroundColor: "rgba(34,197,94,0.8)",
-      stack: "days"
-    },
-    {
-      label: t("releaseStabilityRegression"),
-      data: regressionDays,
-      backgroundColor: "rgba(250,204,21,0.85)",
-      stack: "days"
-    },
-    {
-      label: t("releaseStabilityHotfix"),
-      data: hotfixDays,
-      backgroundColor: "rgba(248,113,113,0.85)",
-      stack: "days"
-    }
+    { label: t("releaseStabilityStable"), data: stableData, backgroundColor: "rgba(34,197,94,0.8)", stack: "s" },
+    { label: t("releaseStabilityRegression"), data: regressionData, backgroundColor: "rgba(250,204,21,0.85)", stack: "s" },
+    { label: t("releaseStabilityHotfix"), data: hotfixData, backgroundColor: "rgba(248,113,113,0.85)", stack: "s" },
+    { label: t("releaseStabilityUnknown"), data: unknownData, backgroundColor: "rgba(100,116,139,0.4)", stack: "s" }
   ];
 
   _userCharts.releaseStability = new Chart(el, {
     type: "bar",
-    data: { labels: labels, datasets: datasets },
+    data: { labels: sortedVers, datasets: datasets },
     options: {
       indexAxis: "y",
       responsive: true,
@@ -4287,7 +4298,8 @@ function renderReleaseStabilityChart(releaseData) {
               var m = meta[idx];
               if (!m) return "";
               var lines = [];
-              lines.push(m.date + " \u00B7 " + m.daysActive + "d active");
+              if (m.stability === "unknown") { lines.push(t("releaseStabilityNoRelease")); return lines.join("\n"); }
+              lines.push((m.date || "") + " \u00B7 " + (m.daysActive || 0) + "d active \u00B7 " + m.stability);
               if (m.skippedPatches > 0) lines.push(t("releaseStabilitySkipped") + ": " + m.skippedPatches);
               if (m.matchedKeywords && m.matchedKeywords.length) lines.push("Keywords: " + m.matchedKeywords.join(", "));
               return lines.join("\n");

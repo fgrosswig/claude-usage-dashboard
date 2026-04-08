@@ -37,7 +37,6 @@ h1{font-size:1.5rem;margin-bottom:4px;color:#f8fafc}
 .charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:24px;align-items:stretch}
 .charts.has-session-row{grid-template-columns:repeat(3,minmax(0,1fr))}
 .charts.full{grid-template-columns:1fr}
-.charts-full{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px}
 .chart-box{background:#1e293b;border-radius:10px;padding:16px;border:1px solid #334155}
 /* Zweite Reihe: Host (gestapelt) | Output/h | Subagent-Cache % — drei Spalten */
 .charts-pair{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:24px;align-items:stretch}
