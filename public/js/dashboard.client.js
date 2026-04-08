@@ -4342,6 +4342,7 @@ function renderBudgetEfficiency(data) {
   // Aggregate across all filtered days
   // Respect host filter from top bar
   var filteredHost = typeof getFilterHost === "function" ? getFilterHost() : "";
+  __budgetFilteredHost = filteredHost;
 
   var tot = { input: 0, output: 0, cache_read: 0, cache_creation: 0, total: 0,
               retries: 0, interrupts: 0, api_errors: 0, hit_limits: 0, calls: 0, active_hours: 0 };
@@ -4460,6 +4461,7 @@ var __quotaWeights = {
 var __budgetViewMode = "volume"; // "volume" | "cost"
 var __budgetFlowMode = "budget"; // "budget" | "api" | "user"
 var __budgetSankeyState = null;
+var __budgetFilteredHost = "";
 var __budgetSwitchesWired = false;
 
 function __buildBudgetSwitches() {
@@ -4588,10 +4590,10 @@ function renderBudgetWaterfall(tot, quota) {
 
   if (__budgetFlowMode === "budget") {
     // Source → Token Types → Productive/Overhead
-    var srcLabel = filteredHost ? filteredHost : "MAX5 Budget";
+    var srcLabel = __budgetFilteredHost ? __budgetFilteredHost : "MAX5 Budget";
     var nProd = t("budgetWfProductive") + " (" + pctOf(src.out) + "%)";
     var nOver = t("budgetWfOverhead") + " (" + (100 - pctOf(src.out)) + "%)";
-    nodeColors[srcLabel] = filteredHost ? "#8b5cf6" : "#94a3b8";
+    nodeColors[srcLabel] = __budgetFilteredHost ? "#8b5cf6" : "#94a3b8";
     nodeColors[nProd] = "#22c55e"; nodeColors[nOver] = "#f87171";
     labelMap[srcLabel] = srcLabel; labelMap[nProd] = nProd; labelMap[nOver] = nOver;
     if (pOut > 0) flows.push({ from: srcLabel, to: nOutput, flow: pOut });
