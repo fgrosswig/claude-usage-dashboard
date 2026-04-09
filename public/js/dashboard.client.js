@@ -4864,6 +4864,72 @@ function __budgetFuelGaugeHtml(tot, quota, t) {
   return fuelRows.join("");
 }
 
+/** Destroy waterfall + trend chart instances (called from empty-state handler). */
+function __budgetDisposeCharts() {
+  if (_budgetCharts.waterfall) { _budgetCharts.waterfall.destroy(); _budgetCharts.waterfall = null; }
+  if (_budgetCharts.trend) { _budgetCharts.trend.destroy(); _budgetCharts.trend = null; }
+}
+
+/** Handle empty-data state: render 'no data' text and clean up charts. */
+function __budgetHandleEmpty(sumEl, cardsEl) {
+  sumEl.textContent = t("budgetNoData");
+  if (cardsEl) cardsEl.innerHTML = "";
+  __budgetDisposeCharts();
+}
+
+/** Compute aggregated budget-efficiency metrics from totals. */
+function __budgetMetricsFromTot(tot) {
+  return {
+    outputPct: tot.total > 0 ? Math.round(tot.output / tot.total * 100) : 0,
+    overheadFactor: tot.output > 0 ? Math.round(tot.total / tot.output * 10) / 10 : 0,
+    cacheMissRate: (tot.cache_creation + tot.cache_read) > 0
+      ? Math.round(tot.cache_creation / (tot.cache_creation + tot.cache_read) * 100) : 0,
+    lostSignals: tot.retries + tot.interrupts + tot.api_errors
+  };
+}
+
+/** Fill the budget summary line with placeholder substitution. */
+function __budgetFillSummary(sumEl, tot, m) {
+  sumEl.textContent = t("budgetSummary")
+    .replace("{overhead}", String(m.overheadFactor))
+    .replace("{outputPct}", String(m.outputPct))
+    .replace("{cmr}", String(m.cacheMissRate))
+    .replace("{retries}", String(tot.retries))
+    .replace("{interrupts}", String(tot.interrupts));
+}
+
+/** Show or hide the fuel gauge row based on quota availability. */
+function __budgetRenderFuel(fuelEl, tot, quota) {
+  if (!fuelEl) return;
+  if (quota.pct_5h != null) {
+    fuelEl.innerHTML = __budgetFuelGaugeHtml(tot, quota, t);
+    fuelEl.style.display = "flex";
+  } else {
+    fuelEl.style.display = "none";
+  }
+}
+
+/** Build the HTML parts for the capacity-reduced alert banner. */
+function __budgetAlertParts(quota) {
+  var fbPctAlert = Math.round(quota.fallback_pct * 100);
+  var parts = ["<strong>" + t("budgetAlertTitle") + "</strong> "];
+  parts.push(t("budgetAlertFallback").split("{pct}").join(String(fbPctAlert)));
+  if (quota.overage_status === "rejected") parts.push(" · " + t("budgetAlertOverage"));
+  if (quota.representative_claim) parts.push(" · " + t("budgetAlertClaim").replace("{claim}", quota.representative_claim.replaceAll("_", " ")));
+  return parts;
+}
+
+/** Show or hide the capacity-reduced alert banner. */
+function __budgetRenderAlert(alertEl, quota) {
+  if (!alertEl) return;
+  if (quota.fallback_pct != null && quota.fallback_pct < 1) {
+    alertEl.innerHTML = __budgetAlertParts(quota).join("");
+    alertEl.style.display = "block";
+  } else {
+    alertEl.style.display = "none";
+  }
+}
+
 function renderBudgetEfficiency(data) {
   var sumEl = document.getElementById("budget-summary-line");
   var cardsEl = document.getElementById("budget-cards");
@@ -4871,14 +4937,10 @@ function renderBudgetEfficiency(data) {
 
   var days = getFilteredDays(data.days);
   if (!days || !days.length) {
-    sumEl.textContent = t("budgetNoData");
-    if (cardsEl) cardsEl.innerHTML = "";
-    if (_budgetCharts.waterfall) { _budgetCharts.waterfall.destroy(); _budgetCharts.waterfall = null; }
-    if (_budgetCharts.trend) { _budgetCharts.trend.destroy(); _budgetCharts.trend = null; }
+    __budgetHandleEmpty(sumEl, cardsEl);
     return;
   }
 
-  // Aggregate across all filtered days
   // Respect host filter from top bar
   var filteredHost = typeof getFilterHost === "function" ? getFilterHost() : "";
   __budgetFilteredHost = filteredHost;
@@ -4887,50 +4949,16 @@ function renderBudgetEfficiency(data) {
   var tot = aggBe.tot;
   var dailyTrend = aggBe.dailyTrend;
 
-  // Compute metrics
-  var outputPct = tot.total > 0 ? Math.round(tot.output / tot.total * 100) : 0;
-  var overheadFactor = tot.output > 0 ? Math.round(tot.total / tot.output * 10) / 10 : 0;
-  var cacheMissRate = (tot.cache_creation + tot.cache_read) > 0
-    ? Math.round(tot.cache_creation / (tot.cache_creation + tot.cache_read) * 100) : 0;
-  var lostSignals = tot.retries + tot.interrupts + tot.api_errors;
-
-  // Summary line
-  sumEl.textContent = t("budgetSummary")
-    .replace("{overhead}", String(overheadFactor))
-    .replace("{outputPct}", String(outputPct))
-    .replace("{cmr}", String(cacheMissRate))
-    .replace("{retries}", String(tot.retries))
-    .replace("{interrupts}", String(tot.interrupts));
+  var m = __budgetMetricsFromTot(tot);
+  __budgetFillSummary(sumEl, tot, m);
 
   if (cardsEl) {
-    cardsEl.innerHTML = __budgetKpiCardsHtml(days, tot, outputPct, overheadFactor, cacheMissRate, lostSignals, t, escHtml);
+    cardsEl.innerHTML = __budgetKpiCardsHtml(days, tot, m.outputPct, m.overheadFactor, m.cacheMissRate, m.lostSignals, t, escHtml);
   }
 
   var quota = __budgetQuotaFromLatestProxy(data.proxy);
-
-  var fuelEl = document.getElementById("budget-fuel");
-  if (fuelEl && quota.pct_5h != null) {
-    fuelEl.innerHTML = __budgetFuelGaugeHtml(tot, quota, t);
-    fuelEl.style.display = "flex";
-  } else if (fuelEl) {
-    fuelEl.style.display = "none";
-  }
-
-  // Alert banner for capacity reduction
-  var alertEl = document.getElementById("budget-alert");
-  if (alertEl) {
-    if (quota.fallback_pct != null && quota.fallback_pct < 1) {
-      var fbPctAlert = Math.round(quota.fallback_pct * 100);
-      var alertParts = ["<strong>" + t("budgetAlertTitle") + "</strong> "];
-      alertParts.push(t("budgetAlertFallback").split("{pct}").join(String(fbPctAlert)));
-      if (quota.overage_status === "rejected") alertParts.push(" · " + t("budgetAlertOverage"));
-      if (quota.representative_claim) alertParts.push(" · " + t("budgetAlertClaim").replace("{claim}", quota.representative_claim.replaceAll("_", " ")));
-      alertEl.innerHTML = alertParts.join("");
-      alertEl.style.display = "block";
-    } else {
-      alertEl.style.display = "none";
-    }
-  }
+  __budgetRenderFuel(document.getElementById("budget-fuel"), tot, quota);
+  __budgetRenderAlert(document.getElementById("budget-alert"), quota);
 
   var hostTotals = __budgetHostTotalsFromDays(days);
 
@@ -5131,109 +5159,107 @@ function __updateBudgetSwitchActive() {
   }
 }
 
+/** Build host-local src (weighted if cost view, raw otherwise). */
+function __budgetHostSrc(hd, isCost) {
+  if (isCost) {
+    return {
+      out: hd.output * __quotaWeights.output,
+      inp: hd.input * __quotaWeights.input,
+      cr:  hd.cache_read * __quotaWeights.cache_read,
+      cc:  hd.cache_creation * __quotaWeights.cache_creation
+    };
+  }
+  return { out: hd.output, inp: hd.input, cr: hd.cache_read, cc: hd.cache_creation };
+}
+
+/** Push one conditional row per token-kind (output / input / cache_read / cache_creation). */
+function __budgetPushLeafs(rows, from, s, x, w) {
+  if (s.out > 0) rows.push([from, x.nOut, w.out]);
+  if (s.inp > 0) rows.push([from, x.nInp, w.inp]);
+  if (s.cr  > 0) rows.push([from, x.nCr,  w.cr]);
+  if (s.cc  > 0) rows.push([from, x.nCc,  w.cc]);
+}
+
+/** Expand parentNode into per-host sub-nodes and recurse into leafs. */
+function __budgetExpandHosts(rows, parentNode, x) {
+  for (const hk of x.hostKeys) {
+    var hd = x.hostTotals[hk];
+    var hLabel = hk + " (" + x.fmtTok(hd.total) + ")";
+    var hsrc = __budgetHostSrc(hd, x.isCost);
+    var hTotal = hsrc.out + hsrc.inp + hsrc.cr + hsrc.cc;
+    rows.push([parentNode, hLabel, x.wOf(hTotal)]);
+    __budgetPushLeafs(rows, hLabel, hsrc, x, {
+      out: x.wOf(hsrc.out),
+      inp: x.wOf(hsrc.inp),
+      cr:  x.wOf(hsrc.cr),
+      cc:  x.wOf(hsrc.cc)
+    });
+  }
+}
+
+/** Push final leaf→target rows (output → outNode, overhead → restNode). */
+function __budgetPushFinalLeafs(rows, x, outNode, restNode) {
+  if (x.src.out > 0) rows.push([x.nOut, outNode,  x.wOut]);
+  if (x.src.inp > 0) rows.push([x.nInp, restNode, x.wInp]);
+  if (x.src.cr  > 0) rows.push([x.nCr,  restNode, x.wCr]);
+  if (x.src.cc  > 0) rows.push([x.nCc,  restNode, x.wCc]);
+}
+
+/** Top-level weights adapter for __budgetPushLeafs. */
+function __budgetTopWeights(x) {
+  return { out: x.wOut, inp: x.wInp, cr: x.wCr, cc: x.wCc };
+}
+
+/** Build budget-mode sankey rows: Plan Budget → (hosts) → leafs → Productive/Overhead. */
+function __budgetRowsBudget(x) {
+  var rows = [];
+  var srcN = getSelectedPlanLabel() + " Budget";
+  var prodN = t("budgetWfProductive") + " (" + x.fmtTok(x.raw.out) + ")";
+  var overN = t("budgetWfOverhead") + " (" + x.fmtTok(x.raw.inp + x.raw.cr + x.raw.cc) + ")";
+  if (x.hostKeys.length > 1) {
+    __budgetExpandHosts(rows, srcN, x);
+  } else {
+    __budgetPushLeafs(rows, srcN, x.src, x, __budgetTopWeights(x));
+  }
+  __budgetPushFinalLeafs(rows, x, prodN, overN);
+  return rows;
+}
+
+/** Build api-mode sankey rows: Claude API → (hosts) → leafs → You. */
+function __budgetRowsApi(x) {
+  var rows = [];
+  var apiN = "Claude API";
+  var youN = t("budgetWfYou") + " (" + x.fmtTok(x.totalVal) + ")";
+  if (x.hostKeys.length > 1) {
+    __budgetExpandHosts(rows, apiN, x);
+  } else {
+    __budgetPushLeafs(rows, apiN, x.src, x, __budgetTopWeights(x));
+  }
+  __budgetPushFinalLeafs(rows, x, youN, youN);
+  return rows;
+}
+
+/** Build user-mode sankey rows: You → (hosts | Claude API) → leafs → Result. */
+function __budgetRowsUser(x) {
+  var rows = [];
+  var youN = t("budgetWfYou");
+  var resN = t("budgetWfResult") + " (" + x.fmtTok(x.totalVal) + ")";
+  if (x.hostKeys.length > 1) {
+    __budgetExpandHosts(rows, youN, x);
+  } else {
+    var apiN = "Claude API";
+    rows.push([youN, apiN, x.wOut + x.wInp + x.wCr + x.wCc]);
+    __budgetPushLeafs(rows, apiN, x.src, x, __budgetTopWeights(x));
+  }
+  __budgetPushFinalLeafs(rows, x, resN, resN);
+  return rows;
+}
+
 /** Build Sankey rows for budget / api / user flow (reduces renderBudgetWaterfall complexity). */
 function __budgetBuildSankeyRows(x) {
-  var src = x.src;
-  var raw = x.raw;
-  var hostKeys = x.hostKeys;
-  var hostTotals = x.hostTotals || {};
-  var isCost = x.isCost;
-  var wOf = x.wOf;
-  var wOut = x.wOut, wInp = x.wInp, wCr = x.wCr, wCc = x.wCc;
-  var nOut = x.nOut, nInp = x.nInp, nCr = x.nCr, nCc = x.nCc;
-  var totalVal = x.totalVal;
-  var fmtTok = x.fmtTok;
-  var rows = [];
-
-  if (x.flowMode === "budget") {
-    var srcN = getSelectedPlanLabel() + " Budget";
-    var prodN = t("budgetWfProductive") + " (" + fmtTok(raw.out) + ")";
-    var overN = t("budgetWfOverhead") + " (" + fmtTok(raw.inp + raw.cr + raw.cc) + ")";
-    if (hostKeys.length > 1) {
-      for (const hk of hostKeys) {
-        var hd = hostTotals[hk];
-        var hLabel = hk + " (" + fmtTok(hd.total) + ")";
-        var hsrc = isCost ? {
-          out: hd.output * __quotaWeights.output, inp: hd.input * __quotaWeights.input,
-          cr: hd.cache_read * __quotaWeights.cache_read, cc: hd.cache_creation * __quotaWeights.cache_creation
-        } : { out: hd.output, inp: hd.input, cr: hd.cache_read, cc: hd.cache_creation };
-        var hTotal = hsrc.out + hsrc.inp + hsrc.cr + hsrc.cc;
-        rows.push([srcN, hLabel, wOf(hTotal)]);
-        if (hsrc.out > 0) rows.push([hLabel, nOut, wOf(hsrc.out)]);
-        if (hsrc.inp > 0) rows.push([hLabel, nInp, wOf(hsrc.inp)]);
-        if (hsrc.cr > 0) rows.push([hLabel, nCr, wOf(hsrc.cr)]);
-        if (hsrc.cc > 0) rows.push([hLabel, nCc, wOf(hsrc.cc)]);
-      }
-    } else {
-      if (src.out > 0) rows.push([srcN, nOut, wOut]);
-      if (src.inp > 0) rows.push([srcN, nInp, wInp]);
-      if (src.cr > 0) rows.push([srcN, nCr, wCr]);
-      if (src.cc > 0) rows.push([srcN, nCc, wCc]);
-    }
-    if (src.out > 0) rows.push([nOut, prodN, wOut]);
-    if (src.inp > 0) rows.push([nInp, overN, wInp]);
-    if (src.cr > 0) rows.push([nCr, overN, wCr]);
-    if (src.cc > 0) rows.push([nCc, overN, wCc]);
-  } else if (x.flowMode === "api") {
-    var apiN = "Claude API";
-    var youN = t("budgetWfYou") + " (" + fmtTok(totalVal) + ")";
-    if (hostKeys.length > 1) {
-      for (const hk2 of hostKeys) {
-        var hd2 = hostTotals[hk2];
-        var hLabel2 = hk2 + " (" + fmtTok(hd2.total) + ")";
-        var hsrc2 = isCost ? {
-          out: hd2.output * __quotaWeights.output, inp: hd2.input * __quotaWeights.input,
-          cr: hd2.cache_read * __quotaWeights.cache_read, cc: hd2.cache_creation * __quotaWeights.cache_creation
-        } : { out: hd2.output, inp: hd2.input, cr: hd2.cache_read, cc: hd2.cache_creation };
-        var hTot2 = hsrc2.out + hsrc2.inp + hsrc2.cr + hsrc2.cc;
-        rows.push([apiN, hLabel2, wOf(hTot2)]);
-        if (hsrc2.out > 0) rows.push([hLabel2, nOut, wOf(hsrc2.out)]);
-        if (hsrc2.inp > 0) rows.push([hLabel2, nInp, wOf(hsrc2.inp)]);
-        if (hsrc2.cr > 0) rows.push([hLabel2, nCr, wOf(hsrc2.cr)]);
-        if (hsrc2.cc > 0) rows.push([hLabel2, nCc, wOf(hsrc2.cc)]);
-      }
-    } else {
-      if (src.out > 0) rows.push([apiN, nOut, wOut]);
-      if (src.inp > 0) rows.push([apiN, nInp, wInp]);
-      if (src.cr > 0) rows.push([apiN, nCr, wCr]);
-      if (src.cc > 0) rows.push([apiN, nCc, wCc]);
-    }
-    if (src.out > 0) rows.push([nOut, youN, wOut]);
-    if (src.inp > 0) rows.push([nInp, youN, wInp]);
-    if (src.cr > 0) rows.push([nCr, youN, wCr]);
-    if (src.cc > 0) rows.push([nCc, youN, wCc]);
-  } else {
-    var youN2 = t("budgetWfYou");
-    var resN = t("budgetWfResult") + " (" + fmtTok(totalVal) + ")";
-    if (hostKeys.length > 1) {
-      for (const hk3 of hostKeys) {
-        var hd3 = hostTotals[hk3];
-        var hLabel3 = hk3 + " (" + fmtTok(hd3.total) + ")";
-        var hsrc3 = isCost ? {
-          out: hd3.output * __quotaWeights.output, inp: hd3.input * __quotaWeights.input,
-          cr: hd3.cache_read * __quotaWeights.cache_read, cc: hd3.cache_creation * __quotaWeights.cache_creation
-        } : { out: hd3.output, inp: hd3.input, cr: hd3.cache_read, cc: hd3.cache_creation };
-        var hTot3 = hsrc3.out + hsrc3.inp + hsrc3.cr + hsrc3.cc;
-        rows.push([youN2, hLabel3, wOf(hTot3)]);
-        if (hsrc3.out > 0) rows.push([hLabel3, nOut, wOf(hsrc3.out)]);
-        if (hsrc3.inp > 0) rows.push([hLabel3, nInp, wOf(hsrc3.inp)]);
-        if (hsrc3.cr > 0) rows.push([hLabel3, nCr, wOf(hsrc3.cr)]);
-        if (hsrc3.cc > 0) rows.push([hLabel3, nCc, wOf(hsrc3.cc)]);
-      }
-    } else {
-      var apiN2 = "Claude API";
-      rows.push([youN2, apiN2, wOut + wInp + wCr + wCc]);
-      if (src.out > 0) rows.push([apiN2, nOut, wOut]);
-      if (src.inp > 0) rows.push([apiN2, nInp, wInp]);
-      if (src.cr > 0) rows.push([apiN2, nCr, wCr]);
-      if (src.cc > 0) rows.push([apiN2, nCc, wCc]);
-    }
-    if (src.out > 0) rows.push([nOut, resN, wOut]);
-    if (src.inp > 0) rows.push([nInp, resN, wInp]);
-    if (src.cr > 0) rows.push([nCr, resN, wCr]);
-    if (src.cc > 0) rows.push([nCc, resN, wCc]);
-  }
-  return rows;
+  if (x.flowMode === "budget") return __budgetRowsBudget(x);
+  if (x.flowMode === "api")    return __budgetRowsApi(x);
+  return __budgetRowsUser(x);
 }
 
 function renderBudgetWaterfall(tot, quota, hostTotals) {
@@ -6053,6 +6079,14 @@ function renderProxyJsonlComparison(data) {
 }
 
 // ── Per-Hour Latency Heatmap ──────────────────────────────────────────────
+/** Fold one hour-latency entry into the aggregate. */
+function __aggAddHourLatency(agg, hk, hl) {
+  if (!agg[hk]) agg[hk] = { sum: 0, count: 0, max: 0 };
+  agg[hk].sum += hl.sum;
+  agg[hk].count += hl.count;
+  if (hl.max > agg[hk].max) agg[hk].max = hl.max;
+}
+
 function aggregateHourlyLatency(proxyDays) {
   var agg = {};
   for (const pd of proxyDays) {
@@ -6060,17 +6094,14 @@ function aggregateHourlyLatency(proxyDays) {
     for (var hk in phl) {
       if (!Object.hasOwn(phl, hk)) continue;
       var hl = phl[hk];
-      if (!hl?.count) continue;
-      if (!agg[hk]) agg[hk] = { sum: 0, count: 0, max: 0 };
-      agg[hk].sum += hl.sum;
-      agg[hk].count += hl.count;
-      if (hl.max > agg[hk].max) agg[hk].max = hl.max;
+      if (hl?.count) __aggAddHourLatency(agg, hk, hl);
     }
   }
   var labels = [], avgData = [], maxData = [];
   for (var h = 0; h <= 23; h++) {
-    labels.push(String(h).length < 2 ? "0" + h : String(h));
-    var a = agg[String(h)];
+    var key = String(h);
+    labels.push(key.length < 2 ? "0" + key : key);
+    var a = agg[key];
     avgData.push(a?.count > 0 ? Math.round(a.sum / a.count) : 0);
     maxData.push(a?.max || 0);
   }
@@ -6239,25 +6270,51 @@ function renderProxyCacheTrend(data) {
 // ── Efficiency Trend (JSONL Ratio + Visible/1% + Cache Miss aus JSONL) ───
 function buildEfficiencyData(proxyDays, mainDays) {
   var jsonlByDate = {};
+  var jsonlVisibleByDate = {};
   var cacheMissByDate = {};
   for (const md of mainDays) {
     if (!md.date) continue;
     jsonlByDate[md.date] = (md.input || 0) + (md.output || 0) + (md.cache_read || 0) + (md.cache_creation || 0);
+    jsonlVisibleByDate[md.date] = (md.input || 0) + (md.output || 0);
     var cc = md.cache_creation || 0;
     var cr = md.cache_read || 0;
     cacheMissByDate[md.date] = cc + cr > 0 ? Math.round((cc / (cc + cr)) * 1000) / 10 : 0;
   }
   var labels = [], ratioData = [], visPerPctData = [], cacheMissData = [];
+  var visPerPctMeta = []; // per-day {method, q5Pct, coverage, samples, lowCoverage}
   for (const pd of proxyDays) {
     var dk = pd.date || "";
     labels.push(dk ? dk.slice(5) : "?");
     var proxyTotal = pd.total_tokens || 0;
     var jsonlTotal = jsonlByDate[dk] || 0;
     ratioData.push(proxyTotal > 0 ? Math.round(jsonlTotal / proxyTotal * 100) / 100 : 0);
-    visPerPctData.push(pd.visible_tokens_per_pct || 0);
+
+    var vpp = pd.visible_tokens_per_pct;
+    visPerPctData.push(vpp || 0);
+
+    // Proxy coverage: active-phase proxy tokens / JSONL visible tokens for same day
+    var jsonlVisible = jsonlVisibleByDate[dk] || 0;
+    var proxyActive = pd.proxy_active_visible_tokens || 0;
+    var coverage = jsonlVisible > 0 ? proxyActive / jsonlVisible : null;
+    visPerPctMeta.push({
+      method: pd.visible_tokens_per_pct_method || null,
+      q5Pct: pd.q5_consumed_pct || 0,
+      samples: pd.q5_samples || 0,
+      proxyActive: proxyActive,
+      jsonlVisible: jsonlVisible,
+      coverage: coverage,
+      lowCoverage: coverage != null && coverage < 0.5
+    });
+
     cacheMissData.push(cacheMissByDate[dk] || 0);
   }
-  return { labels: labels, ratioData: ratioData, visPerPctData: visPerPctData, cacheMissData: cacheMissData };
+  return {
+    labels: labels,
+    ratioData: ratioData,
+    visPerPctData: visPerPctData,
+    visPerPctMeta: visPerPctMeta,
+    cacheMissData: cacheMissData
+  };
 }
 
 function renderProxyEfficiencyTrend(data) {
@@ -6281,6 +6338,7 @@ function renderProxyEfficiencyTrend(data) {
       _proxyCharts.efficiencyTrend.data.labels = ed.labels;
       _proxyCharts.efficiencyTrend.data.datasets[0].data = ed.ratioData;
       _proxyCharts.efficiencyTrend.data.datasets[1].data = ed.visPerPctData;
+      _proxyCharts.efficiencyTrend.data.datasets[1].__meta = ed.visPerPctMeta;
       _proxyCharts.efficiencyTrend.data.datasets[2].data = ed.cacheMissData;
       freezeChartNoAnim(_proxyCharts.efficiencyTrend);
       _proxyCharts.efficiencyTrend.update("none");
@@ -6294,7 +6352,7 @@ function renderProxyEfficiencyTrend(data) {
       labels: ed.labels,
       datasets: [
         { label: t("proxyDSJsonlRatio"), data: ed.ratioData, borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.1)", fill: true, tension: 0.3, pointRadius: 3, yAxisID: "y", order: 2 },
-        { label: t("proxyDSVisPerPct"), data: ed.visPerPctData, type: "bar", backgroundColor: "rgba(139,92,246,.5)", borderRadius: 2, yAxisID: "y1", order: 3 },
+        { label: t("proxyDSVisPerPct"), data: ed.visPerPctData, __meta: ed.visPerPctMeta, type: "bar", backgroundColor: "rgba(139,92,246,.5)", borderRadius: 2, yAxisID: "y1", order: 3 },
         {
           label: t("budgetTrendCacheMiss"),
           data: ed.cacheMissData,
@@ -6334,7 +6392,7 @@ function renderProxyEfficiencyTrend(data) {
           ticks: { color: "#eab308", callback: function (v) { return v + "%"; } },
           grid: { drawOnChartArea: false },
           beginAtZero: true,
-          suggestedMax: 100,
+          suggestedMax: 10,
           title: { display: true, text: t("budgetTrendCacheMiss"), color: "#eab308", font: { size: 9 } }
         }
       },
@@ -6346,6 +6404,23 @@ function renderProxyEfficiencyTrend(data) {
               if (ctx.dataset.yAxisID === "y") return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(2) + "x";
               if (ctx.dataset.yAxisID === "y2") return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(1) + "%";
               return ctx.dataset.label + ": " + fmt(ctx.parsed.y);
+            },
+            afterLabel: function (ctx) {
+              if (ctx.dataset.yAxisID !== "y1") return null;
+              var meta = ctx.dataset.__meta && ctx.dataset.__meta[ctx.dataIndex];
+              if (!meta) return null;
+              var lines = [];
+              if (meta.method === "cumulative_delta") {
+                lines.push("  Δq5: " + meta.q5Pct.toFixed(2) + "% across " + meta.samples + " samples");
+              } else if (meta.samples > 0) {
+                lines.push("  insufficient q5 data (" + meta.samples + " samples)");
+              }
+              if (meta.coverage != null) {
+                var covPct = Math.round(meta.coverage * 100);
+                lines.push("  proxy coverage: " + covPct + "% of JSONL visible");
+                if (meta.lowCoverage) lines.push("  ⚠ below 50% — metric understates real value");
+              }
+              return lines.length ? lines : null;
             }
           }
         }

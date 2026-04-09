@@ -2074,6 +2074,26 @@ function __releaseSkippedPatches(prev, cur) {
   return 0;
 }
 
+function __releaseStabilityOf(cur, isHotfix) {
+  if (isHotfix) return 'hotfix';
+  if (cur.hasRegression) return 'regression';
+  return 'stable';
+}
+
+function __releaseBuildOne(cur, prev, nextEntry, ri, nEnt, nowMs) {
+  var isHotfix = prev ? (cur.date === prev.date) : false;
+  return {
+    tag: cur.tag,
+    date: cur.date,
+    daysActive: __releaseDaysActive(cur, nextEntry, ri, nEnt, nowMs),
+    stability: __releaseStabilityOf(cur, isHotfix),
+    isHotfix: isHotfix,
+    hasRegression: cur.hasRegression,
+    matchedKeywords: cur.matchedKeywords,
+    skippedPatches: __releaseSkippedPatches(prev, cur)
+  };
+}
+
 function buildReleaseStabilityData() {
   var rels = releasesCache.releases;
   if (!rels?.length) return null;
@@ -2094,26 +2114,11 @@ function buildReleaseStabilityData() {
   for (var ri = 0; ri < nEnt; ri++) {
     var cur = entries[ri];
     var prev = ri > 0 ? entries[ri - 1] : null;
-    var nextEntry = entries[ri + 1];
-    var daysActive = __releaseDaysActive(cur, nextEntry, ri, nEnt, nowMs);
-    var isHotfix = prev ? (cur.date === prev.date) : false;
-    if (isHotfix) hotfixCount++;
-    var skipped = __releaseSkippedPatches(prev, cur);
-    totalSkipped += skipped;
+    var r = __releaseBuildOne(cur, prev, entries[ri + 1], ri, nEnt, nowMs);
+    releases.push(r);
+    if (r.isHotfix) hotfixCount++;
+    totalSkipped += r.skippedPatches;
     if (cur.hasRegression) regressionCount++;
-    var stability = 'stable';
-    if (isHotfix) stability = 'hotfix';
-    else if (cur.hasRegression) stability = 'regression';
-    releases.push({
-      tag: cur.tag,
-      date: cur.date,
-      daysActive: daysActive,
-      stability: stability,
-      isHotfix: isHotfix,
-      hasRegression: cur.hasRegression,
-      matchedKeywords: cur.matchedKeywords,
-      skippedPatches: skipped
-    });
   }
 
   var firstEnt = entries[0];
@@ -3022,6 +3027,7 @@ function emptyProxyDayBucket() {
     status_codes: {},
     hours: {},
     rate_limit_snapshots: [],
+    q5_samples: [],
     cold_starts: 0,
     cache_ratios: [],
     per_hour_latency: {},
@@ -3029,6 +3035,34 @@ function emptyProxyDayBucket() {
     context_resets: 0,
     _prev_cache_read_high: false
   };
+}
+
+/**
+ * Compute cumulative 5h-window consumption from chronological q5 samples.
+ * Sums only positive deltas between consecutive requests (active consumption),
+ * ignoring natural rollback of the rolling 5h window. Tokens of the consuming
+ * request are attributed to the delta they caused. Returns:
+ *   { consumed: fraction_0_to_many, tokens: sum_input_output, count: num_samples }
+ */
+function computeQ5Consumption(samples) {
+  if (!samples || samples.length < 2) {
+    return { consumed: 0, tokens: 0, count: (samples && samples.length) || 0 };
+  }
+  var sorted = samples.slice().sort(function (a, b) {
+    if (a.ts < b.ts) return -1;
+    if (a.ts > b.ts) return 1;
+    return 0;
+  });
+  var consumed = 0;
+  var tokens = 0;
+  for (var i = 1; i < sorted.length; i++) {
+    var delta = sorted[i].q5 - sorted[i - 1].q5;
+    if (delta > 0) {
+      consumed += delta;
+      tokens += sorted[i].tokens;
+    }
+  }
+  return { consumed: consumed, tokens: tokens, count: sorted.length };
 }
 
 function parseProxyNdjsonFiles() {
@@ -3148,6 +3182,19 @@ function parseProxyNdjsonFiles() {
             snap._ts = tsEnd;
             // Keep only latest snapshot per day (overwrite)
             dd.rate_limit_snapshots = [snap];
+
+            // Cumulative q5 tracking for tokens-per-pct (see computeQ5Consumption)
+            var q5Str = snap['anthropic-ratelimit-unified-5h-utilization'];
+            if (q5Str != null) {
+              var q5Num = parseFloat(q5Str);
+              if (!isNaN(q5Num) && q5Num >= 0) {
+                dd.q5_samples.push({
+                  ts: tsEnd,
+                  q5: q5Num,
+                  tokens: (u && u.input_tokens || 0) + (u && u.output_tokens || 0)
+                });
+              }
+            }
           }
         }
       });
@@ -3194,17 +3241,24 @@ function parseProxyNdjsonFiles() {
       false_429s: d.false_429s,
       context_resets: d.context_resets,
       stop_reasons: d.stop_reasons || {},
-      visible_tokens_per_pct: null
+      visible_tokens_per_pct: null,
+      visible_tokens_per_pct_method: null,
+      q5_consumed_pct: 0,
+      q5_samples: 0,
+      proxy_active_visible_tokens: 0
     });
-    // Quota benchmark: visible tokens per 1% quota
+    // Quota benchmark: visible tokens per 1% of 5h window consumption.
+    // Cumulative over positive Δq5 between consecutive chronological requests —
+    // avoids the snapshot/rolling-window/idle-decay mismatch of dividing whole-day
+    // tokens by the final-snapshot utilization.
     var lastResult = result[result.length - 1];
-    var rl = lastResult.rate_limit;
-    if (rl) {
-      var q5 = parseFloat(rl['anthropic-ratelimit-unified-5h-utilization'] || 0);
-      if (q5 > 0) {
-        var visTokens = lastResult.input_tokens + lastResult.output_tokens;
-        lastResult.visible_tokens_per_pct = Math.round(visTokens / (q5 * 100));
-      }
+    var q5stats = computeQ5Consumption(d.q5_samples);
+    lastResult.q5_consumed_pct = Math.round(q5stats.consumed * 10000) / 100;
+    lastResult.q5_samples = q5stats.count;
+    lastResult.proxy_active_visible_tokens = q5stats.tokens;
+    if (q5stats.consumed > 0.0005 && q5stats.tokens > 0 && q5stats.count >= 3) {
+      lastResult.visible_tokens_per_pct = Math.round(q5stats.tokens / (q5stats.consumed * 100));
+      lastResult.visible_tokens_per_pct_method = 'cumulative_delta';
     }
   }
 
