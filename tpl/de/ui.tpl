@@ -380,7 +380,7 @@
   "proxyDSCacheRatio": "Cache-Read-Ratio",
   "proxyDSColdStarts": "Cold Starts",
   "proxyEfficiencyTrendTitle": "Effizienz-Trend",
-  "proxyEfficiencyTrendBlurb": "JSONL/Proxy-Ratio (orange Linie) zeigt Token-Zaehlungs-Inflation. Sichtbare Tokens pro 1% Quota (lila Balken) zeigt wieviel nutzbarer Output pro Budget-Einheit anfaellt.",
+  "proxyEfficiencyTrendBlurb": "Pro Tag zusammen: JSONL/Proxy (orange) = Zaehl-Overhead vs. Proxy; sichtbare Tokens/1% Quota (lila Balken) = nutzbarer Output pro Budget-Anteil; Cache-Miss-% aus JSONL (gelb gestrichelt) = cache_creation ÷ (creation+read) — neuer Prompt-Kontext vs. Wiederverwendung. Verbindet Overhead, Output und Cache.",
   "proxyDSJsonlRatio": "JSONL/Proxy-Ratio",
   "proxyDSVisPerPct": "Sichtbare Tokens/1%",
   "healthScoreTitle": "Gesundheits-Score",

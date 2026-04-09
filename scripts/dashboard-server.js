@@ -3280,6 +3280,7 @@ function devFetchRemoteUsage(cb, retryCount) {
   });
 }
 
+/** Lädt nur Proxy-NDJSON vom Remote (nicht die JSONL-Sessionlogs). JSONL bleibt lokal aus parseAllUsageIncremental — sonst fehlen Tage trotz proxy_days. */
 function devFetchProxyLogs(cb) {
   var source = (process.env.DEV_PROXY_SOURCE || '').trim();
   if (!source) return cb();
@@ -3422,13 +3423,29 @@ var server = http.createServer(function (req, res) {
     res.writeHead(200, corsMp);
     res.end(JSON.stringify({ ok: true, message: 'marketplace_refresh_started' }));
   } else if (pathname === '/api/debug/proxy-logs' && process.env.DEBUG_API === '1') {
-    // Debug endpoint: serve usage data + proxy NDJSON files in one call
+    // Debug: vollständiges usage + alle proxy-*.ndjson als { name, content }.
+    // DEV_MODE=proxy (devFetchProxyLogs) braucht `files` — sonst bleibt das Zielverzeichnis leer und proxy_days passt nicht zu lokalen JSONL-Tagen.
     res.writeHead(200, {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
       'Cache-Control': 'no-store'
     });
-    res.end(JSON.stringify({ usage: cachedData }));
+    var proxyNdjsonExport = [];
+    var proxyPathsExport = collectProxyNdjsonFiles();
+    for (var pxi = 0; pxi < proxyPathsExport.length; pxi++) {
+      try {
+        proxyNdjsonExport.push({
+          name: path.basename(proxyPathsExport[pxi]),
+          content: fs.readFileSync(proxyPathsExport[pxi], 'utf8')
+        });
+      } catch (readEx) {
+        serviceLog.warn(
+          'proxy-parse',
+          'debug proxy-logs read failed ' + proxyPathsExport[pxi] + ': ' + (readEx.message || readEx)
+        );
+      }
+    }
+    res.end(JSON.stringify({ usage: cachedData, files: proxyNdjsonExport }));
   } else if (pathname === '/api/debug/sync-proxy-logs' && __devMode && __devSource) {
     // Manual trigger: re-fetch data from remote
     var corsSync = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };

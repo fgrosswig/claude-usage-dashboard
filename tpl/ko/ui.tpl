@@ -294,7 +294,7 @@
   "proxyDSCacheRatio": "캐시 읽기 비율",
   "proxyDSColdStarts": "콜드 스타트",
   "proxyEfficiencyTrendTitle": "효율성 추이",
-  "proxyEfficiencyTrendBlurb": "JSONL/프록시 비율(주황색 선)은 토큰 계산 인플레이션을 보여줍니다. 1% 쿼터당 가시 토큰(보라색 막대)은 예산 단위당 사용 가능한 출력을 보여줍니다.",
+  "proxyEfficiencyTrendBlurb": "같은 날 세 가지: JSONL/프록시(주황)=프록시 대비 계산 오버헤드, 1%당 가시 토큰(보라)=예산 조각당 출력, JSONL 캐시 미스%(황색 점선)=cache_creation÷(creation+read)—콜드 컨텍스트 vs 재사용. 오버헤드·출력·캐시를 한데 묶습니다.",
   "proxyDSJsonlRatio": "JSONL/프록시 비율",
   "proxyDSVisPerPct": "가시 토큰/1%",
   "healthScoreTitle": "Health Score",

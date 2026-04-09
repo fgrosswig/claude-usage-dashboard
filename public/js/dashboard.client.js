@@ -786,6 +786,33 @@ function freezeChartNoAnim(ch) {
   ch.options.transitions = __chartTransitionsOff;
 }
 
+/** Chart.resize nur wenn Canvas noch im DOM — vermeidet ownerDocument-null nach Modal/DOM-Zug. */
+function __safeChartResize(ch) {
+  if (!ch || typeof ch.resize !== "function") return;
+  try {
+    var c = ch.canvas;
+    if (!c || !c.isConnected) return;
+    ch.resize();
+  } catch (e) {}
+}
+
+var __anthropicHealthResizeT = null;
+function __scheduleAnthropicHealthChartsResize() {
+  if (__anthropicHealthResizeT) clearTimeout(__anthropicHealthResizeT);
+  __anthropicHealthResizeT = setTimeout(function () {
+    __anthropicHealthResizeT = null;
+    __safeChartResize(_proxyCharts.uptimeChart);
+    __safeChartResize(_proxyCharts.incidentHistory);
+    __safeChartResize(_proxyCharts.outageTimeline);
+  }, 80);
+}
+
+function __bumpAnthropicHealthCharts() {
+  __safeChartResize(_proxyCharts.uptimeChart);
+  __safeChartResize(_proxyCharts.incidentHistory);
+  __safeChartResize(_proxyCharts.outageTimeline);
+}
+
 function fetchUsageJsonOnce() {
   return fetch("/api/usage", { headers: apiGithubTokenHeader() })
     .then(function (r) {
@@ -4087,6 +4114,28 @@ var __versionHealthMetrics = [
   { key: "api_error",  label: "userDSApiError",   color: "rgba(236,72,153,0.85)" }
 ];
 
+/** Max. Zeilensumme über alle Datasets (ein gemeinsamer Stack) — verhindert x-Skala < gestapelte Summe (Balken laufen aus). */
+function __stackedHBarXMax(datasets) {
+  if (!datasets || !datasets.length) return undefined;
+  var len = 0;
+  for (var i = 0; i < datasets.length; i++) {
+    var d = datasets[i].data;
+    if (d && d.length > len) len = d.length;
+  }
+  if (!len) return undefined;
+  var sums = new Array(len).fill(0);
+  for (var di = 0; di < datasets.length; di++) {
+    var row = datasets[di].data || [];
+    for (var j = 0; j < len; j++) sums[j] += Number(row[j]) || 0;
+  }
+  var mx = 0;
+  for (var k = 0; k < len; k++) {
+    if (sums[k] > mx) mx = sums[k];
+  }
+  if (mx <= 0) return 1;
+  return Math.ceil(mx * 1.15);
+}
+
 function semverCmpDesc(a, b) {
   var pa = a.split(".").map(Number);
   var pb = b.split(".").map(Number);
@@ -4317,11 +4366,16 @@ function renderUserProfileCharts(days) {
     : allVers;
   var sortedVers = sortVersionKeys(filteredVers, stats, __userVersionSort);
 
-  // Set consistent chart height for all 3 user-profile charts
-  var chartH = Math.max(180, sortedVers.length * 28 + 60);
-  var boxes = document.querySelectorAll("#user-profile-charts .chart-box canvas");
-  for (const box of boxes) {
-    box.parentElement.style.height = chartH + "px";
+  // Nur der Canvas-Host bekommt die Plot-Höhe — nicht die ganze .chart-box (sonst stimmt Chart.js-Layout vs. h3+Blurb nicht).
+  var barPitch = 30;
+  var chartCanvasH = Math.max(240, sortedVers.length * barPitch + 56);
+  var hosts = document.querySelectorAll("#user-profile-charts .user-chart-canvas-host");
+  for (const hEl of hosts) {
+    hEl.style.height = chartCanvasH + "px";
+    hEl.style.minHeight = chartCanvasH + "px";
+  }
+  for (const bx of document.querySelectorAll("#user-profile-charts .chart-box")) {
+    bx.style.height = "";
   }
 
   renderVersionHealthChart(sortedVers, stats, allVers);
@@ -4335,15 +4389,19 @@ function renderVersionHealthChart(sortedVers, stats, allVers) {
   if (h3V) h3V.textContent = t("userVersionHealthTitle");
   var blurbV = document.getElementById("user-version-blurb");
   if (blurbV) blurbV.textContent = t("userVersionHealthBlurb");
-  if (!elV || !allVers.length) return;
+  if (!elV || !allVers.length || !sortedVers.length) {
+    if (_userCharts.versions) { _userCharts.versions.destroy(); _userCharts.versions = null; }
+    return;
+  }
   if (_userCharts.versions) { _userCharts.versions.destroy(); _userCharts.versions = null; }
 
   var datasets = [];
   for (const m of __versionHealthMetrics) {
     var mData = sortedVers.map(function(sv) { return stats[sv] ? (stats[sv][m.key] || 0) : 0; });
-    datasets.push({ label: t(m.label), data: mData, backgroundColor: m.color });
+    datasets.push({ label: t(m.label), data: mData, backgroundColor: m.color, stack: "vh" });
   }
 
+  var vhXMax = __stackedHBarXMax(datasets);
   _userCharts.versions = new Chart(elV, {
     type: "bar",
     data: { labels: sortedVers, datasets: datasets },
@@ -4353,10 +4411,25 @@ function renderVersionHealthChart(sortedVers, stats, allVers) {
       maintainAspectRatio: false,
       animation: false,
       transitions: __chartTransitionsOff,
+      layout: { padding: { left: 2, right: 10, top: 4, bottom: 10 } },
       interaction: { mode: "index", intersect: false },
+      datasets: {
+        bar: { categoryPercentage: 0.88, barPercentage: 0.92 }
+      },
       scales: {
-        x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8", precision: 0 } },
-        y: { stacked: true, grid: { color: "rgba(51,65,85,0.3)" }, ticks: { color: "#e2e8f0", font: { family: "monospace" } } }
+        x: {
+          stacked: true,
+          min: 0,
+          max: vhXMax,
+          grid: { color: "rgba(51,65,85,0.5)" },
+          ticks: { color: "#94a3b8", precision: 0 }
+        },
+        y: {
+          stacked: false,
+          offset: true,
+          grid: { color: "rgba(51,65,85,0.3)" },
+          ticks: { color: "#e2e8f0", font: { family: "monospace" }, autoSkip: false }
+        }
       },
       plugins: {
         legend: { labels: { color: "#cbd5e1" } },
@@ -4382,7 +4455,10 @@ function renderEntrypointsChart(sortedVers, stats) {
   if (h3E) h3E.textContent = t("userEntrypointChartTitle");
   var blurbE = document.getElementById("user-entrypoint-blurb");
   if (blurbE) blurbE.textContent = t("userEntrypointBlurb");
-  if (!elE || !sortedVers.length) return;
+  if (!elE || !sortedVers.length) {
+    if (_userCharts.entrypoints) { _userCharts.entrypoints.destroy(); _userCharts.entrypoints = null; }
+    return;
+  }
   if (_userCharts.entrypoints) { _userCharts.entrypoints.destroy(); _userCharts.entrypoints = null; }
 
   var allEp = {};
@@ -4409,6 +4485,7 @@ function renderEntrypointsChart(sortedVers, stats) {
       stack: "ep"
     });
   }
+  var epXMax = __stackedHBarXMax(epDatasets);
   _userCharts.entrypoints = new Chart(elE, {
     type: "bar",
     data: { labels: sortedVers, datasets: epDatasets },
@@ -4418,10 +4495,25 @@ function renderEntrypointsChart(sortedVers, stats) {
       maintainAspectRatio: false,
       animation: false,
       transitions: __chartTransitionsOff,
+      layout: { padding: { left: 2, right: 10, top: 4, bottom: 10 } },
       interaction: { mode: "index", intersect: false },
+      datasets: {
+        bar: { categoryPercentage: 0.88, barPercentage: 0.92 }
+      },
       scales: {
-        x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" }, ticks: { color: "#94a3b8", precision: 0 } },
-        y: { stacked: true, grid: { color: "rgba(51,65,85,0.3)" }, ticks: { color: "#e2e8f0", font: { family: "monospace" } } }
+        x: {
+          stacked: true,
+          min: 0,
+          max: epXMax,
+          grid: { color: "rgba(51,65,85,0.5)" },
+          ticks: { color: "#94a3b8", precision: 0 }
+        },
+        y: {
+          stacked: false,
+          offset: true,
+          grid: { color: "rgba(51,65,85,0.3)" },
+          ticks: { color: "#e2e8f0", font: { family: "monospace" }, autoSkip: false }
+        }
       },
       plugins: {
         legend: { labels: { color: "#cbd5e1" } },
@@ -4538,6 +4630,7 @@ function renderReleaseStabilityChart(sortedVers, releaseData) {
     { label: t("releaseStabilityUnknown"), data: unknownData, backgroundColor: "rgba(100,116,139,0.4)", stack: "s" }
   ];
 
+  var rsXMax = __stackedHBarXMax(datasets);
   _userCharts.releaseStability = new Chart(el, {
     type: "bar",
     data: { labels: sortedVers, datasets: datasets },
@@ -4547,18 +4640,31 @@ function renderReleaseStabilityChart(sortedVers, releaseData) {
       maintainAspectRatio: false,
       animation: false,
       transitions: __chartTransitionsOff,
+      layout: { padding: { left: 2, right: 10, top: 4, bottom: 32 } },
       interaction: { mode: "index", intersect: false },
+      datasets: {
+        bar: { categoryPercentage: 0.88, barPercentage: 0.92 }
+      },
       scales: {
         x: {
           stacked: true,
+          min: 0,
+          max: rsXMax,
           grid: { color: "rgba(51,65,85,0.5)" },
           ticks: { color: "#94a3b8" },
-          title: { display: true, text: t("releaseStabilityXAxis"), color: "#64748b", font: { size: 11 } }
+          title: {
+            display: true,
+            text: t("releaseStabilityXAxis"),
+            color: "#64748b",
+            font: { size: 11 },
+            padding: { top: 10 }
+          }
         },
         y: {
-          stacked: true,
+          stacked: false,
+          offset: true,
           grid: { color: "rgba(51,65,85,0.18)" },
-          ticks: { color: "#e2e8f0", font: { family: "monospace" } }
+          ticks: { color: "#e2e8f0", font: { family: "monospace" }, autoSkip: false }
         }
       },
       plugins: {
@@ -4850,6 +4956,109 @@ var __budgetSankeyState = null;
 var __budgetFilteredHost = "";
 var __budgetSwitchesWired = false;
 var __googleChartsReady = false;
+var __budgetSankeyChart = null;
+var __budgetSankeyData = null;
+var __budgetSankeyRowCount = 0;
+var __budgetSankeyRo = null;
+var __budgetSankeyResizeDeb = null;
+var __budgetSankeyWindowResizeBound = false;
+
+function __budgetSankeyDispose() {
+  if (__budgetSankeyRo) {
+    try { __budgetSankeyRo.disconnect(); } catch (eR) {}
+    __budgetSankeyRo = null;
+  }
+  if (__budgetSankeyResizeDeb) {
+    clearTimeout(__budgetSankeyResizeDeb);
+    __budgetSankeyResizeDeb = null;
+  }
+  __budgetSankeyChart = null;
+  __budgetSankeyData = null;
+  __budgetSankeyRowCount = 0;
+}
+
+function __budgetSankeyMeasure(el, rowCount) {
+  var w = 0;
+  if (el && el.getBoundingClientRect) {
+    w = Math.floor(el.getBoundingClientRect().width);
+  }
+  if (w < 48 && el && el.closest) {
+    var box = el.closest(".chart-box");
+    if (box && box.getBoundingClientRect) {
+      w = Math.floor(box.getBoundingClientRect().width - 36);
+    }
+  }
+  if (w < 48 && typeof window !== "undefined") {
+    w = Math.floor(window.innerWidth - 80);
+  }
+  // Kein Math.max(300, …): sonst wird beim Verkleinern nie schmaler neu gezeichnet.
+  w = Math.max(160, Math.min(w, 12000));
+  var rc = Math.max(rowCount, 1);
+  var pitch = Math.max(14, Math.min(26, Math.round(w / 26)));
+  var hFromRows = Math.max(220, rc * pitch);
+  var vh = typeof window !== "undefined" ? window.innerHeight : 700;
+  var hFromVp = Math.floor(Math.min(720, Math.max(220, vh * 0.42)));
+  var h = Math.min(780, Math.max(hFromRows, hFromVp));
+  return { width: w, height: h };
+}
+
+function __budgetSankeyDrawOptions(width, height) {
+  var fs = Math.max(10, Math.min(12, Math.round(width / 72)));
+  var pad = Math.max(10, Math.min(18, Math.round(width / 52)));
+  var nw = Math.max(22, Math.min(34, Math.round(width / 26)));
+  return {
+    width: width,
+    height: height,
+    sankey: {
+      node: {
+        label: { fontSize: fs, bold: true, color: "#e2e8f0" },
+        nodePadding: pad,
+        width: nw,
+        colors: ["#94a3b8", "#22c55e", "#3b82f6", "#22d3ee", "#f59e0b", "#f87171", "#a855f7", "#8b5cf6"]
+      },
+      link: {
+        color: { fill: "#94a3b8", fillOpacity: 0.18 },
+        colorMode: "gradient"
+      }
+    }
+  };
+}
+
+function __budgetSankeyRedraw() {
+  if (!__budgetSankeyChart || !__budgetSankeyData || !globalThis.google?.visualization) return;
+  var el = document.getElementById("c-budget-sankey");
+  if (!el) return;
+  var m = __budgetSankeyMeasure(el, __budgetSankeyRowCount || 1);
+  try {
+    if (typeof __budgetSankeyChart.clearChart === "function") __budgetSankeyChart.clearChart();
+  } catch (eC) {}
+  el.style.minWidth = "";
+  el.style.width = "100%";
+  __budgetSankeyChart.draw(__budgetSankeyData, __budgetSankeyDrawOptions(m.width, m.height));
+}
+
+function __budgetSankeyBindResize(el) {
+  if (typeof ResizeObserver !== "undefined") {
+    if (__budgetSankeyRo) {
+      try { __budgetSankeyRo.disconnect(); } catch (eD) {}
+      __budgetSankeyRo = null;
+    }
+    __budgetSankeyRo = new ResizeObserver(function() {
+      if (__budgetSankeyResizeDeb) clearTimeout(__budgetSankeyResizeDeb);
+      __budgetSankeyResizeDeb = setTimeout(__budgetSankeyRedraw, 100);
+    });
+    __budgetSankeyRo.observe(el);
+    var box = el.closest && el.closest(".chart-box");
+    if (box && box !== el) __budgetSankeyRo.observe(box);
+  }
+  if (!__budgetSankeyWindowResizeBound && typeof window !== "undefined") {
+    __budgetSankeyWindowResizeBound = true;
+    window.addEventListener("resize", function() {
+      if (__budgetSankeyResizeDeb) clearTimeout(__budgetSankeyResizeDeb);
+      __budgetSankeyResizeDeb = setTimeout(__budgetSankeyRedraw, 120);
+    });
+  }
+}
 
 // Load Google Charts Sankey package
 (function() {
@@ -5039,12 +5248,14 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
   if (!el) return;
 
   if (!__googleChartsReady || !globalThis.google?.visualization) {
+    __budgetSankeyDispose();
     el.innerHTML = "<div style='text-align:center;padding:2rem;color:#94a3b8'>Loading Google Charts...</div>";
     setTimeout(function() { if (__budgetSankeyState) renderBudgetWaterfall(__budgetSankeyState.tot, __budgetSankeyState.quota, __budgetSankeyState.hostTotals); }, 500);
     return;
   }
 
   if (tot.total <= 0) {
+    __budgetSankeyDispose();
     el.innerHTML = "<div style='text-align:center;padding:2rem;color:#94a3b8'>" + t("budgetNoData") + "</div>";
     return;
   }
@@ -5100,6 +5311,7 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
   });
 
   if (!rows.length) {
+    __budgetSankeyDispose();
     el.innerHTML = "";
     return;
   }
@@ -5110,22 +5322,15 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
   data.addColumn("number", "Weight");
   data.addRows(rows);
 
-  var chart = new globalThis.google.visualization.Sankey(el);
-  chart.draw(data, {
-    height: Math.max(250, rows.length * 16),
-    sankey: {
-      node: {
-        label: { fontSize: 11, bold: true, color: "#e2e8f0" },
-        nodePadding: 14,
-        width: 28,
-        colors: ["#94a3b8", "#22c55e", "#3b82f6", "#22d3ee", "#f59e0b", "#f87171", "#a855f7", "#8b5cf6"]
-      },
-      link: {
-        color: { fill: "#94a3b8", fillOpacity: 0.18 },
-        colorMode: "gradient"
-      }
-    }
-  });
+  if (!__budgetSankeyChart) {
+    el.innerHTML = "";
+    __budgetSankeyChart = new globalThis.google.visualization.Sankey(el);
+    __budgetSankeyBindResize(el);
+  }
+  __budgetSankeyData = data;
+  __budgetSankeyRowCount = rows.length;
+  var m0 = __budgetSankeyMeasure(el, rows.length);
+  __budgetSankeyChart.draw(data, __budgetSankeyDrawOptions(m0.width, m0.height));
 }
 
 function __budgetDrawTrendEfficiencyChart(el, labels, dailyTrend, t) {
@@ -6031,21 +6236,28 @@ function renderProxyCacheTrend(data) {
   });
 }
 
-// ── Efficiency Trend (JSONL Ratio + Visible/1%) ─────────────────────────
+// ── Efficiency Trend (JSONL Ratio + Visible/1% + Cache Miss aus JSONL) ───
 function buildEfficiencyData(proxyDays, mainDays) {
   var jsonlByDate = {};
+  var cacheMissByDate = {};
   for (const md of mainDays) {
-    if (md.date) jsonlByDate[md.date] = (md.input || 0) + (md.output || 0) + (md.cache_read || 0) + (md.cache_creation || 0);
+    if (!md.date) continue;
+    jsonlByDate[md.date] = (md.input || 0) + (md.output || 0) + (md.cache_read || 0) + (md.cache_creation || 0);
+    var cc = md.cache_creation || 0;
+    var cr = md.cache_read || 0;
+    cacheMissByDate[md.date] = cc + cr > 0 ? Math.round((cc / (cc + cr)) * 1000) / 10 : 0;
   }
-  var labels = [], ratioData = [], visPerPctData = [];
+  var labels = [], ratioData = [], visPerPctData = [], cacheMissData = [];
   for (const pd of proxyDays) {
-    labels.push(pd.date ? pd.date.slice(5) : "?");
+    var dk = pd.date || "";
+    labels.push(dk ? dk.slice(5) : "?");
     var proxyTotal = pd.total_tokens || 0;
-    var jsonlTotal = jsonlByDate[pd.date] || 0;
+    var jsonlTotal = jsonlByDate[dk] || 0;
     ratioData.push(proxyTotal > 0 ? Math.round(jsonlTotal / proxyTotal * 100) / 100 : 0);
     visPerPctData.push(pd.visible_tokens_per_pct || 0);
+    cacheMissData.push(cacheMissByDate[dk] || 0);
   }
-  return { labels: labels, ratioData: ratioData, visPerPctData: visPerPctData };
+  return { labels: labels, ratioData: ratioData, visPerPctData: visPerPctData, cacheMissData: cacheMissData };
 }
 
 function renderProxyEfficiencyTrend(data) {
@@ -6062,12 +6274,18 @@ function renderProxyEfficiencyTrend(data) {
   if (blurb) blurb.textContent = t("proxyEfficiencyTrendBlurb");
 
   if (_proxyCharts.efficiencyTrend) {
-    _proxyCharts.efficiencyTrend.data.labels = ed.labels;
-    _proxyCharts.efficiencyTrend.data.datasets[0].data = ed.ratioData;
-    _proxyCharts.efficiencyTrend.data.datasets[1].data = ed.visPerPctData;
-    freezeChartNoAnim(_proxyCharts.efficiencyTrend);
-    _proxyCharts.efficiencyTrend.update("none");
-    return;
+    if (_proxyCharts.efficiencyTrend.data.datasets.length < 3) {
+      _proxyCharts.efficiencyTrend.destroy();
+      _proxyCharts.efficiencyTrend = null;
+    } else {
+      _proxyCharts.efficiencyTrend.data.labels = ed.labels;
+      _proxyCharts.efficiencyTrend.data.datasets[0].data = ed.ratioData;
+      _proxyCharts.efficiencyTrend.data.datasets[1].data = ed.visPerPctData;
+      _proxyCharts.efficiencyTrend.data.datasets[2].data = ed.cacheMissData;
+      freezeChartNoAnim(_proxyCharts.efficiencyTrend);
+      _proxyCharts.efficiencyTrend.update("none");
+      return;
+    }
   }
 
   _proxyCharts.efficiencyTrend = new Chart(el.getContext("2d"), {
@@ -6075,8 +6293,21 @@ function renderProxyEfficiencyTrend(data) {
     data: {
       labels: ed.labels,
       datasets: [
-        { label: t("proxyDSJsonlRatio"), data: ed.ratioData, borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.1)", fill: true, tension: 0.3, pointRadius: 3, yAxisID: "y" },
-        { label: t("proxyDSVisPerPct"), data: ed.visPerPctData, type: "bar", backgroundColor: "rgba(139,92,246,.5)", borderRadius: 2, yAxisID: "y1" }
+        { label: t("proxyDSJsonlRatio"), data: ed.ratioData, borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.1)", fill: true, tension: 0.3, pointRadius: 3, yAxisID: "y", order: 2 },
+        { label: t("proxyDSVisPerPct"), data: ed.visPerPctData, type: "bar", backgroundColor: "rgba(139,92,246,.5)", borderRadius: 2, yAxisID: "y1", order: 3 },
+        {
+          label: t("budgetTrendCacheMiss"),
+          data: ed.cacheMissData,
+          type: "line",
+          borderColor: "rgba(234,179,8,.95)",
+          backgroundColor: "transparent",
+          borderDash: [5, 4],
+          tension: 0.3,
+          pointRadius: 2,
+          fill: false,
+          yAxisID: "y2",
+          order: 1
+        }
       ]
     },
     options: {
@@ -6087,14 +6318,33 @@ function renderProxyEfficiencyTrend(data) {
       scales: {
         x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
         y: { position: "left", ticks: { color: "#f59e0b" }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, title: { display: true, text: "JSONL/Proxy", color: "#f59e0b", font: { size: 10 } } },
-        y1: { position: "right", ticks: { color: "#8b5cf6" }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: "Vis/1%", color: "#8b5cf6", font: { size: 10 } } }
+        y1: {
+          position: "right",
+          stack: "effR",
+          stackWeight: 2,
+          ticks: { color: "#8b5cf6" },
+          grid: { drawOnChartArea: false },
+          beginAtZero: true,
+          title: { display: true, text: "Vis/1%", color: "#8b5cf6", font: { size: 10 } }
+        },
+        y2: {
+          position: "right",
+          stack: "effR",
+          stackWeight: 1,
+          ticks: { color: "#eab308", callback: function (v) { return v + "%"; } },
+          grid: { drawOnChartArea: false },
+          beginAtZero: true,
+          suggestedMax: 100,
+          title: { display: true, text: t("budgetTrendCacheMiss"), color: "#eab308", font: { size: 9 } }
+        }
       },
       plugins: {
         legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
         tooltip: {
           callbacks: {
-            label: function(ctx) {
+            label: function (ctx) {
               if (ctx.dataset.yAxisID === "y") return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(2) + "x";
+              if (ctx.dataset.yAxisID === "y2") return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(1) + "%";
               return ctx.dataset.label + ": " + fmt(ctx.parsed.y);
             }
           }
@@ -6793,8 +7043,10 @@ function renderUptimeChart(data) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       animation: false,
       transitions: __chartTransitionsOff,
+      layout: { padding: { left: 0, right: 2, top: 4, bottom: 0 } },
       interaction: { mode: "index", intersect: false },
       scales: {
         x: { stacked: true, ticks: { color: "#cbd5e1", font: { size: _cf().tick } }, grid: { color: "rgba(51,65,85,.3)" } },
@@ -6812,7 +7064,7 @@ function renderUptimeChart(data) {
       }
     }
   });
-
+  __scheduleAnthropicHealthChartsResize();
 }
 
 // ── Incident History Chart ────────────────────────────────────────────────
@@ -6881,8 +7133,10 @@ function renderIncidentHistory(data) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       animation: false,
       transitions: __chartTransitionsOff,
+      layout: { padding: { left: 0, right: 4, top: 4, bottom: 0 } },
       interaction: { mode: "index", intersect: false },
       scales: {
         x: { stacked: true, ticks: { color: "#cbd5e1", font: { size: _cf().tick } }, grid: { color: "rgba(51,65,85,.4)" } },
@@ -6901,6 +7155,7 @@ function renderIncidentHistory(data) {
       }
     }
   });
+  __scheduleAnthropicHealthChartsResize();
 }
 
 
@@ -7087,8 +7342,10 @@ function renderOutageTimeline(data, monthFilter) {
     data: { labels: labels, datasets: datasets },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       animation: false,
       transitions: __chartTransitionsOff,
+      layout: { padding: { left: 0, right: 2, top: 4, bottom: 0 } },
       interaction: { mode: "index", intersect: false },
       scales: scaleOpts,
       plugins: {
@@ -7103,6 +7360,7 @@ function renderOutageTimeline(data, monthFilter) {
       }
     }
   });
+  __scheduleAnthropicHealthChartsResize();
 }
 
 
@@ -7576,6 +7834,11 @@ function renderAvailabilityKpis(data) {
       renderOutageTimeline(_lastAvailKpiData);
       renderAvailabilityKpis(_lastAvailKpiData);
     }
+    requestAnimationFrame(function () {
+      __bumpAnthropicHealthCharts();
+      requestAnimationFrame(__bumpAnthropicHealthCharts);
+    });
+    setTimeout(__bumpAnthropicHealthCharts, 220);
   }
 
   function closeModal() {
@@ -7602,6 +7865,11 @@ function renderAvailabilityKpis(data) {
       renderOutageTimeline(_lastAvailKpiData);
       renderAvailabilityKpis(_lastAvailKpiData);
     }
+    requestAnimationFrame(function () {
+      __bumpAnthropicHealthCharts();
+      requestAnimationFrame(__bumpAnthropicHealthCharts);
+    });
+    setTimeout(__bumpAnthropicHealthCharts, 220);
   }
 
   expandBtn.addEventListener("click", function(e) {
@@ -7621,6 +7889,26 @@ function renderAvailabilityKpis(data) {
     if (e.key === "Escape" && overlay.classList.contains("is-open")) closeModal();
   });
 })();
+
+(function __initAnthropicHealthChartResizeWatch() {
+  if (typeof window === "undefined") return;
+  window.addEventListener("resize", __scheduleAnthropicHealthChartsResize);
+  ["uptime-chart-details", "incident-history-details", "outage-timeline-details"].forEach(function (id) {
+    var d = document.getElementById(id);
+    if (d) d.addEventListener("toggle", __scheduleAnthropicHealthChartsResize);
+  });
+  if (typeof ResizeObserver === "undefined") return;
+  var ids = ["c-uptime-chart", "c-incident-history", "c-outage-timeline"];
+  for (var i = 0; i < ids.length; i++) {
+    var cv = document.getElementById(ids[i]);
+    var host = cv && cv.parentElement;
+    if (host && host.classList && host.classList.contains("health-chart-canvas-host")) {
+      var ro = new ResizeObserver(__scheduleAnthropicHealthChartsResize);
+      ro.observe(host);
+    }
+  }
+})();
+
 fetchUsageJsonOnce();
 connectUsageStream();
 scheduleFetchExtensionTimeline(900);

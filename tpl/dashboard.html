@@ -55,9 +55,9 @@
 <div class="top-bar-badge" id="anthropic-badge"><span id="anthropic-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#475569;margin-right:6px"></span><span id="anthropic-label">Anthropic</span><div class="anthropic-popup" id="anthropic-popup">
 <button type="button" class="anthropic-popup-expand" id="anthropic-popup-expand" title="Maximize">&#x26F6;</button>
 <div class="health-charts-row">
-<details class="health-chart-sm" id="uptime-chart-details" open><summary class="health-chart-summary"><span id="uptime-chart-title"></span></summary><canvas id="c-uptime-chart" height="180"></canvas></details>
-<details class="health-chart-sm" id="incident-history-details" open><summary class="health-chart-summary"><span id="incident-history-title"></span></summary><canvas id="c-incident-history" height="180"></canvas></details>
-<details class="health-chart-sm" id="outage-timeline-details" open><summary class="health-chart-summary"><span id="outage-timeline-title"></span></summary><canvas id="c-outage-timeline" height="180"></canvas></details></div>
+<details class="health-chart-sm" id="uptime-chart-details" open><summary class="health-chart-summary"><span id="uptime-chart-title"></span></summary><div class="health-chart-canvas-host"><canvas id="c-uptime-chart"></canvas></div></details>
+<details class="health-chart-sm" id="incident-history-details" open><summary class="health-chart-summary"><span id="incident-history-title"></span></summary><div class="health-chart-canvas-host"><canvas id="c-incident-history"></canvas></div></details>
+<details class="health-chart-sm" id="outage-timeline-details" open><summary class="health-chart-summary"><span id="outage-timeline-title"></span></summary><div class="health-chart-canvas-host"><canvas id="c-outage-timeline"></canvas></div></details></div>
 <details class="avail-kpi-details" id="avail-kpi-details">
 <summary class="avail-kpi-summary" id="avail-kpi-summary"></summary>
 <div class="avail-kpi-panel" id="avail-kpi-panel"></div>
@@ -266,9 +266,9 @@
 <div class="forensic-inner">
 <div class="user-chart-controls"><select id="user-version-sort" class="user-chart-select"></select><div class="user-filter-wrap" id="user-version-filter-wrap"><button type="button" class="user-filter-btn" id="user-version-filter-btn">Versions <span id="user-version-filter-count"></span></button><div class="user-filter-dropdown" id="user-version-filter-dd"></div></div></div>
 <div class="charts has-session-row" id="user-profile-charts">
-<div class="chart-box"><h3 id="user-version-h3"></h3><p class="user-chart-blurb" id="user-version-blurb"></p><canvas id="c-user-versions"></canvas></div>
-<div class="chart-box"><h3 id="user-entrypoint-h3"></h3><p class="user-chart-blurb" id="user-entrypoint-blurb"></p><canvas id="c-user-entrypoints"></canvas></div>
-<div class="chart-box"><h3 id="user-release-stability-h3"></h3><p class="user-chart-blurb" id="user-release-stability-blurb"></p><canvas id="c-user-release-stability"></canvas></div>
+<div class="chart-box user-profile-chart-box"><h3 id="user-version-h3"></h3><p class="user-chart-blurb" id="user-version-blurb"></p><div class="user-chart-canvas-host"><canvas id="c-user-versions"></canvas></div></div>
+<div class="chart-box user-profile-chart-box"><h3 id="user-entrypoint-h3"></h3><p class="user-chart-blurb" id="user-entrypoint-blurb"></p><div class="user-chart-canvas-host"><canvas id="c-user-entrypoints"></canvas></div></div>
+<div class="chart-box user-profile-chart-box"><h3 id="user-release-stability-h3"></h3><p class="user-chart-blurb" id="user-release-stability-blurb"></p><div class="user-chart-canvas-host"><canvas id="c-user-release-stability"></canvas></div></div>
 </div>
 </div>
 </details>
