@@ -10,7 +10,18 @@ steps:
   - name: sonar-scan
     image: sonarsource/sonar-scanner-cli
     commands:
-      - sonar-scanner -Dsonar.host.url=$SONAR_URL -Dsonar.token=$SONAR_TOKEN
+      - |
+        # Pass sonar.branch.name only for non-main branches (Community Branch Plugin required)
+        if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+          sonar-scanner \
+            -Dsonar.host.url=$SONAR_URL \
+            -Dsonar.token=$SONAR_TOKEN
+        else
+          sonar-scanner \
+            -Dsonar.host.url=$SONAR_URL \
+            -Dsonar.token=$SONAR_TOKEN \
+            -Dsonar.branch.name=$CI_COMMIT_BRANCH
+        fi
     environment:
       SONAR_URL:
         from_secret: sonar_url
@@ -24,11 +35,16 @@ steps:
         apk add --no-cache curl jq
         echo "Waiting 10s for SonarQube to process analysis..."
         sleep 10
-        STATUS=$(curl -sf -u "$SONAR_TOKEN:" "$SONAR_URL/api/qualitygates/project_status?projectKey=claude-usage-dashboard" | jq -r '.projectStatus.status')
-        echo "Quality Gate: $STATUS"
+        if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+          QG_URL="$SONAR_URL/api/qualitygates/project_status?projectKey=claude-usage-dashboard"
+        else
+          QG_URL="$SONAR_URL/api/qualitygates/project_status?projectKey=claude-usage-dashboard&branch=$CI_COMMIT_BRANCH"
+        fi
+        STATUS=$(curl -sf -u "$SONAR_TOKEN:" "$QG_URL" | jq -r '.projectStatus.status')
+        echo "Quality Gate ($CI_COMMIT_BRANCH): $STATUS"
         if [ "$STATUS" != "OK" ]; then
           echo "FAILED: Quality Gate not passed."
-          curl -sf -u "$SONAR_TOKEN:" "$SONAR_URL/api/qualitygates/project_status?projectKey=claude-usage-dashboard" | jq '.projectStatus.conditions[] | select(.status != "OK")'
+          curl -sf -u "$SONAR_TOKEN:" "$QG_URL" | jq '.projectStatus.conditions[] | select(.status != "OK")'
           exit 1
         fi
         echo "Quality Gate passed."
