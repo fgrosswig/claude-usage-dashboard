@@ -63,6 +63,12 @@ find . -type f ! -path './.git/*' ! -path './node_modules/*' \( \
       -e 's|Vom gleichen Stand wie der Gitea-Feature-Branch|Vom gleichen Stand wie der private Feature-Branch|g'
   done
 
+# Delete internal-infra markdown lines BEFORE generic domain replacement
+# (otherwise a line like "[![Quality Gate](https://sonar.grosswig-it.de/...)"
+# first becomes "https://sonar.example.com/..." and the grosswig-it.de
+# delete rule no longer matches — leaving dead badge links on GitHub).
+# Also: explicitly strip SonarQube project_badges lines by URL pattern so
+# any residual sonar.<anywhere> badge gets removed.
 find . -type f ! -path './.git/*' -name '*.md' -print0 |
   while IFS= read -r -d '' f; do
     case "$f" in
@@ -70,7 +76,9 @@ find . -type f ! -path './.git/*' -name '*.md' -print0 |
     esac
     _apply_sed_to_file "$f" \
       -e '/Woodpecker CI/d' \
-      -e '/grosswig-it\.de/d' || true
+      -e '/grosswig-it\.de/d' \
+      -e '/sonar\..*api\/project_badges/d' \
+      -e '/sonar\.example\.com/d' || true
   done
 
 find . -type f ! -path './.git/*' \( -name 'Dockerfile' -o -name 'Dockerfile.*' \) -print0 |
