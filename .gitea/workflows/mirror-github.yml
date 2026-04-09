@@ -187,8 +187,14 @@ jobs:
                       print(f"GitHub API error for {tag}: {e.code}")
                       continue
 
-              # Scrub internal hostnames from release body
+              # Marker-based body split: everything before <!--INTERNAL--> is the
+              # public body, the rest stays only in the Gitea release. Backward
+              # compatible — bodies without the marker are treated as fully public.
               body = rel.get("body", "")
+              if "<!--INTERNAL-->" in body:
+                  body = body.split("<!--INTERNAL-->", 1)[0].rstrip()
+              # Scrub internal hostnames from the public part (defense in depth
+              # — even if the public section accidentally contains an internal URL).
               body = re.sub(r"https?://gitea\.grosswig-it\.de[^\s)]*", "https://github.com/fgrosswig/claude-usage-dashboard", body)
               body = re.sub(r"https?://ci\.grosswig-it\.de[^\s)]*", "", body)
               body = re.sub(r"https?://claude-usage\.grosswig-it\.de[^\s)]*", "", body)
