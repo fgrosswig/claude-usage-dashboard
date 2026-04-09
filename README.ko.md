@@ -3,10 +3,6 @@
 ## Claude Usage Dashboard
 
 [![Docker build](https://github.com/fgrosswig/claude-usage-dashboard/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/fgrosswig/claude-usage-dashboard/actions/workflows/docker.yml)
-[![Quality Gate](https://sonar.example.com/api/project_badges/measure?project=claude-usage-dashboard&metric=alert_status&token=XXX)](https://sonar.example.com/dashboard?id=claude-usage-dashboard)
-[![Bugs](https://sonar.example.com/api/project_badges/measure?project=claude-usage-dashboard&metric=bugs&token=XXX)](https://sonar.example.com/dashboard?id=claude-usage-dashboard)
-[![Vulnerabilities](https://sonar.example.com/api/project_badges/measure?project=claude-usage-dashboard&metric=vulnerabilities&token=XXX)](https://sonar.example.com/dashboard?id=claude-usage-dashboard)
-[![Security Rating](https://sonar.example.com/api/project_badges/measure?project=claude-usage-dashboard&metric=security_rating&token=XXX)](https://sonar.example.com/dashboard?id=claude-usage-dashboard)
 
 ### 요약
 
