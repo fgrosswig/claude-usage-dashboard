@@ -4304,11 +4304,19 @@ function maxKeyByValue(obj) {
   return best;
 }
 
+/**
+ * Pick the highest semver version with calls on the most recent active day.
+ * Uses newest-semver (not max-count) so a fresh upgrade is reflected
+ * immediately, even if older versions still dominate the day's volume.
+ * Entrypoint stays on max-count because there's no natural ordering.
+ */
 function findLatestDayTopEntries(days) {
   for (var ldi = days.length - 1; ldi >= 0; ldi--) {
     var ldv = days[ldi].versions || {};
-    if (Object.keys(ldv).length) {
-      return { topVersion: maxKeyByValue(ldv), topEntrypoint: maxKeyByValue(days[ldi].entrypoints || {}) };
+    var keys = Object.keys(ldv).filter(function (k) { return (ldv[k] || 0) > 0; });
+    if (keys.length) {
+      keys.sort(semverCmpDesc);
+      return { topVersion: keys[0], topEntrypoint: maxKeyByValue(days[ldi].entrypoints || {}) };
     }
   }
   return { topVersion: "", topEntrypoint: "" };
