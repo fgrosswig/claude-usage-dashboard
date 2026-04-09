@@ -5,6 +5,14 @@ when:
     branch: [main, "feat/**", "fix/**"]
   - event: manual
 
+# Sonar auf main: voller Clone für korrekte SCM-Zuordnung (Quality Gate / Blame).
+clone:
+  git:
+    image: woodpeckerci/plugin-git
+    settings:
+      depth: 0
+      partial: false
+
 labels:
   platform: linux/amd64
 

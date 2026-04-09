@@ -43,6 +43,15 @@ spec:
               value: 'production'
             - name: DEBUG_API
               value: '1'
+            # HTTP-Push JSONL: scripts/claude-data-sync-client.js — Wert nur im Secret, nicht im Git.
+            # Secret anlegen: k8s/README.md (claude-usage-dashboard-app, Key sync-token).
+            # optional: true — ohne Secret startet der Pod trotzdem (Sync-Endpunkt dann 404 sync_disabled).
+            - name: CLAUDE_USAGE_SYNC_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: claude-usage-dashboard-app
+                  key: sync-token
+                  optional: true
           livenessProbe:
             httpGet:
               path: /

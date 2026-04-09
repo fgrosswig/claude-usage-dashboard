@@ -1,6 +1,6 @@
 # Claude Usage Dashboard — Dokumentation (Deutsch)
 
-**[English](../en/README.md)**
+**[English](../en/README.md)** · **[한국어 (KO)](../ko/README.md)** (Sync / K8s / API-Auszug)
 
 Inhalt in logischer Lesereihenfolge:
 
@@ -14,3 +14,4 @@ Inhalt in logischer Lesereihenfolge:
 | 6 | Limits & Forensik (UI), CLI `token-forensics` | [06-forensik-und-cli.md](06-forensik-und-cli.md) |
 | 7 | Umgebungsvariablen, API, Deployment, Docker, CI, Dev-Testing, GitHub-Spiegel | [07-umgebung-api-deployment-dev.md](07-umgebung-api-deployment-dev.md) |
 | 8 | Screenshots & Bildverzeichnis | [08-screenshots.md](08-screenshots.md) |
+| 9 | Datenformate (JSONL-Session-Logs, Proxy-NDJSON), Adapter-/Converter-Leitfaden | [09-datenformate.md](09-datenformate.md) |
