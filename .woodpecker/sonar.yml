@@ -3,6 +3,14 @@
 when:
   - event: manual
 
+# Voller Clone: Sonar braucht SCM-Historie (kein shallow/partial clone).
+clone:
+  git:
+    image: woodpeckerci/plugin-git
+    settings:
+      depth: 0
+      partial: false
+
 labels:
   platform: linux/amd64
 
