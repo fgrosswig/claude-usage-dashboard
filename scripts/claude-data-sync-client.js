@@ -19,10 +19,8 @@ function resolveTarBin() {
   var fromEnv = process.env.CLAUDE_SYNC_TAR;
   if (fromEnv && String(fromEnv).trim()) return String(fromEnv).trim();
   if (process.platform === 'win32') {
-    var sysTar = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe');
-    try {
-      if (fs.existsSync(sysTar)) return sysTar;
-    } catch (e) {}
+    var sysTar = path.join(process.env.SystemRoot || String.raw`C:\Windows`, 'System32', 'tar.exe');
+    if (fs.existsSync(sysTar)) return sysTar;
   }
   return 'tar';
 }
@@ -90,7 +88,7 @@ var tr = cp.spawn(tarBin, args, { stdio: 'inherit', windowsHide: true });
 tr.on('error', function (err) {
   console.error('claude-data-sync-client: tar failed to start: ' + (err.message || err));
   if (process.platform === 'win32' && tarBin === 'tar') {
-    console.error('claude-data-sync-client: try: $env:CLAUDE_SYNC_TAR="C:\\Windows\\System32\\tar.exe"');
+    console.error(String.raw`claude-data-sync-client: try: $env:CLAUDE_SYNC_TAR="C:\Windows\System32\tar.exe"`);
   }
   process.exit(1);
 });

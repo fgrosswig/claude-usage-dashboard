@@ -3046,7 +3046,7 @@ function emptyProxyDayBucket() {
  */
 function computeQ5Consumption(samples) {
   if (!samples || samples.length < 2) {
-    return { consumed: 0, tokens: 0, count: (samples && samples.length) || 0 };
+    return { consumed: 0, tokens: 0, count: samples?.length || 0 };
   }
   var sorted = samples.slice().sort(function (a, b) {
     if (a.ts < b.ts) return -1;
@@ -3186,12 +3186,12 @@ function parseProxyNdjsonFiles() {
             // Cumulative q5 tracking for tokens-per-pct (see computeQ5Consumption)
             var q5Str = snap['anthropic-ratelimit-unified-5h-utilization'];
             if (q5Str != null) {
-              var q5Num = parseFloat(q5Str);
-              if (!isNaN(q5Num) && q5Num >= 0) {
+              var q5Num = Number.parseFloat(q5Str);
+              if (!Number.isNaN(q5Num) && q5Num >= 0) {
                 dd.q5_samples.push({
                   ts: tsEnd,
                   q5: q5Num,
-                  tokens: (u && u.input_tokens || 0) + (u && u.output_tokens || 0)
+                  tokens: (u?.input_tokens || 0) + (u?.output_tokens || 0)
                 });
               }
             }
@@ -3502,16 +3502,16 @@ var server = http.createServer(function (req, res) {
     });
     var proxyNdjsonExport = [];
     var proxyPathsExport = collectProxyNdjsonFiles();
-    for (var pxi = 0; pxi < proxyPathsExport.length; pxi++) {
+    for (const proxyPath of proxyPathsExport) {
       try {
         proxyNdjsonExport.push({
-          name: path.basename(proxyPathsExport[pxi]),
-          content: fs.readFileSync(proxyPathsExport[pxi], 'utf8')
+          name: path.basename(proxyPath),
+          content: fs.readFileSync(proxyPath, 'utf8')
         });
-      } catch (readEx) {
+      } catch (error) {
         serviceLog.warn(
           'proxy-parse',
-          'debug proxy-logs read failed ' + proxyPathsExport[pxi] + ': ' + (readEx.message || readEx)
+          'debug proxy-logs read failed ' + proxyPath + ': ' + (error.message || error)
         );
       }
     }

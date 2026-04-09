@@ -265,16 +265,17 @@ function forensicCodeToScore(code) {
 }
 function forensicScoreForChartDay(day, daysArr, hostFilter) {
   var code;
-  if (!hostFilter) {
-    code = day.forensic_code;
-  } else {
-    var H = day.hosts && day.hosts[hostFilter];
-    if (!H) code = "\u2014";
-    else {
+  if (hostFilter) {
+    var H = day.hosts?.[hostFilter];
+    if (H) {
       var peak = findHostPeakAcrossDays(daysArr, hostFilter);
       var row = hostApiToForensicRow(H);
       code = computeForensicForDayClient(day.date, row, peak.date, peak.total).forensic_code;
+    } else {
+      code = "\u2014";
     }
+  } else {
+    code = day.forensic_code;
   }
   return forensicCodeToScore(code);
 }
@@ -791,9 +792,9 @@ function __safeChartResize(ch) {
   if (!ch || typeof ch.resize !== "function") return;
   try {
     var c = ch.canvas;
-    if (!c || !c.isConnected) return;
+    if (!c?.isConnected) return;
     ch.resize();
-  } catch (e) {}
+  } catch (_error) { /* canvas may have detached between isConnected check and resize() */ }
 }
 
 var __anthropicHealthResizeT = null;
@@ -3647,7 +3648,7 @@ function generateForensicReportMd(data) {
       "",
       (isDE?"Impl@90% = Total / 0.9 (gesch\u00e4tztes Budget wenn ~90% erreicht).":"Impl@90% = total / 0.9 (estimated budget if ~90% was reached)."),
       "",
-      "| "+(isDE?"Datum":"Date")+" | Total | Impl@90% | vs Peak | "+(isDE?"Std.":"Hours")+" | "+(isDE?"Signal":"Signal")+" |",
+      "| "+(isDE?"Datum":"Date")+" | Total | Impl@90% | vs Peak | "+(isDE?"Std.":"Hours")+" | Signal |",
       "|------------|---------|----------|---------|-------|--------|"
     );
     var prevI = 0;
@@ -4116,16 +4117,16 @@ var __versionHealthMetrics = [
 
 /** Max. Zeilensumme über alle Datasets (ein gemeinsamer Stack) — verhindert x-Skala < gestapelte Summe (Balken laufen aus). */
 function __stackedHBarXMax(datasets) {
-  if (!datasets || !datasets.length) return undefined;
+  if (!datasets?.length) return undefined;
   var len = 0;
-  for (var i = 0; i < datasets.length; i++) {
-    var d = datasets[i].data;
+  for (const ds of datasets) {
+    var d = ds.data;
     if (d && d.length > len) len = d.length;
   }
   if (!len) return undefined;
   var sums = new Array(len).fill(0);
-  for (var di = 0; di < datasets.length; di++) {
-    var row = datasets[di].data || [];
+  for (const ds of datasets) {
+    var row = ds.data || [];
     for (var j = 0; j < len; j++) sums[j] += Number(row[j]) || 0;
   }
   var mx = 0;
@@ -4609,7 +4610,7 @@ function renderReleaseStabilityChart(sortedVers, releaseData) {
   var blurb = document.getElementById("user-release-stability-blurb");
   if (!el) return;
   if (_userCharts.releaseStability) { _userCharts.releaseStability.destroy(); _userCharts.releaseStability = null; }
-  if (!sortedVers || !sortedVers.length || !releaseData) {
+  if (!sortedVers?.length || !releaseData) {
     if (blurb) blurb.textContent = t("releaseStabilityNoData");
     return;
   }
@@ -4763,11 +4764,11 @@ function __budgetSankeyWeights(src) {
   return { wOut: wOf(src.out), wInp: wOf(src.inp), wCr: wOf(src.cr), wCc: wOf(src.cc), wOf: wOf };
 }
 
-function __budgetKpiCardsHtml(days, tot, outputPct, overheadFactor, cacheMissRate, lostSignals, t, escHtml) {
+function __budgetKpiCardsHtml(days, tot, outputPct, overheadFactor, cacheMissRate, lostSignals) {
   var totalOutageH = 0;
   for (const d of days) totalOutageH += d.outage_hours || 0;
   var totalTruncated = 0;
-  for (const d of days) totalTruncated += (d.session_signals || {}).truncated || 0;
+  for (const d of days) totalTruncated += d.session_signals?.truncated || 0;
   var cards = [
     { label: t("budgetCardOutput"), value: outputPct + "%", sub: t("budgetCardOutputSub"), cls: outputPct < 25 ? "warn" : "" },
     { label: t("budgetCardOverhead"), value: overheadFactor + "x", sub: t("budgetCardOverheadSub"), cls: overheadFactor > 4 ? "warn" : "" },
@@ -4944,7 +4945,7 @@ function renderBudgetEfficiency(data) {
   if (!sumEl) return;
 
   var days = getFilteredDays(data.days);
-  if (!days || !days.length) {
+  if (!days?.length) {
     __budgetHandleEmpty(sumEl, cardsEl);
     return;
   }
@@ -4961,7 +4962,7 @@ function renderBudgetEfficiency(data) {
   __budgetFillSummary(sumEl, tot, m);
 
   if (cardsEl) {
-    cardsEl.innerHTML = __budgetKpiCardsHtml(days, tot, m.outputPct, m.overheadFactor, m.cacheMissRate, m.lostSignals, t, escHtml);
+    cardsEl.innerHTML = __budgetKpiCardsHtml(days, tot, m.outputPct, m.overheadFactor, m.cacheMissRate, m.lostSignals);
   }
 
   var quota = __budgetQuotaFromLatestProxy(data.proxy);
@@ -5001,7 +5002,7 @@ var __budgetSankeyWindowResizeBound = false;
 
 function __budgetSankeyDispose() {
   if (__budgetSankeyRo) {
-    try { __budgetSankeyRo.disconnect(); } catch (eR) {}
+    try { __budgetSankeyRo.disconnect(); } catch (_error) { /* ResizeObserver may already be disconnected */ }
     __budgetSankeyRo = null;
   }
   if (__budgetSankeyResizeDeb) {
@@ -5015,16 +5016,16 @@ function __budgetSankeyDispose() {
 
 function __budgetSankeyMeasure(el, rowCount) {
   var w = 0;
-  if (el && el.getBoundingClientRect) {
+  if (el?.getBoundingClientRect) {
     w = Math.floor(el.getBoundingClientRect().width);
   }
-  if (w < 48 && el && el.closest) {
+  if (w < 48 && el?.closest) {
     var box = el.closest(".chart-box");
-    if (box && box.getBoundingClientRect) {
+    if (box?.getBoundingClientRect) {
       w = Math.floor(box.getBoundingClientRect().width - 36);
     }
   }
-  if (w < 48 && typeof window !== "undefined") {
+  if (w < 48 && typeof globalThis.window !== "undefined") {
     w = Math.floor(window.innerWidth - 80);
   }
   // Kein Math.max(300, …): sonst wird beim Verkleinern nie schmaler neu gezeichnet.
@@ -5032,7 +5033,7 @@ function __budgetSankeyMeasure(el, rowCount) {
   var rc = Math.max(rowCount, 1);
   var pitch = Math.max(14, Math.min(26, Math.round(w / 26)));
   var hFromRows = Math.max(220, rc * pitch);
-  var vh = typeof window !== "undefined" ? window.innerHeight : 700;
+  var vh = typeof globalThis.window !== "undefined" ? window.innerHeight : 700;
   var hFromVp = Math.floor(Math.min(720, Math.max(220, vh * 0.42)));
   var h = Math.min(780, Math.max(hFromRows, hFromVp));
   return { width: w, height: h };
@@ -5067,7 +5068,7 @@ function __budgetSankeyRedraw() {
   var m = __budgetSankeyMeasure(el, __budgetSankeyRowCount || 1);
   try {
     if (typeof __budgetSankeyChart.clearChart === "function") __budgetSankeyChart.clearChart();
-  } catch (eC) {}
+  } catch (_error) { /* Google Charts may throw on repeat clearChart */ }
   el.style.minWidth = "";
   el.style.width = "100%";
   __budgetSankeyChart.draw(__budgetSankeyData, __budgetSankeyDrawOptions(m.width, m.height));
@@ -5076,7 +5077,7 @@ function __budgetSankeyRedraw() {
 function __budgetSankeyBindResize(el) {
   if (typeof ResizeObserver !== "undefined") {
     if (__budgetSankeyRo) {
-      try { __budgetSankeyRo.disconnect(); } catch (eD) {}
+      try { __budgetSankeyRo.disconnect(); } catch (_error) { /* already disconnected */ }
       __budgetSankeyRo = null;
     }
     __budgetSankeyRo = new ResizeObserver(function() {
@@ -5084,10 +5085,10 @@ function __budgetSankeyBindResize(el) {
       __budgetSankeyResizeDeb = setTimeout(__budgetSankeyRedraw, 100);
     });
     __budgetSankeyRo.observe(el);
-    var box = el.closest && el.closest(".chart-box");
+    var box = el.closest?.(".chart-box");
     if (box && box !== el) __budgetSankeyRo.observe(box);
   }
-  if (!__budgetSankeyWindowResizeBound && typeof window !== "undefined") {
+  if (!__budgetSankeyWindowResizeBound && typeof globalThis.window !== "undefined") {
     __budgetSankeyWindowResizeBound = true;
     window.addEventListener("resize", function() {
       if (__budgetSankeyResizeDeb) clearTimeout(__budgetSankeyResizeDeb);
@@ -5270,6 +5271,14 @@ function __budgetBuildSankeyRows(x) {
   return __budgetRowsUser(x);
 }
 
+/** Compact token formatter: 1.2B / 3.4M / 56K / 789. Shared by sankey and tooltip paths. */
+function __budgetFmtTok(v) {
+  if (v >= 1e9) return (v / 1e9).toFixed(1) + "B";
+  if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
+  if (v >= 1e3) return (v / 1e3).toFixed(0) + "K";
+  return String(Math.round(v));
+}
+
 function renderBudgetWaterfall(tot, quota, hostTotals) {
   __budgetSankeyState = { tot: tot, quota: quota, hostTotals: hostTotals || {} };
   __buildBudgetSwitches();
@@ -5305,12 +5314,6 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
   var src = isCost ? weighted : raw;
   var totalVal = src.out + src.inp + src.cr + src.cc;
 
-  var fmtTok = function(v) {
-    if (v >= 1e9) return (v / 1e9).toFixed(1) + "B";
-    if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
-    if (v >= 1e3) return (v / 1e3).toFixed(0) + "K";
-    return String(Math.round(v));
-  };
   var pctOf = function(v) { return totalVal > 0 ? Math.round(v / totalVal * 1000) / 10 : 0; };
 
   if (blurb) {
@@ -5341,7 +5344,7 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
     wOut: wOut, wInp: wInp, wCr: wCr, wCc: wCc,
     nOut: nOut, nInp: nInp, nCr: nCr, nCc: nCc,
     totalVal: totalVal,
-    fmtTok: fmtTok
+    fmtTok: __budgetFmtTok
   });
 
   if (!rows.length) {
@@ -5564,14 +5567,14 @@ var _proxyCharts = { tokens: null, latency: null };
 var _effCharts = { heatmap: null, ratio: null, vispct: null, cachemiss: null };
 var __effResizeT = null;
 function __effResizeAll() {
-  for (var k in _effCharts) {
-    var c = _effCharts[k];
+  for (const key of Object.keys(_effCharts)) {
+    var c = _effCharts[key];
     if (c && typeof c.resize === "function") {
-      try { c.resize(); } catch (e) {}
+      try { c.resize(); } catch (_error) { /* chart detached or not initialized */ }
     }
   }
 }
-if (typeof window !== "undefined") {
+if (typeof globalThis.window !== "undefined") {
   window.addEventListener("resize", function () {
     if (__effResizeT) clearTimeout(__effResizeT);
     __effResizeT = setTimeout(__effResizeAll, 120);
@@ -6349,18 +6352,17 @@ function buildEfficiencyData(proxyDays, mainDays) {
 
 function __effNormalizeRow(row) {
   var min = Infinity, max = -Infinity;
-  for (var i = 0; i < row.length; i++) {
-    var v = row[i];
-    if (v == null || isNaN(v)) continue;
+  for (const v of row) {
+    if (v == null || Number.isNaN(v)) continue;
     if (v < min) min = v;
     if (v > max) max = v;
   }
-  if (!isFinite(min) || !isFinite(max) || min === max) {
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
     return row.map(function () { return 0.5; });
   }
   var span = max - min;
   return row.map(function (v) {
-    if (v == null || isNaN(v)) return 0;
+    if (v == null || Number.isNaN(v)) return 0;
     return (v - min) / span;
   });
 }
@@ -6378,15 +6380,15 @@ function __effHeatmapOption(ed) {
     ed.ratioData,
     ed.visPerPctData,
     ed.cacheMissData,
-    ed.visPerPctMeta.map(function (m) { return m && m.coverage != null ? m.coverage * 100 : 0; })
+    ed.visPerPctMeta.map(function (m) { return m?.coverage != null ? m.coverage * 100 : 0; })
   ];
   var normRows = rawRows.map(__effNormalizeRow);
   var hdata = [];
-  for (var m = 0; m < rawRows.length; m++) {
-    for (var d = 0; d < ed.labels.length; d++) {
-      hdata.push([d, m, normRows[m][d], rawRows[m][d]]);
-    }
-  }
+  rawRows.forEach(function (rawRow, m) {
+    ed.labels.forEach(function (_unused, d) {
+      hdata.push([d, m, normRows[m][d], rawRow[d]]);
+    });
+  });
   return {
     animation: false,
     backgroundColor: "transparent",
@@ -6400,8 +6402,10 @@ function __effHeatmapOption(ed) {
         var norm = p.data[2];
         var metricName = metricLabels[p.data[1]];
         var dayLabel = ed.labels[p.data[0]];
-        var rawStr = (metricName.indexOf("Ratio") >= 0) ? raw.toFixed(2) + "x"
-          : (metricName.indexOf("%") >= 0 ? raw.toFixed(1) + "%" : Math.round(raw).toLocaleString());
+        var rawStr;
+        if (metricName.includes("Ratio")) rawStr = raw.toFixed(2) + "x";
+        else if (metricName.includes("%")) rawStr = raw.toFixed(1) + "%";
+        else rawStr = Math.round(raw).toLocaleString();
         return dayLabel + "<br/>" + metricName + ": <b>" + rawStr + "</b><br/>"
           + "normalized: " + (norm * 100).toFixed(0) + "%";
       }
@@ -6439,7 +6443,7 @@ function __effHeatmapOption(ed) {
           var raw = p.data[3];
           var m = p.data[1];
           if (m === 0) return raw.toFixed(1) + "x";
-          if (m === 1) return raw >= 1000 ? (raw / 1000).toFixed(1) + "K" : Math.round(raw);
+          if (m === 1) return raw >= 1000 ? (raw / 1000).toFixed(1) + "K" : String(Math.round(raw));
           return raw.toFixed(1) + "%";
         }
       },
@@ -6527,7 +6531,7 @@ function renderProxyEfficiencyTrend(data) {
     labels: ed.labels,
     yFormatter: function (v) { return v.toFixed(1) + "x"; },
     tooltipFormatter: function (ps) {
-      if (!ps || !ps.length) return "";
+      if (!ps?.length) return "";
       var p = ps[0];
       return p.axisValue + "<br/>" + t("proxyDSJsonlRatio") + ": <b>" + p.value.toFixed(2) + "x</b><br/>"
         + "<span style='color:#94a3b8'>B8 baseline: 2.87x</span>";
@@ -6555,9 +6559,9 @@ function renderProxyEfficiencyTrend(data) {
     title: t("proxyDSVisPerPct"),
     color: "#8b5cf6",
     labels: ed.labels,
-    yFormatter: function (v) { return v >= 1000 ? (v / 1000).toFixed(1) + "K" : Math.round(v); },
+    yFormatter: function (v) { return v >= 1000 ? (v / 1000).toFixed(1) + "K" : String(Math.round(v)); },
     tooltipFormatter: function (ps) {
-      if (!ps || !ps.length) return "";
+      if (!ps?.length) return "";
       var p = ps[0];
       var meta = visMeta[p.dataIndex];
       var val = p.value;
@@ -8146,7 +8150,7 @@ function renderAvailabilityKpis(data) {
 })();
 
 (function __initAnthropicHealthChartResizeWatch() {
-  if (typeof window === "undefined") return;
+  if (typeof globalThis.window === "undefined") return;
   window.addEventListener("resize", __scheduleAnthropicHealthChartsResize);
   ["uptime-chart-details", "incident-history-details", "outage-timeline-details"].forEach(function (id) {
     var d = document.getElementById(id);
@@ -8154,10 +8158,10 @@ function renderAvailabilityKpis(data) {
   });
   if (typeof ResizeObserver === "undefined") return;
   var ids = ["c-uptime-chart", "c-incident-history", "c-outage-timeline"];
-  for (var i = 0; i < ids.length; i++) {
-    var cv = document.getElementById(ids[i]);
-    var host = cv && cv.parentElement;
-    if (host && host.classList && host.classList.contains("health-chart-canvas-host")) {
+  for (const id of ids) {
+    var cv = document.getElementById(id);
+    var host = cv?.parentElement;
+    if (host?.classList?.contains("health-chart-canvas-host")) {
       var ro = new ResizeObserver(__scheduleAnthropicHealthChartsResize);
       ro.observe(host);
     }
