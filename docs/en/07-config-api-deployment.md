@@ -11,7 +11,7 @@
 | `ANTHROPIC_PROXY_LOG_DIR` | `~/.claude/anthropic-proxy-logs` | NDJSON directory |
 | `CLAUDE_USAGE_EXTRA_BASES` | — | `auto` or `;`-separated paths |
 | `CLAUDE_USAGE_EXTRA_BASES_ROOT` | `cwd` | Root for `HOST-*` auto-discovery |
-| `CLAUDE_USAGE_SYNC_TOKEN` | — | Token for `POST /api/claude-data-sync` |
+| `CLAUDE_USAGE_SYNC_TOKEN` | — | Token for `POST /api/claude-data-sync` (in Kubernetes: from Secret `sync-token` — see **`k8s/base/deployment.yml`** / **`k8s/README.md`**) |
 | `CLAUDE_USAGE_SYNC_MAX_MB` | `512` | Max upload size |
 | `CLAUDE_USAGE_SCAN_INTERVAL_SEC` | `180` | Scan interval (min. 60) |
 | `CLAUDE_USAGE_SCAN_FILES_PER_TICK` | `20` | JSONL files per SSE tick on first scan (1–80) |
@@ -21,7 +21,7 @@
 | `CLAUDE_USAGE_LOG_FILE` | — | Extra log file |
 | `GITHUB_TOKEN` / `GH_TOKEN` | — | PAT for GitHub API (releases) |
 | `CLAUDE_USAGE_ADMIN_TOKEN` | — | Bearer for admin endpoints |
-| `DEBUG_API` | — | `1`: e.g. `/api/debug/proxy-logs` |
+| `DEBUG_API` | — | `1`: gated debug HTTP routes — see **DEBUG API** below |
 | `DEV_PROXY_SOURCE` | — | Remote dashboard URL for dev |
 | `DEV_MODE` | — | `proxy` or `full` (remote data) |
 
@@ -34,6 +34,31 @@ Proxy-specific flags: **`node … proxy --help`** and [Proxy](05-proxy.md).
 - **`GET /api/i18n-bundles`**: DE/EN bundles.
 - **`POST /api/claude-data-sync`**: gzip-tar upload.
 - **`POST /api/github-releases-refresh`**: refresh releases cache.
+
+## DEBUG API
+
+**`DEBUG_API=1`** enables sensitive / heavy routes; set in production only where you trust the network (e.g. cluster-internal or VPN). **`k8s/base/deployment.yml`** sets it for the shipped pod.
+
+| Method | Path | `DEBUG_API` | Description |
+|--------|------|-------------|-------------|
+| **GET** | **`/api/debug/proxy-logs`** | **required** | JSON **`{ usage, files }`**: **`usage`** is the full **`cachedData`** snapshot (same shape as **`GET /api/usage`**). **`files`** is an array of **`{ name, content }`** for every **`proxy-*.ndjson`** under the proxy log directory — required so **`DEV_MODE=proxy`** can copy real NDJSON to the local temp dir. |
+| **POST** | **`/api/debug/cache-reset`** | **required** | Deletes the on-disk day cache and JSONL “today” index, then starts a **full** rescan. Used by some remote-dev flows. |
+
+**Without `DEBUG_API` (always available):**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| **GET** | **`/api/debug/status`** | JSON: **`dev_mode`**, **`dev_proxy_source`**, **`refresh_sec`**, **`version`**, **`claude_data_sync_enabled`** (whether **`CLAUDE_USAGE_SYNC_TOKEN`** is non-empty in the process — no secret value). |
+
+**Dev-only (requires `DEV_PROXY_SOURCE` + `DEV_MODE`, not `DEBUG_API`):**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| **POST** | **`/api/debug/sync-proxy-logs`** | Triggers a proxy-log / usage re-fetch for local dev (see dev section below). |
+
+### Sync client token from the cluster
+
+If the dashboard runs in **Kubernetes**, use Secret **`claude-usage-dashboard-app`** / key **`sync-token`** (wired in **`k8s/base/deployment.yml`**). For a local **`CLAUDE_SYNC_TOKEN`**, run **`scripts/print-claude-sync-token.ps1`** or **`scripts/print-claude-sync-token.sh`** (see **[k8s/README.md](../../k8s/README.md)** and **[04-multi-host-and-sync.md](04-multi-host-and-sync.md)**).
 
 ## Deployment (short)
 
@@ -69,7 +94,7 @@ Work primarily on **Gitea**; public repo **[claude-usage-dashboard](https://gith
 
 ## Dev testing (remote data)
 
-The app can pull **proxy NDJSON** from a **remote** dashboard and run locally at **`http://localhost:3333`**. Typical case: the remote instance runs in **Kubernetes** with **`DEBUG_API=1`** (see **`k8s/base/deployment.yml`**), exposing **`/api/debug/proxy-logs`**.
+The app can pull **proxy NDJSON** from a **remote** dashboard and run locally at **`http://localhost:3333`**. The remote instance should expose **`GET /api/debug/proxy-logs`** with **`DEBUG_API=1`** (see **`k8s/base/deployment.yml`**). That endpoint returns **`usage`** plus **`files`** (NDJSON contents) so **`DEV_MODE=proxy`** can populate the local temp log directory.
 
 **Placeholders (docs only — use your real hostnames):**
 
@@ -123,7 +148,7 @@ flowchart LR
         Pod["Pod claude-app<br/>DEBUG_API=1"]
         PVC["PVC /root/.claude<br/>anthropic-proxy-logs/*.ndjson"]
         Pod -->|writes| PVC
-        API["/api/debug/proxy-logs"]
+        API["/api/debug/proxy-logs<br/>usage + files[]"]
         PVC -->|on volume| API
     end
 

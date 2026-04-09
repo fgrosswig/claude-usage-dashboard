@@ -4,6 +4,7 @@
 | -------- | ------- |
 | **[Deutsch](de/README.md)** | Vollständige Anleitung mit Unterseiten (Architektur, UI, Proxy, Forensik, …) |
 | **[English](en/README.md)** | Same eight chapters (incl. Docker, GitHub Actions CI, maintainer mirror, screenshot gallery) |
+| **[한국어 (KO)](ko/README.md)** | UI-Strings in `tpl/ko/ui.tpl`; Kapitel 4+7 (Sync, K8s-Secret, API/Deploy-Kern) |
 
 Die **[README.md](../README.md)** bzw. **[README.en.md](../README.en.md)** im Repository-Root bleiben bewusst kurz: Kontext, Schnellstart, Docker, optional Maintainer-Hinweise (Gitea/GitHub), **zwei** eingebettete Screenshots (Token-Übersicht + Proxy) und Verweis hierher.
 

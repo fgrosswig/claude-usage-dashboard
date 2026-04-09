@@ -3,10 +3,14 @@
 ## Claude Usage Dashboard
 
 [![Docker build](https://github.com/fgrosswig/claude-usage-dashboard/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/fgrosswig/claude-usage-dashboard/actions/workflows/docker.yml)
+[![Quality Gate](https://sonar.example.com/api/project_badges/measure?project=claude-usage-dashboard&metric=alert_status&token=XXX)](https://sonar.example.com/dashboard?id=claude-usage-dashboard)
+[![Bugs](https://sonar.example.com/api/project_badges/measure?project=claude-usage-dashboard&metric=bugs&token=XXX)](https://sonar.example.com/dashboard?id=claude-usage-dashboard)
+[![Vulnerabilities](https://sonar.example.com/api/project_badges/measure?project=claude-usage-dashboard&metric=vulnerabilities&token=XXX)](https://sonar.example.com/dashboard?id=claude-usage-dashboard)
+[![Security Rating](https://sonar.example.com/api/project_badges/measure?project=claude-usage-dashboard&metric=security_rating&token=XXX)](https://sonar.example.com/dashboard?id=claude-usage-dashboard)
 
 ### Zusammenfassung
 
-**Anthropic- und Claude-Code-Monitoring:** Ein **selbst gehostetes Web-Dashboard** und optional ein **transparenter HTTP-Proxy** zur **Anthropic-API** — um **Tokenfluss**, heuristische Limits, **Forensik** und Proxy-Metriken darzustellen. **Motivation:** In der Praxis entstehen bei **Anthropic-Nutzung** (Claude Code, Max-/Session-Fenster u. a.) oft **schnelle „Usage-Drains“**; die offizielle Anzeige erklärt nicht immer, **warum** der Zähler so schnell leerläuft. Datenquellen: **`~/.claude/projects/**/*.jsonl`** und — mit Proxy — **NDJSON** pro Request (Latenz, Cache, u. a. **rate-limit-relevante Header**). Gezählt werden nur **`claude-*`**-Modelle (kein `<synthetic>`). Betrieb **lokal** oder in **Docker/Kubernetes** — kein zentraler SaaS.
+**Anthropic- und Claude-Code-Monitoring:** Ein **selbst gehostetes Web-Dashboard** und optional ein **transparenter HTTP-Proxy** zur **Anthropic-API** — um **Tokenfluss**, heuristische Limits, **Forensik** und Proxy-Metriken darzustellen. **Motivation:** In der Praxis entstehen bei **Anthropic-Nutzung** (Claude Code, Max-/Session-Fenster u. a.) oft **schnelle „Usage-Drains“**; die offizielle Anzeige erklärt nicht immer, **warum** der Zähler so schnell leerläuft. Datenquellen: **`~/.claude/projects/**/_.jsonl`** und — mit Proxy — **NDJSON** pro Request (Latenz, Cache, u. a. **rate-limit-relevante Header**). Gezählt werden nur **`claude-_`**-Modelle (kein `<synthetic>`). Betrieb **lokal** oder in **Docker/Kubernetes** — kein zentraler SaaS.
 
 ### Referenz und Kontext
 
@@ -21,7 +25,7 @@ Technik, UI, Umgebungsvariablen und API: **[Dokumentation](docs/README.md)**.
 
 Die **vollständige** Beschreibung liegt in **[docs/](docs/README.md)** mit Unterseiten (Architektur, UI, Proxy, Forensik, Umgebungsvariablen, API).
 
-- **Deutsch:** [docs/de/README.md](docs/de/README.md)  
+- **Deutsch:** [docs/de/README.md](docs/de/README.md)
 - **English:** [docs/en/README.md](docs/en/README.md)
 
 ### Schnellstart
@@ -159,7 +163,7 @@ node server.js
 
 ### GitHub API (Releases)
 
-Unauthentifiziertes Limit: nur **~60 Requests/Stunde pro IP**. Bei *Rate-Limit*: **`GITHUB_TOKEN`** oder **`GH_TOKEN`** setzen (Classic PAT reicht fuer oeffentliches Repo). **Kein periodischer Fetch:** Netzwerk nur wenn **`~/.claude/claude-code-releases.json`** fehlt oder leer — sonst Disk-Cache. Manuell: **`POST /api/github-releases-refresh`**; optional **`CLAUDE_USAGE_ADMIN_TOKEN`** mit `Authorization: Bearer`. Beim Start erzwingen: **`CLAUDE_USAGE_GITHUB_RELEASES_FETCH=1`**. **Optional im UI:** Meta-Bereich aufklappen, PAT eingeben — nur in diesem Tab's `sessionStorage`.
+Unauthentifiziertes Limit: nur **~60 Requests/Stunde pro IP**. Bei _Rate-Limit_: **`GITHUB_TOKEN`** oder **`GH_TOKEN`** setzen (Classic PAT reicht fuer oeffentliches Repo). **Kein periodischer Fetch:** Netzwerk nur wenn **`~/.claude/claude-code-releases.json`** fehlt oder leer — sonst Disk-Cache. Manuell: **`POST /api/github-releases-refresh`**; optional **`CLAUDE_USAGE_ADMIN_TOKEN`** mit `Authorization: Bearer`. Beim Start erzwingen: **`CLAUDE_USAGE_GITHUB_RELEASES_FETCH=1`**. **Optional im UI:** Meta-Bereich aufklappen, PAT eingeben — nur in diesem Tab's `sessionStorage`.
 
 ### Limits & Forensic (nur Heuristik)
 
@@ -189,7 +193,7 @@ node start.js forensics
 1. **Tagesuebersicht** — Cache:Output-Ratio, aktive Stunden, Limit-Label, Outage-Marker.
 2. **Effizienz-Kollaps** — Overhead (Tokens pro Output-Token), Output/h, Subagent-Anteil.
 3. **Subagent-Analyse** — Cache-Multiplikator: Subagent-Cache als Anteil am Gesamt-Cache.
-4. **Budget-Schaetzung** — Impliziertes Cap (`total/0.9`) pro Limit-Tag, Trend, Median-Bereich. Outage-Tage werden separiert (*OUT*-Markierung).
+4. **Budget-Schaetzung** — Impliziertes Cap (`total/0.9`) pro Limit-Tag, Trend, Median-Bereich. Outage-Tage werden separiert (_OUT_-Markierung).
 5. **Stuendliche Analyse** — Stundengenaue Aufschluesselung des letzten aussagekraeftigen Limit-Tags.
 6. **Fazit** — Vergleich Peak-Tag vs. Limit-Tag: Budget-Reduktion, geschaetzte Minuten bis Limit.
 7. **Visuell** — ASCII-Balkendiagramm mit Peak-/Limit-/Outage-Markierungen.
@@ -252,24 +256,24 @@ kubectl apply -k k8s/overlays/dev
 
 ### Umgebungsvariablen
 
-| Variable | Default | Beschreibung |
-|----------|---------|--------------|
-| `ANTHROPIC_PROXY_BIND` | `127.0.0.1` | Proxy Bind-Adresse |
-| `ANTHROPIC_PROXY_PORT` | `8080` | Proxy Port |
-| `ANTHROPIC_PROXY_LOG_DIR` | `~/.claude/anthropic-proxy-logs` | NDJSON Log-Verzeichnis |
-| `CLAUDE_USAGE_EXTRA_BASES` | — | `auto` oder `;`-getrennte Pfade |
-| `CLAUDE_USAGE_EXTRA_BASES_ROOT` | `cwd` | Root fuer HOST-* Auto-Discovery |
-| `CLAUDE_USAGE_SYNC_TOKEN` | — | Token fuer `/api/claude-data-sync` |
-| `CLAUDE_USAGE_SYNC_MAX_MB` | `512` | Max Upload-Groesse |
-| `CLAUDE_USAGE_SCAN_INTERVAL_SEC` | `180` | Scan-Intervall (Min. 60) |
-| `CLAUDE_USAGE_NO_CACHE` | — | `1` oder `true` erzwingt Vollscan |
-| `CLAUDE_USAGE_LOG_LEVEL` | `info` | `error`/`warn`/`info`/`debug`/`none` |
-| `CLAUDE_USAGE_LOG_FILE` | — | Log-Datei (zusaetzlich zu stderr) |
-| `GITHUB_TOKEN` / `GH_TOKEN` | — | GitHub PAT fuer Releases (>60 req/h) |
-| `CLAUDE_USAGE_ADMIN_TOKEN` | — | Bearer-Token fuer Admin-Endpoints |
-| `DEBUG_API` | — | `1` aktiviert `/api/debug/proxy-logs` Endpoint |
-| `DEV_PROXY_SOURCE` | — | URL des Remote-Dashboards fuer Dev-Testing |
-| `DEV_MODE` | — | `proxy` (nur Proxy remote) oder `full` (alles remote) |
+| Variable                         | Default                          | Beschreibung                                          |
+| -------------------------------- | -------------------------------- | ----------------------------------------------------- |
+| `ANTHROPIC_PROXY_BIND`           | `127.0.0.1`                      | Proxy Bind-Adresse                                    |
+| `ANTHROPIC_PROXY_PORT`           | `8080`                           | Proxy Port                                            |
+| `ANTHROPIC_PROXY_LOG_DIR`        | `~/.claude/anthropic-proxy-logs` | NDJSON Log-Verzeichnis                                |
+| `CLAUDE_USAGE_EXTRA_BASES`       | —                                | `auto` oder `;`-getrennte Pfade                       |
+| `CLAUDE_USAGE_EXTRA_BASES_ROOT`  | `cwd`                            | Root fuer HOST-\* Auto-Discovery                      |
+| `CLAUDE_USAGE_SYNC_TOKEN`        | —                                | Token fuer `/api/claude-data-sync`                    |
+| `CLAUDE_USAGE_SYNC_MAX_MB`       | `512`                            | Max Upload-Groesse                                    |
+| `CLAUDE_USAGE_SCAN_INTERVAL_SEC` | `180`                            | Scan-Intervall (Min. 60)                              |
+| `CLAUDE_USAGE_NO_CACHE`          | —                                | `1` oder `true` erzwingt Vollscan                     |
+| `CLAUDE_USAGE_LOG_LEVEL`         | `info`                           | `error`/`warn`/`info`/`debug`/`none`                  |
+| `CLAUDE_USAGE_LOG_FILE`          | —                                | Log-Datei (zusaetzlich zu stderr)                     |
+| `GITHUB_TOKEN` / `GH_TOKEN`      | —                                | GitHub PAT fuer Releases (>60 req/h)                  |
+| `CLAUDE_USAGE_ADMIN_TOKEN`       | —                                | Bearer-Token fuer Admin-Endpoints                     |
+| `DEBUG_API`                      | —                                | `1` aktiviert `/api/debug/proxy-logs` Endpoint        |
+| `DEV_PROXY_SOURCE`               | —                                | URL des Remote-Dashboards fuer Dev-Testing            |
+| `DEV_MODE`                       | —                                | `proxy` (nur Proxy remote) oder `full` (alles remote) |
 
 ### API (kurz)
 

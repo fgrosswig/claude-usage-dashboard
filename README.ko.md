@@ -3,10 +3,14 @@
 ## Claude Usage Dashboard
 
 [![Docker build](https://github.com/fgrosswig/claude-usage-dashboard/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/fgrosswig/claude-usage-dashboard/actions/workflows/docker.yml)
+[![Quality Gate](https://sonar.example.com/api/project_badges/measure?project=claude-usage-dashboard&metric=alert_status&token=XXX)](https://sonar.example.com/dashboard?id=claude-usage-dashboard)
+[![Bugs](https://sonar.example.com/api/project_badges/measure?project=claude-usage-dashboard&metric=bugs&token=XXX)](https://sonar.example.com/dashboard?id=claude-usage-dashboard)
+[![Vulnerabilities](https://sonar.example.com/api/project_badges/measure?project=claude-usage-dashboard&metric=vulnerabilities&token=XXX)](https://sonar.example.com/dashboard?id=claude-usage-dashboard)
+[![Security Rating](https://sonar.example.com/api/project_badges/measure?project=claude-usage-dashboard&metric=security_rating&token=XXX)](https://sonar.example.com/dashboard?id=claude-usage-dashboard)
 
 ### 요약
 
-**Anthropic / Claude Code 모니터링:** **셀프 호스팅 웹 대시보드** + 선택적 **Anthropic API 투명 HTTP Proxy** — **Token 흐름**, 휴리스틱 한도, **Forensic 분석**, Proxy 메트릭을 시각화합니다. **배경:** Anthropic 사용 시 (Claude Code, Max/세션 윈도우 등) 공식 카운터로는 설명되지 않는 **빠른 사용량 소진**이 자주 발생합니다. 데이터 소스: **`~/.claude/projects/**/*.jsonl`**, Proxy 활성화 시 **요청별 NDJSON** (지연 시간, 캐시, **Rate Limit 관련 헤더** 등). **`claude-*`** 모델만 집계 (`<synthetic>` 제외). **로컬** 또는 **Docker/Kubernetes**에서 실행 — 중앙 SaaS가 아닙니다.
+**Anthropic / Claude Code 모니터링:** **셀프 호스팅 웹 대시보드** + 선택적 **Anthropic API 투명 HTTP Proxy** — **Token 흐름**, 휴리스틱 한도, **Forensic 분석**, Proxy 메트릭을 시각화합니다. **배경:** Anthropic 사용 시 (Claude Code, Max/세션 윈도우 등) 공식 카운터로는 설명되지 않는 **빠른 사용량 소진**이 자주 발생합니다. 데이터 소스: **`~/.claude/projects/**/_.jsonl`**, Proxy 활성화 시 **요청별 NDJSON** (지연 시간, 캐시, **Rate Limit 관련 헤더** 등). **`claude-_`** 모델만 집계 (`<synthetic>` 제외). **로컬** 또는 **Docker/Kubernetes**에서 실행 — 중앙 SaaS가 아닙니다.
 
 ### 참조 및 배경
 
@@ -21,7 +25,7 @@
 
 전체 가이드: **[docs/](docs/README.md)** (하위 페이지: 아키텍처, UI, Proxy, Forensic, 환경 변수, API).
 
-- **English:** [docs/en/README.md](docs/en/README.md)  
+- **English:** [docs/en/README.md](docs/en/README.md)
 - **Deutsch:** [docs/de/README.md](docs/de/README.md)
 
 ### 빠른 시작
