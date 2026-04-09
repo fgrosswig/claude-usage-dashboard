@@ -794,7 +794,9 @@ function __safeChartResize(ch) {
     var c = ch.canvas;
     if (!c?.isConnected) return;
     ch.resize();
-  } catch (_error) { /* canvas may have detached between isConnected check and resize() */ }
+  } catch {
+    // canvas may have detached between isConnected check and resize()
+  }
 }
 
 var __anthropicHealthResizeT = null;
@@ -3629,10 +3631,10 @@ function generateForensicReportMd(data) {
     var sp = (dy.sub_pct || 0) + "%";
     md.push("| " + dy.date + " | " + oh + " | " + fmt(Math.round(dy.output / ah)) + " | " + fmt(Math.round(tot2 / ah)) + " | " + sp + " |");
   }
-  md.push("");
 
   // 3. Subagent
   md.push(
+    "",
     "## 3. "+(isDE?"Subagent-Analyse":"Subagent Analysis"),
     "",
     "| "+(isDE?"Datum":"Date")+" | "+(isDE?"Aufrufe":"Calls")+" | Sub | Sub-Cache | Sub-Cache% |",
@@ -4909,13 +4911,13 @@ function __budgetFillSummary(sumEl, tot, m) {
 
 /** Show or hide the fuel gauge row based on quota availability. */
 function __budgetRenderFuel(fuelEl, tot, quota) {
-  if (!fuelEl) return;
-  if (quota.pct_5h != null) {
-    fuelEl.innerHTML = __budgetFuelGaugeHtml(tot, quota, t);
-    fuelEl.style.display = "flex";
-  } else {
+  if (fuelEl == null) return;
+  if (quota.pct_5h == null) {
     fuelEl.style.display = "none";
+    return;
   }
+  fuelEl.innerHTML = __budgetFuelGaugeHtml(tot, quota, t);
+  fuelEl.style.display = "flex";
 }
 
 /** Build the HTML parts for the capacity-reduced alert banner. */
@@ -5002,7 +5004,11 @@ var __budgetSankeyWindowResizeBound = false;
 
 function __budgetSankeyDispose() {
   if (__budgetSankeyRo) {
-    try { __budgetSankeyRo.disconnect(); } catch (_error) { /* ResizeObserver may already be disconnected */ }
+    try {
+      __budgetSankeyRo.disconnect();
+    } catch {
+      // ResizeObserver may already be disconnected
+    }
     __budgetSankeyRo = null;
   }
   if (__budgetSankeyResizeDeb) {
@@ -5025,15 +5031,16 @@ function __budgetSankeyMeasure(el, rowCount) {
       w = Math.floor(box.getBoundingClientRect().width - 36);
     }
   }
-  if (w < 48 && typeof globalThis.window !== "undefined") {
-    w = Math.floor(window.innerWidth - 80);
+  var win = globalThis.window;
+  if (w < 48 && win) {
+    w = Math.floor(win.innerWidth - 80);
   }
   // Kein Math.max(300, …): sonst wird beim Verkleinern nie schmaler neu gezeichnet.
   w = Math.max(160, Math.min(w, 12000));
   var rc = Math.max(rowCount, 1);
   var pitch = Math.max(14, Math.min(26, Math.round(w / 26)));
   var hFromRows = Math.max(220, rc * pitch);
-  var vh = typeof globalThis.window !== "undefined" ? window.innerHeight : 700;
+  var vh = win ? win.innerHeight : 700;
   var hFromVp = Math.floor(Math.min(720, Math.max(220, vh * 0.42)));
   var h = Math.min(780, Math.max(hFromRows, hFromVp));
   return { width: w, height: h };
@@ -5068,7 +5075,9 @@ function __budgetSankeyRedraw() {
   var m = __budgetSankeyMeasure(el, __budgetSankeyRowCount || 1);
   try {
     if (typeof __budgetSankeyChart.clearChart === "function") __budgetSankeyChart.clearChart();
-  } catch (_error) { /* Google Charts may throw on repeat clearChart */ }
+  } catch {
+    // Google Charts may throw on repeat clearChart
+  }
   el.style.minWidth = "";
   el.style.width = "100%";
   __budgetSankeyChart.draw(__budgetSankeyData, __budgetSankeyDrawOptions(m.width, m.height));
@@ -5077,7 +5086,11 @@ function __budgetSankeyRedraw() {
 function __budgetSankeyBindResize(el) {
   if (typeof ResizeObserver !== "undefined") {
     if (__budgetSankeyRo) {
-      try { __budgetSankeyRo.disconnect(); } catch (_error) { /* already disconnected */ }
+      try {
+        __budgetSankeyRo.disconnect();
+      } catch {
+        // already disconnected
+      }
       __budgetSankeyRo = null;
     }
     __budgetSankeyRo = new ResizeObserver(function() {
@@ -5088,9 +5101,10 @@ function __budgetSankeyBindResize(el) {
     var box = el.closest?.(".chart-box");
     if (box && box !== el) __budgetSankeyRo.observe(box);
   }
-  if (!__budgetSankeyWindowResizeBound && typeof globalThis.window !== "undefined") {
+  var winB = globalThis.window;
+  if (winB && !__budgetSankeyWindowResizeBound) {
     __budgetSankeyWindowResizeBound = true;
-    window.addEventListener("resize", function() {
+    winB.addEventListener("resize", function() {
       if (__budgetSankeyResizeDeb) clearTimeout(__budgetSankeyResizeDeb);
       __budgetSankeyResizeDeb = setTimeout(__budgetSankeyRedraw, 120);
     });
@@ -5570,12 +5584,17 @@ function __effResizeAll() {
   for (const key of Object.keys(_effCharts)) {
     var c = _effCharts[key];
     if (c && typeof c.resize === "function") {
-      try { c.resize(); } catch (_error) { /* chart detached or not initialized */ }
+      try {
+        c.resize();
+      } catch {
+        // chart detached or not initialized
+      }
     }
   }
 }
-if (typeof globalThis.window !== "undefined") {
-  window.addEventListener("resize", function () {
+var __effWin = globalThis.window;
+if (__effWin) {
+  __effWin.addEventListener("resize", function () {
     if (__effResizeT) clearTimeout(__effResizeT);
     __effResizeT = setTimeout(__effResizeAll, 120);
   });
@@ -6357,14 +6376,14 @@ function __effNormalizeRow(row) {
     if (v < min) min = v;
     if (v > max) max = v;
   }
-  if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
-    return row.map(function () { return 0.5; });
+  if (Number.isFinite(min) && Number.isFinite(max) && min < max) {
+    var span = max - min;
+    return row.map(function (v) {
+      if (v == null || Number.isNaN(v)) return 0;
+      return (v - min) / span;
+    });
   }
-  var span = max - min;
-  return row.map(function (v) {
-    if (v == null || Number.isNaN(v)) return 0;
-    return (v - min) / span;
-  });
+  return row.map(function () { return 0.5; });
 }
 
 function __effHeatmapOption(ed) {
@@ -6595,7 +6614,7 @@ function renderProxyEfficiencyTrend(data) {
     labels: ed.labels,
     yFormatter: function (v) { return v.toFixed(1) + "%"; },
     tooltipFormatter: function (ps) {
-      if (!ps || !ps.length) return "";
+      if (!ps?.length) return "";
       var p = ps[0];
       return p.axisValue + "<br/>" + t("budgetTrendCacheMiss") + ": <b>" + p.value.toFixed(2) + "%</b>";
     },
@@ -8150,8 +8169,9 @@ function renderAvailabilityKpis(data) {
 })();
 
 (function __initAnthropicHealthChartResizeWatch() {
-  if (typeof globalThis.window === "undefined") return;
-  window.addEventListener("resize", __scheduleAnthropicHealthChartsResize);
+  var winH = globalThis.window;
+  if (!winH) return;
+  winH.addEventListener("resize", __scheduleAnthropicHealthChartsResize);
   ["uptime-chart-details", "incident-history-details", "outage-timeline-details"].forEach(function (id) {
     var d = document.getElementById(id);
     if (d) d.addEventListener("toggle", __scheduleAnthropicHealthChartsResize);
