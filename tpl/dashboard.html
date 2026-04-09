@@ -328,7 +328,14 @@
 <div class="proxy-charts-grid-3">
 <div class="chart-box"><h3 id="proxy-error-trend-h3"></h3><p id="proxy-error-trend-blurb" class="user-chart-blurb"></p><canvas id="c-proxy-error-trend"></canvas></div>
 <div class="chart-box"><h3 id="proxy-cache-trend-h3"></h3><p id="proxy-cache-trend-blurb" class="user-chart-blurb"></p><canvas id="c-proxy-cache-trend"></canvas></div>
-<div class="chart-box"><h3 id="proxy-efficiency-trend-h3"></h3><p id="proxy-efficiency-trend-blurb" class="user-chart-blurb"></p><canvas id="c-proxy-efficiency-trend"></canvas></div>
+<div class="chart-box"><h3 id="proxy-efficiency-trend-h3"></h3><p id="proxy-efficiency-trend-blurb" class="user-chart-blurb"></p>
+<div id="c-proxy-efficiency-heatmap" style="width:100%;height:140px"></div>
+<div class="efficiency-small-multiples" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
+<div id="c-proxy-efficiency-ratio" style="width:100%;height:180px"></div>
+<div id="c-proxy-efficiency-vispct" style="width:100%;height:180px"></div>
+<div id="c-proxy-efficiency-cachemiss" style="width:100%;height:180px"></div>
+</div>
+</div>
 </div>
 <!-- Info line -->
 <div class="proxy-info-row">
@@ -368,6 +375,7 @@
 <script>globalThis.__I18N_BUNDLES=__I18N_PLACEHOLDER__;</script>
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js" integrity="sha384-b0GXujLkk9eYYSmcSfoyZbfyElGAQnDyY0skCHSG6w3JgTMFnz11ggrTAr7seu9f" crossorigin="anonymous"></script>
 <script defer src="https://www.gstatic.com/charts/loader.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" crossorigin="anonymous"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js" crossorigin="anonymous"></script>
 <script defer src="/assets/dashboard.client.js"></script>
 </body>

@@ -5552,6 +5552,23 @@ function renderBudgetTrend(dailyTrend) {
 
 // ── Proxy Analytics Panel ─────────────────────────────────────────────────
 var _proxyCharts = { tokens: null, latency: null };
+// ECharts instances for Efficiency Trend (Phase 1 PoC for #166)
+var _effCharts = { heatmap: null, ratio: null, vispct: null, cachemiss: null };
+var __effResizeT = null;
+function __effResizeAll() {
+  for (var k in _effCharts) {
+    var c = _effCharts[k];
+    if (c && typeof c.resize === "function") {
+      try { c.resize(); } catch (e) {}
+    }
+  }
+}
+if (typeof window !== "undefined") {
+  window.addEventListener("resize", function () {
+    if (__effResizeT) clearTimeout(__effResizeT);
+    __effResizeT = setTimeout(__effResizeAll, 120);
+  });
+}
 
 function getProxyDay(data) {
   var pd = data?.proxy?.proxy_days;
@@ -6317,10 +6334,171 @@ function buildEfficiencyData(proxyDays, mainDays) {
   };
 }
 
-function renderProxyEfficiencyTrend(data) {
-  if (typeof Chart === "undefined") return;
-  var el = document.getElementById("c-proxy-efficiency-trend");
+// ── Efficiency Trend: ECharts PoC (issue #166, Phase 1) ────────────────
+// 1 Heatmap Matrix (metric x day, per-row min-max normalized) +
+// 3 Small Multiples (JSONL/Proxy Ratio, Visible Tokens/1%, Cache Miss %).
+// Synced tooltips via echarts.connect(). No Chart.js here.
+
+function __effNormalizeRow(row) {
+  var min = Infinity, max = -Infinity;
+  for (var i = 0; i < row.length; i++) {
+    var v = row[i];
+    if (v == null || isNaN(v)) continue;
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  if (!isFinite(min) || !isFinite(max) || min === max) {
+    return row.map(function () { return 0.5; });
+  }
+  var span = max - min;
+  return row.map(function (v) {
+    if (v == null || isNaN(v)) return 0;
+    return (v - min) / span;
+  });
+}
+
+function __effHeatmapOption(ed) {
+  var covLabel = t("proxyDSCoverage");
+  if (covLabel === "proxyDSCoverage") covLabel = "Coverage %";
+  var metricLabels = [
+    t("proxyDSJsonlRatio"),
+    t("proxyDSVisPerPct"),
+    t("budgetTrendCacheMiss"),
+    covLabel
+  ];
+  var rawRows = [
+    ed.ratioData,
+    ed.visPerPctData,
+    ed.cacheMissData,
+    ed.visPerPctMeta.map(function (m) { return m && m.coverage != null ? m.coverage * 100 : 0; })
+  ];
+  var normRows = rawRows.map(__effNormalizeRow);
+  var hdata = [];
+  for (var m = 0; m < rawRows.length; m++) {
+    for (var d = 0; d < ed.labels.length; d++) {
+      hdata.push([d, m, normRows[m][d], rawRows[m][d]]);
+    }
+  }
+  return {
+    animation: false,
+    backgroundColor: "transparent",
+    tooltip: {
+      position: "top",
+      backgroundColor: "rgba(15,23,42,.95)",
+      borderColor: "#475569",
+      textStyle: { color: "#e2e8f0" },
+      formatter: function (p) {
+        var raw = p.data[3];
+        var norm = p.data[2];
+        var metricName = metricLabels[p.data[1]];
+        var dayLabel = ed.labels[p.data[0]];
+        var rawStr = (metricName.indexOf("Ratio") >= 0) ? raw.toFixed(2) + "x"
+          : (metricName.indexOf("%") >= 0 ? raw.toFixed(1) + "%" : Math.round(raw).toLocaleString());
+        return dayLabel + "<br/>" + metricName + ": <b>" + rawStr + "</b><br/>"
+          + "normalized: " + (norm * 100).toFixed(0) + "%";
+      }
+    },
+    grid: { left: 110, right: 20, top: 8, bottom: 24 },
+    xAxis: {
+      type: "category",
+      data: ed.labels,
+      axisLabel: { color: "#94a3b8", fontSize: 10 },
+      axisLine: { lineStyle: { color: "#475569" } },
+      splitArea: { show: false }
+    },
+    yAxis: {
+      type: "category",
+      data: metricLabels,
+      axisLabel: { color: "#cbd5e1", fontSize: 10 },
+      axisLine: { lineStyle: { color: "#475569" } },
+      splitArea: { show: false }
+    },
+    visualMap: {
+      min: 0,
+      max: 1,
+      show: false,
+      inRange: { color: ["#1e3a5f", "#3b82f6", "#a855f7", "#f59e0b", "#ef4444"] }
+    },
+    series: [{
+      type: "heatmap",
+      data: hdata,
+      label: {
+        show: true,
+        color: "#f1f5f9",
+        fontSize: 9,
+        formatter: function (p) {
+          var raw = p.data[3];
+          var m = p.data[1];
+          if (m === 0) return raw.toFixed(1) + "x";
+          if (m === 1) return raw >= 1000 ? (raw / 1000).toFixed(1) + "K" : Math.round(raw);
+          return raw.toFixed(1) + "%";
+        }
+      },
+      itemStyle: { borderColor: "#0f172a", borderWidth: 1 }
+    }]
+  };
+}
+
+function __effSmallMultipleOption(spec) {
+  return {
+    animation: false,
+    backgroundColor: "transparent",
+    title: {
+      text: spec.title,
+      left: "center",
+      top: 4,
+      textStyle: { color: spec.color, fontSize: 11, fontWeight: "normal" }
+    },
+    tooltip: {
+      trigger: "axis",
+      backgroundColor: "rgba(15,23,42,.95)",
+      borderColor: "#475569",
+      textStyle: { color: "#e2e8f0", fontSize: 11 },
+      formatter: spec.tooltipFormatter
+    },
+    grid: { left: 42, right: 10, top: 28, bottom: 22 },
+    xAxis: {
+      type: "category",
+      data: spec.labels,
+      axisLabel: { color: "#94a3b8", fontSize: 9 },
+      axisLine: { lineStyle: { color: "#475569" } },
+      splitLine: { show: false }
+    },
+    yAxis: {
+      type: "value",
+      axisLabel: { color: "#94a3b8", fontSize: 9, formatter: spec.yFormatter },
+      axisLine: { show: false },
+      splitLine: { lineStyle: { color: "rgba(51,65,85,.4)" } }
+    },
+    series: [spec.series]
+  };
+}
+
+function __effInitOrSet(key, el, option) {
   if (!el) return;
+  if (!_effCharts[key]) {
+    if (typeof echarts === "undefined") return;
+    _effCharts[key] = echarts.init(el, null, { renderer: "canvas" });
+  }
+  _effCharts[key].setOption(option, { notMerge: false, lazyUpdate: false });
+}
+
+function __effConnectCharts() {
+  if (typeof echarts === "undefined" || !echarts.connect) return;
+  var group = [];
+  if (_effCharts.ratio) group.push(_effCharts.ratio);
+  if (_effCharts.vispct) group.push(_effCharts.vispct);
+  if (_effCharts.cachemiss) group.push(_effCharts.cachemiss);
+  if (group.length >= 2) echarts.connect(group);
+}
+
+function renderProxyEfficiencyTrend(data) {
+  if (typeof echarts === "undefined") return;
+  var elHeat = document.getElementById("c-proxy-efficiency-heatmap");
+  var elR = document.getElementById("c-proxy-efficiency-ratio");
+  var elV = document.getElementById("c-proxy-efficiency-vispct");
+  var elC = document.getElementById("c-proxy-efficiency-cachemiss");
+  if (!elHeat || !elR || !elV || !elC) return;
   var proxyDays = data.proxy?.proxy_days || [];
   if (proxyDays.length < 2) return;
   var ed = buildEfficiencyData(proxyDays, data.days || []);
@@ -6330,103 +6508,96 @@ function renderProxyEfficiencyTrend(data) {
   var blurb = document.getElementById("proxy-efficiency-trend-blurb");
   if (blurb) blurb.textContent = t("proxyEfficiencyTrendBlurb");
 
-  if (_proxyCharts.efficiencyTrend) {
-    if (_proxyCharts.efficiencyTrend.data.datasets.length < 3) {
-      _proxyCharts.efficiencyTrend.destroy();
-      _proxyCharts.efficiencyTrend = null;
-    } else {
-      _proxyCharts.efficiencyTrend.data.labels = ed.labels;
-      _proxyCharts.efficiencyTrend.data.datasets[0].data = ed.ratioData;
-      _proxyCharts.efficiencyTrend.data.datasets[1].data = ed.visPerPctData;
-      _proxyCharts.efficiencyTrend.data.datasets[1].__meta = ed.visPerPctMeta;
-      _proxyCharts.efficiencyTrend.data.datasets[2].data = ed.cacheMissData;
-      freezeChartNoAnim(_proxyCharts.efficiencyTrend);
-      _proxyCharts.efficiencyTrend.update("none");
-      return;
-    }
-  }
+  // Heatmap Matrix
+  __effInitOrSet("heatmap", elHeat, __effHeatmapOption(ed));
 
-  _proxyCharts.efficiencyTrend = new Chart(el.getContext("2d"), {
-    type: "line",
-    data: {
-      labels: ed.labels,
-      datasets: [
-        { label: t("proxyDSJsonlRatio"), data: ed.ratioData, borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.1)", fill: true, tension: 0.3, pointRadius: 3, yAxisID: "y", order: 2 },
-        { label: t("proxyDSVisPerPct"), data: ed.visPerPctData, __meta: ed.visPerPctMeta, type: "bar", backgroundColor: "rgba(139,92,246,.5)", borderRadius: 2, yAxisID: "y1", order: 3 },
-        {
-          label: t("budgetTrendCacheMiss"),
-          data: ed.cacheMissData,
-          type: "line",
-          borderColor: "rgba(234,179,8,.95)",
-          backgroundColor: "transparent",
-          borderDash: [5, 4],
-          tension: 0.3,
-          pointRadius: 2,
-          fill: false,
-          yAxisID: "y2",
-          order: 1
-        }
-      ]
+  // Small multiple 1: JSONL/Proxy Ratio (line + B8 reference at 2.87)
+  __effInitOrSet("ratio", elR, __effSmallMultipleOption({
+    title: t("proxyDSJsonlRatio"),
+    color: "#f59e0b",
+    labels: ed.labels,
+    yFormatter: function (v) { return v.toFixed(1) + "x"; },
+    tooltipFormatter: function (ps) {
+      if (!ps || !ps.length) return "";
+      var p = ps[0];
+      return p.axisValue + "<br/>" + t("proxyDSJsonlRatio") + ": <b>" + p.value.toFixed(2) + "x</b><br/>"
+        + "<span style='color:#94a3b8'>B8 baseline: 2.87x</span>";
     },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { position: "left", ticks: { color: "#f59e0b" }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, title: { display: true, text: "JSONL/Proxy", color: "#f59e0b", font: { size: 10 } } },
-        y1: {
-          position: "right",
-          stack: "effR",
-          stackWeight: 2,
-          ticks: { color: "#8b5cf6" },
-          grid: { drawOnChartArea: false },
-          beginAtZero: true,
-          title: { display: true, text: "Vis/1%", color: "#8b5cf6", font: { size: 10 } }
-        },
-        y2: {
-          position: "right",
-          stack: "effR",
-          stackWeight: 1,
-          ticks: { color: "#eab308", callback: function (v) { return v + "%"; } },
-          grid: { drawOnChartArea: false },
-          beginAtZero: true,
-          suggestedMax: 10,
-          title: { display: true, text: t("budgetTrendCacheMiss"), color: "#eab308", font: { size: 9 } }
-        }
-      },
-      plugins: {
-        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
-        tooltip: {
-          callbacks: {
-            label: function (ctx) {
-              if (ctx.dataset.yAxisID === "y") return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(2) + "x";
-              if (ctx.dataset.yAxisID === "y2") return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(1) + "%";
-              return ctx.dataset.label + ": " + fmt(ctx.parsed.y);
-            },
-            afterLabel: function (ctx) {
-              if (ctx.dataset.yAxisID !== "y1") return null;
-              var meta = ctx.dataset.__meta && ctx.dataset.__meta[ctx.dataIndex];
-              if (!meta) return null;
-              var lines = [];
-              if (meta.method === "cumulative_delta") {
-                lines.push("  Δq5: " + meta.q5Pct.toFixed(2) + "% across " + meta.samples + " samples");
-              } else if (meta.samples > 0) {
-                lines.push("  insufficient q5 data (" + meta.samples + " samples)");
-              }
-              if (meta.coverage != null) {
-                var covPct = Math.round(meta.coverage * 100);
-                lines.push("  proxy coverage: " + covPct + "% of JSONL visible");
-                if (meta.lowCoverage) lines.push("  ⚠ below 50% — metric understates real value");
-              }
-              return lines.length ? lines : null;
-            }
-          }
-        }
+    series: {
+      type: "line",
+      data: ed.ratioData,
+      smooth: 0.3,
+      symbol: "circle",
+      symbolSize: 6,
+      lineStyle: { color: "#f59e0b", width: 2 },
+      itemStyle: { color: "#f59e0b" },
+      areaStyle: { color: "rgba(245,158,11,.12)" },
+      markLine: {
+        silent: true,
+        symbol: "none",
+        data: [{ yAxis: 2.87, lineStyle: { color: "#94a3b8", type: "dashed", width: 1 }, label: { show: true, position: "end", color: "#94a3b8", fontSize: 9, formatter: "B8 2.87x" } }]
       }
     }
-  });
+  }));
+
+  // Small multiple 2: Visible Tokens per 1% (bar with coverage-aware tooltip)
+  var visMeta = ed.visPerPctMeta;
+  __effInitOrSet("vispct", elV, __effSmallMultipleOption({
+    title: t("proxyDSVisPerPct"),
+    color: "#8b5cf6",
+    labels: ed.labels,
+    yFormatter: function (v) { return v >= 1000 ? (v / 1000).toFixed(1) + "K" : Math.round(v); },
+    tooltipFormatter: function (ps) {
+      if (!ps || !ps.length) return "";
+      var p = ps[0];
+      var meta = visMeta[p.dataIndex];
+      var val = p.value;
+      var txt = p.axisValue + "<br/>" + t("proxyDSVisPerPct") + ": <b>"
+        + (val >= 1000 ? (val / 1000).toFixed(2) + "K" : Math.round(val)) + "/1%</b>";
+      if (!meta) return txt;
+      if (meta.method === "cumulative_delta") {
+        txt += "<br/><span style='color:#94a3b8'>Δq5: " + meta.q5Pct.toFixed(1) + "% / " + meta.samples + " samples</span>";
+      }
+      if (meta.coverage != null) {
+        var covPct = Math.round(meta.coverage * 100);
+        txt += "<br/><span style='color:#94a3b8'>proxy coverage: " + covPct + "% of JSONL</span>";
+        if (meta.lowCoverage) {
+          txt += "<br/><span style='color:#f59e0b'>⚠ below 50% — lower bound</span>";
+        }
+      }
+      return txt;
+    },
+    series: {
+      type: "bar",
+      data: ed.visPerPctData,
+      barMaxWidth: 28,
+      itemStyle: { color: "rgba(139,92,246,.75)", borderRadius: [2, 2, 0, 0] }
+    }
+  }));
+
+  // Small multiple 3: Cache Miss % (dashed line)
+  __effInitOrSet("cachemiss", elC, __effSmallMultipleOption({
+    title: t("budgetTrendCacheMiss"),
+    color: "#eab308",
+    labels: ed.labels,
+    yFormatter: function (v) { return v.toFixed(1) + "%"; },
+    tooltipFormatter: function (ps) {
+      if (!ps || !ps.length) return "";
+      var p = ps[0];
+      return p.axisValue + "<br/>" + t("budgetTrendCacheMiss") + ": <b>" + p.value.toFixed(2) + "%</b>";
+    },
+    series: {
+      type: "line",
+      data: ed.cacheMissData,
+      smooth: 0.3,
+      symbol: "circle",
+      symbolSize: 5,
+      lineStyle: { color: "#eab308", width: 2, type: "dashed" },
+      itemStyle: { color: "#eab308" }
+    }
+  }));
+
+  __effConnectCharts();
 }
 
 // ── Health Score Ampel ────────────────────────────────────────────────────
