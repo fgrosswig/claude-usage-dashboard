@@ -6416,6 +6416,7 @@ function __effHeatmapOption(ed) {
     visualMap: {
       min: 0,
       max: 1,
+      dimension: 2,
       show: false,
       inRange: { color: ["#1e3a5f", "#3b82f6", "#a855f7", "#f59e0b", "#ef4444"] }
     },
