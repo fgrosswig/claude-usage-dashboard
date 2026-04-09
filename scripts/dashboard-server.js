@@ -2853,7 +2853,7 @@ function getClaudeUsageSyncToken() {
 /** Bearer-Token aus Authorization-Header (case-insensitive, trim). */
 function parseBearerFromAuthorization(authHeader) {
   var s = String(authHeader || '').trim();
-  var m = s.match(/^Bearer\s+(\S.*)$/i);
+  var m = /^Bearer\s+(\S.*)$/i.exec(s);
   return m ? String(m[1]).trim() : '';
 }
 
