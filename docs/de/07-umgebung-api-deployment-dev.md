@@ -11,7 +11,7 @@
 | `ANTHROPIC_PROXY_LOG_DIR` | `~/.claude/anthropic-proxy-logs` | NDJSON-Verzeichnis |
 | `CLAUDE_USAGE_EXTRA_BASES` | — | `auto` oder `;`-getrennte Pfade |
 | `CLAUDE_USAGE_EXTRA_BASES_ROOT` | `cwd` | Root für `HOST-*` Auto-Discovery |
-| `CLAUDE_USAGE_SYNC_TOKEN` | — | Token für `POST /api/claude-data-sync` |
+| `CLAUDE_USAGE_SYNC_TOKEN` | — | Token für `POST /api/claude-data-sync` (Kubernetes: aus Secret **`sync-token`** — **`k8s/base/deployment.yml`** / **`k8s/README.md`**) |
 | `CLAUDE_USAGE_SYNC_MAX_MB` | `512` | Max. Upload-Größe |
 | `CLAUDE_USAGE_SCAN_INTERVAL_SEC` | `180` | Scan-Intervall (Min. 60) |
 | `CLAUDE_USAGE_SCAN_FILES_PER_TICK` | `20` | JSONL pro SSE-Tick beim ersten Scan (1–80) |
@@ -21,7 +21,7 @@
 | `CLAUDE_USAGE_LOG_FILE` | — | Zusätzliche Log-Datei |
 | `GITHUB_TOKEN` / `GH_TOKEN` | — | PAT für Releases |
 | `CLAUDE_USAGE_ADMIN_TOKEN` | — | Bearer für Admin-Endpunkte |
-| `DEBUG_API` | — | `1`: u. a. `/api/debug/proxy-logs` |
+| `DEBUG_API` | — | `1`: geschützte Debug-HTTP-Routen — siehe **DEBUG-API** unten |
 | `DEV_PROXY_SOURCE` | — | Remote-Dashboard-URL für Dev |
 | `DEV_MODE` | — | `proxy` oder `full` (Remote-Daten) |
 
@@ -34,6 +34,31 @@ Proxy-spezifisch siehe [Anthropic Proxy](05-anthropic-proxy.md) und `node … pr
 - **`GET /api/i18n-bundles`**: DE/EN-Bundles.
 - **`POST /api/claude-data-sync`**: gzip-tar Upload.
 - **`POST /api/github-releases-refresh`**: Releases neu laden.
+
+## DEBUG-API
+
+**`DEBUG_API=1`** schaltet empfindliche bzw. schwere Routen frei — in Produktion nur setzen, wo das Netz vertrauenswürdig ist (z. B. Cluster-intern/VPN). **`k8s/base/deployment.yml`** setzt es für das ausgelieferte Pod.
+
+| Methode | Pfad | `DEBUG_API` | Beschreibung |
+|---------|------|-------------|--------------|
+| **GET** | **`/api/debug/proxy-logs`** | **nötig** | JSON **`{ usage, files }`**: **`usage`** = vollständiger **`cachedData`**-Snapshot (gleiche Struktur wie **`GET /api/usage`**). **`files`** = Array **`{ name, content }`** für alle **`proxy-*.ndjson`** im Proxy-Log-Verzeichnis — nötig, damit **`DEV_MODE=proxy`** echte NDJSON-Dateien ins lokale Temp-Verzeichnis schreiben kann. |
+| **POST** | **`/api/debug/cache-reset`** | **nötig** | Löscht Tages-Cache und JSONL-„Heute“-Index, startet **Voll**-Rescan. Wird von manchen Remote-Dev-Abläufen genutzt. |
+
+**Ohne `DEBUG_API` (immer erreichbar):**
+
+| Methode | Pfad | Beschreibung |
+|---------|------|----------------|
+| **GET** | **`/api/debug/status`** | JSON: **`dev_mode`**, **`dev_proxy_source`**, **`refresh_sec`**, **`version`**, **`claude_data_sync_enabled`** (ob **`CLAUDE_USAGE_SYNC_TOKEN`** im Prozess gesetzt ist — **kein** Geheimniswert). |
+
+**Nur Dev** (`DEV_PROXY_SOURCE` und `DEV_MODE` gesetzt; dieser POST verlangt **kein** `DEBUG_API`):
+
+| Methode | Pfad | Beschreibung |
+|---------|------|----------------|
+| **POST** | **`/api/debug/sync-proxy-logs`** | Löst lokalen Dev-Fetch der Proxy-Logs / Aktualisierung aus (siehe Dev-Abschnitt unten). |
+
+### Sync-Client: Token aus dem Cluster
+
+Läuft das Dashboard in **Kubernetes**, gilt Secret **`claude-usage-dashboard-app`** / Key **`sync-token`** (Verdrahtung **`k8s/base/deployment.yml`**). Für **`CLAUDE_SYNC_TOKEN`** lokal: **`scripts/print-claude-sync-token.ps1`** oder **`print-claude-sync-token.sh`** — siehe **[k8s/README.md](../../k8s/README.md)** und **[04-multi-host-und-datensync.md](04-multi-host-und-datensync.md)**.
 
 ## Deployment (Kurz)
 
@@ -68,7 +93,7 @@ Primär **Gitea**, öffentliches Repo **[claude-usage-dashboard](https://github.
 
 ## Lokales Dev-Testing (Remote-Daten)
 
-Das Dashboard kann **Proxy-NDJSON** von einem **Remote-Server** holen und lokal unter **`http://localhost:3333`** nutzen (sinnvoll z. B. wenn eingesetzte Instanz im **Kubernetes**-Cluster läuft und dort **`DEBUG_API=1`** gesetzt ist — siehe **`k8s/base/deployment.yml`**). Dann liefert **`/api/debug/proxy-logs`** Metadaten zu den Log-Dateien.
+Das Dashboard kann **Proxy-NDJSON** von einem **Remote-Server** holen und lokal unter **`http://localhost:3333`** nutzen. Die Remote-Instanz sollte **`GET /api/debug/proxy-logs`** mit **`DEBUG_API=1`** anbieten (**`k8s/base/deployment.yml`**). Dieser Endpoint liefert **`usage`** plus **`files`** (NDJSON-Inhalte), damit **`DEV_MODE=proxy`** das lokale Temp-Logverzeichnis befüllen kann.
 
 **Platzhalter (nur Doku, durch eure echten Hosts ersetzen):**
 
@@ -121,7 +146,7 @@ flowchart LR
         Pod["Pod claude-app<br/>DEBUG_API=1"]
         PVC["PVC /root/.claude<br/>anthropic-proxy-logs/*.ndjson"]
         Pod -->|schreibt| PVC
-        API["/api/debug/proxy-logs"]
+        API["/api/debug/proxy-logs<br/>usage + files[]"]
         PVC -->|liest| API
     end
 

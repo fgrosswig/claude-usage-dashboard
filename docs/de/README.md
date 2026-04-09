@@ -1,6 +1,6 @@
 # Claude Usage Dashboard — Dokumentation (Deutsch)
 
-**[English](../en/README.md)**
+**[English](../en/README.md)** · **[한국어 (KO)](../ko/README.md)** (Sync / K8s / API-Auszug)
 
 Inhalt in logischer Lesereihenfolge:
 

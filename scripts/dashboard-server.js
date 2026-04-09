@@ -2845,6 +2845,13 @@ function getClaudeUsageSyncToken() {
   return String(process.env.CLAUDE_USAGE_SYNC_TOKEN || '').trim();
 }
 
+/** Bearer-Token aus Authorization-Header (case-insensitive, trim). */
+function parseBearerFromAuthorization(authHeader) {
+  var s = String(authHeader || '').trim();
+  var m = s.match(/^Bearer\s+(\S.*)$/i);
+  return m ? String(m[1]).trim() : '';
+}
+
 function handleClaudeDataSyncRequest(req, res) {
   var cors = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
   if (!getClaudeUsageSyncToken()) {
@@ -2866,8 +2873,17 @@ function handleClaudeDataSyncRequest(req, res) {
     res.end(JSON.stringify({ ok: false, error: 'method_not_allowed' }));
     return;
   }
-  var authH = String(req.headers.authorization || '');
-  if (authH !== 'Bearer ' + getClaudeUsageSyncToken()) {
+  var expected = getClaudeUsageSyncToken();
+  var presented = parseBearerFromAuthorization(req.headers.authorization);
+  if (!presented || presented !== expected) {
+    serviceLog.warn(
+      'ingest',
+      'sync auth failed presented_len=' +
+        presented.length +
+        ' expected_len=' +
+        expected.length +
+        (presented ? '' : ' (no Bearer token)')
+    );
     res.writeHead(401, cors);
     res.end(JSON.stringify({ ok: false, error: 'unauthorized' }));
     return;
@@ -3466,7 +3482,8 @@ var server = http.createServer(function (req, res) {
       dev_mode: __devMode || null,
       dev_proxy_source: __devSource || null,
       refresh_sec: REFRESH_SEC,
-      version: __appVersion
+      version: __appVersion,
+      claude_data_sync_enabled: !!getClaudeUsageSyncToken()
     }));
   } else if (pathname === '/api/debug/cache-reset' && req.method === 'POST' && process.env.DEBUG_API === '1') {
     // Loescht Day-Cache + Today-Index und triggert Full-Rescan

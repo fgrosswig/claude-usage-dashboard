@@ -6,7 +6,7 @@
  *   CLAUDE_SYNC_URL=http://127.0.0.1:3333 CLAUDE_SYNC_TOKEN=geheim node scripts/claude-data-sync-client.js
  *   node scripts/claude-data-sync-client.js --url=https://usage.example.com --token=geheim --proxy-logs
  *
- * Benötigt im PATH: tar (Windows 10+, macOS, Linux).
+ * tar: macOS/Linux im PATH; Windows oft nur unter System32 — siehe resolveTarBin().
  */
 var cp = require('child_process');
 var fs = require('fs');
@@ -15,10 +15,22 @@ var os = require('os');
 var http = require('http');
 var https = require('https');
 
+function resolveTarBin() {
+  var fromEnv = process.env.CLAUDE_SYNC_TAR;
+  if (fromEnv && String(fromEnv).trim()) return String(fromEnv).trim();
+  if (process.platform === 'win32') {
+    var sysTar = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe');
+    try {
+      if (fs.existsSync(sysTar)) return sysTar;
+    } catch (e) {}
+  }
+  return 'tar';
+}
+
 var urlStr = process.env.CLAUDE_SYNC_URL || '';
 var token = process.env.CLAUDE_SYNC_TOKEN || '';
 var includeProxyLogs = false;
-var tarBin = process.env.CLAUDE_SYNC_TAR || 'tar';
+var tarBin = resolveTarBin();
 
 for (var ai = 2; ai < process.argv.length; ai++) {
   var a = process.argv[ai];
@@ -38,6 +50,12 @@ for (var ai = 2; ai < process.argv.length; ai++) {
     );
     process.exit(0);
   }
+}
+
+urlStr = String(urlStr || '').trim();
+token = String(token || '').trim();
+if (/^Bearer\s+/i.test(token)) {
+  token = token.replace(/^Bearer\s+/i, '').trim();
 }
 
 if (!urlStr || !token) {
@@ -71,6 +89,9 @@ var args = ['czf', tmpTar, '-C', claudeDir].concat(toPack);
 var tr = cp.spawn(tarBin, args, { stdio: 'inherit', windowsHide: true });
 tr.on('error', function (err) {
   console.error('claude-data-sync-client: tar failed to start: ' + (err.message || err));
+  if (process.platform === 'win32' && tarBin === 'tar') {
+    console.error('claude-data-sync-client: try: $env:CLAUDE_SYNC_TAR="C:\\Windows\\System32\\tar.exe"');
+  }
   process.exit(1);
 });
 tr.on('close', function (code) {
@@ -116,6 +137,10 @@ tr.on('close', function (code) {
   };
 
   var req = mod.request(opts, function (res) {
+    res.on('error', function (e) {
+      console.error('claude-data-sync-client: response stream error: ' + (e.message || e));
+      process.exit(1);
+    });
     var chunks = [];
     res.on('data', function (c) {
       chunks.push(c);
@@ -127,6 +152,15 @@ tr.on('close', function (code) {
         process.exit(0);
       }
       console.error('claude-data-sync-client: HTTP ' + res.statusCode + ' ' + body);
+      if (res.statusCode === 401) {
+        console.error(
+          'claude-data-sync-client: local token length=' +
+            token.length +
+            ' — must match CLAUDE_USAGE_SYNC_TOKEN in the pod. Check: GET ' +
+            urlStr.replace(/\/$/, '') +
+            '/api/debug/status (claude_data_sync_enabled).'
+        );
+      }
       process.exit(1);
     });
   });
