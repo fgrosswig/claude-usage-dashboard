@@ -135,8 +135,8 @@ function buildSessionSignalsStackedByDay(days, hostLabel) {
   };
 }
 
-var I18N = (typeof __I18N_BUNDLES === "object" && __I18N_BUNDLES && __I18N_BUNDLES.de && __I18N_BUNDLES.en)
-  ? __I18N_BUNDLES
+var I18N = (typeof globalThis.__I18N_BUNDLES === "object" && globalThis.__I18N_BUNDLES && globalThis.__I18N_BUNDLES.de && globalThis.__I18N_BUNDLES.en)
+  ? globalThis.__I18N_BUNDLES
   : { de: {}, en: {}, ko: {} };
 function detectLang() {
   try {
@@ -2978,13 +2978,6 @@ function renderDashboardCore(data) {
 
   // ─── Forensic Chart (Original: Hit-Limit Bars + Score Line) ───
   var fhForensic = getForensicHostFilterForCharts();
-  function forensicScoreDay(d){
-    var c=d.forensic_code||"—";
-    if(c==="?")return 3;
-    if(c==="HIT")return 2;
-    if(c==="<<P")return 1;
-    return 0;
-  }
   function hitLimitBarForChart(d) {
     if (!fhForensic) return d.hit_limit || 0;
     var H = d.hosts && d.hosts[fhForensic];
@@ -3514,6 +3507,8 @@ function updateStatusLamp(data) {
 }
 
 // ─── Forensic Report Generator ───
+function __rptDayTotal(d){return (d.input||0)+(d.output||0)+(d.cache_read||0)+(d.cache_creation||0);}
+function __rptSigCell(d){var s=d.session_signals||{};return (s.continue||0)+"/"+(s.resume||0)+"/"+(s.retry||0)+"/"+(s.interrupt||0);}
 function generateForensicReportMd(data) {
   var days = data.days || [];
   if (!days.length) return t("reportNoData");
@@ -3523,70 +3518,77 @@ function generateForensicReportMd(data) {
   var md = [];
   var now = new Date().toISOString().replace("T"," ").slice(0,19);
 
-  // helper
-  function pad(s,w){s=String(s);while(s.length<w)s=" "+s;return s;}
-  function dayTotal(d){return (d.input||0)+(d.output||0)+(d.cache_read||0)+(d.cache_creation||0);}
-  function sigCell(d){var s=d.session_signals||{};return (s.continue||0)+"/"+(s.resume||0)+"/"+(s.retry||0)+"/"+(s.interrupt||0);}
-
   // Detect peak + limit days
   var peakDay=null,peakVal=0;
-  for(var i=0;i<days.length;i++){var tt=dayTotal(days[i]);if(tt>peakVal){peakVal=tt;peakDay=days[i];}}
+  for(const dy of days){var tt=__rptDayTotal(dy);if(tt>peakVal){peakVal=tt;peakDay=dy;}}
   var limitDays=[];
-  for(var i=0;i<days.length;i++){var d=days[i];var fl=[];if((d.hit_limit||0)>=HIT_MIN)fl.push("HIT("+(d.hit_limit)+")");if((d.cache_read||0)>=CACHE_THRESH)fl.push("CACHE\u2265500M");if(fl.length)limitDays.push({d:d,flags:fl});}
+  for(const dy of days){var fl=[];if((dy.hit_limit||0)>=HIT_MIN)fl.push("HIT("+(dy.hit_limit)+")");if((dy.cache_read||0)>=CACHE_THRESH)fl.push("CACHE\u2265500M");if(fl.length)limitDays.push({d:dy,flags:fl});}
 
-  md.push("# Forensic Report \u2014 Claude Code Token Usage");
-  md.push("");
-  md.push((isDE?"Erstellt: ":"Generated: ")+now);
-  md.push((isDE?"Peak-Tag: ":"Peak day: ")+(peakDay?peakDay.date+" ("+fmt(peakVal)+")":"\u2014"));
-  md.push((isDE?"Limit-Tage: ":"Limit days: ")+limitDays.length);
-  md.push("");
+  md.push(
+    "# Forensic Report \u2014 Claude Code Token Usage",
+    "",
+    (isDE?"Erstellt: ":"Generated: ")+now,
+    (isDE?"Peak-Tag: ":"Peak day: ")+(peakDay?peakDay.date+" ("+fmt(peakVal)+")":"\u2014"),
+    (isDE?"Limit-Tage: ":"Limit days: ")+limitDays.length,
+    ""
+  );
 
   // 1. Daily overview
-  md.push("## 1. "+(isDE?"Tages\u00fcbersicht":"Daily Overview"));
-  md.push("");
-  md.push("| "+(isDE?"Datum":"Date")+" | Output | Cache Read | C:O | Calls | "+(isDE?"Std.":"Hours")+" | Sig c/r/y/i | Limit |");
-  md.push("|------------|----------|------------|--------|-------|-------|-------------|--------|");
-  for(var i=0;i<days.length;i++){var d=days[i];var cr=d.output>0?Math.round(d.cache_read/d.output):0;var lim="\u2014";if((d.hit_limit||0)>=HIT_MIN)lim="HIT("+(d.hit_limit)+")";if((d.cache_read||0)>=CACHE_THRESH)lim+=(lim!=="\u2014"?", ":"")+"CACHE\u2265500M";md.push("| "+d.date+" | "+fmt(d.output)+" | "+fmt(d.cache_read)+" | "+cr+"x | "+d.calls+" | "+(d.active_hours||0)+" | "+sigCell(d)+" | "+lim+" |");}
+  md.push(
+    "## 1. "+(isDE?"Tages\u00fcbersicht":"Daily Overview"),
+    "",
+    "| "+(isDE?"Datum":"Date")+" | Output | Cache Read | C:O | Calls | "+(isDE?"Std.":"Hours")+" | Sig c/r/y/i | Limit |",
+    "|------------|----------|------------|--------|-------|-------|-------------|--------|"
+  );
+  for(const dy of days){var cr=dy.output>0?Math.round(dy.cache_read/dy.output):0;var lim="\u2014";if((dy.hit_limit||0)>=HIT_MIN)lim="HIT("+(dy.hit_limit)+")";if((dy.cache_read||0)>=CACHE_THRESH)lim+=(lim!=="\u2014"?", ":"")+"CACHE\u2265500M";md.push("| "+dy.date+" | "+fmt(dy.output)+" | "+fmt(dy.cache_read)+" | "+cr+"x | "+dy.calls+" | "+(dy.active_hours||0)+" | "+__rptSigCell(dy)+" | "+lim+" |");}
   md.push("");
 
   // 2. Efficiency
-  md.push("## 2. "+(isDE?"Effizienz":"Efficiency"));
-  md.push("");
-  md.push("| "+(isDE?"Datum":"Date")+" | Overhead | Output/h | Total/h | Subagent% |");
-  md.push("|------------|----------|----------|---------|-----------|");
-  for(var i=0;i<days.length;i++){var d=days[i];var tot=dayTotal(d);var ah=Math.max(1,d.active_hours||1);var oh=d.output>0?(tot/d.output).toFixed(0)+"x":"\u2014";var sp=(d.sub_pct||0)+"%";md.push("| "+d.date+" | "+oh+" | "+fmt(Math.round(d.output/ah))+" | "+fmt(Math.round(tot/ah))+" | "+sp+" |");}
+  md.push(
+    "## 2. "+(isDE?"Effizienz":"Efficiency"),
+    "",
+    "| "+(isDE?"Datum":"Date")+" | Overhead | Output/h | Total/h | Subagent% |",
+    "|------------|----------|----------|---------|-----------|"
+  );
+  for(const dy of days){var tot2=__rptDayTotal(dy);var ah=Math.max(1,dy.active_hours||1);var oh=dy.output>0?(tot2/dy.output).toFixed(0)+"x":"\u2014";var sp=(dy.sub_pct||0)+"%";md.push("| "+dy.date+" | "+oh+" | "+fmt(Math.round(dy.output/ah))+" | "+fmt(Math.round(tot2/ah))+" | "+sp+" |");}
   md.push("");
 
   // 3. Subagent
-  md.push("## 3. "+(isDE?"Subagent-Analyse":"Subagent Analysis"));
-  md.push("");
-  md.push("| "+(isDE?"Datum":"Date")+" | "+(isDE?"Aufrufe":"Calls")+" | Sub | Sub-Cache | Sub-Cache% |");
-  md.push("|------------|--------|------|-----------|------------|");
-  for(var i=0;i<days.length;i++){var d=days[i];var sc=d.sub_cache||0;var scp=(d.sub_cache_pct||0)+"%";md.push("| "+d.date+" | "+d.calls+" | "+(d.sub_calls||0)+" | "+fmt(sc)+" | "+scp+" |");}
+  md.push(
+    "## 3. "+(isDE?"Subagent-Analyse":"Subagent Analysis"),
+    "",
+    "| "+(isDE?"Datum":"Date")+" | "+(isDE?"Aufrufe":"Calls")+" | Sub | Sub-Cache | Sub-Cache% |",
+    "|------------|--------|------|-----------|------------|"
+  );
+  for(const dy of days){var sc=dy.sub_cache||0;var scp=(dy.sub_cache_pct||0)+"%";md.push("| "+dy.date+" | "+dy.calls+" | "+(dy.sub_calls||0)+" | "+fmt(sc)+" | "+scp+" |");}
   md.push("");
 
   // 4. Budget estimate
   if(limitDays.length>0 && peakDay){
-    md.push("## 4. "+(isDE?"Budget-Sch\u00e4tzung":"Budget Estimate"));
-    md.push("");
-    md.push((isDE?"Impl@90% = Total / 0.9 (gesch\u00e4tztes Budget wenn ~90% erreicht).":"Impl@90% = total / 0.9 (estimated budget if ~90% was reached)."));
-    md.push("");
-    md.push("| "+(isDE?"Datum":"Date")+" | Total | Impl@90% | vs Peak | "+(isDE?"Std.":"Hours")+" | "+(isDE?"Signal":"Signal")+" |");
-    md.push("|------------|---------|----------|---------|-------|--------|");
+    md.push(
+      "## 4. "+(isDE?"Budget-Sch\u00e4tzung":"Budget Estimate"),
+      "",
+      (isDE?"Impl@90% = Total / 0.9 (gesch\u00e4tztes Budget wenn ~90% erreicht).":"Impl@90% = total / 0.9 (estimated budget if ~90% was reached)."),
+      "",
+      "| "+(isDE?"Datum":"Date")+" | Total | Impl@90% | vs Peak | "+(isDE?"Std.":"Hours")+" | "+(isDE?"Signal":"Signal")+" |",
+      "|------------|---------|----------|---------|-------|--------|"
+    );
     var prevI=0;
-    for(var li=0;li<limitDays.length;li++){var ld=limitDays[li];var tot=dayTotal(ld.d);var impl=Math.round(tot/0.9);var vsp=peakVal>0?(peakVal/impl).toFixed(1)+"x":"\u2014";var trend="";if(prevI>0){var ch=Math.round(((impl-prevI)/prevI)*100);if(ch>5)trend=" \u2191"+ch+"%";else if(ch<-5)trend=" \u2193"+Math.abs(ch)+"%";else trend=" \u2192";}prevI=impl;md.push("| "+ld.d.date+" | "+fmt(tot)+" | "+fmt(impl)+" | "+vsp+" | "+(ld.d.active_hours||0)+" | "+ld.flags.join(", ")+trend+" |");}
+    for(const ld of limitDays){var tot4=__rptDayTotal(ld.d);var impl=Math.round(tot4/0.9);var vsp=peakVal>0?(peakVal/impl).toFixed(1)+"x":"\u2014";var trend="";if(prevI>0){var ch=Math.round(((impl-prevI)/prevI)*100);if(ch>5)trend=" \u2191"+ch+"%";else if(ch<-5)trend=" \u2193"+Math.abs(ch)+"%";else trend=" \u2192";}prevI=impl;md.push("| "+ld.d.date+" | "+fmt(tot4)+" | "+fmt(impl)+" | "+vsp+" | "+(ld.d.active_hours||0)+" | "+ld.flags.join(", ")+trend+" |");}
 
     // Median
     var ivs=[];
-    for(var li=0;li<limitDays.length;li++){var ld=limitDays[li];if(ld.d.calls>=50&&(ld.d.active_hours||0)>=2)ivs.push(Math.round(dayTotal(ld.d)/0.9));}
+    for(const ld of limitDays){if(ld.d.calls>=50&&(ld.d.active_hours||0)>=2)ivs.push(Math.round(__rptDayTotal(ld.d)/0.9));}
     if(ivs.length>=2){
       ivs.sort(function(a,b){return a-b;});
       var med=ivs[Math.floor(ivs.length/2)];
-      md.push("");
-      md.push((isDE?"**Zusammenfassung** (":"**Summary** (")+ivs.length+(isDE?" aussagekr\u00e4ftige Limit-Tage):":" meaningful limit days):"));
-      md.push("- Median Impl@90%: ~"+fmt(med));
-      md.push("- "+(isDE?"Bereich: ":"Range: ")+fmt(ivs[0])+" .. "+fmt(ivs[ivs.length-1]));
-      md.push("- Peak: "+fmt(peakVal)+" ("+peakDay.date+")");
+      md.push(
+        "",
+        (isDE?"**Zusammenfassung** (":"**Summary** (")+ivs.length+(isDE?" aussagekr\u00e4ftige Limit-Tage):":" meaningful limit days):"),
+        "- Median Impl@90%: ~"+fmt(med),
+        "- "+(isDE?"Bereich: ":"Range: ")+fmt(ivs[0])+" .. "+fmt(ivs[ivs.length-1]),
+        "- Peak: "+fmt(peakVal)+" ("+peakDay.date+")"
+      );
       if(med>0)md.push("- Peak / Median: "+(peakVal/med).toFixed(1)+"x");
     }
     md.push("");
@@ -3595,25 +3597,27 @@ function generateForensicReportMd(data) {
   // 5. Peak vs Limit comparison
   if(peakDay && limitDays.length>0){
     var bestLim=null;
-    for(var li=limitDays.length-1;li>=0;li--){var ld=limitDays[li];if(ld.d.calls>=50&&(ld.d.active_hours||0)>=2){bestLim=ld;break;}}
+    for(var li5=limitDays.length-1;li5>=0;li5--){var ld5=limitDays[li5];if(ld5.d.calls>=50&&(ld5.d.active_hours||0)>=2){bestLim=ld5;break;}}
     if(!bestLim)bestLim=limitDays[limitDays.length-1];
     if(bestLim && bestLim.d.date!==peakDay.date){
-      md.push("## "+(isDE?"Fazit: Peak vs. Limit-Tag":"Conclusion: Peak vs. Limit Day"));
-      md.push("");
-      var tP=dayTotal(peakDay),tL=dayTotal(bestLim.d);
-      md.push("| | "+peakDay.date+" (Peak) | "+bestLim.d.date+" (Limit) |");
-      md.push("|---|---|---|");
-      md.push("| Output | "+fmt(peakDay.output)+" | "+fmt(bestLim.d.output)+" |");
-      md.push("| Cache Read | "+fmt(peakDay.cache_read)+" | "+fmt(bestLim.d.cache_read)+" |");
-      md.push("| Total | "+fmt(tP)+" | "+fmt(tL)+" |");
-      md.push("| "+(isDE?"Stunden":"Hours")+" | "+(peakDay.active_hours||0)+" | "+(bestLim.d.active_hours||0)+" |");
-      md.push("| Calls | "+peakDay.calls+" | "+bestLim.d.calls+" |");
+      var tP=__rptDayTotal(peakDay),tL=__rptDayTotal(bestLim.d);
       var crP=peakDay.output>0?Math.round(peakDay.cache_read/peakDay.output):0;
       var crL=bestLim.d.output>0?Math.round(bestLim.d.cache_read/bestLim.d.output):0;
-      md.push("| C:O Ratio | "+crP+"x | "+crL+"x |");
-      md.push("");
-      var impl=Math.round(tL/0.9);
-      var drop=impl>0?Math.round(tP/impl):0;
+      md.push(
+        "## "+(isDE?"Fazit: Peak vs. Limit-Tag":"Conclusion: Peak vs. Limit Day"),
+        "",
+        "| | "+peakDay.date+" (Peak) | "+bestLim.d.date+" (Limit) |",
+        "|---|---|---|",
+        "| Output | "+fmt(peakDay.output)+" | "+fmt(bestLim.d.output)+" |",
+        "| Cache Read | "+fmt(peakDay.cache_read)+" | "+fmt(bestLim.d.cache_read)+" |",
+        "| Total | "+fmt(tP)+" | "+fmt(tL)+" |",
+        "| "+(isDE?"Stunden":"Hours")+" | "+(peakDay.active_hours||0)+" | "+(bestLim.d.active_hours||0)+" |",
+        "| Calls | "+peakDay.calls+" | "+bestLim.d.calls+" |",
+        "| C:O Ratio | "+crP+"x | "+crL+"x |",
+        ""
+      );
+      var impl5=Math.round(tL/0.9);
+      var drop=impl5>0?Math.round(tP/impl5):0;
       if(drop>1){
         md.push("**"+(isDE?"Effektive Budget-Reduktion: ~":"Effective budget reduction: ~")+drop+"x**");
         md.push("");
@@ -3622,88 +3626,94 @@ function generateForensicReportMd(data) {
   }
 
   // ─── Service Impact: Work vs Outage mit ASCII-Bars ───
-  var hasAnyOutage=false;
-  for(var oi=0;oi<days.length;oi++){if((days[oi].outage_hours||0)>0){hasAnyOutage=true;break;}}
-  if(hasAnyOutage){
-    md.push("## "+(isDE?"Service Impact: Arbeitszeit vs. Ausfall":"Service Impact: Work vs. Outage"));
-    md.push("");
-    md.push((isDE?"Legende: ":"Legend: ")+"\u2588 = "+(isDE?"saubere Arbeit":"clean work")+" | \u2593 = "+(isDE?"Arbeit bei Ausfall":"work during outage")+" | \u2591 = "+(isDE?"Ausfall (keine Arbeit)":"outage (no work)"));
-    md.push("");
-    // Berechne max Stunden fuer Skalierung
-    var maxH=0;
-    var svcRows=[];
-    for(var si=0;si<days.length;si++){
-      var sd=days[si];
-      var wHrs=Object.keys(sd.hours||{}).map(function(h){return parseInt(h);});
-      var spans=sd.outage_spans||[];
-      var affected=0;
-      for(var wi=0;wi<wHrs.length;wi++){
-        for(var oj=0;oj<spans.length;oj++){
-          if(wHrs[wi]>=Math.floor(spans[oj].from)&&wHrs[wi]<Math.ceil(spans[oj].to)){affected++;break;}
+  var hasAnyOutage = false;
+  for (const dayOut of days) {
+    if ((dayOut.outage_hours || 0) > 0) { hasAnyOutage = true; break; }
+  }
+  if (hasAnyOutage) {
+    md.push(
+      "## " + (isDE ? "Service Impact: Arbeitszeit vs. Ausfall" : "Service Impact: Work vs. Outage"),
+      "",
+      (isDE ? "Legende: " : "Legend: ") + "\u2588 = " + (isDE ? "saubere Arbeit" : "clean work") + " | \u2593 = " + (isDE ? "Arbeit bei Ausfall" : "work during outage") + " | \u2591 = " + (isDE ? "Ausfall (keine Arbeit)" : "outage (no work)"),
+      ""
+    );
+    var maxH = 0;
+    var svcRows = [];
+    for (const sd of days) {
+      var wHrs = Object.keys(sd.hours || {}).map(function (h) { return Number.parseInt(h, 10); });
+      var spans = sd.outage_spans || [];
+      var affected = 0;
+      for (const hour of wHrs) {
+        var hitSpan = false;
+        for (const span of spans) {
+          if (hour >= Math.floor(span.from) && hour < Math.ceil(span.to)) { hitSpan = true; break; }
         }
+        if (hitSpan) affected++;
       }
-      var outTotal=0;
-      for(var oj=0;oj<spans.length;oj++) outTotal+=spans[oj].to-spans[oj].from;
-      var clean=wHrs.length-affected;
-      var outOnly=Math.max(0,Math.round((outTotal-affected)*10)/10);
-      var totalH=clean+affected+outOnly;
-      if(totalH>maxH)maxH=totalH;
-      svcRows.push({date:sd.date,clean:clean,affected:affected,outOnly:outOnly,cr:sd.cache_read||0,co:sd.cache_output_ratio||0,outageH:sd.outage_hours||0,mc:sd.model_change});
+      var outTotal = 0;
+      for (const span2 of spans) outTotal += span2.to - span2.from;
+      var clean = wHrs.length - affected;
+      var outOnly = Math.max(0, Math.round((outTotal - affected) * 10) / 10);
+      var totalHRow = clean + affected + outOnly;
+      if (totalHRow > maxH) maxH = totalHRow;
+      svcRows.push({ date: sd.date, clean: clean, affected: affected, outOnly: outOnly, cr: sd.cache_read || 0, co: sd.cache_output_ratio || 0, outageH: sd.outage_hours || 0, mc: sd.model_change });
     }
-    var barW=40;
+    var barW = 40;
     md.push("```");
-    for(var si=0;si<svcRows.length;si++){
-      var r=svcRows[si];
-      var totalH=r.clean+r.affected+r.outOnly;
-      if(totalH===0&&r.outageH===0) continue;
-      var scale=maxH>0?barW/maxH:1;
-      var bClean=Math.round(r.clean*scale);
-      var bAff=Math.round(r.affected*scale);
-      var bOut=Math.round(r.outOnly*scale);
-      var bar="";
-      for(var b=0;b<bClean;b++) bar+="\u2588";
-      for(var b=0;b<bAff;b++) bar+="\u2593";
-      for(var b=0;b<bOut;b++) bar+="\u2591";
-      var label=r.date.slice(5)+" "+bar+" ";
-      if(r.affected>0) label+=r.clean+"h+"+(isDE?r.affected+"h Ausfall":r.affected+"h outage");
-      else label+=r.clean+"h";
-      if(r.outOnly>0) label+=" (+"+r.outOnly.toFixed(0)+"h "+(isDE?"nur Ausfall":"outage only")+")";
-      if(r.cr>0) label+=" | C:"+fmt(r.cr)+" ("+r.co+"x)";
-      if(r.mc){
-        if(r.mc.added&&r.mc.added.length) label+=" \u25c7+"+r.mc.added.join(",");
-        if(r.mc.removed&&r.mc.removed.length) label+=" \u25c7-"+r.mc.removed.join(",");
+    for (const r of svcRows) {
+      var totalH = r.clean + r.affected + r.outOnly;
+      if (totalH === 0 && r.outageH === 0) continue;
+      var scale = maxH > 0 ? barW / maxH : 1;
+      var bClean = Math.round(r.clean * scale);
+      var bAff = Math.round(r.affected * scale);
+      var bOut = Math.round(r.outOnly * scale);
+      var barSeg = "\u2588".repeat(bClean) + "\u2593".repeat(bAff) + "\u2591".repeat(bOut);
+      var label = r.date.slice(5) + " " + barSeg + " ";
+      if (r.affected > 0) label += r.clean + "h+" + (isDE ? r.affected + "h Ausfall" : r.affected + "h outage");
+      else label += r.clean + "h";
+      if (r.outOnly > 0) label += " (+" + r.outOnly.toFixed(0) + "h " + (isDE ? "nur Ausfall" : "outage only") + ")";
+      if (r.cr > 0) label += " | C:" + fmt(r.cr) + " (" + r.co + "x)";
+      if (r.mc) {
+        if (r.mc.added && r.mc.added.length) label += " \u25c7+" + r.mc.added.join(",");
+        if (r.mc.removed && r.mc.removed.length) label += " \u25c7-" + r.mc.removed.join(",");
       }
       md.push(label);
     }
-    md.push("```");
-    md.push("");
-    // Zusammenfassung
-    var totClean=0,totAff=0,totOutOnly=0;
-    for(var si=0;si<svcRows.length;si++){totClean+=svcRows[si].clean;totAff+=svcRows[si].affected;totOutOnly+=svcRows[si].outOnly;}
-    md.push((isDE?"**Gesamt:** ":"**Total:** ")+totClean+"h "+(isDE?"saubere Arbeit":"clean work")+" | "+totAff+"h "+(isDE?"Arbeit bei Ausfall":"work during outage")+" | "+Math.round(totOutOnly)+"h "+(isDE?"Ausfall ohne Arbeit":"outage without work"));
-    if(totAff>0&&(totClean+totAff)>0){
-      var pctAff=Math.round(totAff/(totClean+totAff)*100);
-      md.push((isDE?"**Betroffene Arbeitszeit: ":"**Affected work time: ")+pctAff+"%**");
+    md.push("```", "");
+    var totClean = 0, totAff = 0, totOutOnly = 0;
+    for (const rowSum of svcRows) {
+      totClean += rowSum.clean;
+      totAff += rowSum.affected;
+      totOutOnly += rowSum.outOnly;
+    }
+    md.push((isDE ? "**Gesamt:** " : "**Total:** ") + totClean + "h " + (isDE ? "saubere Arbeit" : "clean work") + " | " + totAff + "h " + (isDE ? "Arbeit bei Ausfall" : "work during outage") + " | " + Math.round(totOutOnly) + "h " + (isDE ? "Ausfall ohne Arbeit" : "outage without work"));
+    if (totAff > 0 && (totClean + totAff) > 0) {
+      var pctAff = Math.round(totAff / (totClean + totAff) * 100);
+      md.push((isDE ? "**Betroffene Arbeitszeit: " : "**Affected work time: ") + pctAff + "%**");
     }
     md.push("");
   }
 
   // ─── Extension-Versionen & Releases ───
-  var hasVerChange=false;
-  for(var vi=0;vi<days.length;vi++){if(days[vi].version_change){hasVerChange=true;break;}}
-  if(hasVerChange){
-    md.push("## "+(isDE?"Extension-Updates (Claude Code)":"Extension Updates (Claude Code)"));
-    md.push("");
-    md.push("| "+(isDE?"Datum":"Date")+" | Version | Highlights |");
-    md.push("|------------|---------|------------|");
-    for(var vi=0;vi<days.length;vi++){
-      var vc=days[vi].version_change;
-      if(!vc)continue;
-      var ver=vc.added.join(", ");
-      if(vc.from)ver=vc.from+" \u2192 "+ver;
-      var hl=(vc.highlights||[]).slice(0,3).join("; ");
-      if(hl.length>120)hl=hl.slice(0,117)+"...";
-      md.push("| "+days[vi].date+" | "+ver+" | "+hl+" |");
+  var hasVerChange = false;
+  for (const dvc of days) {
+    if (dvc.version_change) { hasVerChange = true; break; }
+  }
+  if (hasVerChange) {
+    md.push(
+      "## " + (isDE ? "Extension-Updates (Claude Code)" : "Extension Updates (Claude Code)"),
+      "",
+      "| " + (isDE ? "Datum" : "Date") + " | Version | Highlights |",
+      "|------------|---------|------------|"
+    );
+    for (const dVer of days) {
+      var vc = dVer.version_change;
+      if (!vc) continue;
+      var ver = vc.added.join(", ");
+      if (vc.from) ver = vc.from + " \u2192 " + ver;
+      var hl = (vc.highlights || []).slice(0, 3).join("; ");
+      if (hl.length > 120) hl = hl.slice(0, 117) + "...";
+      md.push("| " + dVer.date + " | " + ver + " | " + hl + " |");
     }
     md.push("");
   }
@@ -3713,8 +3723,7 @@ function generateForensicReportMd(data) {
   var pdays = proxy.proxy_days || [];
   var lastPd = pdays.length > 0 ? pdays[pdays.length - 1] : null;
   if (lastPd) {
-    md.push("## " + (isDE ? "Budget-Effizienz" : "Budget Efficiency"));
-    md.push("");
+    md.push("## " + (isDE ? "Budget-Effizienz" : "Budget Efficiency"), "");
     var rl = lastPd.rate_limit || {};
     var q5r = rl["anthropic-ratelimit-unified-5h-utilization"];
     var q7r = rl["anthropic-ratelimit-unified-7d-utilization"];
@@ -3723,38 +3732,45 @@ function generateForensicReportMd(data) {
     var ovrR = rl["anthropic-ratelimit-unified-overage-disabled-reason"];
     var clm = rl["anthropic-ratelimit-unified-representative-claim"];
 
-    md.push("| " + (isDE ? "Metrik" : "Metric") + " | " + (isDE ? "Wert" : "Value") + " | " + (isDE ? "Bewertung" : "Assessment") + " |");
-    md.push("|--------|-------|------------|");
-    if (q5r != null) {
-      var q5v = Math.round(parseFloat(q5r) * 1000) / 10;
-      md.push("| 5h Quota | " + q5v + "% | " + (q5v > 80 ? "\u26a0 HIGH" : q5v > 50 ? "\u26a0 MODERATE" : "\u2705 OK") + " |");
+    md.push(
+      "| " + (isDE ? "Metrik" : "Metric") + " | " + (isDE ? "Wert" : "Value") + " | " + (isDE ? "Bewertung" : "Assessment") + " |",
+      "|--------|-------|------------|"
+    );
+    if (q5r !== undefined && q5r !== null) {
+      var q5v = Math.round(Number.parseFloat(q5r) * 1000) / 10;
+      var assess5h = q5v > 80 ? "\u26a0 HIGH" : (q5v > 50 ? "\u26a0 MODERATE" : "\u2705 OK");
+      md.push("| 5h Quota | " + q5v + "% | " + assess5h + " |");
     }
-    if (q7r != null) {
-      var q7v = Math.round(parseFloat(q7r) * 1000) / 10;
-      md.push("| 7d Quota | " + q7v + "% | " + (q7v > 80 ? "\u26a0 HIGH" : "\u2705 OK") + " |");
+    if (q7r !== undefined && q7r !== null) {
+      var q7v = Math.round(Number.parseFloat(q7r) * 1000) / 10;
+      var assess7d = q7v > 80 ? "\u26a0 HIGH" : "\u2705 OK";
+      md.push("| 7d Quota | " + q7v + "% | " + assess7d + " |");
     }
-    if (fbr != null) {
-      var fbv = Math.round(parseFloat(fbr) * 100);
-      md.push("| Fallback % | " + fbv + "% | " + (fbv < 100 ? "\u274c REDUCED \u2014 effective budget is " + fbv + "% of maximum" : "\u2705 FULL") + " |");
+    if (fbr !== undefined && fbr !== null) {
+      var fbv = Math.round(Number.parseFloat(fbr) * 100);
+      var fbAssess = fbv < 100 ? "\u274c REDUCED \u2014 effective budget is " + fbv + "% of maximum" : "\u2705 FULL";
+      md.push("| Fallback % | " + fbv + "% | " + fbAssess + " |");
     }
-    if (ovr) md.push("| Overage | " + ovr + " | " + (ovr === "rejected" ? "\u274c Hard cutoff \u2014 no buffer" : "\u2705 " + ovr) + " |");
+    if (ovr) {
+      var ovrAssess = ovr === "rejected" ? "\u274c Hard cutoff \u2014 no buffer" : "\u2705 " + ovr;
+      md.push("| Overage | " + ovr + " | " + ovrAssess + " |");
+    }
     if (ovrR) md.push("| Overage Reason | " + ovrR + " | |");
-    if (clm) md.push("| Binding Limit | " + clm.replace(/_/g, " ") + " | " + (clm === "five_hour" ? "5h window is active constraint" : clm) + " |");
+    if (clm) {
+      var clmNote = clm === "five_hour" ? "5h window is active constraint" : clm;
+      md.push("| Binding Limit | " + clm.replaceAll("_", " ") + " | " + clmNote + " |");
+    }
 
-    // Plan
     var planLabel = typeof getSelectedPlanLabel === "function" ? getSelectedPlanLabel() : "?";
     md.push("| Plan | " + planLabel + " | " + (isDE ? "manuell gew\u00e4hlt" : "manually selected") + " |");
 
-    // Visible tokens per %
     if (lastPd.visible_tokens_per_pct) {
       md.push("| Tokens/1% | " + fmt(lastPd.visible_tokens_per_pct) + " | " + (isDE ? "sichtbare Tokens pro 1% Quota" : "visible tokens per 1% quota") + " |");
     }
     md.push("");
 
-    // Totals
     var totOut = 0, totAll = 0, totCr = 0, totCc = 0, totRetries = 0, totInterrupts = 0, totTrunc = 0, totOutageH = 0;
-    for (var bi = 0; bi < days.length; bi++) {
-      var bd = days[bi];
+    for (const bd of days) {
       totOut += bd.output || 0;
       totAll += bd.total || 0;
       totCr += bd.cache_read || 0;
@@ -3769,31 +3785,35 @@ function generateForensicReportMd(data) {
     var bOutputPct = totAll > 0 ? Math.round(totOut / totAll * 100) : 0;
     var bCmr = (totCc + totCr) > 0 ? Math.round(totCc / (totCc + totCr) * 100) : 0;
 
-    md.push("| " + (isDE ? "Metrik" : "Metric") + " | " + (isDE ? "Wert" : "Value") + " |");
-    md.push("|--------|-------|");
-    md.push("| Effective Output | " + bOutputPct + "% |");
-    md.push("| Overhead Factor | " + bOverhead + "x |");
-    md.push("| Cache Miss Rate | " + bCmr + "% |");
-    md.push("| Retries | " + totRetries + " |");
-    md.push("| Interrupts | " + totInterrupts + " |");
-    md.push("| Tool Bloat (truncated) | " + totTrunc + " |");
-    md.push("| Outage Loss | " + totOutageH.toFixed(1) + "h |");
-    md.push("");
+    md.push(
+      "| " + (isDE ? "Metrik" : "Metric") + " | " + (isDE ? "Wert" : "Value") + " |",
+      "|--------|-------|",
+      "| Effective Output | " + bOutputPct + "% |",
+      "| Overhead Factor | " + bOverhead + "x |",
+      "| Cache Miss Rate | " + bCmr + "% |",
+      "| Retries | " + totRetries + " |",
+      "| Interrupts | " + totInterrupts + " |",
+      "| Tool Bloat (truncated) | " + totTrunc + " |",
+      "| Outage Loss | " + totOutageH.toFixed(1) + "h |",
+      ""
+    );
   }
 
   // ─── Release Stability ───
-  if (data.release_stability && data.release_stability.summary) {
+  if (data.release_stability?.summary) {
     var rs = data.release_stability.summary;
-    md.push("## " + (isDE ? "Release-Stabilit\u00e4t" : "Release Stability"));
-    md.push("");
-    md.push("| " + (isDE ? "Metrik" : "Metric") + " | " + (isDE ? "Wert" : "Value") + " |");
-    md.push("|--------|-------|");
-    md.push("| Releases | " + rs.total + " (" + rs.daysSpan + (isDE ? " Tage" : " days") + ") |");
-    md.push("| " + (isDE ? "Kadenz" : "Cadence") + " | ~" + rs.cadenceDays + (isDE ? " Tage" : " days") + " |");
-    md.push("| " + (isDE ? "\u00dcbersprungen" : "Skipped") + " | " + rs.totalSkipped + " |");
-    md.push("| Hotfixes | " + rs.hotfixCount + " |");
-    md.push("| Regressions | " + rs.regressionCount + " |");
-    md.push("");
+    md.push(
+      "## " + (isDE ? "Release-Stabilit\u00e4t" : "Release Stability"),
+      "",
+      "| " + (isDE ? "Metrik" : "Metric") + " | " + (isDE ? "Wert" : "Value") + " |",
+      "|--------|-------|",
+      "| Releases | " + rs.total + " (" + rs.daysSpan + (isDE ? " Tage" : " days") + ") |",
+      "| " + (isDE ? "Kadenz" : "Cadence") + " | ~" + rs.cadenceDays + (isDE ? " Tage" : " days") + " |",
+      "| " + (isDE ? "\u00dcbersprungen" : "Skipped") + " | " + rs.totalSkipped + " |",
+      "| Hotfixes | " + rs.hotfixCount + " |",
+      "| Regressions | " + rs.regressionCount + " |",
+      ""
+    );
   }
 
   // ─── Thinking-Token Hinweis ───
@@ -3817,11 +3837,11 @@ function openReportModal(){
 
     // Post-process: wrap each <h2> + siblings in <details>
     var h2s = el.querySelectorAll("h2");
-    for (var si = h2s.length - 1; si >= 0; si--) {
-      var h2 = h2s[si];
+    for (var sxi = h2s.length - 1; sxi >= 0; sxi--) {
+      var h2 = h2s[sxi];
       var details = document.createElement("details");
       details.className = "report-section";
-      details.id = "rpt-s" + (si + 1);
+      details.id = "rpt-s" + (sxi + 1);
       // All sections start collapsed
       var summary = document.createElement("summary");
       summary.className = "report-section-head";
@@ -3844,12 +3864,13 @@ function openReportModal(){
       nav.className = "report-index";
       nav.innerHTML = "<strong>Contents</strong>";
       var ol = document.createElement("ol");
-      for (var ni = 0; ni < secs.length; ni++) {
+      for (var nix = 0; nix < secs.length; nix++) {
         var li = document.createElement("li");
         var a = document.createElement("a");
         a.href = "#";
-        a.textContent = secs[ni].querySelector(".report-section-head").textContent.replace(/^\d+\.\s*/, "");
-        a.dataset.rptIdx = String(ni);
+        var secHead = secs[nix].querySelector(".report-section-head");
+        a.textContent = secHead ? secHead.textContent.replace(/^\d+\.\s*/, "") : "";
+        a.dataset.rptIdx = String(nix);
         li.appendChild(a);
         ol.appendChild(li);
       }
@@ -3860,10 +3881,10 @@ function openReportModal(){
       ol.addEventListener("click", function(e) {
         var link = e.target.tagName === "A" ? e.target : e.target.closest("a");
         if (!link) link = e.target.parentElement;
-        if (!link || !link.dataset || link.dataset.rptIdx == null) return;
+        if (link?.dataset?.rptIdx == null) return;
         e.preventDefault();
         e.stopPropagation();
-        var idx = parseInt(link.dataset.rptIdx, 10);
+        var idx = Number.parseInt(link.dataset.rptIdx, 10);
         var allSecs = document.getElementById("report-content").querySelectorAll(".report-section");
         if (allSecs[idx]) {
           var wasOpen = allSecs[idx].open;
@@ -3958,7 +3979,7 @@ function copyReport(){
         ev.preventDefault();
         ev.stopPropagation();
         initUpdateSlideoutOnce();
-        openUpdateSlideout(parseInt(btn.dataset.dayIndex, 10));
+        openUpdateSlideout(Number.parseInt(btn.dataset.dayIndex, 10));
       });
     }
   }
@@ -4348,37 +4369,10 @@ function renderEntrypointsChart(sortedVers, stats) {
 }
 
 // ── Release Stability Chart ──────────────────────────────────────────────
-// Build a lookup: version string (without "v" prefix) → release info
-function __buildReleaseLookup(releaseData) {
-  var map = {};
-  if (!releaseData || !releaseData.releases) return map;
-  for (var i = 0; i < releaseData.releases.length; i++) {
-    var r = releaseData.releases[i];
-    // Key without "v" prefix to match version_stats keys (e.g. "2.1.87")
-    var key = (r.tag || "").replace(/^v/, "");
-    map[key] = r;
-  }
-  return map;
-}
-
-function renderReleaseStabilityChart(sortedVers, releaseData) {
-  var el = document.getElementById("c-user-release-stability");
-  var h3 = document.getElementById("user-release-stability-h3");
-  if (h3) h3.textContent = t("releaseStabilityTitle");
-  var blurb = document.getElementById("user-release-stability-blurb");
-  if (!el) return;
-  if (_userCharts.releaseStability) { _userCharts.releaseStability.destroy(); _userCharts.releaseStability = null; }
-  if (!sortedVers || !sortedVers.length || !releaseData) {
-    if (blurb) blurb.textContent = t("releaseStabilityNoData");
-    return;
-  }
-
-  var lookup = __buildReleaseLookup(releaseData);
-
-  // Count matched stats for blurb
+function __countReleaseStabilityBlurb(sortedVers, lookup) {
   var matched = 0, stableN = 0, regN = 0, hotN = 0, unknownN = 0;
-  for (var ci = 0; ci < sortedVers.length; ci++) {
-    var info = lookup[sortedVers[ci]];
+  for (const ver of sortedVers) {
+    var info = lookup[ver];
     if (info) {
       matched++;
       if (info.stability === "hotfix") hotN++;
@@ -4388,23 +4382,16 @@ function renderReleaseStabilityChart(sortedVers, releaseData) {
       unknownN++;
     }
   }
+  return { matched: matched, stableN: stableN, regN: regN, hotN: hotN, unknownN: unknownN };
+}
 
-  if (blurb) blurb.textContent = t("releaseStabilityBlurb")
-    .replace("{total}", String(sortedVers.length))
-    .replace("{matched}", String(matched))
-    .replace("{stable}", String(stableN))
-    .replace("{hotfixes}", String(hotN))
-    .replace("{regressions}", String(regN));
-
-  // Build data arrays per version (same Y-axis as other charts)
+function __buildReleaseStabilitySeries(sortedVers, lookup) {
   var stableData = [];
   var regressionData = [];
   var hotfixData = [];
   var unknownData = [];
   var meta = [];
-
-  for (var vi = 0; vi < sortedVers.length; vi++) {
-    var ver = sortedVers[vi];
+  for (const ver of sortedVers) {
     var r = lookup[ver];
     if (!r) {
       stableData.push(0);
@@ -4425,6 +4412,61 @@ function renderReleaseStabilityChart(sortedVers, releaseData) {
     }
     meta.push(r);
   }
+  return { stableData: stableData, regressionData: regressionData, hotfixData: hotfixData, unknownData: unknownData, meta: meta };
+}
+
+function __releaseStabilityTooltipAfterBody(meta, items, t) {
+  if (!items.length) return "";
+  var idx = items[0].dataIndex;
+  var m = meta[idx];
+  if (!m) return "";
+  if (m.stability === "unknown") return t("releaseStabilityNoRelease");
+  var lines = [];
+  lines.push((m.date || "") + " \u00B7 " + (m.daysActive || 0) + "d active \u00B7 " + m.stability);
+  if (m.skippedPatches > 0) lines.push(t("releaseStabilitySkipped") + ": " + m.skippedPatches);
+  if (m.matchedKeywords?.length) lines.push("Keywords: " + m.matchedKeywords.join(", "));
+  return lines.join("\n");
+}
+
+// Build a lookup: version string (without "v" prefix) → release info
+function __buildReleaseLookup(releaseData) {
+  var map = {};
+  if (!releaseData?.releases) return map;
+  for (const r of releaseData.releases) {
+    var key = (r.tag || "").replace(/^v/, "");
+    map[key] = r;
+  }
+  return map;
+}
+
+function renderReleaseStabilityChart(sortedVers, releaseData) {
+  var el = document.getElementById("c-user-release-stability");
+  var h3 = document.getElementById("user-release-stability-h3");
+  if (h3) h3.textContent = t("releaseStabilityTitle");
+  var blurb = document.getElementById("user-release-stability-blurb");
+  if (!el) return;
+  if (_userCharts.releaseStability) { _userCharts.releaseStability.destroy(); _userCharts.releaseStability = null; }
+  if (!sortedVers || !sortedVers.length || !releaseData) {
+    if (blurb) blurb.textContent = t("releaseStabilityNoData");
+    return;
+  }
+
+  var lookup = __buildReleaseLookup(releaseData);
+
+  var counts = __countReleaseStabilityBlurb(sortedVers, lookup);
+  if (blurb) blurb.textContent = t("releaseStabilityBlurb")
+    .replace("{total}", String(sortedVers.length))
+    .replace("{matched}", String(counts.matched))
+    .replace("{stable}", String(counts.stableN))
+    .replace("{hotfixes}", String(counts.hotN))
+    .replace("{regressions}", String(counts.regN));
+
+  var series = __buildReleaseStabilitySeries(sortedVers, lookup);
+  var stableData = series.stableData;
+  var regressionData = series.regressionData;
+  var hotfixData = series.hotfixData;
+  var unknownData = series.unknownData;
+  var meta = series.meta;
 
   var datasets = [
     { label: t("releaseStabilityStable"), data: stableData, backgroundColor: "rgba(34,197,94,0.8)", stack: "s" },
@@ -4461,16 +4503,7 @@ function renderReleaseStabilityChart(sortedVers, releaseData) {
         tooltip: {
           callbacks: {
             afterBody: function(items) {
-              if (!items.length) return "";
-              var idx = items[0].dataIndex;
-              var m = meta[idx];
-              if (!m) return "";
-              var lines = [];
-              if (m.stability === "unknown") { lines.push(t("releaseStabilityNoRelease")); return lines.join("\n"); }
-              lines.push((m.date || "") + " \u00B7 " + (m.daysActive || 0) + "d active \u00B7 " + m.stability);
-              if (m.skippedPatches > 0) lines.push(t("releaseStabilitySkipped") + ": " + m.skippedPatches);
-              if (m.matchedKeywords && m.matchedKeywords.length) lines.push("Keywords: " + m.matchedKeywords.join(", "));
-              return lines.join("\n");
+              return __releaseStabilityTooltipAfterBody(meta, items, t);
             }
           }
         }
@@ -4481,6 +4514,78 @@ function renderReleaseStabilityChart(sortedVers, releaseData) {
 
 // ── Budget Efficiency Section ─────────────────────────────────────────────
 var _budgetCharts = { waterfall: null, trend: null, quota: null };
+
+function __aggregateBudgetDaysForEfficiency(days, filteredHost) {
+  var tot = { input: 0, output: 0, cache_read: 0, cache_creation: 0, total: 0,
+    retries: 0, interrupts: 0, api_errors: 0, hit_limits: 0, calls: 0, active_hours: 0 };
+  var dailyTrend = [];
+  for (var di = 0; di < days.length; di++) {
+    var d = days[di];
+    var src_d = d;
+    if (filteredHost && d.hosts && d.hosts[filteredHost]) src_d = d.hosts[filteredHost];
+    tot.input += src_d.input || 0;
+    tot.output += src_d.output || 0;
+    tot.cache_read += src_d.cache_read || 0;
+    tot.cache_creation += src_d.cache_creation || 0;
+    var daySum = src_d.total;
+    if (daySum == null) daySum = (src_d.input || 0) + (src_d.output || 0) + (src_d.cache_read || 0) + (src_d.cache_creation || 0);
+    tot.total += daySum;
+    tot.calls += src_d.calls || 0;
+    tot.active_hours += src_d.active_hours || 0;
+    var ss = src_d.session_signals || d.session_signals || {};
+    tot.retries += ss.retry || 0;
+    tot.interrupts += ss.interrupt || 0;
+    tot.api_errors += ss.api_error || 0;
+    tot.hit_limits += (src_d.hit_limit != null ? src_d.hit_limit : d.hit_limit) || 0;
+
+    var dayTotal = d.total || 0;
+    var dayOutput = d.output || 0;
+    dailyTrend.push({
+      date: d.date,
+      overhead: dayOutput > 0 ? Math.round(dayTotal / dayOutput * 10) / 10 : 0,
+      output_pct: dayTotal > 0 ? Math.round(dayOutput / dayTotal * 100) : 0,
+      cache_miss_rate: (d.cache_creation || 0) + (d.cache_read || 0) > 0
+        ? Math.round((d.cache_creation || 0) / ((d.cache_creation || 0) + (d.cache_read || 0)) * 100)
+        : 0
+    });
+  }
+  return { tot: tot, dailyTrend: dailyTrend };
+}
+
+function __budgetHostTotalsFromDays(days) {
+  var hostTotals = {};
+  for (var hi2 = 0; hi2 < days.length; hi2++) {
+    var dh = days[hi2].hosts || {};
+    var hk2 = Object.keys(dh);
+    for (var hj = 0; hj < hk2.length; hj++) {
+      var hl = hk2[hj];
+      var hv = dh[hl];
+      if (!hostTotals[hl]) hostTotals[hl] = { output: 0, input: 0, cache_read: 0, cache_creation: 0, total: 0 };
+      hostTotals[hl].output += hv.output || 0;
+      hostTotals[hl].input += hv.input || 0;
+      hostTotals[hl].cache_read += hv.cache_read || 0;
+      hostTotals[hl].cache_creation += hv.cache_creation || 0;
+      hostTotals[hl].total += hv.total || (hv.output || 0) + (hv.input || 0) + (hv.cache_read || 0) + (hv.cache_creation || 0);
+    }
+  }
+  return hostTotals;
+}
+
+function __budgetSankeyWeights(src) {
+  var allVals = [src.out, src.inp, src.cr, src.cc].filter(function(v) { return v > 0; });
+  var maxLog = 0;
+  for (var ai = 0; ai < allVals.length; ai++) {
+    var lx = Math.log10(1 + allVals[ai]);
+    if (lx > maxLog) maxLog = lx;
+  }
+  function wOf(v) {
+    if (v <= 0) return 0;
+    var logV = Math.log10(1 + v);
+    var normalized = maxLog > 0 ? (logV / maxLog) : 1;
+    return Math.max(1, Math.round(1 + normalized * 3));
+  }
+  return { wOut: wOf(src.out), wInp: wOf(src.inp), wCr: wOf(src.cr), wCc: wOf(src.cc), wOf: wOf };
+}
 
 function renderBudgetEfficiency(data) {
   var sumEl = document.getElementById("budget-summary-line");
@@ -4501,41 +4606,9 @@ function renderBudgetEfficiency(data) {
   var filteredHost = typeof getFilterHost === "function" ? getFilterHost() : "";
   __budgetFilteredHost = filteredHost;
 
-  var tot = { input: 0, output: 0, cache_read: 0, cache_creation: 0, total: 0,
-              retries: 0, interrupts: 0, api_errors: 0, hit_limits: 0, calls: 0, active_hours: 0 };
-  var dailyTrend = [];
-
-  for (var di = 0; di < days.length; di++) {
-    var d = days[di];
-    // If host filter active, use per-host data
-    var src_d = d;
-    if (filteredHost && d.hosts && d.hosts[filteredHost]) {
-      src_d = d.hosts[filteredHost];
-    }
-    tot.input += src_d.input || 0;
-    tot.output += src_d.output || 0;
-    tot.cache_read += src_d.cache_read || 0;
-    tot.cache_creation += src_d.cache_creation || 0;
-    tot.total += (src_d.total != null ? src_d.total : ((src_d.input || 0) + (src_d.output || 0) + (src_d.cache_read || 0) + (src_d.cache_creation || 0)));
-    tot.calls += src_d.calls || 0;
-    tot.active_hours += src_d.active_hours || 0;
-    var ss = src_d.session_signals || d.session_signals || {};
-    tot.retries += ss.retry || 0;
-    tot.interrupts += ss.interrupt || 0;
-    tot.api_errors += ss.api_error || 0;
-    tot.hit_limits += (src_d.hit_limit != null ? src_d.hit_limit : d.hit_limit) || 0;
-
-    var dayTotal = d.total || 0;
-    var dayOutput = d.output || 0;
-    dailyTrend.push({
-      date: d.date,
-      overhead: dayOutput > 0 ? Math.round(dayTotal / dayOutput * 10) / 10 : 0,
-      output_pct: dayTotal > 0 ? Math.round(dayOutput / dayTotal * 100) : 0,
-      cache_miss_rate: (d.cache_creation || 0) + (d.cache_read || 0) > 0
-        ? Math.round((d.cache_creation || 0) / ((d.cache_creation || 0) + (d.cache_read || 0)) * 100)
-        : 0
-    });
-  }
+  var aggBe = __aggregateBudgetDaysForEfficiency(days, filteredHost);
+  var tot = aggBe.tot;
+  var dailyTrend = aggBe.dailyTrend;
 
   // Compute metrics
   var outputPct = tot.total > 0 ? Math.round(tot.output / tot.total * 100) : 0;
@@ -4574,7 +4647,7 @@ function renderBudgetEfficiency(data) {
       var pds = data.proxy.proxy_days;
       var latest = pds[pds.length - 1];
       var latestRl = latest.rate_limit || {};
-      var q5now = parseFloat(latestRl["anthropic-ratelimit-unified-5h-utilization"] || 0);
+      var q5now = Number.parseFloat(latestRl["anthropic-ratelimit-unified-5h-utilization"] || 0);
       if (q5now > 0 && latest.active_hours > 0) {
         // Rate: quota % per active hour
         var pctPerHour = q5now * 100 / latest.active_hours;
@@ -4610,10 +4683,10 @@ function renderBudgetEfficiency(data) {
       var rl = lastPd.rate_limit;
       var q5 = rl["anthropic-ratelimit-unified-5h-utilization"];
       var q7 = rl["anthropic-ratelimit-unified-7d-utilization"];
-      if (q5 != null) quota.pct_5h = parseFloat(q5) * 100;
-      if (q7 != null) quota.pct_7d = parseFloat(q7) * 100;
+      if (q5 != null) quota.pct_5h = Number.parseFloat(q5) * 100;
+      if (q7 != null) quota.pct_7d = Number.parseFloat(q7) * 100;
       var fb = rl["anthropic-ratelimit-unified-fallback-percentage"];
-      if (fb != null) quota.fallback_pct = parseFloat(fb);
+      if (fb != null) quota.fallback_pct = Number.parseFloat(fb);
       var ov = rl["anthropic-ratelimit-unified-overage-status"];
       if (ov) quota.overage_status = ov;
       var ovr = rl["anthropic-ratelimit-unified-overage-disabled-reason"];
@@ -4650,7 +4723,6 @@ function renderBudgetEfficiency(data) {
     // 7d gauge
     if (quota.pct_7d != null) {
       var pct7 = Math.min(quota.pct_7d, 100);
-      var left7 = (100 - pct7);
       fuelRows.push(
         "<div class=\"fuel-row\"><span class=\"fuel-label\">7d Window</span>" +
         "<div class=\"fuel-bar\"><div class=\"fuel-fill\" style=\"width:" + pct7 + "%;background:" + fuelColor(pct7) + "\"></div>" +
@@ -4677,12 +4749,12 @@ function renderBudgetEfficiency(data) {
   // Alert banner for capacity reduction
   var alertEl = document.getElementById("budget-alert");
   if (alertEl) {
-    if (quota.fallback_pct != null && quota.fallback_pct < 1.0) {
+    if (quota.fallback_pct != null && quota.fallback_pct < 1) {
       var fbPctAlert = Math.round(quota.fallback_pct * 100);
       var alertParts = ["<strong>" + t("budgetAlertTitle") + "</strong> "];
       alertParts.push(t("budgetAlertFallback").split("{pct}").join(String(fbPctAlert)));
       if (quota.overage_status === "rejected") alertParts.push(" · " + t("budgetAlertOverage"));
-      if (quota.representative_claim) alertParts.push(" · " + t("budgetAlertClaim").replace("{claim}", quota.representative_claim.replace(/_/g, " ")));
+      if (quota.representative_claim) alertParts.push(" · " + t("budgetAlertClaim").replace("{claim}", quota.representative_claim.replaceAll("_", " ")));
       alertEl.innerHTML = alertParts.join("");
       alertEl.style.display = "block";
     } else {
@@ -4690,22 +4762,7 @@ function renderBudgetEfficiency(data) {
     }
   }
 
-  // Aggregate per-host totals for Sankey worker nodes
-  var hostTotals = {};
-  for (var hi2 = 0; hi2 < days.length; hi2++) {
-    var dh = days[hi2].hosts || {};
-    var hk2 = Object.keys(dh);
-    for (var hj = 0; hj < hk2.length; hj++) {
-      var hl = hk2[hj];
-      var hv = dh[hl];
-      if (!hostTotals[hl]) hostTotals[hl] = { output: 0, input: 0, cache_read: 0, cache_creation: 0, total: 0 };
-      hostTotals[hl].output += hv.output || 0;
-      hostTotals[hl].input += hv.input || 0;
-      hostTotals[hl].cache_read += hv.cache_read || 0;
-      hostTotals[hl].cache_creation += hv.cache_creation || 0;
-      hostTotals[hl].total += hv.total || (hv.output || 0) + (hv.input || 0) + (hv.cache_read || 0) + (hv.cache_creation || 0);
-    }
-  }
+  var hostTotals = __budgetHostTotalsFromDays(days);
 
   // Waterfall Chart — if host filter active, skip multi-host view
   renderBudgetWaterfall(tot, quota, filteredHost ? {} : hostTotals);
@@ -4720,10 +4777,10 @@ function renderBudgetEfficiency(data) {
       var q7 = pd.rate_limit["anthropic-ratelimit-unified-7d-utilization"];
       var fb = pd.rate_limit["anthropic-ratelimit-unified-fallback-percentage"];
       quotaByDate[pd.date] = {
-        pct_5h: q5 != null ? Math.round(parseFloat(q5) * 1000) / 10 : null,
-        pct_7d: q7 != null ? Math.round(parseFloat(q7) * 1000) / 10 : null,
+        pct_5h: q5 != null ? Math.round(Number.parseFloat(q5) * 1000) / 10 : null,
+        pct_7d: q7 != null ? Math.round(Number.parseFloat(q7) * 1000) / 10 : null,
         vis_per_pct: pd.visible_tokens_per_pct || 0,
-        fallback_pct: fb != null ? Math.round(parseFloat(fb) * 100) : null
+        fallback_pct: fb != null ? Math.round(Number.parseFloat(fb) * 100) : null
       };
     }
   }
@@ -4738,9 +4795,9 @@ function renderBudgetEfficiency(data) {
   renderBudgetTrend(dailyTrend);
 }
 
-// Approximate quota cost weights (relative to output=1.0)
+// Approximate quota cost weights (relative to output=1)
 var __quotaWeights = {
-  output: 1.0,
+  output: 1,
   input: 0.33,
   cache_creation: 0.42,
   cache_read: 0.03
@@ -4754,20 +4811,37 @@ var __googleChartsReady = false;
 
 // Load Google Charts Sankey package
 (function() {
-  if (typeof google !== "undefined" && google.charts) {
-    google.charts.load("current", { packages: ["sankey"] });
-    google.charts.setOnLoadCallback(function() { __googleChartsReady = true; });
+  if (globalThis.google?.charts) {
+    globalThis.google.charts.load("current", { packages: ["sankey"] });
+    globalThis.google.charts.setOnLoadCallback(function() { __googleChartsReady = true; });
   } else {
-    // Wait for script to load
     var iv = setInterval(function() {
-      if (typeof google !== "undefined" && google.charts) {
+      if (globalThis.google?.charts) {
         clearInterval(iv);
-        google.charts.load("current", { packages: ["sankey"] });
-        google.charts.setOnLoadCallback(function() { __googleChartsReady = true; });
+        globalThis.google.charts.load("current", { packages: ["sankey"] });
+        globalThis.google.charts.setOnLoadCallback(function() { __googleChartsReady = true; });
       }
     }, 200);
   }
 })();
+
+function __renderBudgetGroup(el, modes, current, setter) {
+  el.innerHTML = "";
+  for (var i = 0; i < modes.length; i++) {
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = modes[i].label;
+    btn.dataset.key = modes[i].key;
+    if (modes[i].key === current) btn.className = "active";
+    btn.addEventListener("click", (function(k) {
+      return function() {
+        setter(k);
+        if (__budgetSankeyState) renderBudgetWaterfall(__budgetSankeyState.tot, __budgetSankeyState.quota, __budgetSankeyState.hostTotals);
+      };
+    })(modes[i].key));
+    el.appendChild(btn);
+  }
+}
 
 function __buildBudgetSwitches() {
   if (__budgetSwitchesWired) return;
@@ -4787,26 +4861,8 @@ function __buildBudgetSwitches() {
     { key: "cost",   label: t("budgetWfCost") }
   ];
 
-  function renderGroup(el, modes, current, setter) {
-    el.innerHTML = "";
-    for (var i = 0; i < modes.length; i++) {
-      var btn = document.createElement("button");
-      btn.type = "button";
-      btn.textContent = modes[i].label;
-      btn.dataset.key = modes[i].key;
-      if (modes[i].key === current) btn.className = "active";
-      btn.addEventListener("click", (function(k) {
-        return function() {
-          setter(k);
-          if (__budgetSankeyState) renderBudgetWaterfall(__budgetSankeyState.tot, __budgetSankeyState.quota, __budgetSankeyState.hostTotals);
-        };
-      })(modes[i].key));
-      el.appendChild(btn);
-    }
-  }
-
-  renderGroup(flowGrp, flowModes, __budgetFlowMode, function(k) { __budgetFlowMode = k; });
-  renderGroup(weightGrp, weightModes, __budgetViewMode, function(k) { __budgetViewMode = k; });
+  __renderBudgetGroup(flowGrp, flowModes, __budgetFlowMode, function(k) { __budgetFlowMode = k; });
+  __renderBudgetGroup(weightGrp, weightModes, __budgetViewMode, function(k) { __budgetViewMode = k; });
 }
 
 function __updateBudgetSwitchActive() {
@@ -4833,7 +4889,7 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
   var blurb = document.getElementById("budget-waterfall-blurb");
   if (!el) return;
 
-  if (!__googleChartsReady || !window.google || !window.google.visualization) {
+  if (!__googleChartsReady || !globalThis.google?.visualization) {
     el.innerHTML = "<div style='text-align:center;padding:2rem;color:#94a3b8'>Loading Google Charts...</div>";
     setTimeout(function() { if (__budgetSankeyState) renderBudgetWaterfall(__budgetSankeyState.tot, __budgetSankeyState.quota, __budgetSankeyState.hostTotals); }, 500);
     return;
@@ -4874,29 +4930,13 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
   var nCr  = t("budgetWfCacheRead") + " " + pctOf(src.cr) + "%";
   var nCc  = t("budgetWfCacheCreate") + " " + pctOf(src.cc) + "%";
 
-  // Compressed weights: log-scaled with minimum band width
-  // Ensures overhead (small flows) stays visible next to cache (huge flows)
-  // Max ratio capped at ~4:1 so no flow disappears
-  var allVals = [src.out, src.inp, src.cr, src.cc].filter(function(v) { return v > 0; });
-  var maxLog = 0;
-  for (var ai = 0; ai < allVals.length; ai++) {
-    var l = Math.log10(1 + allVals[ai]);
-    if (l > maxLog) maxLog = l;
-  }
-  var wOf = function(v) {
-    if (v <= 0) return 0;
-    var logV = Math.log10(1 + v);
-    // Normalize to 1-4 range: smallest visible flow = 1, largest = 4
-    var normalized = maxLog > 0 ? (logV / maxLog) : 1;
-    return Math.max(1, Math.round(1 + normalized * 3));
-  };
-  var wOut = wOf(src.out);
-  var wInp = wOf(src.inp);
-  var wCr  = wOf(src.cr);
-  var wCc  = wOf(src.cc);
+  // Compressed weights: log-scaled (see __budgetSankeyWeights)
+  var sw2 = __budgetSankeyWeights(src);
+  var wOf = sw2.wOf;
+  var wOut = sw2.wOut, wInp = sw2.wInp, wCr = sw2.wCr, wCc = sw2.wCc;
 
   // Aggregate per-host data for worker nodes
-  var hostKeys = Object.keys(hostTotals || {}).sort();
+  var hostKeys = Object.keys(hostTotals || {}).sort(function (a, b) { return a.localeCompare(b); });
 
   if (__budgetFlowMode === "budget") {
     var srcN = getSelectedPlanLabel() + " Budget";
@@ -4997,13 +5037,13 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
     return;
   }
 
-  var data = new google.visualization.DataTable();
+  var data = new globalThis.google.visualization.DataTable();
   data.addColumn("string", "From");
   data.addColumn("string", "To");
   data.addColumn("number", "Weight");
   data.addRows(rows);
 
-  var chart = new google.visualization.Sankey(el);
+  var chart = new globalThis.google.visualization.Sankey(el);
   chart.draw(data, {
     height: Math.max(250, rows.length * 16),
     sankey: {
@@ -5122,8 +5162,8 @@ function renderBudgetTrend(dailyTrend) {
     var quota5hData = dailyTrend.map(function(d) { return d.quota_5h; });
     var quota7dData = dailyTrend.map(function(d) { return d.quota_7d; });
     var fallbackData = dailyTrend.map(function(d) { return d.fallback_pct; });
-    var hasQuota = quota5hData.some(function(v) { return v != null; });
-    var hasFallback = fallbackData.some(function(v) { return v != null; });
+    var hasQuota = quota5hData.some(function(v) { return v !== null && v !== undefined; });
+    var hasFallback = fallbackData.some(function(v) { return v !== null && v !== undefined; });
 
     var qDatasets = [];
     if (hasQuota) {
@@ -5237,8 +5277,8 @@ function renderProxyAnalysis(data) {
   var rl = pd.rate_limit || {};
   var q5h = rl["anthropic-ratelimit-unified-5h-utilization"];
   var q7d = rl["anthropic-ratelimit-unified-7d-utilization"];
-  var q5pct = q5h != null ? (parseFloat(q5h) * 100).toFixed(1) : "?";
-  var q7pct = q7d != null ? (parseFloat(q7d) * 100).toFixed(1) : "?";
+  var q5pct = q5h != null ? (Number.parseFloat(q5h) * 100).toFixed(1) : "?";
+  var q7pct = q7d != null ? (Number.parseFloat(q7d) * 100).toFixed(1) : "?";
   sumEl.textContent = tr("proxySummaryLine", {
     reqs: pd.requests || 0,
     errs: pd.errors || 0,
@@ -5271,14 +5311,14 @@ function renderProxyAnalysis(data) {
   if (scParts.length) reqSub += " (" + scParts.join(", ") + ")";
 
   // Quota values (rl already declared above for summary line)
-  var q5raw = parseFloat(rl["anthropic-ratelimit-unified-5h-utilization"] || 0);
-  var q7raw = parseFloat(rl["anthropic-ratelimit-unified-7d-utilization"] || 0);
+  var q5raw = Number.parseFloat(rl["anthropic-ratelimit-unified-5h-utilization"] || 0);
+  var q7raw = Number.parseFloat(rl["anthropic-ratelimit-unified-7d-utilization"] || 0);
   var q5pctVal = q5raw * 100;
   var q7pctVal = q7raw * 100;
 
   function quotaResetStr(epoch) {
     if (!epoch) return "";
-    var diff = parseInt(epoch, 10) - Date.now() / 1000;
+    var diff = Number.parseInt(epoch, 10) - Date.now() / 1000;
     if (diff <= 0) return "";
     var rh = Math.floor(diff / 3600);
     var rm = Math.floor((diff % 3600) / 60);
@@ -5510,7 +5550,7 @@ function renderProxyInvisibleCost(pd) {
   var el = document.getElementById("proxy-invisible-cost");
   if (!el) return;
   var rl = pd.rate_limit || {};
-  var q5 = parseFloat(rl["anthropic-ratelimit-unified-5h-utilization"] || 0);
+  var q5 = Number.parseFloat(rl["anthropic-ratelimit-unified-5h-utilization"] || 0);
   var visibleTokens = (pd.output_tokens || 0) + (pd.input_tokens || 0);
   var cacheTokens = (pd.cache_read_tokens || 0) + (pd.cache_creation_tokens || 0);
   var totalVisible = visibleTokens + cacheTokens;
@@ -6038,7 +6078,7 @@ function computeHealthIndicators(data) {
 
   // Proxy metrics (fallback to 0/defaults if no proxy)
   var rl = pd ? (pd.rate_limit || {}) : {};
-  var q5h = parseFloat(rl["anthropic-ratelimit-unified-5h-utilization"] || 0) * 100;
+  var q5h = Number.parseFloat(rl["anthropic-ratelimit-unified-5h-utilization"] || 0) * 100;
   var cacheRatio = pd ? ((pd.cache_read_ratio || 0) * 100) : 100;
   var errorRate = pd ? (pd.error_rate || 0) : 0;
   var avgLatMs = pd ? (pd.avg_duration_ms || 0) : 0;
@@ -6239,8 +6279,8 @@ function computeKeyFindings(data) {
   // 5. Quota (from proxy)
   if (pd) {
     var rl = pd.rate_limit || {};
-    var q5 = parseFloat(rl["anthropic-ratelimit-unified-5h-utilization"] || 0) * 100;
-    var q7 = parseFloat(rl["anthropic-ratelimit-unified-7d-utilization"] || 0) * 100;
+    var q5 = Number.parseFloat(rl["anthropic-ratelimit-unified-5h-utilization"] || 0) * 100;
+    var q7 = Number.parseFloat(rl["anthropic-ratelimit-unified-7d-utilization"] || 0) * 100;
     if (q5 > 0) {
       findings.push({
         icon: q5 > 80 ? "red" : q5 > 50 ? "yellow" : "green",
@@ -6255,8 +6295,8 @@ function computeKeyFindings(data) {
   if (pd) {
     var rl6 = pd.rate_limit || {};
     var fb = rl6["anthropic-ratelimit-unified-fallback-percentage"];
-    if (fb != null) {
-      var fbPct = Math.round(parseFloat(fb) * 100);
+    if (fb !== undefined && fb !== null) {
+      var fbPct = Math.round(Number.parseFloat(fb) * 100);
       findings.push({
         icon: fbPct < 100 ? "red" : "green",
         title: t("findingFallback"),
@@ -6289,7 +6329,7 @@ function computeKeyFindings(data) {
       findings.push({
         icon: claim === "five_hour" ? "yellow" : "green",
         title: t("findingClaim"),
-        value: claim.replace(/_/g, " "),
+        value: claim.replaceAll("_", " "),
         detail: t("findingClaimDetail")
       });
     }
@@ -6431,7 +6471,7 @@ function initFilterBar(data) {
       var dh = days[hdi].hosts || {};
       for (var hk in dh) { if (Object.prototype.hasOwnProperty.call(dh, hk)) hosts[hk] = true; }
     }
-    var hkeys = Object.keys(hosts).sort();
+    var hkeys = Object.keys(hosts).sort(function (a, b) { return a.localeCompare(b); });
     if (hkeys.length <= 5) {
       // Chips mode
       var hhtml = '<div class="filter-chips">';
@@ -6537,7 +6577,7 @@ function computeHealthScoreForDay(dayData, proxyDay) {
   var interrupts = ss.interrupt || 0;
   var retries = ss.retry || 0;
   var rl = pd ? (pd.rate_limit || {}) : {};
-  var q5h = parseFloat(rl["anthropic-ratelimit-unified-5h-utilization"] || 0) * 100;
+  var q5h = Number.parseFloat(rl["anthropic-ratelimit-unified-5h-utilization"] || 0) * 100;
   var cacheRatio = pd ? ((pd.cache_read_ratio || 0) * 100) : 95;
   var errorRate = pd ? (pd.error_rate || 0) : 0;
   var avgLatS = pd ? ((pd.avg_duration_ms || 0) / 1000) : 5;
@@ -7050,8 +7090,8 @@ function renderAvailabilityKpis(data) {
   var realUptimePct = totalH > 0 ? ((totalH - totalOutageH) / totalH * 100) : 100;
 
   // Median-based color: per-day weighted quality %, sort, take median
-  // Severity weights: critical=1.0, major=0.7, minor=0.3, none=0
-  var _sevWeight = { critical: 1.0, major: 0.7, minor: 0.3, none: 0 };
+  // Severity weights: critical=1, major=0.7, minor=0.3, none=0
+  var _sevWeight = { critical: 1, major: 0.7, minor: 0.3, none: 0 };
   var dailySqPcts = [];
   var dailyUtPcts = [];
   for (var dpi = 0; dpi < allDays.length; dpi++) {
@@ -7107,7 +7147,7 @@ function renderAvailabilityKpis(data) {
   }
 
   // Monthly table
-  var monthKeys = Object.keys(byMonth).sort();
+  var monthKeys = Object.keys(byMonth).sort(function (a, b) { return a.localeCompare(b); });
   if (monthKeys.length > 0) {
     var now = new Date();
     var curMonth = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
