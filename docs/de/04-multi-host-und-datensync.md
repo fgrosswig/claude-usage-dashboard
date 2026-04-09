@@ -50,3 +50,22 @@ Wenn **`~/.claude/projects`** auf dem Server nicht direkt lesbar ist:
 - Nur **`projects/**`** und **`anthropic-proxy-logs/**`** werden extrahiert.
 - Max. Größe: **`CLAUDE_USAGE_SYNC_MAX_MB`** (Standard **512**).
 - Client-Hilfe: **`scripts/claude-data-sync-client.js`**.
+
+### Kubernetes: Token aus Secret (nicht im Git)
+
+In **`k8s/base/deployment.yml`** kommt **`CLAUDE_USAGE_SYNC_TOKEN`** aus Secret **`claude-usage-dashboard-app`**, Key **`sync-token`** (`optional: true`). Anlegen/Rotieren: **`k8s/README.md`**. Kein Klartext-`env` im Deployment.
+
+**Lokal denselben Wert für `CLAUDE_SYNC_TOKEN`** (mit **`kubectl`** auf den Cluster):
+
+- **`scripts/print-claude-sync-token.ps1`** (PowerShell)
+- **`scripts/print-claude-sync-token.sh`** (bash, braucht **`base64`**)
+
+Optional: **`CLAUDE_SYNC_K8S_NAMESPACE`** (Default **`claude`**), **`CLAUDE_SYNC_K8S_SECRET`** (Default **`claude-usage-dashboard-app`**).
+
+**Beispiel (PowerShell, NodePort):**
+
+```powershell
+$env:CLAUDE_SYNC_TOKEN = (& pwsh -NoProfile -File .\scripts\print-claude-sync-token.ps1).Trim()
+$env:CLAUDE_SYNC_URL = "http://KNOTEN_IP:31333"
+node scripts/claude-data-sync-client.js
+```

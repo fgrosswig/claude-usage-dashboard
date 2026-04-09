@@ -161,6 +161,7 @@ Kubernetes mountet **kein** Verzeichnis von deinem Laptop direkt in einen Pod au
      `node scripts/claude-data-sync-client.js`  
    - Der Server entpackt ein `tar.gz` nach `/root/.claude` (**nur** `projects/**` und optional `anthropic-proxy-logs/**`) und startet einen Neu-Scan.  
    - API: `POST /api/claude-data-sync`, Body = rohes gzip-Tar-Archiv, Header `Authorization: Bearer <Token>`.
+   - **`CLAUDE_SYNC_TOKEN`** lokal aus dem **gleichen** Secret wie das Deployment: `scripts/print-claude-sync-token.ps1` (PowerShell) oder `scripts/print-claude-sync-token.sh` — Secret **`claude-usage-dashboard-app`**, Key **`sync-token`**, Namespace **`claude`** (override: `CLAUDE_SYNC_K8S_NAMESPACE`, `CLAUDE_SYNC_K8S_SECRET`).
 
 2. **PVC + rsync über Jump**  
    Ein PersistentVolume (z. B. NFS), das du vom Client aus per `rsync`/`scp` auf einen Sync-Host schreibst, der dieselbe Freigabe mountet — oder `kubectl cp` in den Pod (eher manuell).
@@ -186,6 +187,8 @@ kubectl create secret generic claude-usage-dashboard-app -n claude \
   --from-literal=github-token="ghp_..." \
   --from-literal=admin-token="$(openssl rand -hex 16)"
 ```
+
+**Deployment:** `k8s/base/deployment.yml` mappt **`sync-token`** → **`CLAUDE_USAGE_SYNC_TOKEN`** (`secretKeyRef`, `optional: true`). Es gibt **keinen** Sync-Token im Git — früher manuell per `kubectl set env` gesetzte Klartext-Variablen bitte entfernen und den Wert **nur** noch unter `sync-token` pflegen; danach `kubectl apply -k k8s/overlays/dev` (oder euer CI-Deploy), sonst überschreibt das alte Inline-Env weiterhin das Secret.
 
 ## Lokales Dev-Testing (Proxy-Logs vom Cluster)
 

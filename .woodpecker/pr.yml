@@ -1,6 +1,16 @@
 # PR-Checks auf Docker-Agent .220 — kein Kaniko/Harbor-Push (vgl. k8s/README.md).
+# Enthält: K8s-Verify + SonarQube PR-Decoration (Ergebnisse landen via
+# Bot als Review-Kommentare + Commit-Status im PR, siehe issue #168).
 when:
   event: pull_request
+
+# Sonar braucht vollen Clone für SCM-Blame und new-code-period detection.
+clone:
+  git:
+    image: woodpeckerci/plugin-git
+    settings:
+      depth: 0
+      partial: false
 
 labels:
   platform: linux/amd64
@@ -12,3 +22,19 @@ steps:
     commands:
       - apk add --no-cache kubectl
       - sh scripts/k8-ci-verify.sh
+
+  - name: sonar-scan-pr
+    image: sonarsource/sonar-scanner-cli
+    commands:
+      - |
+        sonar-scanner \
+          -Dsonar.host.url=$SONAR_URL \
+          -Dsonar.token=$SONAR_TOKEN \
+          -Dsonar.pullrequest.key=$CI_COMMIT_PULL_REQUEST \
+          -Dsonar.pullrequest.branch=$CI_COMMIT_SOURCE_BRANCH \
+          -Dsonar.pullrequest.base=$CI_COMMIT_TARGET_BRANCH
+    environment:
+      SONAR_URL:
+        from_secret: sonar_url
+      SONAR_TOKEN:
+        from_secret: sonar_token

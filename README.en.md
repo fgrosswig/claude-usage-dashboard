@@ -3,10 +3,14 @@
 ## Claude Usage Dashboard
 
 [![Docker build](https://github.com/fgrosswig/claude-usage-dashboard/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/fgrosswig/claude-usage-dashboard/actions/workflows/docker.yml)
+[![Quality Gate](https://sonar.grosswig-it.de/api/project_badges/measure?project=claude-usage-dashboard&metric=alert_status&token=XXX)](https://sonar.grosswig-it.de/dashboard?id=claude-usage-dashboard)
+[![Bugs](https://sonar.grosswig-it.de/api/project_badges/measure?project=claude-usage-dashboard&metric=bugs&token=XXX)](https://sonar.grosswig-it.de/dashboard?id=claude-usage-dashboard)
+[![Vulnerabilities](https://sonar.grosswig-it.de/api/project_badges/measure?project=claude-usage-dashboard&metric=vulnerabilities&token=XXX)](https://sonar.grosswig-it.de/dashboard?id=claude-usage-dashboard)
+[![Security Rating](https://sonar.grosswig-it.de/api/project_badges/measure?project=claude-usage-dashboard&metric=security_rating&token=XXX)](https://sonar.grosswig-it.de/dashboard?id=claude-usage-dashboard)
 
 ### Summary
 
-**Anthropic / Claude Code monitoring:** A **self-hosted web dashboard** and optional **transparent HTTP proxy** to the **Anthropic API** — surfacing **tokens**, heuristic limits, **forensics**, and proxy-side metrics. **Why it exists:** many users see **fast “usage drains”** on **Anthropic** workloads (Claude Code, Max / session windows, etc.) where the official counters do not fully explain **why** the budget empties so quickly. Inputs: **`~/.claude/projects/**/*.jsonl`**, and — with the proxy — **per-request NDJSON** (latency, cache, **rate-limit-related headers**, etc.). Only **`claude-*`** models (no `<synthetic>`). Runs **locally** or in **Docker/Kubernetes** — not a central SaaS.
+**Anthropic / Claude Code monitoring:** A **self-hosted web dashboard** and optional **transparent HTTP proxy** to the **Anthropic API** — surfacing **tokens**, heuristic limits, **forensics**, and proxy-side metrics. **Why it exists:** many users see **fast “usage drains”** on **Anthropic** workloads (Claude Code, Max / session windows, etc.) where the official counters do not fully explain **why** the budget empties so quickly. Inputs: **`~/.claude/projects/**/_.jsonl`**, and — with the proxy — **per-request NDJSON** (latency, cache, **rate-limit-related headers**, etc.). Only **`claude-_`** models (no `<synthetic>`). Runs **locally** or in **Docker/Kubernetes** — not a central SaaS.
 
 ### References and context
 
@@ -21,7 +25,7 @@ See **[Documentation](docs/README.md)** for architecture, env vars, and API.
 
 The **full** guide is in **[docs/](docs/README.md)** with sub-pages (architecture, UI, proxy, forensics, env vars, API).
 
-- **English:** [docs/en/README.md](docs/en/README.md)  
+- **English:** [docs/en/README.md](docs/en/README.md)
 - **Deutsch:** [docs/de/README.md](docs/de/README.md)
 
 ### Quick start

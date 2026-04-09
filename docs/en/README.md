@@ -1,6 +1,6 @@
 # Claude Usage Dashboard — Documentation (English)
 
-**[Deutsch](../de/README.md)**
+**[Deutsch](../de/README.md)** · **[한국어 (KO)](../ko/README.md)** (sync / K8s / API excerpt)
 
 | # | Topic | File |
 |---|--------|------|
@@ -12,3 +12,4 @@
 | 6 | Limits & forensic UI, CLI `token-forensics` | [06-forensics-and-cli.md](06-forensics-and-cli.md) |
 | 7 | Environment, API, deployment, Docker, CI, dev mode, GitHub mirror | [07-config-api-deployment.md](07-config-api-deployment.md) |
 | 8 | Screenshots & image gallery | [08-screenshots.md](08-screenshots.md) |
+| 9 | Data formats (JSONL session logs, Proxy NDJSON), adapter/converter guidance | [09-data-formats.md](09-data-formats.md) |

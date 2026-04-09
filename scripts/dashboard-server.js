@@ -2025,100 +2025,104 @@ function hostSliceToApi(h) {
 // ── Release Stability Analysis ──────────────────────────────────────────
 var REVERT_KEYWORDS = ['revert', 'rollback', 'roll back', 'backed out', 'regression', 'hotfix'];
 
+function __releaseParseTagEntry(r) {
+  var tag = (r.tag_name || '').replace(/^v/, '');
+  var parts = tag.split('.');
+  if (parts.length < 3) return null;
+  var major = Number.parseInt(parts[0], 10) || 0;
+  var minor = Number.parseInt(parts[1], 10) || 0;
+  var patch = Number.parseInt(parts[2], 10) || 0;
+  var body = (r.body || '').toLowerCase();
+  var matchedKeywords = [];
+  for (const kw of REVERT_KEYWORDS) {
+    if (body.includes(kw)) matchedKeywords.push(kw);
+  }
+  return {
+    tag: r.tag_name || '',
+    date: (r.published_at || '').substring(0, 10),
+    major: major,
+    minor: minor,
+    patch: patch,
+    hasRegression: matchedKeywords.length > 0,
+    matchedKeywords: matchedKeywords,
+    prerelease: !!r.prerelease
+  };
+}
+
+function __releaseBuildEntries(sorted) {
+  var entries = [];
+  for (const r of sorted) {
+    var ent = __releaseParseTagEntry(r);
+    if (ent) entries.push(ent);
+  }
+  return entries;
+}
+
+function __releaseDaysActive(cur, nextEntry, ri, entriesLen, nowMs) {
+  if (ri < entriesLen - 1) {
+    var d1 = new Date(cur.date);
+    var d2 = new Date(nextEntry.date);
+    return Math.max(0, Math.round((d2 - d1) / 86400000));
+  }
+  return Math.max(0, Math.round((nowMs - new Date(cur.date)) / 86400000));
+}
+
+function __releaseSkippedPatches(prev, cur) {
+  if (prev && cur.minor === prev.minor) {
+    return Math.max(0, cur.patch - prev.patch - 1);
+  }
+  return 0;
+}
+
+function __releaseStabilityOf(cur, isHotfix) {
+  if (isHotfix) return 'hotfix';
+  if (cur.hasRegression) return 'regression';
+  return 'stable';
+}
+
+function __releaseBuildOne(cur, prev, nextEntry, ri, nEnt, nowMs) {
+  var isHotfix = prev ? (cur.date === prev.date) : false;
+  return {
+    tag: cur.tag,
+    date: cur.date,
+    daysActive: __releaseDaysActive(cur, nextEntry, ri, nEnt, nowMs),
+    stability: __releaseStabilityOf(cur, isHotfix),
+    isHotfix: isHotfix,
+    hasRegression: cur.hasRegression,
+    matchedKeywords: cur.matchedKeywords,
+    skippedPatches: __releaseSkippedPatches(prev, cur)
+  };
+}
+
 function buildReleaseStabilityData() {
   var rels = releasesCache.releases;
-  if (!rels || !rels.length) return null;
+  if (!rels?.length) return null;
 
-  // Sort ascending by published_at
   var sorted = rels.slice().sort(function(a, b) {
     return (a.published_at || '').localeCompare(b.published_at || '');
   });
 
-  // Parse into structured entries
-  var entries = [];
-  for (var i = 0; i < sorted.length; i++) {
-    var r = sorted[i];
-    var tag = (r.tag_name || '').replace(/^v/, '');
-    var parts = tag.split('.');
-    if (parts.length < 3) continue;
-    var major = parseInt(parts[0], 10) || 0;
-    var minor = parseInt(parts[1], 10) || 0;
-    var patch = parseInt(parts[2], 10) || 0;
-    var body = (r.body || '').toLowerCase();
-    var hasRegression = false;
-    var matchedKeywords = [];
-    for (var ki = 0; ki < REVERT_KEYWORDS.length; ki++) {
-      if (body.indexOf(REVERT_KEYWORDS[ki]) >= 0) {
-        hasRegression = true;
-        matchedKeywords.push(REVERT_KEYWORDS[ki]);
-      }
-    }
-    entries.push({
-      tag: r.tag_name || '',
-      date: (r.published_at || '').substring(0, 10),
-      major: major,
-      minor: minor,
-      patch: patch,
-      hasRegression: hasRegression,
-      matchedKeywords: matchedKeywords,
-      prerelease: !!r.prerelease
-    });
-  }
-
+  var entries = __releaseBuildEntries(sorted);
   if (!entries.length) return null;
 
-  // Compute per-release metrics
   var releases = [];
   var totalSkipped = 0;
   var hotfixCount = 0;
   var regressionCount = 0;
-  for (var ri = 0; ri < entries.length; ri++) {
+  var nowMs = Date.now();
+  var nEnt = entries.length;
+  for (var ri = 0; ri < nEnt; ri++) {
     var cur = entries[ri];
     var prev = ri > 0 ? entries[ri - 1] : null;
-
-    // Days active until next release
-    var daysActive = 0;
-    if (ri < entries.length - 1) {
-      var d1 = new Date(cur.date);
-      var d2 = new Date(entries[ri + 1].date);
-      daysActive = Math.max(0, Math.round((d2 - d1) / 86400000));
-    } else {
-      // Last release: days until today
-      var now = new Date();
-      var dLast = new Date(cur.date);
-      daysActive = Math.max(0, Math.round((now - dLast) / 86400000));
-    }
-
-    // Same-day hotfix detection
-    var isHotfix = prev ? (cur.date === prev.date) : false;
-    if (isHotfix) hotfixCount++;
-
-    // Skipped patches (only within same minor)
-    var skipped = 0;
-    if (prev && cur.minor === prev.minor) {
-      skipped = Math.max(0, cur.patch - prev.patch - 1);
-      totalSkipped += skipped;
-    }
-
+    var r = __releaseBuildOne(cur, prev, entries[ri + 1], ri, nEnt, nowMs);
+    releases.push(r);
+    if (r.isHotfix) hotfixCount++;
+    totalSkipped += r.skippedPatches;
     if (cur.hasRegression) regressionCount++;
-
-    // Stability classification: hotfix > regression > stable
-    var stability = 'stable';
-    if (isHotfix) stability = 'hotfix';
-    else if (cur.hasRegression) stability = 'regression';
-
-    releases.push({
-      tag: cur.tag,
-      date: cur.date,
-      daysActive: daysActive,
-      stability: stability,
-      isHotfix: isHotfix,
-      hasRegression: cur.hasRegression,
-      matchedKeywords: cur.matchedKeywords,
-      skippedPatches: skipped
-    });
   }
 
+  var firstEnt = entries[0];
+  var lastEnt = entries.at(-1);
   return {
     releases: releases,
     summary: {
@@ -2127,11 +2131,11 @@ function buildReleaseStabilityData() {
       hotfixCount: hotfixCount,
       regressionCount: regressionCount,
       stableCount: releases.length - hotfixCount - regressionCount + (hotfixCount > 0 ? releases.filter(function(r) { return r.isHotfix && r.hasRegression; }).length : 0),
-      firstDate: entries[0].date,
-      lastDate: entries[entries.length - 1].date,
-      daysSpan: Math.round((new Date(entries[entries.length - 1].date) - new Date(entries[0].date)) / 86400000),
+      firstDate: firstEnt.date,
+      lastDate: lastEnt.date,
+      daysSpan: Math.round((new Date(lastEnt.date) - new Date(firstEnt.date)) / 86400000),
       cadenceDays: entries.length > 1
-        ? Math.round((new Date(entries[entries.length - 1].date) - new Date(entries[0].date)) / 86400000 / (entries.length - 1) * 10) / 10
+        ? Math.round((new Date(lastEnt.date) - new Date(firstEnt.date)) / 86400000 / (entries.length - 1) * 10) / 10
         : 0
     }
   };
@@ -2846,6 +2850,13 @@ function getClaudeUsageSyncToken() {
   return String(process.env.CLAUDE_USAGE_SYNC_TOKEN || '').trim();
 }
 
+/** Bearer-Token aus Authorization-Header (case-insensitive, trim). */
+function parseBearerFromAuthorization(authHeader) {
+  var s = String(authHeader || '').trim();
+  var m = s.match(/^Bearer\s+(\S.*)$/i);
+  return m ? String(m[1]).trim() : '';
+}
+
 function handleClaudeDataSyncRequest(req, res) {
   var cors = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
   if (!getClaudeUsageSyncToken()) {
@@ -2867,8 +2878,17 @@ function handleClaudeDataSyncRequest(req, res) {
     res.end(JSON.stringify({ ok: false, error: 'method_not_allowed' }));
     return;
   }
-  var authH = String(req.headers.authorization || '');
-  if (authH !== 'Bearer ' + getClaudeUsageSyncToken()) {
+  var expected = getClaudeUsageSyncToken();
+  var presented = parseBearerFromAuthorization(req.headers.authorization);
+  if (!presented || presented !== expected) {
+    serviceLog.warn(
+      'ingest',
+      'sync auth failed presented_len=' +
+        presented.length +
+        ' expected_len=' +
+        expected.length +
+        (presented ? '' : ' (no Bearer token)')
+    );
     res.writeHead(401, cors);
     res.end(JSON.stringify({ ok: false, error: 'unauthorized' }));
     return;
@@ -3007,6 +3027,7 @@ function emptyProxyDayBucket() {
     status_codes: {},
     hours: {},
     rate_limit_snapshots: [],
+    q5_samples: [],
     cold_starts: 0,
     cache_ratios: [],
     per_hour_latency: {},
@@ -3014,6 +3035,34 @@ function emptyProxyDayBucket() {
     context_resets: 0,
     _prev_cache_read_high: false
   };
+}
+
+/**
+ * Compute cumulative 5h-window consumption from chronological q5 samples.
+ * Sums only positive deltas between consecutive requests (active consumption),
+ * ignoring natural rollback of the rolling 5h window. Tokens of the consuming
+ * request are attributed to the delta they caused. Returns:
+ *   { consumed: fraction_0_to_many, tokens: sum_input_output, count: num_samples }
+ */
+function computeQ5Consumption(samples) {
+  if (!samples || samples.length < 2) {
+    return { consumed: 0, tokens: 0, count: samples?.length || 0 };
+  }
+  var sorted = samples.slice().sort(function (a, b) {
+    if (a.ts < b.ts) return -1;
+    if (a.ts > b.ts) return 1;
+    return 0;
+  });
+  var consumed = 0;
+  var tokens = 0;
+  for (var i = 1; i < sorted.length; i++) {
+    var delta = sorted[i].q5 - sorted[i - 1].q5;
+    if (delta > 0) {
+      consumed += delta;
+      tokens += sorted[i].tokens;
+    }
+  }
+  return { consumed: consumed, tokens: tokens, count: sorted.length };
 }
 
 function parseProxyNdjsonFiles() {
@@ -3133,6 +3182,19 @@ function parseProxyNdjsonFiles() {
             snap._ts = tsEnd;
             // Keep only latest snapshot per day (overwrite)
             dd.rate_limit_snapshots = [snap];
+
+            // Cumulative q5 tracking for tokens-per-pct (see computeQ5Consumption)
+            var q5Str = snap['anthropic-ratelimit-unified-5h-utilization'];
+            if (q5Str != null) {
+              var q5Num = Number.parseFloat(q5Str);
+              if (!Number.isNaN(q5Num) && q5Num >= 0) {
+                dd.q5_samples.push({
+                  ts: tsEnd,
+                  q5: q5Num,
+                  tokens: (u?.input_tokens || 0) + (u?.output_tokens || 0)
+                });
+              }
+            }
           }
         }
       });
@@ -3179,17 +3241,24 @@ function parseProxyNdjsonFiles() {
       false_429s: d.false_429s,
       context_resets: d.context_resets,
       stop_reasons: d.stop_reasons || {},
-      visible_tokens_per_pct: null
+      visible_tokens_per_pct: null,
+      visible_tokens_per_pct_method: null,
+      q5_consumed_pct: 0,
+      q5_samples: 0,
+      proxy_active_visible_tokens: 0
     });
-    // Quota benchmark: visible tokens per 1% quota
+    // Quota benchmark: visible tokens per 1% of 5h window consumption.
+    // Cumulative over positive Δq5 between consecutive chronological requests —
+    // avoids the snapshot/rolling-window/idle-decay mismatch of dividing whole-day
+    // tokens by the final-snapshot utilization.
     var lastResult = result[result.length - 1];
-    var rl = lastResult.rate_limit;
-    if (rl) {
-      var q5 = parseFloat(rl['anthropic-ratelimit-unified-5h-utilization'] || 0);
-      if (q5 > 0) {
-        var visTokens = lastResult.input_tokens + lastResult.output_tokens;
-        lastResult.visible_tokens_per_pct = Math.round(visTokens / (q5 * 100));
-      }
+    var q5stats = computeQ5Consumption(d.q5_samples);
+    lastResult.q5_consumed_pct = Math.round(q5stats.consumed * 10000) / 100;
+    lastResult.q5_samples = q5stats.count;
+    lastResult.proxy_active_visible_tokens = q5stats.tokens;
+    if (q5stats.consumed > 0.0005 && q5stats.tokens > 0 && q5stats.count >= 3) {
+      lastResult.visible_tokens_per_pct = Math.round(q5stats.tokens / (q5stats.consumed * 100));
+      lastResult.visible_tokens_per_pct_method = 'cumulative_delta';
     }
   }
 
@@ -3281,6 +3350,7 @@ function devFetchRemoteUsage(cb, retryCount) {
   });
 }
 
+/** Lädt nur Proxy-NDJSON vom Remote (nicht die JSONL-Sessionlogs). JSONL bleibt lokal aus parseAllUsageIncremental — sonst fehlen Tage trotz proxy_days. */
 function devFetchProxyLogs(cb) {
   var source = (process.env.DEV_PROXY_SOURCE || '').trim();
   if (!source) return cb();
@@ -3423,13 +3493,29 @@ var server = http.createServer(function (req, res) {
     res.writeHead(200, corsMp);
     res.end(JSON.stringify({ ok: true, message: 'marketplace_refresh_started' }));
   } else if (pathname === '/api/debug/proxy-logs' && process.env.DEBUG_API === '1') {
-    // Debug endpoint: serve usage data + proxy NDJSON files in one call
+    // Debug: vollständiges usage + alle proxy-*.ndjson als { name, content }.
+    // DEV_MODE=proxy (devFetchProxyLogs) braucht `files` — sonst bleibt das Zielverzeichnis leer und proxy_days passt nicht zu lokalen JSONL-Tagen.
     res.writeHead(200, {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
       'Cache-Control': 'no-store'
     });
-    res.end(JSON.stringify({ usage: cachedData }));
+    var proxyNdjsonExport = [];
+    var proxyPathsExport = collectProxyNdjsonFiles();
+    for (const proxyPath of proxyPathsExport) {
+      try {
+        proxyNdjsonExport.push({
+          name: path.basename(proxyPath),
+          content: fs.readFileSync(proxyPath, 'utf8')
+        });
+      } catch (error) {
+        serviceLog.warn(
+          'proxy-parse',
+          'debug proxy-logs read failed ' + proxyPath + ': ' + (error.message || error)
+        );
+      }
+    }
+    res.end(JSON.stringify({ usage: cachedData, files: proxyNdjsonExport }));
   } else if (pathname === '/api/debug/sync-proxy-logs' && __devMode && __devSource) {
     // Manual trigger: re-fetch data from remote
     var corsSync = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
@@ -3450,7 +3536,8 @@ var server = http.createServer(function (req, res) {
       dev_mode: __devMode || null,
       dev_proxy_source: __devSource || null,
       refresh_sec: REFRESH_SEC,
-      version: __appVersion
+      version: __appVersion,
+      claude_data_sync_enabled: !!getClaudeUsageSyncToken()
     }));
   } else if (pathname === '/api/debug/cache-reset' && req.method === 'POST' && process.env.DEBUG_API === '1') {
     // Loescht Day-Cache + Today-Index und triggert Full-Rescan

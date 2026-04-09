@@ -71,7 +71,7 @@ var pulseCss = pulseStart >= 0 ? html.slice(pulseStart + '<style>'.length, pulse
 var headEnd = html.indexOf('</head>');
 var bodyBlock = html.slice(headEnd + '</head>'.length);
 
-var i18nMark = '<script>window.__I18N_BUNDLES=__I18N_PLACEHOLDER__;</script>';
+var i18nMark = '<script>globalThis.__I18N_BUNDLES=__I18N_PLACEHOLDER__;</script>';
 var i18nIdx = bodyBlock.indexOf(i18nMark);
 if (i18nIdx < 0) throw new Error('i18n script not found');
 
