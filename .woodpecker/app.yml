@@ -2,7 +2,7 @@
 # Prod-Build: Push auf main          → SonarQube + Container + Deploy (+ GitHub-Mirror bei Tag)
 when:
   - event: push
-    branch: [main, "feat/**", "fix/**"]
+    branch: [main, develop, "feat/**", "fix/**"]
   - event: manual
 
 # Sonar auf main: voller Clone für korrekte SCM-Zuordnung (Quality Gate / Blame).
