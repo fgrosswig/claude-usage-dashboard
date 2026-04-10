@@ -1,13 +1,37 @@
-# UI and i18n
+# UI, Filters, and Internationalization
 
 [← Contents](README.md)
 
-Strings in **`tpl/de/ui.tpl`** and **`tpl/en/ui.tpl`** (JSON). In-memory cache on **`/`** and **`GET /api/i18n-bundles`**; reload after edits.
+## UI Texts (DE/EN)
 
-**Meta** (`<details>`): `claude-*` only, parse line, limits, scan sources. **`usageMetaDetailsOpen`** in **sessionStorage**.
+- Strings stored as **JSON** in **`tpl/de/ui.tpl`** and **`tpl/en/ui.tpl`** (file extension `.tpl`, content is valid JSON).
+- **`/`** uses an **in-memory cache** (invalidated on **mtime** change of the `.tpl` files). Save → reload the page.
+- **`GET /api/i18n-bundles`** returns `{ "de": …, "en": … }`.
+- Keys: flat IDs (e.g. `chartDailyToken`); placeholders `{n}`, `{files}` are replaced on the client.
 
-**Day picker:** cards + daily table follow selected day; charts / forensic typically all days. **`usageDashboardDay`**. If calendar “today” has **0** tokens, UI hints to pick another day.
+## Meta Line and Legend
 
-**Filters:** date range, scope **all days** vs **24 h (selected day)**, source chips per host.
+- Below the heading: collapsible block with model hint (**only `claude-*`**, no `<synthetic>`), parse/status line, limit/data source, scan sources.
+- Collapsed: short summary (e.g. log files, refresh interval).
+- State: **`sessionStorage.usageMetaDetailsOpen`**.
 
-**Extension markers:** Marketplace [version history](https://marketplace.visualstudio.com/items?itemName=anthropic.claude-code&ssr=false#version-history) → **`~/.claude/claude-code-marketplace-versions.json`**; GitHub releases → **`~/.claude/claude-code-releases.json`**. Dates aligned to **UTC calendar day**; merge prefers Marketplace `lastUpdated`. Normalize versions to **`major.minor.patch`**; rescrape if old day cache keys are weird.
+## Day Picker (Cards and Table)
+
+- Dropdown: all days with data (newest on top).
+- **Cards** and **daily detail table**: selected day. **Charts** and **forensic section**: typically **all** days (or as set by the date-range filter).
+- Selection: **`sessionStorage.usageDashboardDay`**.
+- Calendar "today" with 0 tokens: brief hint displayed.
+
+## Filters and Navigation (Top Bar)
+
+- **Date range** start/end (dropdowns).
+- **Cards & table**: day picker.
+- **Charts**: **All days** vs. **24 h (selected day)**.
+- **Source**: total or individual hosts — see [Multi-Host](04-multi-host-and-sync.md).
+- Badges: **Live**, **Anthropic**, compressed **Meta** line (log files, refresh).
+
+## Extension Updates (Service Impact, Reports)
+
+- **Markers:** primarily **VS Code Marketplace** ([Version History](https://marketplace.visualstudio.com/items?itemName=anthropic.claude-code&ssr=false#version-history)) — `lastUpdated`, latest semver; aligned to **UTC calendar day**. Cache: **`~/.claude/claude-code-marketplace-versions.json`**.
+- **Changelog:** **GitHub Releases** (up to 100 entries), cache **`~/.claude/claude-code-releases.json`**. Data: merge Marketplace ∪ GitHub (Marketplace date takes precedence), otherwise JSONL fallback.
+- Version from JSONL: normalized to **`major.minor.patch`**. For old day caches with raw keys: run a full rescan (`CLAUDE_USAGE_NO_CACHE=1` or delete the cache file).
