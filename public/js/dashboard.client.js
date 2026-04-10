@@ -1867,6 +1867,7 @@ function renderDashboardCore(data) {
   }
   renderProxyAnalysis(data);
   renderBudgetEfficiency(data);
+  renderEconomicSection(data);
   __releaseStabilityData = data.release_stability || null;
   renderUserProfileCharts(getFilteredDays(data.days));
   updateMetaDetailsSummary(data);
@@ -8323,6 +8324,343 @@ function inlineMd(s) {
   };
   xhr.send();
 })();
+
+// ── Ökonomische Nutzung — Session-Turn-Level Efficiency Charts ───────
+
+var _econCharts = {};
+var _econData = null;
+
+function renderEconomicSection(data) {
+  var collapse = document.getElementById("economic-collapse");
+  if (!collapse) return;
+  var sumEl = document.getElementById("economic-summary-line");
+  var datePicker = document.getElementById("econ-date-picker");
+  var sessPicker = document.getElementById("econ-session-picker");
+  var infoEl = document.getElementById("econ-session-info");
+
+  // Set labels
+  var lblDate = document.getElementById("lbl-econ-date");
+  var lblSess = document.getElementById("lbl-econ-session");
+  if (lblDate) lblDate.textContent = t("econDateLabel");
+  if (lblSess) lblSess.textContent = t("econSessionLabel");
+
+  // Section header titles
+  var wH = document.getElementById("econ-waste-h3");
+  var eH = document.getElementById("econ-efficiency-h3");
+  var dH = document.getElementById("econ-daycompare-h3");
+  if (wH) wH.textContent = t("econWasteTitle");
+  if (eH) eH.textContent = t("econEfficiencyTitle");
+  if (dH) dH.textContent = t("econDayCompareTitle");
+  var wB = document.getElementById("econ-waste-blurb");
+  var eB = document.getElementById("econ-efficiency-blurb");
+  var dB = document.getElementById("econ-daycompare-blurb");
+  if (wB) wB.textContent = t("econWasteBlurb");
+  if (eB) eB.textContent = t("econEfficiencyBlurb");
+  if (dB) dB.textContent = t("econDayCompareBlurb");
+
+  // Default date from day picker or today
+  var defaultDate = (data.days && data.days.length) ? data.days[data.days.length - 1].date : new Date().toISOString().slice(0, 10);
+  if (datePicker && !datePicker.value) datePicker.value = defaultDate;
+
+  // Fetch session turns for selected date
+  function fetchAndRender() {
+    var dateVal = datePicker ? datePicker.value : defaultDate;
+    fetch("/api/session-turns?date=" + encodeURIComponent(dateVal))
+      .then(function (r) { return r.json(); })
+      .then(function (stData) {
+        _econData = stData;
+        populateSessionPicker(stData, sessPicker, infoEl, sumEl);
+        var sel = sessPicker ? sessPicker.value : "";
+        var session = findSession(stData, sel);
+        if (session) {
+          renderWasteCurve(session);
+          renderEfficiencyTimeline(stData);
+        }
+        renderDayComparison(data.days || []);
+      })
+      .catch(function () {
+        if (sumEl) sumEl.textContent = t("econSummaryNoData");
+      });
+  }
+
+  if (datePicker) datePicker.addEventListener("change", fetchAndRender);
+  if (sessPicker) sessPicker.addEventListener("change", function () {
+    var session = findSession(_econData, sessPicker.value);
+    if (session) {
+      updateSessionInfo(session, infoEl);
+      renderWasteCurve(session);
+    }
+  });
+
+  fetchAndRender();
+}
+
+function populateSessionPicker(stData, picker, infoEl, sumEl) {
+  if (!picker || !stData || !stData.sessions) return;
+  picker.innerHTML = "";
+  var sessions = stData.sessions;
+  for (var i = 0; i < sessions.length; i++) {
+    var s = sessions[i];
+    var opt = document.createElement("option");
+    opt.value = s.session_id_hash;
+    var timeRange = s.first_ts.slice(11, 16) + "–" + s.last_ts.slice(11, 16);
+    opt.textContent = s.session_id_hash.slice(0, 8) + " (" + timeRange + ", " + s.turn_count + " turns)";
+    picker.appendChild(opt);
+  }
+  if (sessions.length && !picker.value) picker.value = sessions[0].session_id_hash;
+  var sel = findSession(stData, picker.value);
+  if (sel) updateSessionInfo(sel, infoEl);
+
+  if (sumEl) {
+    if (!sessions.length) {
+      sumEl.textContent = t("econSummaryNoData");
+    } else {
+      var totalOut = sessions.reduce(function (s, x) { return s + x.total_output; }, 0);
+      var totalAll = sessions.reduce(function (s, x) { return s + x.total_all; }, 0);
+      var ratio = totalAll > 0 ? (totalOut / totalAll * 100).toFixed(2) : "0";
+      sumEl.textContent = tr("econSummaryLine", { sessions: sessions.length, ratio: ratio });
+    }
+  }
+}
+
+function findSession(stData, hash) {
+  if (!stData || !stData.sessions) return null;
+  for (var i = 0; i < stData.sessions.length; i++) {
+    if (stData.sessions[i].session_id_hash === hash) return stData.sessions[i];
+  }
+  return stData.sessions[0] || null;
+}
+
+function updateSessionInfo(session, infoEl) {
+  if (!infoEl || !session) return;
+  infoEl.textContent = tr("econSessionInfo", {
+    turns: session.turn_count,
+    output: fmt(session.total_output),
+    cacheRead: fmt(session.total_cache_read),
+    total: fmt(session.total_all)
+  });
+}
+
+function renderWasteCurve(session) {
+  if (typeof echarts === "undefined") return;
+  var el = document.getElementById("chart-shell-econ-waste");
+  if (!el || !session || !session.turns || !session.turns.length) return;
+
+  var turns = session.turns;
+  var xData = [];
+  var cumOutput = [];
+  var cumCacheRead = [];
+  var cumCacheCreate = [];
+  var cumInput = [];
+  var cO = 0, cR = 0, cC = 0, cI = 0;
+  var splitIndex = -1;
+
+  for (var i = 0; i < turns.length; i++) {
+    var T = turns[i];
+    cO += T.output;
+    cR += T.cache_read;
+    cC += T.cache_creation;
+    cI += T.input;
+    xData.push(i + 1);
+    cumOutput.push(cO);
+    cumCacheRead.push(cR);
+    cumCacheCreate.push(cC);
+    cumInput.push(cI);
+    if (splitIndex < 0 && cO > 0 && cR / cO > 500) splitIndex = i;
+  }
+
+  var option = {
+    tooltip: {
+      trigger: "axis",
+      formatter: function (params) {
+        var idx = params[0].dataIndex;
+        var T = turns[idx];
+        var lines = ["Turn " + (idx + 1)];
+        for (var p = 0; p < params.length; p++) {
+          lines.push(params[p].marker + " " + params[p].seriesName + ": " + fmt(params[p].value));
+        }
+        lines.push("");
+        lines.push("Turn: out=" + fmt(T.output) + " cr=" + fmt(T.cache_read));
+        if (cR > 0 && cumOutput[idx] > 0) {
+          lines.push("Ratio: " + Math.round(cumCacheRead[idx] / cumOutput[idx]) + "×");
+        }
+        return lines.join("<br>");
+      }
+    },
+    legend: { top: 4, textStyle: { color: "#94a3b8", fontSize: 11 } },
+    grid: { top: 40, right: 20, bottom: 30, left: 60 },
+    xAxis: { type: "category", data: xData, name: "Turn", axisLabel: { color: "#64748b" } },
+    yAxis: { type: "value", axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } } },
+    series: [
+      {
+        name: t("econWasteCacheRead"),
+        type: "line",
+        stack: "total",
+        areaStyle: { color: "rgba(100,116,139,0.35)" },
+        lineStyle: { color: "#64748b", width: 1 },
+        symbol: "none",
+        data: cumCacheRead
+      },
+      {
+        name: t("econWasteCacheCreate"),
+        type: "line",
+        stack: "total",
+        areaStyle: { color: "rgba(251,191,36,0.25)" },
+        lineStyle: { color: "#fbbf24", width: 1 },
+        symbol: "none",
+        data: cumCacheCreate
+      },
+      {
+        name: t("econWasteInput"),
+        type: "line",
+        stack: "total",
+        areaStyle: { color: "rgba(96,165,250,0.2)" },
+        lineStyle: { color: "#60a5fa", width: 1 },
+        symbol: "none",
+        data: cumInput
+      },
+      {
+        name: t("econWasteOutput"),
+        type: "line",
+        areaStyle: { color: "rgba(52,211,153,0.4)" },
+        lineStyle: { color: "#34d399", width: 2 },
+        symbol: "none",
+        data: cumOutput,
+        markLine: splitIndex >= 0 ? {
+          silent: true,
+          symbol: "none",
+          lineStyle: { color: "#ef4444", type: "dashed", width: 1.5 },
+          data: [{ xAxis: splitIndex, label: { formatter: t("econWasteSplitHint"), color: "#ef4444", fontSize: 10, position: "insideEndTop" } }]
+        } : undefined
+      }
+    ]
+  };
+
+  __effInitOrSet("econWaste", el, option);
+}
+
+function renderEfficiencyTimeline(stData) {
+  if (typeof echarts === "undefined") return;
+  var el = document.getElementById("chart-shell-econ-efficiency");
+  if (!el || !stData || !stData.sessions) return;
+
+  // Aggregate all turns across sessions by hour
+  var hourly = {};
+  for (var si = 0; si < stData.sessions.length; si++) {
+    var turns = stData.sessions[si].turns;
+    for (var ti = 0; ti < turns.length; ti++) {
+      var T = turns[ti];
+      var h = parseInt(T.ts.slice(11, 13), 10);
+      if (!hourly[h]) hourly[h] = { output: 0, total: 0 };
+      hourly[h].output += T.output;
+      hourly[h].total += T.input + T.output + T.cache_read + T.cache_creation;
+    }
+  }
+
+  var hours = Object.keys(hourly).map(Number).sort(function (a, b) { return a - b; });
+  if (!hours.length) return;
+  var xData = hours.map(function (h) { return (h < 10 ? "0" : "") + h + ":00"; });
+  var outputData = hours.map(function (h) { return hourly[h].output; });
+  var totalData = hours.map(function (h) { return hourly[h].total; });
+
+  // Peak hours: 13-19 UTC = 15-21 MESZ (mark in UTC since timestamps are UTC)
+  var peakStart = 13;
+  var peakEnd = 19;
+
+  var option = {
+    tooltip: {
+      trigger: "axis",
+      formatter: function (params) {
+        var lines = [params[0].axisValue];
+        for (var p = 0; p < params.length; p++) {
+          lines.push(params[p].marker + " " + params[p].seriesName + ": " + fmt(params[p].value));
+        }
+        var idx = params[0].dataIndex;
+        var h = hours[idx];
+        if (h >= peakStart && h < peakEnd) lines.push("⚠ " + t("econEfficiencyPeakBand"));
+        var tot = totalData[idx];
+        var out = outputData[idx];
+        if (tot > 0) lines.push(t("econEfficiencyRatio") + ": " + (out / tot * 100).toFixed(2) + "%");
+        return lines.join("<br>");
+      }
+    },
+    legend: { top: 4, textStyle: { color: "#94a3b8", fontSize: 11 } },
+    grid: { top: 40, right: 60, bottom: 30, left: 60 },
+    xAxis: { type: "category", data: xData, axisLabel: { color: "#64748b" } },
+    yAxis: [
+      { type: "value", name: t("econEfficiencyTotal"), axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } }, position: "left" },
+      { type: "value", name: t("econEfficiencyOutput"), axisLabel: { color: "#34d399", formatter: function (v) { return fmt(v); } }, position: "right" }
+    ],
+    series: [
+      {
+        name: t("econEfficiencyTotal"),
+        type: "bar",
+        yAxisIndex: 0,
+        itemStyle: {
+          color: function (params) {
+            var h = hours[params.dataIndex];
+            return (h >= peakStart && h < peakEnd) ? "rgba(251,146,60,0.5)" : "rgba(100,116,139,0.35)";
+          }
+        },
+        data: totalData
+      },
+      {
+        name: t("econEfficiencyOutput"),
+        type: "bar",
+        yAxisIndex: 1,
+        itemStyle: { color: "rgba(52,211,153,0.7)" },
+        data: outputData
+      }
+    ],
+    // Peak hours visual band
+    visualMap: undefined
+  };
+
+  __effInitOrSet("econEfficiency", el, option);
+}
+
+function renderDayComparison(days) {
+  if (typeof echarts === "undefined") return;
+  var el = document.getElementById("chart-shell-econ-daycompare");
+  if (!el || !days || days.length < 2) return;
+
+  var xData = [];
+  var ratioData = [];
+  for (var i = 0; i < days.length; i++) {
+    var d = days[i];
+    var total = (d.input || 0) + (d.output || 0) + (d.cache_read || 0) + (d.cache_creation || 0);
+    var ratio = total > 0 ? (d.output || 0) / total * 100 : 0;
+    xData.push(d.date);
+    ratioData.push(Math.round(ratio * 100) / 100);
+  }
+
+  var option = {
+    tooltip: {
+      trigger: "axis",
+      formatter: function (params) {
+        var idx = params[0].dataIndex;
+        var d = days[idx];
+        return d.date + "<br>" + t("econEfficiencyRatio") + ": " + params[0].value + "%<br>Output: " + fmt(d.output || 0) + "<br>Total: " + fmt((d.input || 0) + (d.output || 0) + (d.cache_read || 0) + (d.cache_creation || 0));
+      }
+    },
+    grid: { top: 20, right: 20, bottom: 40, left: 50 },
+    xAxis: { type: "category", data: xData, axisLabel: { color: "#64748b", rotate: 45, fontSize: 10 } },
+    yAxis: { type: "value", name: "%", axisLabel: { color: "#64748b" }, max: function (v) { return Math.max(v.max * 1.2, 1); } },
+    series: [{
+      type: "bar",
+      data: ratioData,
+      itemStyle: {
+        color: function (params) {
+          var v = params.value;
+          return v > 0.5 ? "#34d399" : v > 0.1 ? "#fbbf24" : "#ef4444";
+        }
+      },
+      label: { show: true, position: "top", formatter: "{c}%", fontSize: 9, color: "#94a3b8" }
+    }]
+  };
+
+  __effInitOrSet("econDayCompare", el, option);
+}
 
 // ── Korean term tooltip system (ko locale only) ──────────────────────
 (function () {

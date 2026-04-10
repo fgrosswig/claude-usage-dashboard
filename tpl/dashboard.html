@@ -199,6 +199,51 @@
 <p id="thinking-note" style="font-size:.75rem;color:#f59e0b;margin:12px 0 4px;line-height:1.45"></p>
 </div>
 </details>
+
+<!-- ── Ökonomische Nutzung ─────────────────────────────────── -->
+<details class="forensic-details" id="economic-collapse">
+<summary class="forensic-summary forensic-summary--bar">
+<div class="forensic-summary-row">
+<p id="economic-summary-line" class="forensic-summary-metrics"></p>
+</div>
+</summary>
+<div class="forensic-inner">
+<div class="economic-controls" style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+<label id="lbl-econ-date" for="econ-date-picker" style="font-size:.75rem;color:#94a3b8"></label>
+<input type="date" id="econ-date-picker" style="font-size:.8rem;padding:2px 6px;border:1px solid #334155;border-radius:4px;background:#1e293b;color:#e2e8f0">
+<label id="lbl-econ-session" for="econ-session-picker" style="font-size:.75rem;color:#94a3b8"></label>
+<select id="econ-session-picker" style="font-size:.8rem;padding:2px 6px;border:1px solid #334155;border-radius:4px;background:#1e293b;color:#e2e8f0"></select>
+<span id="econ-session-info" style="font-size:.72rem;color:#64748b"></span>
+</div>
+<div class="forensic-charts-stack">
+<!-- Chart 1: Cumulative Waste Curve -->
+<details class="forensic-chart-disclosure" open>
+<summary class="forensic-chart-summary"><span id="econ-waste-h3"></span></summary>
+<div class="forensic-chart-panel">
+<p id="econ-waste-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"></p>
+<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-waste" style="height:320px"></div>
+</div>
+</details>
+<!-- Chart 2: Value Efficiency Timeline -->
+<details class="forensic-chart-disclosure" open>
+<summary class="forensic-chart-summary"><span id="econ-efficiency-h3"></span></summary>
+<div class="forensic-chart-panel">
+<p id="econ-efficiency-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"></p>
+<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-efficiency" style="height:280px"></div>
+</div>
+</details>
+<!-- Chart 3: Tagesvergleich -->
+<details class="forensic-chart-disclosure" open>
+<summary class="forensic-chart-summary"><span id="econ-daycompare-h3"></span></summary>
+<div class="forensic-chart-panel">
+<p id="econ-daycompare-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"></p>
+<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-daycompare" style="height:280px"></div>
+</div>
+</details>
+</div>
+</div>
+</details>
+
 <div class="report-modal-overlay" id="report-modal-overlay">
 <div class="report-modal">
 <div class="report-modal-head">

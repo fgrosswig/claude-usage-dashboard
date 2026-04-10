@@ -3384,6 +3384,84 @@ function devFetchProxyLogs(cb) {
   });
 }
 
+// ── /api/session-turns: per-session turn-level token data for a given date ──
+
+function buildSessionTurnsForDate(dateKey) {
+  var crypto = require('crypto');
+  var collected = collectTaggedJsonlFiles();
+  var files = collected.tagged;
+  var sessions = Object.create(null);
+  var totalParsed = 0;
+
+  for (var fi = 0; fi < files.length; fi++) {
+    try {
+      forEachJsonlLineSync(files[fi].path, function (line) {
+        if (!line) return;
+        var rec;
+        try { rec = JSON.parse(line); } catch (_e) { return; }
+        if (rec.type !== 'assistant') return;
+        if (rec.isSidechain) return;
+        var ts = rec.timestamp;
+        if (!ts || typeof ts !== 'string' || ts.length < 19) return;
+        if (ts.slice(0, 10) !== dateKey) return;
+        var msg = rec.message || {};
+        var usage = msg.usage;
+        if (!usage) return;
+        var input = usage.input_tokens || 0;
+        var output = usage.output_tokens || 0;
+        var cacheRead = usage.cache_read_input_tokens || 0;
+        var cacheCreation = usage.cache_creation_input_tokens || 0;
+        if (input + output + cacheRead + cacheCreation === 0) return;
+        var sid = rec.sessionId;
+        if (!sid) return;
+        totalParsed++;
+        if (!sessions[sid]) sessions[sid] = [];
+        sessions[sid].push({
+          ts: ts,
+          input: input,
+          output: output,
+          cache_read: cacheRead,
+          cache_creation: cacheCreation,
+          model: (msg.model || 'unknown').replace(/-\d{8}$/, '')
+        });
+      });
+    } catch (_e) { /* skip unreadable files */ }
+  }
+
+  var result = [];
+  var sids = Object.keys(sessions);
+  for (var si = 0; si < sids.length; si++) {
+    var sid = sids[si];
+    var turns = sessions[sid];
+    turns.sort(function (a, b) { return a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0; });
+    var mapped = [];
+    for (var ti = 0; ti < turns.length; ti++) {
+      mapped.push({
+        index: ti,
+        ts: turns[ti].ts,
+        input: turns[ti].input,
+        output: turns[ti].output,
+        cache_read: turns[ti].cache_read,
+        cache_creation: turns[ti].cache_creation,
+        model: turns[ti].model
+      });
+    }
+    var hash = crypto.createHash('sha256').update(sid).digest('hex').slice(0, 12);
+    result.push({
+      session_id_hash: hash,
+      turn_count: mapped.length,
+      first_ts: turns[0].ts,
+      last_ts: turns[turns.length - 1].ts,
+      total_output: turns.reduce(function (s, t) { return s + t.output; }, 0),
+      total_cache_read: turns.reduce(function (s, t) { return s + t.cache_read; }, 0),
+      total_all: turns.reduce(function (s, t) { return s + t.input + t.output + t.cache_read + t.cache_creation; }, 0),
+      turns: mapped
+    });
+  }
+  result.sort(function (a, b) { return b.total_all - a.total_all; });
+  return { date: dateKey, session_count: result.length, total_turns: totalParsed, sessions: result };
+}
+
 var server = http.createServer(function (req, res) {
   var pathname = dashboardHttp.requestPathname(req.url);
   if (
@@ -3558,6 +3636,17 @@ var server = http.createServer(function (req, res) {
     res.end(JSON.stringify(__proxyCache.data));
   } else if (pathname === '/api/claude-data-sync') {
     handleClaudeDataSyncRequest(req, res);
+  } else if (pathname === '/api/session-turns') {
+    var stQuery = require('url').parse(req.url, true).query || {};
+    var stDate = stQuery.date || new Date().toISOString().slice(0, 10);
+    var stResult = buildSessionTurnsForDate(stDate);
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      Pragma: 'no-cache'
+    });
+    res.end(JSON.stringify(stResult));
   } else {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(getDashboardHtml());

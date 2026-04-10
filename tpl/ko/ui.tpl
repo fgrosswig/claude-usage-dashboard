@@ -458,5 +458,26 @@
   "budgetCardOutage": "장애 손실",
   "budgetCardOutageSub": "서비스 장애로 손실된 시간",
   "budgetCardTruncated": "도구 팽창",
-  "budgetCardTruncatedSub": "잘린 도구 결과 (>50K 토큰 손실)"
+  "budgetCardTruncatedSub": "잘린 도구 결과 (>50K 토큰 손실)",
+
+  "econSummaryLine": "경제적 사용 — {sessions}개 세션, 효율 {ratio}%",
+  "econSummaryNoData": "경제적 사용 — 세션 데이터 없음",
+  "econDateLabel": "날짜:",
+  "econSessionLabel": "세션:",
+  "econSessionInfo": "{turns}개 턴 · 출력 {output} · 캐시 읽기 {cacheRead} · 전체 {total}",
+  "econWasteTitle": "누적 사용 곡선",
+  "econWasteBlurb": "턴별 누적 토큰 소비. 캐시 읽기(회색)와 출력(녹색) 사이의 격차가 세션이 비효율적으로 변하는 시점을 보여줍니다.",
+  "econWasteOutput": "출력 (누적)",
+  "econWasteCacheRead": "캐시 읽기 (누적)",
+  "econWasteCacheCreate": "캐시 생성 (누적)",
+  "econWasteInput": "입력 (누적)",
+  "econWasteSplitHint": "여기서 세션 분할 고려",
+  "econEfficiencyTitle": "효율 타임라인",
+  "econEfficiencyBlurb": "시간대별 출력 토큰 vs. 전체 토큰. 주황색 대역은 Anthropic 피크 시간(GMT 13~19시)으로 할당량 소비가 증가합니다.",
+  "econEfficiencyOutput": "출력 토큰",
+  "econEfficiencyTotal": "전체 토큰",
+  "econEfficiencyRatio": "효율 비율",
+  "econEfficiencyPeakBand": "피크 시간",
+  "econDayCompareTitle": "일별 비교 — 효율 비율",
+  "econDayCompareBlurb": "일별 출력 / 전체 — 높을수록 소비된 토큰당 생산적 수익이 많음."
 }

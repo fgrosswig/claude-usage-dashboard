@@ -458,5 +458,26 @@
   "uptimePartial": "Teilausfall",
   "uptimeOutage": "Ausfall",
   "availKpiTrend": "vs. Vormonat",
-  "availKpiCurrent": "(laufend)"
+  "availKpiCurrent": "(laufend)",
+
+  "econSummaryLine": "\u00d6konomische Nutzung \u2014 {sessions} Sessions, Effizienz {ratio}%",
+  "econSummaryNoData": "\u00d6konomische Nutzung \u2014 keine Session-Daten",
+  "econDateLabel": "Datum:",
+  "econSessionLabel": "Session:",
+  "econSessionInfo": "{turns} Turns \u00b7 Output {output} \u00b7 Cache Read {cacheRead} \u00b7 Total {total}",
+  "econWasteTitle": "Kumulative Nutzungskurve",
+  "econWasteBlurb": "Kumulativer Token-Verbrauch pro Turn. Die Schere zwischen Cache Read (grau) und Output (gr\u00fcn) zeigt ab welchem Turn die Session ineffizient wird.",
+  "econWasteOutput": "Output (kumulativ)",
+  "econWasteCacheRead": "Cache Read (kumulativ)",
+  "econWasteCacheCreate": "Cache Creation (kumulativ)",
+  "econWasteInput": "Input (kumulativ)",
+  "econWasteSplitHint": "Ab hier Session splitten erw\u00e4gen",
+  "econEfficiencyTitle": "Effizienz-Zeitverlauf",
+  "econEfficiencyBlurb": "Output-Tokens vs. Gesamt-Tokens pro Stunde. Das orange Band markiert Anthropic Peak Hours (15\u201321 MESZ) mit erh\u00f6htem Quota-Verbrauch.",
+  "econEfficiencyOutput": "Output-Tokens",
+  "econEfficiencyTotal": "Gesamt-Tokens",
+  "econEfficiencyRatio": "Effizienz-Ratio",
+  "econEfficiencyPeakBand": "Peak Hours",
+  "econDayCompareTitle": "Tagesvergleich \u2014 Effizienz-Ratio",
+  "econDayCompareBlurb": "Output / Total pro Tag \u2014 h\u00f6her = mehr produktiver Ertrag pro verbranntem Token."
 }
