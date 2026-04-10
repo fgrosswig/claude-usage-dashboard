@@ -8702,7 +8702,7 @@ function renderButterflyChart(days) {
       {
         name: t("econButterflyRatio"),
         type: "line",
-        smooth: 0.5,
+        smooth: false,
         areaStyle: { color: "rgba(52,211,153,0.25)" },
         lineStyle: { color: "#34d399", width: 2 },
         symbol: "circle",
@@ -8713,7 +8713,7 @@ function renderButterflyChart(days) {
       {
         name: t("econButterflyOutput"),
         type: "line",
-        smooth: 0.5,
+        smooth: false,
         areaStyle: { color: "rgba(96,165,250,0.25)" },
         lineStyle: { color: "#60a5fa", width: 2 },
         symbol: "circle",
