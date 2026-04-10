@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-113",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "3b64c6e",
+      "commit_full": "3b64c6e8bc01b6efee22c838fea5e467793a3676",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): re-render economic charts on toggle + notMerge on session change",
+      "detail": "- Re-render charts when details section opens and data already fetched\n- Use notMerge:true for economic charts to clear stale markLines/markAreas\n- Listen on both change+input events for session picker robustness\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-112",
       "timestamp": "2026-04-11",
       "session": "auto",
