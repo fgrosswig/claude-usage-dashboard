@@ -8630,7 +8630,7 @@ function renderDayComparison(days) {
     var d = days[i];
     var total = (d.input || 0) + (d.output || 0) + (d.cache_read || 0) + (d.cache_creation || 0);
     var ratio = total > 0 ? (d.output || 0) / total * 100 : 0;
-    xData.push(d.date);
+    xData.push(d.date.slice(5));
     ratioData.push(Math.round(ratio * 100) / 100);
   }
 
