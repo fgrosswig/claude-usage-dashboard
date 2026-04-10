@@ -8350,31 +8350,26 @@ function renderEconomicSection(data, filteredDays) {
 
   // Section header titles
   var wH = document.getElementById("econ-waste-h3");
-  var wmH = document.getElementById("econ-waste-month-h3");
-  var moH = document.getElementById("econ-month-output-h3");
+  var bfH = document.getElementById("econ-butterfly-h3");
   var eH = document.getElementById("econ-efficiency-h3");
   var dH = document.getElementById("econ-daycompare-h3");
   if (wH) wH.textContent = t("econWasteTitle");
-  if (wmH) wmH.textContent = t("econWasteMonthTitle");
-  if (moH) moH.textContent = t("econMonthOutputTitle");
+  if (bfH) bfH.textContent = t("econButterflyTitle");
   if (eH) eH.textContent = t("econEfficiencyTitle");
   if (dH) dH.textContent = t("econDayCompareTitle");
   var wB = document.getElementById("econ-waste-blurb");
-  var wmB = document.getElementById("econ-waste-month-blurb");
-  var moB = document.getElementById("econ-month-output-blurb");
+  var bfB = document.getElementById("econ-butterfly-blurb");
   var eB = document.getElementById("econ-efficiency-blurb");
   var dB = document.getElementById("econ-daycompare-blurb");
   if (wB) wB.textContent = t("econWasteBlurb");
-  if (wmB) wmB.textContent = t("econWasteMonthBlurb");
-  if (moB) moB.textContent = t("econMonthOutputBlurb");
+  if (bfB) bfB.textContent = t("econButterflyBlurb");
   if (eB) eB.textContent = t("econEfficiencyBlurb");
   if (dB) dB.textContent = t("econDayCompareBlurb");
 
   // These render immediately from cached data (no server call)
   var econDays = filteredDays || data.days || [];
   renderDayComparison(econDays);
-  renderMonthlyWasteCurve(econDays);
-  renderMonthlyOutputChart(econDays);
+  renderButterflyChart(econDays);
 
   // Session-turn charts: lazy-load only when section is opened
   function fetchSessionTurns() {
@@ -8647,136 +8642,22 @@ function renderEfficiencyTimeline(stData) {
   __effInitOrSet("econEfficiency", el, option);
 }
 
-function renderMonthlyWasteCurve(days) {
+function renderButterflyChart(days) {
   if (typeof echarts === "undefined") return;
-  var el = document.getElementById("chart-shell-econ-waste-month");
+  var el = document.getElementById("chart-shell-econ-butterfly");
   if (!el || !days || days.length < 2) return;
 
   var xData = [];
-  var outputData = [];
-  var cacheReadData = [];
-  var cacheCreateData = [];
-  var inputData = [];
-
-  for (var i = 0; i < days.length; i++) {
-    var d = days[i];
-    xData.push(d.date.slice(5));
-    outputData.push(d.output || 0);
-    cacheReadData.push(d.cache_read || 0);
-    cacheCreateData.push(d.cache_creation || 0);
-    inputData.push(d.input || 0);
-  }
-
-  // Precompute trend for all visible combinations
-  function calcTrend(selected) {
-    var trend = [];
-    for (var i = 0; i < days.length; i++) {
-      var total = 0;
-      var out = outputData[i];
-      if (selected[t("econWasteCacheRead")] !== false) total += cacheReadData[i];
-      if (selected[t("econWasteCacheCreate")] !== false) total += cacheCreateData[i];
-      if (selected[t("econWasteOutput")] !== false) total += out;
-      if (selected[t("econWasteInput")] !== false) total += inputData[i];
-      trend.push(total > 0 ? Math.round(out / total * 10000) / 100 : 0);
-    }
-    return trend;
-  }
-
-  var initSelected = {};
-  var initTrend = calcTrend(initSelected);
-
-  var option = {
-    tooltip: {
-      trigger: "axis",
-      formatter: function (params) {
-        var idx = params[0].dataIndex;
-        var d = days[idx];
-        var lines = [d.date];
-        for (var p = 0; p < params.length; p++) {
-          if (params[p].seriesName === t("econEfficiencyRatio")) {
-            lines.push(params[p].marker + " " + params[p].seriesName + ": " + params[p].value + "%");
-          } else {
-            lines.push(params[p].marker + " " + params[p].seriesName + ": " + fmt(params[p].value));
-          }
-        }
-        return lines.join("<br>");
-      }
-    },
-    legend: { top: 4, textStyle: { color: "#94a3b8", fontSize: 11 } },
-    grid: { top: 40, right: 50, bottom: 40, left: 60 },
-    xAxis: { type: "category", data: xData, axisLabel: { color: "#64748b", rotate: 45, fontSize: 10 }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
-    yAxis: [
-      { type: "value", axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
-      { type: "value", name: "%", axisLabel: { color: "#34d399", formatter: function (v) { return v + "%"; } }, splitLine: { show: false }, position: "right", max: function (v) { return Math.max(v.max * 1.5, 1); } }
-    ],
-    series: [
-      {
-        name: t("econWasteCacheRead"),
-        type: "bar",
-        stack: "tokens",
-        yAxisIndex: 0,
-        itemStyle: { color: "rgba(100,116,139,0.5)" },
-        data: cacheReadData
-      },
-      {
-        name: t("econWasteCacheCreate"),
-        type: "bar",
-        stack: "tokens",
-        yAxisIndex: 0,
-        itemStyle: { color: "rgba(251,191,36,0.4)" },
-        data: cacheCreateData
-      },
-      {
-        name: t("econWasteOutput"),
-        type: "bar",
-        stack: "tokens",
-        yAxisIndex: 0,
-        itemStyle: { color: "rgba(52,211,153,0.7)" },
-        data: outputData
-      },
-      {
-        name: t("econEfficiencyRatio"),
-        type: "line",
-        yAxisIndex: 1,
-        smooth: 0.4,
-        lineStyle: { color: "#34d399", width: 2, type: "dashed" },
-        symbol: "circle",
-        symbolSize: 4,
-        itemStyle: { color: "#34d399" },
-        data: initTrend
-      }
-    ]
-  };
-
-  __effInitOrSet("econWasteMonth", el, option);
-
-  // Recalculate trend when legend selection changes
-  var chart = _effCharts.econWasteMonth;
-  if (chart && !chart.__econLegendBound) {
-    chart.__econLegendBound = true;
-    chart.on("legendselectchanged", function (params) {
-      var newTrend = calcTrend(params.selected);
-      chart.setOption({ series: [{ }, { }, { }, { data: newTrend }] });
-    });
-  }
-}
-
-function renderMonthlyOutputChart(days) {
-  if (typeof echarts === "undefined") return;
-  var el = document.getElementById("chart-shell-econ-month-output");
-  if (!el || !days || days.length < 2) return;
-
-  var xData = [];
-  var outputData = [];
-  var trendData = [];
+  var ratioData = [];
+  var outputNeg = [];
 
   for (var i = 0; i < days.length; i++) {
     var d = days[i];
     var out = d.output || 0;
     var total = (d.input || 0) + out + (d.cache_read || 0) + (d.cache_creation || 0);
     xData.push(d.date.slice(5));
-    outputData.push(out);
-    trendData.push(total > 0 ? Math.round(out / total * 10000) / 100 : 0);
+    ratioData.push(total > 0 ? Math.round(out / total * 10000) / 100 : 0);
+    outputNeg.push(-out);
   }
 
   var option = {
@@ -8787,45 +8668,63 @@ function renderMonthlyOutputChart(days) {
         var d = days[idx];
         var lines = [d.date];
         for (var p = 0; p < params.length; p++) {
-          if (params[p].seriesName === t("econEfficiencyRatio")) {
+          if (params[p].seriesName === t("econButterflyRatio")) {
             lines.push(params[p].marker + " " + params[p].seriesName + ": " + params[p].value + "%");
           } else {
-            lines.push(params[p].marker + " " + params[p].seriesName + ": " + fmt(params[p].value));
+            lines.push(params[p].marker + " " + params[p].seriesName + ": " + fmt(Math.abs(params[p].value)));
           }
         }
         return lines.join("<br>");
       }
     },
     legend: { top: 4, textStyle: { color: "#94a3b8", fontSize: 11 } },
-    grid: { top: 40, right: 50, bottom: 40, left: 50 },
-    xAxis: { type: "category", data: xData, axisLabel: { color: "#64748b", rotate: 45, fontSize: 10 }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+    grid: { top: 40, right: 20, bottom: 40, left: 60 },
+    xAxis: {
+      type: "category",
+      data: xData,
+      axisLabel: { color: "#64748b", rotate: 45, fontSize: 10 },
+      axisLine: { lineStyle: { color: "rgba(51,65,85,.6)" } },
+      splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
+    },
     yAxis: [
-      { type: "value", axisLabel: { color: "#34d399", formatter: function (v) { return fmt(v); } }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
-      { type: "value", name: "%", axisLabel: { color: "#94a3b8", formatter: function (v) { return v + "%"; } }, splitLine: { show: false }, position: "right", max: function (v) { return Math.max(v.max * 1.5, 1); } }
+      {
+        type: "value",
+        name: "%",
+        position: "left",
+        axisLabel: {
+          color: "#64748b",
+          formatter: function (v) { return v >= 0 ? v + "%" : fmt(Math.abs(v)); }
+        },
+        splitLine: { lineStyle: { color: "rgba(51,65,85,.2)" } }
+      }
     ],
     series: [
       {
-        name: t("econWasteOutput"),
-        type: "bar",
-        yAxisIndex: 0,
-        itemStyle: { color: "rgba(52,211,153,0.7)" },
-        data: outputData
-      },
-      {
-        name: t("econEfficiencyRatio"),
+        name: t("econButterflyRatio"),
         type: "line",
-        yAxisIndex: 1,
-        smooth: 0.4,
-        lineStyle: { color: "#fbbf24", width: 2, type: "dashed" },
+        smooth: 0.5,
+        areaStyle: { color: "rgba(52,211,153,0.25)" },
+        lineStyle: { color: "#34d399", width: 2 },
         symbol: "circle",
         symbolSize: 4,
-        itemStyle: { color: "#fbbf24" },
-        data: trendData
+        itemStyle: { color: "#34d399" },
+        data: ratioData
+      },
+      {
+        name: t("econButterflyOutput"),
+        type: "line",
+        smooth: 0.5,
+        areaStyle: { color: "rgba(96,165,250,0.25)" },
+        lineStyle: { color: "#60a5fa", width: 2 },
+        symbol: "circle",
+        symbolSize: 4,
+        itemStyle: { color: "#60a5fa" },
+        data: outputNeg
       }
     ]
   };
 
-  __effInitOrSet("econMonthOutput", el, option);
+  __effInitOrSet("econButterfly", el, option);
 }
 
 function renderDayComparison(days) {
