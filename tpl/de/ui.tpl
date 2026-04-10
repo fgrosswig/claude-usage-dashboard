@@ -472,6 +472,8 @@
   "econWasteCacheCreate": "Cache Creation (kumulativ)",
   "econWasteInput": "Input (kumulativ)",
   "econWasteSplitHint": "Ab hier Session splitten erw\u00e4gen",
+  "econWasteMonthTitle": "Kumulative Nutzungskurve \u2014 Monat",
+  "econWasteMonthBlurb": "Kumulativer Token-Verbrauch pro Tag \u00fcber den Monat. Zeigt die Gesamt-Akkumulation von Cache Read vs. Output \u00fcber alle Tage.",
   "econEfficiencyTitle": "Effizienz-Zeitverlauf",
   "econEfficiencyBlurb": "Output-Tokens vs. Gesamt-Tokens pro Stunde. Das orange Band markiert Anthropic Peak Hours (15\u201321 MESZ) mit erh\u00f6htem Quota-Verbrauch.",
   "econEfficiencyOutput": "Output-Tokens",

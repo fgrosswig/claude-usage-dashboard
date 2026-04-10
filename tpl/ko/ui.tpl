@@ -472,6 +472,8 @@
   "econWasteCacheCreate": "캐시 생성 (누적)",
   "econWasteInput": "입력 (누적)",
   "econWasteSplitHint": "여기서 세션 분할 고려",
+  "econWasteMonthTitle": "누적 사용 곡선 — 월별",
+  "econWasteMonthBlurb": "월별 일별 누적 토큰 소비. 모든 날에 걸쳐 캐시 읽기 대 출력의 전체 누적을 보여줍니다.",
   "econEfficiencyTitle": "효율 타임라인",
   "econEfficiencyBlurb": "시간대별 출력 토큰 vs. 전체 토큰. 주황색 대역은 Anthropic 피크 시간(GMT 13~19시)으로 할당량 소비가 증가합니다.",
   "econEfficiencyOutput": "출력 토큰",

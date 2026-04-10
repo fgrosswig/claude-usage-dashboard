@@ -8350,20 +8350,25 @@ function renderEconomicSection(data, filteredDays) {
 
   // Section header titles
   var wH = document.getElementById("econ-waste-h3");
+  var wmH = document.getElementById("econ-waste-month-h3");
   var eH = document.getElementById("econ-efficiency-h3");
   var dH = document.getElementById("econ-daycompare-h3");
   if (wH) wH.textContent = t("econWasteTitle");
+  if (wmH) wmH.textContent = t("econWasteMonthTitle");
   if (eH) eH.textContent = t("econEfficiencyTitle");
   if (dH) dH.textContent = t("econDayCompareTitle");
   var wB = document.getElementById("econ-waste-blurb");
+  var wmB = document.getElementById("econ-waste-month-blurb");
   var eB = document.getElementById("econ-efficiency-blurb");
   var dB = document.getElementById("econ-daycompare-blurb");
   if (wB) wB.textContent = t("econWasteBlurb");
+  if (wmB) wmB.textContent = t("econWasteMonthBlurb");
   if (eB) eB.textContent = t("econEfficiencyBlurb");
   if (dB) dB.textContent = t("econDayCompareBlurb");
 
-  // Day Comparison renders immediately from cached data (no server call)
+  // These render immediately from cached data (no server call)
   renderDayComparison(filteredDays || data.days || []);
+  renderMonthlyWasteCurve(filteredDays || data.days || []);
 
   // Session-turn charts: lazy-load only when section is opened
   function fetchSessionTurns() {
@@ -8634,6 +8639,92 @@ function renderEfficiencyTimeline(stData) {
   };
 
   __effInitOrSet("econEfficiency", el, option);
+}
+
+function renderMonthlyWasteCurve(days) {
+  if (typeof echarts === "undefined") return;
+  var el = document.getElementById("chart-shell-econ-waste-month");
+  if (!el || !days || days.length < 2) return;
+
+  var xData = [];
+  var cumOutput = [];
+  var cumCacheRead = [];
+  var cumCacheCreate = [];
+  var cumInput = [];
+  var cO = 0, cR = 0, cC = 0, cI = 0;
+
+  for (var i = 0; i < days.length; i++) {
+    var d = days[i];
+    cO += (d.output || 0);
+    cR += (d.cache_read || 0);
+    cC += (d.cache_creation || 0);
+    cI += (d.input || 0);
+    xData.push(d.date.slice(5));
+    cumOutput.push(cO);
+    cumCacheRead.push(cR);
+    cumCacheCreate.push(cC);
+    cumInput.push(cI);
+  }
+
+  var option = {
+    tooltip: {
+      trigger: "axis",
+      formatter: function (params) {
+        var idx = params[0].dataIndex;
+        var d = days[idx];
+        var lines = [d.date];
+        for (var p = 0; p < params.length; p++) {
+          lines.push(params[p].marker + " " + params[p].seriesName + ": " + fmt(params[p].value));
+        }
+        lines.push("");
+        lines.push("Day: out=" + fmt(d.output || 0) + " cr=" + fmt(d.cache_read || 0));
+        return lines.join("<br>");
+      }
+    },
+    legend: { top: 4, textStyle: { color: "#94a3b8", fontSize: 11 } },
+    grid: { top: 40, right: 20, bottom: 30, left: 60 },
+    xAxis: { type: "category", data: xData, axisLabel: { color: "#64748b", rotate: 45, fontSize: 10 }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+    yAxis: { type: "value", axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+    series: [
+      {
+        name: t("econWasteCacheRead"),
+        type: "line",
+        stack: "total",
+        areaStyle: { color: "rgba(100,116,139,0.35)" },
+        lineStyle: { color: "#64748b", width: 1 },
+        symbol: "none",
+        data: cumCacheRead
+      },
+      {
+        name: t("econWasteCacheCreate"),
+        type: "line",
+        stack: "total",
+        areaStyle: { color: "rgba(251,191,36,0.25)" },
+        lineStyle: { color: "#fbbf24", width: 1 },
+        symbol: "none",
+        data: cumCacheCreate
+      },
+      {
+        name: t("econWasteInput"),
+        type: "line",
+        stack: "total",
+        areaStyle: { color: "rgba(96,165,250,0.2)" },
+        lineStyle: { color: "#60a5fa", width: 1 },
+        symbol: "none",
+        data: cumInput
+      },
+      {
+        name: t("econWasteOutput"),
+        type: "line",
+        areaStyle: { color: "rgba(52,211,153,0.4)" },
+        lineStyle: { color: "#34d399", width: 2 },
+        symbol: "none",
+        data: cumOutput
+      }
+    ]
+  };
+
+  __effInitOrSet("econWasteMonth", el, option);
 }
 
 function renderDayComparison(days) {
