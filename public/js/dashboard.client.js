@@ -8852,13 +8852,17 @@ function renderDayComparison(days) {
         return d.date + "<br>" + t("econEfficiencyRatio") + ": " + params[0].value + "%<br>Output: " + fmt(d.output || 0) + "<br>Total: " + fmt((d.input || 0) + (d.output || 0) + (d.cache_read || 0) + (d.cache_creation || 0));
       }
     },
-    grid: { top: 20, right: 20, bottom: 40, left: 50 },
+    grid: { top: 30, right: 50, bottom: 40, left: 50 },
     xAxis: { type: "category", data: xData, axisLabel: { color: "#64748b", rotate: 45, fontSize: 10 }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
-    yAxis: { type: "value", name: "%", axisLabel: { color: "#64748b" }, max: function (v) { return Math.max(v.max * 1.2, 1); }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+    yAxis: [
+      { type: "value", name: "%", axisLabel: { color: "#64748b" }, max: function (v) { return Math.max(v.max * 1.2, 1); }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+      { type: "value", name: "%", axisLabel: { color: "#94a3b8" }, max: function (v) { return Math.max(v.max * 2, 1); }, splitLine: { show: false }, position: "right" }
+    ],
     series: [
       {
         name: t("econEfficiencyRatio"),
         type: "bar",
+        yAxisIndex: 0,
         data: ratioData,
         itemStyle: {
           color: function (params) {
@@ -8871,8 +8875,9 @@ function renderDayComparison(days) {
       {
         name: "Trend",
         type: "line",
+        yAxisIndex: 1,
         smooth: 0.4,
-        lineStyle: { color: "rgba(148,163,184,0.6)", width: 2 },
+        lineStyle: { color: "rgba(148,163,184,0.7)", width: 2 },
         symbol: "none",
         data: ratioData
       }
