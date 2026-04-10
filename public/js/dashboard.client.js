@@ -8876,7 +8876,6 @@ function renderDayComparison(days) {
         type: "line",
         yAxisIndex: 1,
         smooth: false,
-        lineStyle: { color: "rgba(148,163,184,0.7)", width: 2 },
         symbol: "none",
         data: (function () {
           var n = ratioData.length;
@@ -8885,11 +8884,21 @@ function renderDayComparison(days) {
           for (var i = 0; i < n; i++) {
             sx += i; sy += ratioData[i]; sxy += i * ratioData[i]; sxx += i * i;
           }
-          var slope = (n * sxy - sx * sy) / (n * sxx - sx * sx);
-          var intercept = (sy - slope * sx) / n;
+          var _slope = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+          var intercept = (sy - _slope * sx) / n;
           var line = [];
-          for (var j = 0; j < n; j++) line.push(Math.round((intercept + slope * j) * 10000) / 10000);
-          return line;
+          for (var j = 0; j < n; j++) line.push(Math.round((intercept + _slope * j) * 10000) / 10000);
+          return { slope: _slope, data: line };
+        })().data,
+        lineStyle: (function () {
+          var n = ratioData.length;
+          if (n < 2) return { color: "#94a3b8", width: 1.5 };
+          var sx = 0, sy = 0, sxy = 0, sxx = 0;
+          for (var i = 0; i < n; i++) {
+            sx += i; sy += ratioData[i]; sxy += i * ratioData[i]; sxx += i * i;
+          }
+          var s = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+          return { color: s >= 0 ? "#34d399" : "#ef4444", width: 1.5 };
         })()
       }
     ]
