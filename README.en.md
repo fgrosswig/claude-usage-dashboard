@@ -299,6 +299,20 @@ DEV_PROXY_SOURCE=https://claude-usage.example.com DEV_MODE=full node start.js da
 - Auto-sync every 180s, `node start.js both` blocks in dev mode
 - See `k8s/README.md` for Mermaid flowchart
 
+### UDAA Field Study — Anonymized Session Export
+
+The dashboard includes an **exporter** for the UDAA field study (Usage Drain Anomalies Audit). It exports **anonymized** session data (token counts, time deltas, model ID only) — no prompts, no paths, no hostnames.
+
+```bash
+node scripts/udaa-fieldstudy-export.js              # Export all sessions
+node scripts/udaa-fieldstudy-export.js --dry-run     # Preview without writing files
+node scripts/udaa-fieldstudy-export.js --out ./data  # Custom output directory
+```
+
+Share data: Upload exported JSON files via [file.io](https://www.file.io) (one-time download), [catbox.moe](https://catbox.moe), or [temp.sh](https://temp.sh).
+
+Details: **[docs/en/10-udaa-field-study.md](docs/en/10-udaa-field-study.md)** | **[Deutsch](docs/de/10-udaa-feldstudie.md)** | **[한국어](docs/ko/10-udaa-field-study.md)**
+
 ### References
 
 - [Claude Code Hidden Problem Analysis](https://github.com/ArkNill/claude-code-hidden-problem-analysis) — basis for anomaly detection (B1-B8)

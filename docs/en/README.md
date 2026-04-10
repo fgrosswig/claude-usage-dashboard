@@ -13,3 +13,4 @@
 | 7 | Environment, API, deployment, Docker, CI, dev mode, GitHub mirror | [07-config-api-deployment.md](07-config-api-deployment.md) |
 | 8 | Screenshots & image gallery | [08-screenshots.md](08-screenshots.md) |
 | 9 | Data formats (JSONL session logs, Proxy NDJSON), adapter/converter guidance | [09-data-formats.md](09-data-formats.md) |
+| 10 | UDAA Field Study — Anonymized session export, data sharing | [10-udaa-field-study.md](10-udaa-field-study.md) |

@@ -6507,13 +6507,13 @@ function __effSmallMultipleOption(spec) {
   };
 }
 
-function __effInitOrSet(key, el, option) {
+function __effInitOrSet(key, el, option, notMerge) {
   if (!el) return;
   if (!_effCharts[key]) {
     if (typeof echarts === "undefined") return;
     _effCharts[key] = echarts.init(el, null, { renderer: "canvas" });
   }
-  _effCharts[key].setOption(option, { notMerge: false, lazyUpdate: false });
+  _effCharts[key].setOption(option, { notMerge: !!notMerge, lazyUpdate: false });
 }
 
 function __effConnectCharts() {
@@ -8413,20 +8413,36 @@ function renderEconomicSection(data, filteredDays) {
   if (!collapse.dataset.bound) {
     collapse.dataset.bound = "1";
     collapse.addEventListener("toggle", function () {
-      if (collapse.open && !_econData) fetchSessionTurns();
+      if (!collapse.open) return;
+      if (!_econData) {
+        fetchSessionTurns();
+      } else {
+        // Data already fetched while collapsed — re-render charts now that container is visible
+        var sel = sessPicker ? sessPicker.value : "";
+        var session = findSession(_econData, sel);
+        if (session) {
+          renderWasteCurve(session);
+          renderCacheExplosion(session);
+          renderEfficiencyTimeline(_econData);
+        }
+      }
     });
   }
 
   if (sessPicker && !sessPicker.dataset.bound) {
     sessPicker.dataset.bound = "1";
-    sessPicker.addEventListener("change", function () {
+    function _onSessionChange() {
+      if (!_econData) return;
       var session = findSession(_econData, sessPicker.value);
       if (session) {
-        updateSessionInfo(session, infoEl);
+        var info = document.getElementById("econ-session-info");
+        updateSessionInfo(session, info);
         renderWasteCurve(session);
         renderCacheExplosion(session);
       }
-    });
+    }
+    sessPicker.addEventListener("change", _onSessionChange);
+    sessPicker.addEventListener("input", _onSessionChange);
   }
 }
 
@@ -8714,7 +8730,7 @@ function renderWasteCurve(session) {
     }]
   }];
 
-  __effInitOrSet("econWaste", el, option);
+  __effInitOrSet("econWaste", el, option, true);
 }
 
 function renderCacheExplosion(session) {
@@ -8976,7 +8992,7 @@ function renderCacheExplosion(session) {
     ]
   };
 
-  __effInitOrSet("econExplosion", el, option);
+  __effInitOrSet("econExplosion", el, option, true);
 }
 
 function renderEfficiencyTimeline(stData) {
@@ -9056,7 +9072,7 @@ function renderEfficiencyTimeline(stData) {
     visualMap: undefined
   };
 
-  __effInitOrSet("econEfficiency", el, option);
+  __effInitOrSet("econEfficiency", el, option, true);
 }
 
 var _butterflyMode = "cache";
