@@ -8351,24 +8351,30 @@ function renderEconomicSection(data, filteredDays) {
   // Section header titles
   var wH = document.getElementById("econ-waste-h3");
   var wmH = document.getElementById("econ-waste-month-h3");
+  var moH = document.getElementById("econ-month-output-h3");
   var eH = document.getElementById("econ-efficiency-h3");
   var dH = document.getElementById("econ-daycompare-h3");
   if (wH) wH.textContent = t("econWasteTitle");
   if (wmH) wmH.textContent = t("econWasteMonthTitle");
+  if (moH) moH.textContent = t("econMonthOutputTitle");
   if (eH) eH.textContent = t("econEfficiencyTitle");
   if (dH) dH.textContent = t("econDayCompareTitle");
   var wB = document.getElementById("econ-waste-blurb");
   var wmB = document.getElementById("econ-waste-month-blurb");
+  var moB = document.getElementById("econ-month-output-blurb");
   var eB = document.getElementById("econ-efficiency-blurb");
   var dB = document.getElementById("econ-daycompare-blurb");
   if (wB) wB.textContent = t("econWasteBlurb");
   if (wmB) wmB.textContent = t("econWasteMonthBlurb");
+  if (moB) moB.textContent = t("econMonthOutputBlurb");
   if (eB) eB.textContent = t("econEfficiencyBlurb");
   if (dB) dB.textContent = t("econDayCompareBlurb");
 
   // These render immediately from cached data (no server call)
-  renderDayComparison(filteredDays || data.days || []);
-  renderMonthlyWasteCurve(filteredDays || data.days || []);
+  var econDays = filteredDays || data.days || [];
+  renderDayComparison(econDays);
+  renderMonthlyWasteCurve(econDays);
+  renderMonthlyOutputChart(econDays);
 
   // Session-turn charts: lazy-load only when section is opened
   function fetchSessionTurns() {
@@ -8731,6 +8737,73 @@ function renderMonthlyWasteCurve(days) {
   __effInitOrSet("econWasteMonth", el, option);
 }
 
+function renderMonthlyOutputChart(days) {
+  if (typeof echarts === "undefined") return;
+  var el = document.getElementById("chart-shell-econ-month-output");
+  if (!el || !days || days.length < 2) return;
+
+  var xData = [];
+  var outputData = [];
+  var trendData = [];
+
+  for (var i = 0; i < days.length; i++) {
+    var d = days[i];
+    var out = d.output || 0;
+    var total = (d.input || 0) + out + (d.cache_read || 0) + (d.cache_creation || 0);
+    xData.push(d.date.slice(5));
+    outputData.push(out);
+    trendData.push(total > 0 ? Math.round(out / total * 10000) / 100 : 0);
+  }
+
+  var option = {
+    tooltip: {
+      trigger: "axis",
+      formatter: function (params) {
+        var idx = params[0].dataIndex;
+        var d = days[idx];
+        var lines = [d.date];
+        for (var p = 0; p < params.length; p++) {
+          if (params[p].seriesName === t("econEfficiencyRatio")) {
+            lines.push(params[p].marker + " " + params[p].seriesName + ": " + params[p].value + "%");
+          } else {
+            lines.push(params[p].marker + " " + params[p].seriesName + ": " + fmt(params[p].value));
+          }
+        }
+        return lines.join("<br>");
+      }
+    },
+    legend: { top: 4, textStyle: { color: "#94a3b8", fontSize: 11 } },
+    grid: { top: 40, right: 50, bottom: 40, left: 50 },
+    xAxis: { type: "category", data: xData, axisLabel: { color: "#64748b", rotate: 45, fontSize: 10 }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+    yAxis: [
+      { type: "value", axisLabel: { color: "#34d399", formatter: function (v) { return fmt(v); } }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+      { type: "value", name: "%", axisLabel: { color: "#94a3b8", formatter: function (v) { return v + "%"; } }, splitLine: { show: false }, position: "right", max: function (v) { return Math.max(v.max * 1.5, 1); } }
+    ],
+    series: [
+      {
+        name: t("econWasteOutput"),
+        type: "bar",
+        yAxisIndex: 0,
+        itemStyle: { color: "rgba(52,211,153,0.7)" },
+        data: outputData
+      },
+      {
+        name: t("econEfficiencyRatio"),
+        type: "line",
+        yAxisIndex: 1,
+        smooth: 0.4,
+        lineStyle: { color: "#fbbf24", width: 2, type: "dashed" },
+        symbol: "circle",
+        symbolSize: 4,
+        itemStyle: { color: "#fbbf24" },
+        data: trendData
+      }
+    ]
+  };
+
+  __effInitOrSet("econMonthOutput", el, option);
+}
+
 function renderDayComparison(days) {
   if (typeof echarts === "undefined") return;
   var el = document.getElementById("chart-shell-econ-daycompare");
@@ -8758,17 +8831,28 @@ function renderDayComparison(days) {
     grid: { top: 20, right: 20, bottom: 40, left: 50 },
     xAxis: { type: "category", data: xData, axisLabel: { color: "#64748b", rotate: 45, fontSize: 10 }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
     yAxis: { type: "value", name: "%", axisLabel: { color: "#64748b" }, max: function (v) { return Math.max(v.max * 1.2, 1); }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
-    series: [{
-      type: "bar",
-      data: ratioData,
-      itemStyle: {
-        color: function (params) {
-          var v = params.value;
-          return v > 0.5 ? "#34d399" : v > 0.1 ? "#fbbf24" : "#ef4444";
-        }
+    series: [
+      {
+        name: t("econEfficiencyRatio"),
+        type: "bar",
+        data: ratioData,
+        itemStyle: {
+          color: function (params) {
+            var v = params.value;
+            return v > 0.5 ? "#34d399" : v > 0.1 ? "#fbbf24" : "#ef4444";
+          }
+        },
+        label: { show: true, position: "top", formatter: "{c}%", fontSize: 9, color: "#94a3b8" }
       },
-      label: { show: true, position: "top", formatter: "{c}%", fontSize: 9, color: "#94a3b8" }
-    }]
+      {
+        name: "Trend",
+        type: "line",
+        smooth: 0.4,
+        lineStyle: { color: "rgba(148,163,184,0.6)", width: 2 },
+        symbol: "none",
+        data: ratioData
+      }
+    ]
   };
 
   __effInitOrSet("econDayCompare", el, option);
