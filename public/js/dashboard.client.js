@@ -8334,15 +8334,19 @@ function renderEconomicSection(data, filteredDays) {
   var collapse = document.getElementById("economic-collapse");
   if (!collapse) return;
   var sumEl = document.getElementById("economic-summary-line");
-  var datePicker = document.getElementById("econ-date-picker");
   var sessPicker = document.getElementById("econ-session-picker");
   var infoEl = document.getElementById("econ-session-info");
 
-  // Set labels
-  var lblDate = document.getElementById("lbl-econ-date");
+  // Immediate header text (before async fetch)
+  if (sumEl) sumEl.textContent = t("econSummaryNoData");
+
+  // Set labels — hide redundant date picker, keep session picker
   var lblSess = document.getElementById("lbl-econ-session");
-  if (lblDate) lblDate.textContent = t("econDateLabel");
   if (lblSess) lblSess.textContent = t("econSessionLabel");
+  var lblDate = document.getElementById("lbl-econ-date");
+  var datePicker = document.getElementById("econ-date-picker");
+  if (lblDate) lblDate.style.display = "none";
+  if (datePicker) datePicker.style.display = "none";
 
   // Section header titles
   var wH = document.getElementById("econ-waste-h3");
@@ -8358,42 +8362,42 @@ function renderEconomicSection(data, filteredDays) {
   if (eB) eB.textContent = t("econEfficiencyBlurb");
   if (dB) dB.textContent = t("econDayCompareBlurb");
 
-  // Sync with main day-picker selection
+  // Use main day-picker date (synced from top nav)
   var mainPicker = document.getElementById("day-picker");
-  var defaultDate = (mainPicker && mainPicker.value) ? mainPicker.value
+  var selectedDate = (mainPicker && mainPicker.value) ? mainPicker.value
     : (data.days && data.days.length) ? data.days[data.days.length - 1].date
     : new Date().toISOString().slice(0, 10);
-  if (datePicker) datePicker.value = defaultDate;
+
+  // Day Comparison renders immediately from cached data (no async)
+  renderDayComparison(filteredDays || data.days || []);
 
   // Fetch session turns for selected date
-  function fetchAndRender() {
-    var dateVal = datePicker ? datePicker.value : defaultDate;
-    fetch("/api/session-turns?date=" + encodeURIComponent(dateVal))
-      .then(function (r) { return r.json(); })
-      .then(function (stData) {
-        _econData = stData;
-        populateSessionPicker(stData, sessPicker, infoEl, sumEl);
-        var sel = sessPicker ? sessPicker.value : "";
-        var session = findSession(stData, sel);
-        if (session) {
-          renderWasteCurve(session);
-          renderEfficiencyTimeline(stData);
-        }
-        renderDayComparison(filteredDays || data.days || []);
-      })
-      .catch(function () {
-        if (sumEl) sumEl.textContent = t("econSummaryNoData");
-      });
-  }
+  fetch("/api/session-turns?date=" + encodeURIComponent(selectedDate))
+    .then(function (r) { return r.json(); })
+    .then(function (stData) {
+      _econData = stData;
+      populateSessionPicker(stData, sessPicker, infoEl, sumEl);
+      var sel = sessPicker ? sessPicker.value : "";
+      var session = findSession(stData, sel);
+      if (session) {
+        renderWasteCurve(session);
+        renderEfficiencyTimeline(stData);
+      }
+    })
+    .catch(function () {
+      if (sumEl) sumEl.textContent = t("econSummaryNoData");
+    });
 
-  if (datePicker) datePicker.addEventListener("change", fetchAndRender);
-  if (sessPicker) sessPicker.addEventListener("change", function () {
-    var session = findSession(_econData, sessPicker.value);
-    if (session) {
-      updateSessionInfo(session, infoEl);
-      renderWasteCurve(session);
-    }
-  });
+  if (sessPicker && !sessPicker.dataset.bound) {
+    sessPicker.dataset.bound = "1";
+    sessPicker.addEventListener("change", function () {
+      var session = findSession(_econData, sessPicker.value);
+      if (session) {
+        updateSessionInfo(session, infoEl);
+        renderWasteCurve(session);
+      }
+    });
+  }
 
   fetchAndRender();
 }
