@@ -3402,15 +3402,15 @@ function invalidateSessionTurnsToday() {
 }
 
 function buildSessionTurnsForDate(dateKey) {
-  var crypto = require('crypto');
+  var crypto = require('node:crypto');
   var collected = collectTaggedJsonlFiles();
   var files = collected.tagged;
   var sessions = Object.create(null);
   var totalParsed = 0;
 
-  for (var fi = 0; fi < files.length; fi++) {
+  for (var file of files) {
     try {
-      forEachJsonlLineSync(files[fi].path, function (line) {
+      forEachJsonlLineSync(file.path, function (line) {
         if (!line) return;
         var rec;
         try { rec = JSON.parse(line); } catch (_e) { return; }
@@ -3445,8 +3445,7 @@ function buildSessionTurnsForDate(dateKey) {
 
   var result = [];
   var sids = Object.keys(sessions);
-  for (var si = 0; si < sids.length; si++) {
-    var sid = sids[si];
+  for (var sid of sids) {
     var turns = sessions[sid];
     turns.sort(function (a, b) { return a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0; });
     var mapped = [];
