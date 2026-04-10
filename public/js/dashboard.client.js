@@ -8662,7 +8662,7 @@ function renderButterflyChart(days) {
     var total = (d.input || 0) + out + (d.cache_read || 0) + (d.cache_creation || 0);
     xData.push(d.date.slice(5));
     ratioData.push(total > 0 ? Math.round(out / total * 10000) / 100 : 0);
-    outputData.push(out);
+    outputData.push(-out);
   }
 
   var option = {
@@ -8676,7 +8676,7 @@ function renderButterflyChart(days) {
           if (params[p].seriesName === t("econButterflyRatio")) {
             lines.push(params[p].marker + " " + params[p].seriesName + ": " + params[p].value + "%");
           } else {
-            lines.push(params[p].marker + " " + params[p].seriesName + ": " + fmt(params[p].value));
+            lines.push(params[p].marker + " " + params[p].seriesName + ": " + fmt(Math.abs(params[p].value)));
           }
         }
         return lines.join("<br>");
@@ -8703,10 +8703,9 @@ function renderButterflyChart(days) {
       {
         type: "value",
         position: "right",
-        inverse: true,
-        axisLabel: { color: "#60a5fa", formatter: function (v) { return fmt(v); } },
+        axisLabel: { color: "#60a5fa", formatter: function (v) { return fmt(Math.abs(v)); } },
         splitLine: { show: false },
-        min: 0
+        max: 0
       }
     ],
     series: [
