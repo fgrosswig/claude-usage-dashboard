@@ -8647,23 +8647,22 @@ function renderMonthlyWasteCurve(days) {
   if (!el || !days || days.length < 2) return;
 
   var xData = [];
-  var cumOutput = [];
-  var cumCacheRead = [];
-  var cumCacheCreate = [];
-  var cumInput = [];
-  var cO = 0, cR = 0, cC = 0, cI = 0;
+  var outputData = [];
+  var cacheReadData = [];
+  var cacheCreateData = [];
+  var trendData = [];
 
   for (var i = 0; i < days.length; i++) {
     var d = days[i];
-    cO += (d.output || 0);
-    cR += (d.cache_read || 0);
-    cC += (d.cache_creation || 0);
-    cI += (d.input || 0);
+    var out = d.output || 0;
+    var cr = d.cache_read || 0;
+    var cc = d.cache_creation || 0;
+    var total = (d.input || 0) + out + cr + cc;
     xData.push(d.date.slice(5));
-    cumOutput.push(cO);
-    cumCacheRead.push(cR);
-    cumCacheCreate.push(cC);
-    cumInput.push(cI);
+    outputData.push(out);
+    cacheReadData.push(cr);
+    cacheCreateData.push(cc);
+    trendData.push(total > 0 ? Math.round(out / total * 10000) / 100 : 0);
   }
 
   var option = {
@@ -8674,52 +8673,56 @@ function renderMonthlyWasteCurve(days) {
         var d = days[idx];
         var lines = [d.date];
         for (var p = 0; p < params.length; p++) {
-          lines.push(params[p].marker + " " + params[p].seriesName + ": " + fmt(params[p].value));
+          if (params[p].seriesName === t("econEfficiencyRatio")) {
+            lines.push(params[p].marker + " " + params[p].seriesName + ": " + params[p].value + "%");
+          } else {
+            lines.push(params[p].marker + " " + params[p].seriesName + ": " + fmt(params[p].value));
+          }
         }
-        lines.push("");
-        lines.push("Day: out=" + fmt(d.output || 0) + " cr=" + fmt(d.cache_read || 0));
         return lines.join("<br>");
       }
     },
     legend: { top: 4, textStyle: { color: "#94a3b8", fontSize: 11 } },
-    grid: { top: 40, right: 20, bottom: 30, left: 60 },
+    grid: { top: 40, right: 50, bottom: 40, left: 60 },
     xAxis: { type: "category", data: xData, axisLabel: { color: "#64748b", rotate: 45, fontSize: 10 }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
-    yAxis: { type: "value", axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+    yAxis: [
+      { type: "value", axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+      { type: "value", name: "%", axisLabel: { color: "#34d399", formatter: function (v) { return v + "%"; } }, splitLine: { show: false }, position: "right", max: function (v) { return Math.max(v.max * 1.5, 1); } }
+    ],
     series: [
       {
         name: t("econWasteCacheRead"),
-        type: "line",
-        stack: "total",
-        areaStyle: { color: "rgba(100,116,139,0.35)" },
-        lineStyle: { color: "#64748b", width: 1 },
-        symbol: "none",
-        data: cumCacheRead
+        type: "bar",
+        stack: "tokens",
+        yAxisIndex: 0,
+        itemStyle: { color: "rgba(100,116,139,0.5)" },
+        data: cacheReadData
       },
       {
         name: t("econWasteCacheCreate"),
-        type: "line",
-        stack: "total",
-        areaStyle: { color: "rgba(251,191,36,0.25)" },
-        lineStyle: { color: "#fbbf24", width: 1 },
-        symbol: "none",
-        data: cumCacheCreate
-      },
-      {
-        name: t("econWasteInput"),
-        type: "line",
-        stack: "total",
-        areaStyle: { color: "rgba(96,165,250,0.2)" },
-        lineStyle: { color: "#60a5fa", width: 1 },
-        symbol: "none",
-        data: cumInput
+        type: "bar",
+        stack: "tokens",
+        yAxisIndex: 0,
+        itemStyle: { color: "rgba(251,191,36,0.4)" },
+        data: cacheCreateData
       },
       {
         name: t("econWasteOutput"),
+        type: "bar",
+        stack: "tokens",
+        yAxisIndex: 0,
+        itemStyle: { color: "rgba(52,211,153,0.7)" },
+        data: outputData
+      },
+      {
+        name: t("econEfficiencyRatio"),
         type: "line",
-        areaStyle: { color: "rgba(52,211,153,0.4)" },
-        lineStyle: { color: "#34d399", width: 2 },
-        symbol: "none",
-        data: cumOutput
+        yAxisIndex: 1,
+        lineStyle: { color: "#34d399", width: 2, type: "dashed" },
+        symbol: "circle",
+        symbolSize: 4,
+        itemStyle: { color: "#34d399" },
+        data: trendData
       }
     ]
   };
