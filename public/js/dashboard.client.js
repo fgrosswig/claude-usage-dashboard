@@ -8406,8 +8406,8 @@ function renderEconomicSection(data, filteredDays) {
   var currentDay = (mainPicker2 && mainPicker2.value) ? mainPicker2.value : "";
   if (_econData && _econData.date !== currentDay) _econData = null;
 
-  // Lazy: only fetch when section is expanded (not on every render)
-  if (collapse.open && !_econData) {
+  // Summary needs data even when collapsed; charts render on open
+  if (!_econData) {
     fetchSessionTurns();
   }
   if (!collapse.dataset.bound) {
@@ -8661,8 +8661,8 @@ function renderWasteCurve(session) {
         name: "Total (actual)",
         type: "line",
         showSymbol: false,
-        areaStyle: { color: "rgba(100,116,139,0.3)", origin: 0 },
-        lineStyle: { color: "#94a3b8", width: 2 },
+        areaStyle: { color: "rgba(134,239,172,0.25)", origin: 0 },
+        lineStyle: { color: "#86efac", width: 2 },
         z: 2,
         data: actualPairs
       },
