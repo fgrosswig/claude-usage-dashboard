@@ -2,6 +2,80 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-114",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "7c00e0b",
+      "commit_full": "7c00e0bef05d342fa3936b5e75a2825a53376ac0",
+      "status": "ABGESCHLOSSEN",
+      "description": "docs: add UDAA field study export documentation (DE/EN/KO) refs #177",
+      "detail": "- New chapter 10: anonymized session export, data sharing options\n- Covers export fields, CLI usage, file.io/catbox/temp.sh sharing\n- Linked from all three main READMEs and doc indexes\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "README.en.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "README.ko.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "README.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/de/10-udaa-feldstudie.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/de/README.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/10-udaa-field-study.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/README.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/10-udaa-field-study.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/README.md",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-113",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "3b64c6e",
+      "commit_full": "3b64c6e8bc01b6efee22c838fea5e467793a3676",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): re-render economic charts on toggle + notMerge on session change",
+      "detail": "- Re-render charts when details section opens and data already fetched\n- Use notMerge:true for economic charts to clear stale markLines/markAreas\n- Listen on both change+input events for session picker robustness\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-112",
       "timestamp": "2026-04-11",
       "session": "auto",

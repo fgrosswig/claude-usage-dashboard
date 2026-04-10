@@ -304,6 +304,20 @@ DEV_PROXY_SOURCE=https://claude-usage.grosswig-it.de DEV_MODE=full node start.js
 - 180초마다 자동 동기화, Dev 모드에서 `node start.js both`는 차단됨
 - Mermaid 플로우차트는 `k8s/README.md` 참조
 
+### UDAA 필드 스터디 — 익명화된 세션 내보내기
+
+대시보드에는 UDAA 필드 스터디(Usage Drain Anomalies Audit)를 위한 **내보내기 도구**가 포함되어 있습니다. **익명화된** 세션 데이터만 내보냅니다(토큰 카운트, 시간 델타, 모델 ID만) — 프롬프트, 경로, 호스트명 없음.
+
+```bash
+node scripts/udaa-fieldstudy-export.js              # 모든 세션 내보내기
+node scripts/udaa-fieldstudy-export.js --dry-run     # 파일 작성 없이 미리보기
+node scripts/udaa-fieldstudy-export.js --out ./data  # 사용자 지정 출력 디렉토리
+```
+
+데이터 공유: 내보낸 JSON 파일을 [file.io](https://www.file.io)(일회 다운로드), [catbox.moe](https://catbox.moe), 또는 [temp.sh](https://temp.sh)를 통해 공유.
+
+상세: **[docs/ko/10-udaa-field-study.md](docs/ko/10-udaa-field-study.md)** | **[English](docs/en/10-udaa-field-study.md)** | **[Deutsch](docs/de/10-udaa-feldstudie.md)**
+
 ### 참고 문헌
 
 - [Claude Code Hidden Problem Analysis](https://github.com/ArkNill/claude-code-hidden-problem-analysis) — 이상 감지(B1-B8)의 기초
