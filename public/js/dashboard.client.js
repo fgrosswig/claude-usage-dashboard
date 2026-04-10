@@ -8656,20 +8656,34 @@ function renderMonthlyWasteCurve(days) {
   var outputData = [];
   var cacheReadData = [];
   var cacheCreateData = [];
-  var trendData = [];
+  var inputData = [];
 
   for (var i = 0; i < days.length; i++) {
     var d = days[i];
-    var out = d.output || 0;
-    var cr = d.cache_read || 0;
-    var cc = d.cache_creation || 0;
-    var total = (d.input || 0) + out + cr + cc;
     xData.push(d.date.slice(5));
-    outputData.push(out);
-    cacheReadData.push(cr);
-    cacheCreateData.push(cc);
-    trendData.push(total > 0 ? Math.round(out / total * 10000) / 100 : 0);
+    outputData.push(d.output || 0);
+    cacheReadData.push(d.cache_read || 0);
+    cacheCreateData.push(d.cache_creation || 0);
+    inputData.push(d.input || 0);
   }
+
+  // Precompute trend for all visible combinations
+  function calcTrend(selected) {
+    var trend = [];
+    for (var i = 0; i < days.length; i++) {
+      var total = 0;
+      var out = outputData[i];
+      if (selected[t("econWasteCacheRead")] !== false) total += cacheReadData[i];
+      if (selected[t("econWasteCacheCreate")] !== false) total += cacheCreateData[i];
+      if (selected[t("econWasteOutput")] !== false) total += out;
+      if (selected[t("econWasteInput")] !== false) total += inputData[i];
+      trend.push(total > 0 ? Math.round(out / total * 10000) / 100 : 0);
+    }
+    return trend;
+  }
+
+  var initSelected = {};
+  var initTrend = calcTrend(initSelected);
 
   var option = {
     tooltip: {
@@ -8729,12 +8743,22 @@ function renderMonthlyWasteCurve(days) {
         symbol: "circle",
         symbolSize: 4,
         itemStyle: { color: "#34d399" },
-        data: trendData
+        data: initTrend
       }
     ]
   };
 
   __effInitOrSet("econWasteMonth", el, option);
+
+  // Recalculate trend when legend selection changes
+  var chart = _effCharts.econWasteMonth;
+  if (chart && !chart.__econLegendBound) {
+    chart.__econLegendBound = true;
+    chart.on("legendselectchanged", function (params) {
+      var newTrend = calcTrend(params.selected);
+      chart.setOption({ series: [{ }, { }, { }, { data: newTrend }] });
+    });
+  }
 }
 
 function renderMonthlyOutputChart(days) {
