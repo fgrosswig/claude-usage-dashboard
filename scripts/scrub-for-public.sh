@@ -81,6 +81,8 @@ find . -type f ! -path './.git/*' -name '*.md' -print0 |
       -e '/sonar\.example\.com/d' || true
   done
 
+rm -f ./scripts/generate-release-notes.js
+
 find . -type f ! -path './.git/*' \( -name 'Dockerfile' -o -name 'Dockerfile.*' \) -print0 |
   while IFS= read -r -d '' f; do
     _apply_sed_to_file "$f" -e 's/^LABEL maintainer="[^"]*"/LABEL maintainer="public@example.com"/' || true

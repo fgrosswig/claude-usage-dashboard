@@ -3,6 +3,7 @@
 when:
   - event: push
     branch: [main, develop, "feat/**", "fix/**"]
+  - event: tag
   - event: manual
 
 # Sonar auf main: voller Clone für korrekte SCM-Zuordnung (Quality Gate / Blame).
@@ -156,3 +157,24 @@ steps:
           fi
         done
     failure: ignore
+
+  - name: draft-release-notes
+    image: node:20-alpine
+    when:
+      event: tag
+    commands:
+      - |
+        apk add --no-cache git curl jq
+        NOTES=$(node scripts/generate-release-notes.js "${CI_COMMIT_TAG}" --public)
+        INTERNAL=$(node scripts/generate-release-notes.js "${CI_COMMIT_TAG}")
+        BODY=$(printf '%s\n\n<!--INTERNAL-->\n\n%s' "$NOTES" "$INTERNAL")
+        curl -sf -X POST \
+          -H "Authorization: token $GITEA_TOKEN" \
+          -H "Content-Type: application/json" \
+          "https://gitea.grosswig-it.de/api/v1/repos/GRO/Claude-Usage-Dashboard/releases" \
+          -d "$(jq -n --arg tag "$CI_COMMIT_TAG" --arg body "$BODY" \
+            --arg name "$CI_COMMIT_TAG" \
+            '{tag_name: $tag, name: $name, body: $body, draft: true}')"
+    environment:
+      GITEA_TOKEN:
+        from_secret: gitea_token
