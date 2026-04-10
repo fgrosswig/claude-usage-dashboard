@@ -8395,6 +8395,11 @@ function renderEconomicSection(data, filteredDays) {
       });
   }
 
+  // Reset session data when day changes so lazy-load re-fetches
+  var mainPicker2 = document.getElementById("day-picker");
+  var currentDay = (mainPicker2 && mainPicker2.value) ? mainPicker2.value : "";
+  if (_econData && _econData.date !== currentDay) _econData = null;
+
   // Lazy: only fetch when section is expanded (not on every render)
   if (collapse.open && !_econData) {
     fetchSessionTurns();
@@ -8649,7 +8654,7 @@ function renderButterflyChart(days) {
 
   var xData = [];
   var ratioData = [];
-  var outputNeg = [];
+  var outputData = [];
 
   for (var i = 0; i < days.length; i++) {
     var d = days[i];
@@ -8657,7 +8662,7 @@ function renderButterflyChart(days) {
     var total = (d.input || 0) + out + (d.cache_read || 0) + (d.cache_creation || 0);
     xData.push(d.date.slice(5));
     ratioData.push(total > 0 ? Math.round(out / total * 10000) / 100 : 0);
-    outputNeg.push(-out);
+    outputData.push(out);
   }
 
   var option = {
@@ -8671,7 +8676,7 @@ function renderButterflyChart(days) {
           if (params[p].seriesName === t("econButterflyRatio")) {
             lines.push(params[p].marker + " " + params[p].seriesName + ": " + params[p].value + "%");
           } else {
-            lines.push(params[p].marker + " " + params[p].seriesName + ": " + fmt(Math.abs(params[p].value)));
+            lines.push(params[p].marker + " " + params[p].seriesName + ": " + fmt(params[p].value));
           }
         }
         return lines.join("<br>");
@@ -8691,17 +8696,24 @@ function renderButterflyChart(days) {
         type: "value",
         name: "%",
         position: "left",
-        axisLabel: {
-          color: "#64748b",
-          formatter: function (v) { return v >= 0 ? v + "%" : fmt(Math.abs(v)); }
-        },
-        splitLine: { lineStyle: { color: "rgba(51,65,85,.2)" } }
+        axisLabel: { color: "#34d399", formatter: function (v) { return v + "%"; } },
+        splitLine: { lineStyle: { color: "rgba(51,65,85,.2)" } },
+        min: 0
+      },
+      {
+        type: "value",
+        position: "right",
+        inverse: true,
+        axisLabel: { color: "#60a5fa", formatter: function (v) { return fmt(v); } },
+        splitLine: { show: false },
+        min: 0
       }
     ],
     series: [
       {
         name: t("econButterflyRatio"),
         type: "line",
+        yAxisIndex: 0,
         smooth: false,
         areaStyle: { color: "rgba(52,211,153,0.25)" },
         lineStyle: { color: "#34d399", width: 2 },
@@ -8713,13 +8725,14 @@ function renderButterflyChart(days) {
       {
         name: t("econButterflyOutput"),
         type: "line",
+        yAxisIndex: 1,
         smooth: false,
         areaStyle: { color: "rgba(96,165,250,0.25)" },
         lineStyle: { color: "#60a5fa", width: 2 },
         symbol: "circle",
         symbolSize: 4,
         itemStyle: { color: "#60a5fa" },
-        data: outputNeg
+        data: outputData
       }
     ]
   };
