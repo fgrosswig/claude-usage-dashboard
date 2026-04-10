@@ -1,0 +1,2847 @@
+{
+  "_meta": {},
+  "transactions": [
+    {
+      "id": "TX-112",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "e24884e",
+      "commit_full": "e24884ef419115b6237eac532e8500af23bd5156",
+      "status": "ABGESCHLOSSEN",
+      "description": "ci(release): track logs/transactions.json for CI draft-release-notes",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": ".gitignore",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "logs/transactions.json",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "scripts/scrub-for-public.sh",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-111",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "15371a6",
+      "commit_full": "15371a64879d86da8f0a9695e1026e4dd14d6568",
+      "status": "ABGESCHLOSSEN",
+      "description": "docs: sync EN + KO translations with DE primary refs #182",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "README.en.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "README.ko.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/01-overview.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/03-ui-and-i18n.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/04-multi-host-and-sync.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/05-proxy.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/06-forensics-and-cli.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/01-overview.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/02-run-and-operation.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/03-ui-and-i18n.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/05-proxy.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/06-forensics-and-cli.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/07-config-api-deployment.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/08-screenshots.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/README.md",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-110",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "9abc24b",
+      "commit_full": "9abc24bf336f249e2818c5aa6d4b5dc5e03ec0f7",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ci): handle unbound CI_COMMIT_BRANCH on tag events",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": ".woodpecker/app.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-109",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "a5c44f0",
+      "commit_full": "a5c44f0059fabeff393bde1f23617e8198240afc",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): economic section padding, green area, eager session fetch closes #181",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-108",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "9228c4d",
+      "commit_full": "9228c4d32bb41e47c5475c7ea9306536b4a28a72",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(sonar): resolve all violations in generate-release-notes.js refs #180",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "scripts/generate-release-notes.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-107",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "89ba931",
+      "commit_full": "89ba931c568aaee0f441462593cb7efb709c79bc",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(release): filter internal-only commits from public release notes",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "scripts/generate-release-notes.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-106",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "95ea9d4",
+      "commit_full": "95ea9d4839d71c0ad7f33533a216c5a1ddd11f2a",
+      "status": "ABGESCHLOSSEN",
+      "description": "ci(release): track generate-release-notes.js, auto-draft on tag push refs #180",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": ".gitignore",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": ".woodpecker/app.yml",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/generate-release-notes.js",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "scripts/scrub-for-public.sh",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-105",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "fc2e9ee",
+      "commit_full": "fc2e9eeeb90d4ea32711abf106fcd674324b2424",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(sonar): remove unused vars, consolidate push calls, modernize requires refs #180",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-104",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "36d29ea",
+      "commit_full": "36d29eab28306c6de835a3348cc86fca57e4fb17",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(dashboard): add cost factor line to cache explosion chart (CUD-7)",
+      "detail": "Dual-Y axis: left shows absolute per-turn cost, right shows\nacceleration factor (cost[i]/cost[0]) as a blue line.\nMakes the 3x/5x/10x escalation directly readable.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-103",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "30698cc",
+      "commit_full": "30698cc4a219cbf0068b8b39d03b39353d33bd4a",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(dashboard): cache explosion chart + cumulative usage redesign",
+      "detail": "New \"Cache Explosion\" chart showing per-turn cost with quadratic fit,\ncolor-coded zones (Warmup/Linear/Drain), compaction event detection\nwith labeled vertical markers, and split recommendation.\n\nCumulative Usage Curve redesigned: value-axis with onZero for visible\nnegative warmup region, burn zone overlay, position indicator, and\npersistent info box with key metrics.\n\nLayout reorganized: Row 1 (Cumulative 1/3 + Explosion 2/3),\nRow 2 (Efficiency + Butterfly + Day Comparison as 3 panels).\ni18n keys added for de/en/ko.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-102",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "c2b790b",
+      "commit_full": "c2b790b548253e5ce0b4dccac8205926fc7fdad4",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): trend line red if declining, green if improving, thinner",
+      "detail": "Linear regression line color based on slope direction:\nred = efficiency declining, green = improving. Width reduced to 1.5.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-101",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "b2e6617",
+      "commit_full": "b2e661769538b41c4d4af24ae6549f019d89ef89",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): day comparison trend as linear regression line",
+      "detail": "Replaces point-to-point trend with a least-squares linear regression.\nShows the overall direction (slope) as a straight diagonal line from\nfirst to last day. Slope down = efficiency declining over the month.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-100",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "63b285f",
+      "commit_full": "63b285f7f2542eef6317ec31165ba493b0772d55",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): butterfly chart as bars instead of lines",
+      "detail": "Discrete bars per day instead of connected lines — each day is an\nindependent index. Green bars grow up (efficiency), blue bars grow\ndown (output). True butterfly/seismograph visual.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-099",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "26a337b",
+      "commit_full": "26a337bdc82312571838c517b49e2b8248caee35",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): day comparison trend line linear (not smoothed)",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-098",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "1f93bd4",
+      "commit_full": "1f93bd48dd155d95329dba1e8300693ba4f2ce5e",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(dashboard): restore 3-chart top row (Session + Monthly + Butterfly)",
+      "detail": "Restored Monthly Waste chart (stacked bars + trend) alongside\nSession Waste and Butterfly. Layout: 3 charts in row 1, 2 in row 2.\n\nPreviously Monthly Waste was removed when Butterfly was introduced.\nNow all three coexist. i18n restored for de/en/ko.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-097",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "791cda5",
+      "commit_full": "791cda5dfffee8cc799c9dffaaebf87389b8679c",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): butterfly chart with normalized single y-axis",
+      "detail": "Both series normalized to 0..1 range on a single y-axis (-1 to +1).\nEfficiency fills above zero line (green), output fills below (blue).\nZero line = center axis, true butterfly/seismograph layout.\n\nY-axis labels show original values (% above, tokens below).\nTooltip shows raw values.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-096",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "fc04fb6",
+      "commit_full": "fc04fb647af8f2e06b369cd3254ffdb12a918580",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): butterfly output line goes below zero axis",
+      "detail": "Output plotted as negative values so the line mirrors downward.\nRight y-axis max:0 with abs() labels. Efficiency stays above zero.\nCreates the butterfly/seismograph visual split at the x-axis.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-095",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "61ba175",
+      "commit_full": "61ba175a2bfd2d44d31d0884acf5785f53b65016",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): butterfly dual y-axis + session fetch on day change",
+      "detail": "Butterfly chart:\n- Efficiency % on left y-axis (green, grows up)\n- Output tokens on right y-axis with inverse:true (blue, grows down)\n- Both on their own scales, no more squished efficiency line\n\nSession turns:\n- _econData reset when day-picker changes so lazy-load re-fetches\n- Fixes empty Waste Curve + Efficiency Timeline after day switch\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-094",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "af5df6f",
+      "commit_full": "af5df6f3759595b9914cab3ed5281348dbe8bc34",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): disable smoothing on butterfly chart — show raw data",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-093",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "f2d8a20",
+      "commit_full": "f2d8a209fca2477588a687cc73a8cd2fe746d86f",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(dashboard): butterfly chart replaces 2 monthly charts",
+      "detail": "New mirrored area chart: efficiency ratio (green, top half) vs\noutput tokens (blue, bottom half, negative Y). Counter-movement\nbetween the two signals is immediately visible.\n\nReplaces separate Monthly Waste + Monthly Output charts with a\nsingle butterfly/seismograph-style visualization.\n\nLayout: 2 charts in row 1 (Session Waste + Butterfly), 2 in row 2.\ni18n in de/en/ko.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-092",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "c51b68a",
+      "commit_full": "c51b68a44705cddbeb96bd34721af0bc398d8886",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): hide redundant right y-axis on day comparison, smoother trend",
+      "detail": "Right y-axis hidden (trend shares % unit with left axis, no need for\nduplicate scale). Trend smoothing increased to 0.6 for clearer\nmonthly direction signal.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-091",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "07ca274",
+      "commit_full": "07ca27482ea4cf6c68e9f57258fdb81071e146bd",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): day comparison trend line on 2nd y-axis with higher scale",
+      "detail": "Trend line now on separate right y-axis with 2x max scale so\nthe smoothed curve sits above the bars and is clearly visible.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-090",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "b6c8682",
+      "commit_full": "b6c86820306b879cf9c3dab393cacaa52decafe1",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(dashboard): dynamic trend line recalculates on legend toggle",
+      "detail": "Monthly waste chart trend line (efficiency ratio) now recalculates\nwhen series are toggled via legend click. Hiding Cache Read changes\nthe denominator, showing a different efficiency perspective.\n\nUses ECharts legendselectchanged event to recompute output/visible_total\nratio and update the trend series in-place.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-089",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "f935449",
+      "commit_full": "f93544973a4d932e5d0208b3609d3e8515cdb80d",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(dashboard): 3-chart top row + monthly output chart + trend lines",
+      "detail": "Layout: 3 charts in row 1 (Session Waste | Monthly Waste | Monthly Output),\n2 charts in row 2 (Efficiency Timeline | Day Comparison).\n\nNew: Monthly Output chart shows output tokens per day on own scale with\nefficiency trend line (smooth, dashed). Separates output visibility from\ncache-dominated stacked bars.\n\nAdded smooth trend line to Day Comparison chart.\ni18n in de/en/ko.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-088",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "feba3a8",
+      "commit_full": "feba3a8388eecdf3685893b7fdfd60f9c0ffa977",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): 2x2 chart grid layout + smooth trend line",
+      "detail": "- Row 1: Session Waste Curve + Efficiency Timeline side by side\n- Row 2: Monthly Waste + Day Comparison side by side\n- All charts same height (300px)\n- Monthly efficiency trend line smoothed (smooth: 0.4)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-087",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "4e770b2",
+      "commit_full": "4e770b2a8da6d4cd1a9c1affdc14f0dd07da98d6",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): monthly chart as daily bars + efficiency trend line",
+      "detail": "Replaced cumulative stacked area with per-day stacked bars\n(cache_read + cache_creation + output) plus a dashed trend line\nshowing efficiency ratio (output/total %) on the right y-axis.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-086",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "fb4c450",
+      "commit_full": "fb4c4500ae2019ce081093240d853e5d683d8015",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(dashboard): add monthly cumulative waste curve",
+      "detail": "New chart below the session waste curve showing cumulative token\nconsumption per day across the month. Same stacked area format\n(cache_read, cache_creation, input, output) but X-axis = days\ninstead of turns.\n\nRenders from cached data.days — no additional server call needed.\ni18n in de/en/ko.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-085",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "cfec169",
+      "commit_full": "cfec1692ff560f62e2c845ecfc0098fefca5b838",
+      "status": "ABGESCHLOSSEN",
+      "description": "perf(dashboard): lazy-load session turns + simplified cache",
+      "detail": "Server: session-turns cache builds once per date, stays forever for\npast days. Today invalidated only via runScanAndBroadcast hook.\n\nClient: session-turn fetch only triggers when Economic Usage section\nis expanded (lazy), not on every dashboard render. Prevents blocking\nthe event loop on page load.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-084",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "0b693a5",
+      "commit_full": "0b693a5e3038936bebc9913a3f1d7ff50f86c526",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): remove collapsible disclosure from economic charts",
+      "detail": "Charts inside the section don't need individual collapse toggles —\nthe section itself has a collapse header. Replaced <details> with\nplain <div> + <h4> for cleaner layout.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-083",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "421f247",
+      "commit_full": "421f2477e9f511a1aed7971cd1705f2e4164d5d3",
+      "status": "ABGESCHLOSSEN",
+      "description": "perf(server): add in-memory cache for /api/session-turns",
+      "detail": "Past days cached for 1h, today cached for 30s. Eliminates\nredundant full JSONL scan on every request.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-082",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "8adde63",
+      "commit_full": "8adde636040c30cdf250ad7478a0eca060883377",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): remove stale fetchAndRender() call causing ReferenceError",
+      "detail": "Leftover from refactor — function was inlined but old call remained.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-081",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "560847a",
+      "commit_full": "560847a5d1cada447e9a50361b252374b614fd51",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(server): replace deprecated url.parse with WHATWG URL API",
+      "detail": "Node DEP0169 warning on /api/session-turns query parsing.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-080",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "1caeaba",
+      "commit_full": "1caeaba949ca0847e9b349fe1c1ac5e9fe126c96",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): immediate header text, hide redundant date picker, prevent listener leak",
+      "detail": "- Summary line shows 'no data' immediately instead of blank until fetch\n- Date picker hidden (redundant with main day-picker in top nav)\n- Session picker uses main day-picker value for date sync\n- Day Comparison renders immediately from cached data (no async wait)\n- Session picker event listener guarded with dataset.bound to prevent\n  duplicate bindings on re-render\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-079",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "1260be0",
+      "commit_full": "1260be0cc476f7c480cc1e0c2bd2df9d772581b6",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): sync economic charts with day-picker + host filter",
+      "detail": "- renderEconomicSection now receives getFilteredDays() result\n- Day Comparison chart uses filtered days instead of all days\n- Economic date picker syncs with main day-picker selection\n- Charts update when day-picker changes (via renderDashboard re-call)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-078",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "dc145dc",
+      "commit_full": "dc145dcc8bd86e6ba57fde2d351a5135ba92fc0b",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): shorten day-compare x-axis labels to MM-DD (no year)",
+      "detail": "Removes year prefix from daily comparison chart x-axis to reduce\nlabel overflow on narrow viewports.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-077",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "bc2a431",
+      "commit_full": "bc2a431b3b42af143d7590d2d81df60fed617317",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): dark grid lines + side-by-side chart layout for economic section",
+      "detail": "- ECharts splitLine color set to rgba(51,65,85,.3) on all 3 economic\n  charts (was default white, invisible on dark background)\n- Efficiency Timeline + Day Comparison now side-by-side in flex row\n- Waste Curve stays full-width above\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-076",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "ae96b85",
+      "commit_full": "ae96b855a3b9132c0e0573dd6e55f034022bb938",
+      "status": "ABGESCHLOSSEN",
+      "description": "ci(woodpecker): add develop branch to app.yml build trigger",
+      "detail": "develop was missing from the branch list — pushes to develop\ndid not trigger builds. Now: main, develop, feat/**, fix/**.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".woodpecker/app.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-075",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "a575b40",
+      "commit_full": "a575b4093ecb2bc6d4bd9f893d9250d7868e09e0",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(dashboard): add 'Ökonomische Nutzung' section with 3 ECharts",
+      "detail": "New section after Forensic Report showing token efficiency metrics:\n\n- /api/session-turns endpoint: per-session turn-level token data\n- Cumulative Waste Curve: stacked area showing cache_read vs output\n  divergence, with split-point marker (cache/output > 500x)\n- Efficiency Timeline: hourly output vs total with Peak Hours overlay\n  (13-19 UTC / 15-21 MESZ per Anthropic policy)\n- Day Comparison: output/total efficiency ratio per day\n\nSession picker with date selector, i18n in de/en/ko.\n\nEmpirical basis: 2026-04-09 showed 469M tokens with 98% cache_read\nand only 0.1% productive output — this section makes that visible.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-074",
+      "timestamp": "2026-04-10",
+      "session": "auto",
+      "commit": "f5a5c2b",
+      "commit_full": "f5a5c2b96eb49a3bba33c8bfbcb5cbdf19f4f474",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(udaa): add anonymized JSONL session exporter for field study",
+      "detail": "Reads local Claude Code JSONL, extracts turn-level token counts,\nanonymizes (SHA-256 session hash, no content/paths/hostnames),\nwrites submission JSONs for UDAA baseline calibration.\n\nFilters synthetic/empty-token records, excludes sidechains by default.\nCross-platform version lookup via stdio:ignore (not 2>/dev/null).\n\nDry-run verified: 39 exportable sessions from 319 JSONL files.\n\nRef: GRO/Claude-Usage-Dashboard#178\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/udaa-fieldstudy-export.js",
+          "op": "CREATE",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-073",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "4a45038",
+      "commit_full": "4a45038db0e2e984ed3cdad6bdaaee3a33d783cf",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(scrub): strip SonarQube badge lines before generic domain replace",
+      "detail": "Bug: public README on GitHub had four dead SonarQube badge links\npointing at https://sonar.example.com/... — the generic replace rule\n`sonar.grosswig-it.de -> sonar.example.com` ran BEFORE the\n`/grosswig-it.de/d` delete rule, so the delete rule no longer matched\nthe already-rewritten lines. Result: dead badges in the public mirror.\n\nFix: add two explicit delete patterns in the markdown-only loop,\nmatching any SonarQube project_badges URL by pattern (so later\nadditions like ci.example.com/sonar also get stripped, and the\nalready-rewritten sonar.example.com lines are cleaned up):\n\n  -e '/sonar\\..*api\\/project_badges/d'\n  -e '/sonar\\.example\\.com/d'\n\nThe first pattern catches lines that still have an internal sonar host\n(covers any future hostname), the second sweeps already-rewritten lines\nif the generic replace rule ran first. Defense in depth — neither rule\nalone would catch all paths through the script.\n\nInternal READMEs in Gitea still show the live SonarQube badges; only\nthe public mirror strips them. Tested locally against the current\nREADME.md before commit.\n\nRefs #171 (release-notes generator improvements — scrub edge cases\nbelong in the same family of post-processing quality issues).\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/scrub-for-public.sh",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-072",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "d1e6b63",
+      "commit_full": "d1e6b63e738e60f9f5a3f1ed43de93f870b345f9",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(sonar): resolve 16 remaining new_code violations",
+      "detail": "Main branch QG was ERROR on new_violations=16 after v1.2.0-rc merge\nbecause the project's new_code_period is \"previous_version\" (v1.1.0),\nwhile PR-mode scans compared against develop (0 delta). This closes\nthe gap — main-branch scan should now match PR-mode result.\n\nBreakdown:\n- 5x S7741 typeof->direct undefined: introduce `var win = globalThis.window`\n  pattern in __budgetSankeyMeasure, __budgetSankeyBindResize, module-level\n  effResize, and __initAnthropicHealthChartResizeWatch. Also replaces\n  five typeof checks with truthy checks on the captured local.\n- 5x S2486 empty catches: convert to ES2019 optional catch binding\n  `catch { /* reason */ }` in __safeChartResize, __budgetSankeyDispose,\n  __budgetSankeyRedraw clearChart, __budgetSankeyBindResize disconnect,\n  and __effResizeAll. Comments on their own line, no unused parameter.\n- 3x S7735 negated conditions:\n  - __budgetRenderFuel: flip `if (quota.pct_5h != null) {A} else {B}`\n    to early-return for null, reverse logic.\n  - __effNormalizeRow: flip degenerate-case check to positive\n    `if (Number.isFinite(min) && Number.isFinite(max) && min < max) {...}`\n    and move the fallback to the end.\n  - (Third S7735 at 5036 was actually the ternary on the globalThis.window\n    line, resolved by the var-win pattern above.)\n- 1x S6582 optional chain: the third ECharts small-multiple tooltip\n  formatter (Cache Miss %) had `!ps || !ps.length` left over, now\n  `!ps?.length`.\n- 1x S6594 .match()->RegExp.exec(): parseBearerFromAuthorization uses\n  /regex/.exec(s) form.\n- 1x S7778 multiple Array.push: `md.push(\"\")` followed by `md.push(\"## 3.\n  Subagent...\", ...)` combined into a single call starting with \"\".\n\nSyntax verified via node --check. Behavior-preserving refactors only.\nFollowup scan expected to show new_violations = 0 on main baseline too.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-071",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "adec5a2",
+      "commit_full": "adec5a2be038f72f045aa543edbfda71b78e7496",
+      "status": "ABGESCHLOSSEN",
+      "description": "ci(mirror): split release body on <!--INTERNAL--> marker for public mirror",
+      "detail": "The Gitea→GitHub release mirror previously copied the entire release body\nverbatim, only scrubbing internal hostnames. That works for URLs but not\nfor internal terminology (SonarQube, Gitea, Woodpecker, Quality Gate\nreferences etc.) that should never reach the public mirror.\n\nNew behavior: if the Gitea release body contains the marker\n`<!--INTERNAL-->`, only the part BEFORE the marker is mirrored to GitHub.\nEverything after the marker stays in Gitea only. Backward-compatible —\nbodies without the marker are treated as fully public.\n\nUsage:\n\n```markdown\n## v1.2.0 — public summary\n... user-facing changes ...\n\n<!--INTERNAL-->\n\n## Internal release notes\n... SonarQube, Gitea, Woodpecker, internal infra ...\n```\n\nThe mirror picks the first section for the GitHub release; both sections\nstay visible in the Gitea release for the team.\n\nURL scrubbing for the public part is preserved as defense-in-depth even\nthough the public section should not contain internal URLs by convention.\n\nRefs #171 (release-notes generator improvements track this kind of\npublic/internal split as future work in the generator itself).\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".gitea/workflows/mirror-github.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-070",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "e69f42e",
+      "commit_full": "e69f42eed5d3ac7b0e69de371e5315aadea068ee",
+      "status": "ABGESCHLOSSEN",
+      "description": "ci: re-scan PR against develop baseline (#169)",
+      "changes": []
+    },
+    {
+      "id": "TX-069",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "bde349c",
+      "commit_full": "bde349c2bf58a19fc834f23e20fa264d84ad8b3c",
+      "status": "ABGESCHLOSSEN",
+      "description": "ci(sonar): pass sonar.branch.name for non-main branches",
+      "detail": "Community Branch Plugin is installed, so non-main branches can now be\ntracked as separate branches in SonarQube. Without sonar.branch.name,\nany manual scan on a feat/* or develop branch would overwrite main's\nanalysis — bad. With the branch parameter, each branch gets its own\nanalysis state and new-code period.\n\n- sonar-scan step: if CI_COMMIT_BRANCH != main, append\n  -Dsonar.branch.name=$CI_COMMIT_BRANCH\n- quality-gate step: fetch project_status with ?branch= param when\n  scanning non-main, so the QG check hits the right branch result\n- main branch scan behavior unchanged (no branch param)\n\nNeeded so develop can get its own Sonar baseline before merging PRs\nagainst it — avoids PR analyses falling back to main as the baseline.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".woodpecker/sonar.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-068",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "2188a2d",
+      "commit_full": "2188a2d626bbe0c83f0cdf95bfa7f885298db219",
+      "status": "ABGESCHLOSSEN",
+      "description": "ci(sonar): pass sonar.branch.name for non-main branches",
+      "detail": "Community Branch Plugin is installed, so non-main branches can now be\ntracked as separate branches in SonarQube. Without sonar.branch.name,\nany manual scan on a feat/* or develop branch would overwrite main's\nanalysis — bad. With the branch parameter, each branch gets its own\nanalysis state and new-code period.\n\n- sonar-scan step: if CI_COMMIT_BRANCH != main, append\n  -Dsonar.branch.name=$CI_COMMIT_BRANCH\n- quality-gate step: fetch project_status with ?branch= param when\n  scanning non-main, so the QG check hits the right branch result\n- main branch scan behavior unchanged (no branch param)\n\nNeeded so develop can get its own Sonar baseline before merging PRs\nagainst it — avoids PR analyses falling back to main as the baseline.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".woodpecker/sonar.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-067",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "578131b",
+      "commit_full": "578131b762bdace1882e5b28ce16b841aec42486",
+      "status": "ABGESCHLOSSEN",
+      "description": "ci: trigger PR sync for bot cache (#169)",
+      "changes": []
+    },
+    {
+      "id": "TX-066",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "a78f681",
+      "commit_full": "a78f68172888c7d3ec5cc2517c5e6a2edce6e81e",
+      "status": "ABGESCHLOSSEN",
+      "description": "ci: re-trigger pipeline after Gitea webhook setup (#169)",
+      "changes": []
+    },
+    {
+      "id": "TX-065",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "4d8a733",
+      "commit_full": "4d8a733a222a5c2c3ea3a837112e2bfd61059ce9",
+      "status": "ABGESCHLOSSEN",
+      "description": "ci: trigger pipeline re-run after Woodpecker secret patch (#169)",
+      "changes": []
+    },
+    {
+      "id": "TX-064",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "8a343b2",
+      "commit_full": "8a343b2dde7d06383575615799ae286c9f178d7a",
+      "status": "ABGESCHLOSSEN",
+      "description": "ci: add SonarQube PR-decoration to Woodpecker pr.yml + webhook setup script",
+      "detail": "Wire the new SonarQube-Gitea bot (running in the sonarqube namespace,\nissue #168 context) into the PR check pipeline:\n\n.woodpecker/pr.yml changes:\n- Add full-clone directive (depth=0, partial=false) — Sonar needs SCM\n  history for blame and new-code-period detection\n- Add sonar-scan-pr step running sonarsource/sonar-scanner-cli with\n  the three sonar.pullrequest.* parameters that drive PR decoration:\n    - sonar.pullrequest.key    = $CI_COMMIT_PULL_REQUEST\n    - sonar.pullrequest.branch = $CI_COMMIT_SOURCE_BRANCH\n    - sonar.pullrequest.base   = $CI_COMMIT_TARGET_BRANCH\n  Scan results trigger SonarQube's webhook back to the bot, which\n  posts review comments + commit status into the Gitea PR.\n- SONAR_URL / SONAR_TOKEN pulled from existing Woodpecker secrets\n  (same as the main app.yml and sonar.yml scans)\n\nscripts/setup-sonarqube-webhook.ps1 (new, Windows-friendly):\n- Wrapper to register the Gitea -> bot webhook on this repo\n- Reads the webhook shared secret from ~/.secrets/infra-secrets.txt\n  at runtime on the user's machine — never echoed, never logged,\n  cleared from local variables in finally{} block\n- Reads Gitea API token from $env:GITEA_TOKEN or a file path, also\n  never echoed\n- POSTs to $GITEA_URL/api/v1/repos/$Repo/hooks with type=gitea,\n  events=[pull_request, pull_request_sync], content_type=json\n- Defaults: Gitea https://gitea.grosswig-it.de, repo\n  GRO/Claude-Usage-Dashboard, webhook URL\n  http://gitea-sonarqube-bot.sonarqube.svc.cluster.local:3000/hooks/gitea\n- Clear error messages if secret file or token missing\n\nBranch-scan pipeline (.woodpecker/sonar.yml) stays unchanged and\nis still triggered manually for dev iteration.\n\nRelated: #165 (SonarQube QG), #168 (PR decoration as dev-experience\nimprovement). This replaces the manual-scan + API-polling workflow\nwith inline PR review comments.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".woodpecker/pr.yml",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/setup-sonarqube-webhook.ps1",
+          "op": "CREATE",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-063",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "2936986",
+      "commit_full": "29369864a1036690ac190af66e9570391ee79bb1",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(sonar): resolve 25 MAJOR + ~30 MINOR QG violations (#165)",
+      "detail": "Target: SonarQube Quality Gate new_violations threshold (10).\nStarting point after CC refactors: 0 CRITICAL, 25 MAJOR, 36 MINOR (61).\n\nMAJOR fixes (25, all resolved):\n- 19x S6582 optional chain: a && a.b -> a?.b across dashboard.client.js\n  and dashboard-server.js (q5 tracking block)\n- S107 __budgetKpiCardsHtml parameter count 8 -> 6 (t and escHtml were\n  globals being passed redundantly, now referenced via module scope)\n- S3358 nested ternary in ECharts heatmap tooltipFormatter extracted\n  to if/else-if/else chain\n- S3800 (2x) return type consistency: heatmap label formatter and\n  small-multiple yFormatter wrap Math.round(v) in String() so all\n  branches return strings\n- S3923 dead conditional: (isDE?\"Signal\":\"Signal\") both branches equal,\n  collapsed to literal \"Signal\"\n- S7721 fmtTok inner function hoisted to module scope as __budgetFmtTok\n  (shared between renderBudgetWaterfall and sankey row builders via the\n  x.fmtTok context param)\n\nMINOR fixes (partial, ~30 of 36):\n- 6x S7773 prefer Number.*: isNaN -> Number.isNaN, isFinite ->\n  Number.isFinite, parseFloat -> Number.parseFloat (in __effNormalizeRow\n  and server q5 delta tracking)\n- 5x S7764 prefer globalThis.window: replace `typeof window` with\n  `typeof globalThis.window` in budget sankey resize paths, efficiency\n  chart resize, anthropic health chart resize watch\n- 2x S7765 prefer .includes() over .indexOf() in heatmap tooltip\n  formatter metricName checks\n- 6x S2486 empty catch: 5 renamed to `_error` with explanatory comment\n  (ResizeObserver disconnect, Google Charts clearChart, canvas detach\n  race), 1 removed entirely (fs.existsSync does not throw in Node)\n- 4x S7718 catch param rename: eR/eC/eD/readEx -> _error/error\n- 3x S4138 for -> for-of: __stackedHBarXMax (2 inner loops), anthropic\n  health resize watch ids loop, dashboard-server.js proxy export loop.\n  __effHeatmapOption hdata builder uses nested forEach since it needs\n  both metric index (m) and day index (d)\n- 2x S7780 String.raw for Windows paths in claude-data-sync-client.js\n  (C:\\Windows fallback and usage hint string)\n\nRemaining (expected to push total under QG threshold after scan):\n- 1x S6594 RegExp.exec (dashboard-server.js:2856)\n- 1x S7778 single Array.push (dashboard.client.js:3634)\n- 3x S7735 negated conditions (borderline style preference)\n\nSyntax verified via `node --check` on all three modified files. No\nbehavior changes — all fixes are structural/stylistic. A fresh\nSonarQube manual scan on the new HEAD will confirm whether new_violations\ndrops below 10.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/claude-data-sync-client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-062",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "844fec8",
+      "commit_full": "844fec82d9743881ecb7f2f3002ed57ec0f86789",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(user-profile): summary version uses newest semver, not max-count",
+      "detail": "findLatestDayTopEntries() picked the version with the highest call\ncount on the most recent active day. On an upgrade day (e.g. Claude\nCode 2.1.92 → 2.1.96 mid-session), the older version still dominated\nthe volume, so User Profile summary showed 2.1.92 even though the\nuser was actively running 2.1.96 with 46 calls already logged.\n\nFix: sort versions by semver descending and pick the highest with\nnon-zero calls. Entrypoint stays on max-count because there's no\nnatural ordering for entrypoint labels (cli/vscode/intellij/web).\n\nRepro: today 2026-04-09, versions: [2.1.92: N calls, 2.1.96: 46 calls]\nwith N > 46. Before: summary shows \"2.1.92\". After: summary shows\n\"2.1.96\".\n\nUses the existing semverCmpDesc() helper already used by the Version\nHealth chart, so behavior is consistent across the User Profile\nsection.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-061",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "69586c9",
+      "commit_full": "69586c948fb32e01f31b8f4fb83ce743e5f50180",
+      "status": "ABGESCHLOSSEN",
+      "description": "docs: add chapter 09 Data Formats (en/de/ko) + claude-sync.ps1 (#167)",
+      "detail": "Phase 1 of issue #167 (log format adapter / converter roadmap):\ndocument the two data formats the dashboard currently ingests, so\nexternal sources (community researchers, enterprise setups, alternative\nproxy implementations) have a clear spec to target.\n\nChapter 09 covers:\n- JSONL session logs written by Claude Code (~/.claude/projects/...):\n  record types, fields consumed, version-detection fallback chain,\n  entrypoint field, privacy warning about message.content arrays\n- Proxy NDJSON logs written by anthropic-proxy-core.js: timing fields,\n  upstream_status, usage, rate-limit headers, cache_health semantics,\n  cumulative q5 tracking (visible_tokens_per_pct via computeQ5Consumption),\n  false-429 detection via cf-ray absence, context-reset pattern B4\n- Cross-format mapping reference table: each semantic concept mapped\n  against JSONL path, Proxy NDJSON path, and which dashboard chart\n  consumes it\n- Minimum viable record for external adapters targeting Proxy NDJSON\n- Worked LiteLLM-to-proxy example with jq\n- Validation snippet\n- Stability & versioning caveat (fields not formally versioned yet,\n  pin to a Dashboard tag when building external adapters)\n\nChapters linked from all three language indices (en/de/ko README.md).\nKO version is the first ko/ content beyond the existing 04/07 chapters,\ntracked for completion under issue #158.\n\nNew script scripts/claude-sync.ps1 (companion to scripts/\nclaude-data-sync-client.js):\n- Reads the sync token from .sync.secret at runtime — never echoed\n- Defaults URL to the k8s production host, overridable via -Url\n- Supports KEY=VALUE format (CLAUDE_SYNC_TOKEN=... / SYNC_TOKEN=...)\n  or plain single-line token as fallback\n- Passes credentials to Node via environment variables (not argv),\n  clears them in finally{} block even on error\n- Only the token length is logged, never the content\n- Strips optional \"Bearer \" prefix to match the Node client\n- -ProxyLogs switch includes ~/.claude/anthropic-proxy-logs/\n- Clear error messages if secret file or sync client missing\n\nRelated: issue #168 (dashboard UI for sync credentials & health panel,\nv1.3+) — the PS1 script is the CLI path, #168 will add the UI path.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "docs/de/09-datenformate.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/de/README.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/09-data-formats.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/README.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/09-data-formats.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/README.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/claude-sync.ps1",
+          "op": "CREATE",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-060",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "2475be2",
+      "commit_full": "2475be28bfc755a5a39c93ee5aef329309616c09",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(charts): heatmap visualMap dimension + update i18n blurb (#166)",
+      "detail": "Two fixes to the ECharts Phase 1 PoC after visual verification on dev:\n\n1. Heatmap cells all rendered red because visualMap read the LAST\n   numerical dimension of each data point by default. I was pushing\n   [x, y, normalized, raw], so visualMap mapped raw values (ratios\n   0.8-7.5x, percentages 1-50%, etc.) against a 0-1 range — everything\n   > 1 clamped to the max color (red). Fix: add `dimension: 2` to the\n   visualMap so it explicitly reads the normalized value column.\n   Now each row spans blue (min) → red (max) correctly.\n\n2. The proxyEfficiencyTrendBlurb text still described the old 3-series-\n   on-one-chart layout (\"Same day, three sides: JSONL/Proxy (orange)...\").\n   Rewritten in en/de/ko to describe the new heatmap + small multiples\n   layout and hint at interactive tooltips.\n\n3. Added proxyDSCoverage i18n key (en/de/ko) replacing the inline\n   fallback \"Coverage %\" in __effHeatmapOption — keeps i18n discipline.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-059",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "75a37e0",
+      "commit_full": "75a37e0c5841120bc17455220e821f9b87de9b92",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(charts): ECharts Phase 1 PoC — Efficiency Trend (#166)",
+      "detail": "Replace Chart.js-based Efficiency Trend with Apache ECharts\nimplementation: 3 Small Multiples (JSONL/Proxy Ratio, Visible Tokens/1%,\nCache Miss %) + Heatmap Matrix overview above.\n\nThis is the Phase 1 Proof of Concept for #166 (chart library\nconsolidation to Apache ECharts). Rationale: Chart.js cannot cleanly\nrender 3+ metrics with different scales on a single chart — the\nprevious triple-axis stacked layout caused visual artifacts (bars\nappearing to hang mid-chart because y1's zero-line was physically\nmid-canvas). The right fix is separate charts per concern (small\nmultiples) plus a unified overview chart (heatmap matrix), which needs\na chart library with native heatmap support.\n\nChanges:\n- tpl/dashboard.html: add echarts@5.5.1 via jsdelivr CDN alongside\n  existing chart.js and google charts loader; replace single canvas\n  with 4 div containers (heatmap + 3 small multiples in a CSS grid).\n- public/js/dashboard.client.js:\n  - New helpers: __effNormalizeRow, __effHeatmapOption,\n    __effSmallMultipleOption, __effInitOrSet, __effConnectCharts,\n    __effResizeAll.\n  - Heatmap Matrix: metric x day grid, per-row min-max normalized to\n    0-1, 5-stop color gradient (blue → purple → orange → red). Cell\n    labels show raw values with unit-aware formatting (x/K/%).\n    Coverage % added as 4th metric row.\n  - Small multiple 1 (ratio): line chart with ArkNill B8 baseline\n    2.87x as dashed markLine reference.\n  - Small multiple 2 (vispct): bar chart with coverage-aware tooltip\n    (shows Δq5, sample count, coverage %, low-coverage warning).\n  - Small multiple 3 (cachemiss): dashed line chart with auto-scale\n    (no more 0-100 forced range that hid 1-2% values).\n  - Tooltips synced across 3 small multiples via echarts.connect().\n  - Window resize handler calls chart.resize() on all 4 instances with\n    120ms debounce.\n- Old Chart.js implementation removed (~110 lines including the\n  stacked-axis workaround config).\n\nValidation points for this PoC (will be tested on dev deploy):\n1. No flickering on window resize / tab switch / data update\n2. No devicePixelRatio issues on HDPI Windows\n3. No ownerDocument-null crashes on DOM re-layout\n4. Smooth data updates via setOption() without re-instantiation\n\nIf PoC passes, Phase 2 (progressive migration of remaining 29 Chart.js\n+ 2 Google Charts instances) proceeds in dedicated branches. If it\nfails, only 4 charts to roll back.\n\nSee #166 for the full migration roadmap.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-058",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "d263e23",
+      "commit_full": "d263e23fcb83b8c90de62f11002350447b14bf17",
+      "status": "ABGESCHLOSSEN",
+      "description": "refactor+fix: CC reduction for SonarQube QG + tokens/1% cumulative q5",
+      "detail": "Refactor (resolves 4 CRITICAL CC violations in #165):\n- __budgetBuildSankeyRows (CC 141→~2): split budget/api/user branches\n  into __budgetRowsBudget / __budgetRowsApi / __budgetRowsUser + shared\n  helpers __budgetExpandHosts / __budgetPushLeafs / __budgetPushFinalLeafs\n  / __budgetHostSrc / __budgetTopWeights. Pure structural, no behavior\n  change.\n- renderBudgetEfficiency (CC 28→~6): extract __budgetHandleEmpty,\n  __budgetDisposeCharts, __budgetMetricsFromTot, __budgetFillSummary,\n  __budgetRenderFuel, __budgetRenderAlert, __budgetAlertParts.\n- aggregateHourlyLatency (CC 20→~12): extract __aggAddHourLatency.\n- buildReleaseStabilityData (CC 16→~10): extract __releaseBuildOne and\n  __releaseStabilityOf.\n\nFix (Efficiency Trend visible_tokens_per_pct — correctness):\nThe previous formula divided full-day visible tokens by the LAST\nrate_limit snapshot's 5h utilization — mixing a calendar-day aggregate\nwith a rolling-5h-window point value, giving meaningless ratios (2.4K/1%\nwhile ArkNill baseline is 1.5-2.1M/1%).\n\nNew approach:\n- Server: collect q5 samples per request into dd.q5_samples (ts, q5,\n  tokens). Add computeQ5Consumption() which sorts chronologically and\n  sums only positive q5 deltas as \"active consumption\". Expose new\n  fields on proxy_days: q5_consumed_pct, q5_samples,\n  proxy_active_visible_tokens, visible_tokens_per_pct_method.\n- Client: buildEfficiencyData tracks proxy coverage per day\n  (proxy_active_visible_tokens / jsonl visible input+output). Tooltip\n  afterLabel shows Δq5, sample count, coverage %, and warns when\n  coverage < 50% (\"metric understates real value\"). Cache Miss axis\n  suggestedMax reduced from 100 to 10 to match actual values.\n\nKnown limitation: during rollback phases of the 5h window, tokens are\nnot attributed (delta skipped), so the metric is a lower bound. Proxy\ncoverage in practice is 25-40% of JSONL visible traffic, so displayed\nvalues are biased low by the coverage ratio — future work should adjust\nwith coverage factor or clamp chart to days with meaningful proxy data.\n\nREADME (en/de/ko): add language badges.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "README.en.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "README.ko.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "README.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-057",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "109040b",
+      "commit_full": "109040b4c772892d4f9fbcfcfc108d3872816e40",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(sync): Claude data sync docs (en/de/ko), k8s token env, debug status",
+      "detail": "- Docs: multi-host/sync, DEBUG API tables, ko section\n\n- k8s: CLAUDE_USAGE_SYNC_TOKEN from optional secret; README\n\n- Server: claude_data_sync_enabled in /api/debug/status; sync auth logging\n\n- Sync client: token trim, Windows tar path, 401 hints\n\n- Scripts: print-claude-sync-token.ps1 / .sh\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "docs/README.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/de/04-multi-host-und-datensync.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/de/07-umgebung-api-deployment-dev.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/de/README.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/04-multi-host-and-sync.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/07-config-api-deployment.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/README.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/04-multi-host-and-sync.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/07-config-api-deployment.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/README.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "k8s/README.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "k8s/base/deployment.yml",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/claude-data-sync-client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/print-claude-sync-token.ps1",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "scripts/print-claude-sync-token.sh",
+          "op": "CREATE",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-056",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "d823764",
+      "commit_full": "d82376408f16ac986c6f14c673218d7dea606ee7",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(server): proxy-logs debug API liefert NDJSON files fuer DEV_MODE=proxy",
+      "detail": "- /api/debug/proxy-logs: \files mit proxy-*.ndjson (name+content), damit\n  devFetchProxyLogs Remote-Logs schreibt und proxy_days zu JSONL passen.\n- Health-Charts: Canvas-Host, CSS ohne width:!important, sicheres Resize.\n- Efficiency Trend: Cache-Miss-% aus JSONL, i18n-Blurbs.\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-055",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "ca91776",
+      "commit_full": "ca9177645a1f8193d1fd8805e96e862e82ec8255",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(charts): native devicePixelRatio; CI full clone for Sonar",
+      "detail": "- Chart.js: drop forced min DPR=2 (caused blurry downscaled canvases on 1x/zoom).\n  Anti-flicker unchanged: shared __chartTransitionsOff + animation off.\n- GitHub Actions: checkout fetch-depth 0.\n- Woodpecker: clone depth 0 + partial false for Sonar pipelines (SCM/blame).\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": ".github/workflows/docker.yml",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": ".woodpecker/app.yml",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": ".woodpecker/sonar.yml",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-054",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "5c686d9",
+      "commit_full": "5c686d92e7ee7e4d1939a397d6c5059065b7216b",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(sonar): forensic/budget/release charts, globalThis i18n, extract marker",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/extract-dashboard-assets.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-053",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "cc2221d",
+      "commit_full": "cc2221dc2f7b27a676d62aabfd5e1eeda62c736b",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat: forensic report as rendered HTML with collapsible sections",
+      "detail": "- Markdown rendered to HTML via marked.js (CDN)\n- Each ## section wrapped in collapsible <details> (DOM post-processing)\n- Clickable table of contents with section toggle + scroll\n- Expand All / Collapse All buttons in modal header\n- New report sections: Budget Efficiency + Release Stability\n- Report modal container changed from <pre> to <div>\n- Dark theme CSS for tables, blockquotes, headings in report\n- Download/Copy still exports raw markdown\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-052",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "8ac4e2c",
+      "commit_full": "8ac4e2ceb6a4341833c324ee145228b274e7696f",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat: budget efficiency section complete (#150, #160)",
+      "detail": "Budget Efficiency Section with full token budget analysis:\n\nSankey (Google Charts):\n- 3 flow modes: Budget/API/User with Volume/Cost toggle\n- Worker/host nodes when multiple sources detected\n- Host filter integration from top bar\n- Log-scaled band widths (1-4 range)\n\nKPI Cards (7):\n- Effective Output %, Overhead Factor, Cache Miss Rate\n- Lost Signals (retries + interrupts + API errors)\n- Outage Loss (hours from service outages)\n- Tool Bloat (truncated tool results)\n\nFuel Gauges:\n- 5h Window: usage % with hours remaining forecast\n- 7d Window: usage %\n- Effective Budget: fallback-percentage from API headers\n- Green-to-red gradient based on utilization\n\nCapacity Alert Banner:\n- Red alert when fallback-percentage < 100%\n- Shows overage policy and binding constraint\n\nCharts (split into 2):\n- Efficiency Trend: Output % up (good), Overhead inverted down (bad)\n- Quota Usage: 5h/7d utilization + fallback budget %\n\nKey Findings (#6-#8):\n- Effective Budget (fallback-percentage)\n- Overage Policy (rejected = hard cutoff)\n- Binding Constraint (representative-claim)\n\nInfrastructure:\n- Plan Selector (MAX5/MAX20/Pro/Free/API) with localStorage\n- Sticky filter bar with dev-bar offset support\n- Collapsible Token Budget Breakdown sub-section\n- Filter bar title \"Filter criteria\"\n- Compact budget cards styling\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-051",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "c27cf7c",
+      "commit_full": "c27cf7c151dfda6090fa91a7e3be377896d8b072",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: wider Sankey node bars (18→28px) for better visibility",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-050",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "9df3b0b",
+      "commit_full": "9df3b0bc58635b5c80933ed8968e05b39d23c4b7",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat: worker nodes in all 3 Sankey flow modes",
+      "detail": "All modes show workers when multiple hosts exist:\n- Budget: MAX5 → Workers → Token Types → Productive/Overhead\n- API:    Claude API → Workers → Token Types → You\n- User:   You → Workers → Token Types → Total Usage\n\nSingle host falls back to direct flow without worker column.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-049",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "2179ac0",
+      "commit_full": "2179ac0fc7d90518df1a969a6ed79a3242062806",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat: worker/host nodes in budget Sankey + revert light bg",
+      "detail": "Budget Flow now shows 4 columns when multiple hosts exist:\n  MAX5 Budget → Worker A/B/C/D → Token Types → Productive/Overhead\n\n- Per-host token aggregation passed to Sankey renderer\n- Single host falls back to direct MAX5 → Token Types flow\n- Reverted light background (stays dark theme)\n- Worker labels show host name + total tokens\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-048",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "cf62b4d",
+      "commit_full": "cf62b4d221cf37fbc110dc80f6478a845285f466",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: light background for Sankey + dark labels for contrast",
+      "detail": "Google Charts has no dark mode — light container (#f8fafc) makes\nnode bars and labels visible. Label color set to #1e293b (dark).\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-047",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "240c15e",
+      "commit_full": "240c15e4535cc96087985aaf1fa1f0d4b6d09b41",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat: replace chartjs-chart-sankey with Google Charts Sankey",
+      "detail": "- Google Charts renders proper node bars at ALL positions (left, middle, right)\n- CDN: gstatic.com/charts/loader.js (same as SCHUFA project)\n- Removed d3.js and d3-sankey dependencies\n- Removed chartjs-chart-sankey dependency\n- Sankey container changed from <canvas> to <div> (SVG-based)\n- All 3 flow modes + volume/cost toggle preserved\n- Node colors: gray(source), green(output), blue(input), cyan(cache read),\n  amber(cache creation), red(overhead), purple(API)\n- Gradient link coloring for visual flow direction\n- Dynamic height based on flow count\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-046",
+      "timestamp": "2026-04-09",
+      "session": "auto",
+      "commit": "4d4410a",
+      "commit_full": "4d4410a6bc6e12c64da069b25ea3aa2058252484",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: remove epsilon terminator hack causing ghost nodes",
+      "detail": "Terminator node created visible \"Total Usage → 0\" artifact.\nEnd nodes now terminate naturally — labels provide the endpoint.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-045",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "443eb8f",
+      "commit_full": "443eb8f93412a1b227f2c209259ddd9d92d3868e",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: sankey equal-width bands for clean flow visualization",
+      "detail": "- All flows use width=1 regardless of token volume\n- Eliminates thick-block problem from extreme ratios (98% vs 0.1%)\n- Real percentages and token counts shown in node labels\n- Labels format: \"Output 3.8% (27.8M)\" instead of just \"Output (27.8M)\"\n- Aspect ratio 2.8 for better proportions with equal bands\n- Tooltips still show full details on hover\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-044",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "c8bcee7",
+      "commit_full": "c8bcee792713bfe8e6aade9ddcd491541242f496",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: replace broken endBar plugin with epsilon terminator node",
+      "detail": "- Removed custom afterDraw plugin (couldn't access internal _nodes)\n- Added invisible terminator node with 0.01 epsilon flows from end nodes\n- Forces Sankey plugin to draw end-node bars natively\n- All nodes now have both incoming and outgoing flows = visible bars\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-043",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "71e7f61",
+      "commit_full": "71e7f61e361c9380750f171a020b7ee9d2ec3c19",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: filteredHost scoped to global for sankey re-render access",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-042",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "8d6ee44",
+      "commit_full": "8d6ee4412c1e34adf9ac2d4927f7d93458aa9c90",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat: budget sankey respects host filter from top bar",
+      "detail": "- When a source/host is selected in the top filter bar, budget efficiency\n  section shows only that host's token data\n- Sankey source node shows host name instead of \"MAX5 Budget\"\n- All KPI cards, waterfall, and trend reflect filtered host data\n- No host filter = aggregated \"MAX5 Budget\" view (all sources combined)\n- Removed unused hostTotals aggregation (filter handles it)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-041",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "7ab9934",
+      "commit_full": "7ab9934022b8809a5ac0fff89f5ef608649ec462",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: draw sankey end-node bars via custom Chart.js plugin",
+      "detail": "- Custom afterDraw plugin detects end-nodes (incoming only, no outgoing)\n- Draws colored rectangles with border at end-node positions\n- Labels rendered next to end bars\n- Right padding (120px) reserves space for end labels\n- End bars use node colors from flow colorTo mapping\n- Works across all 3 flow modes\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-040",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "de490b9",
+      "commit_full": "de490b9569db5d4614b6e4e3cc8eb190306c94a6",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: sankey end nodes as solid bars + User Flow gets Result collector",
+      "detail": "- nodeWidth increased to 26px for visible end bars\n- User Flow: Token Types now flow into \"Total Usage\" end node\n- All 3 modes have proper left→middle→right structure, no open ends\n- Budget Flow: Budget → Types → Productive/Overhead\n- API Flow: API → Types → You\n- User Flow: You → API → Types → Total Usage\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-039",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "f1d7c1f",
+      "commit_full": "f1d7c1f99473e73b9f7ef580b91262ff103526e4",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat: sankey with 3 flow modes + volume/cost switch buttons",
+      "detail": "Three switchable flow perspectives:\n- Budget Flow: MAX5 Budget → Token Types → Productive/Overhead\n- API Flow: Claude API → Token Types → You\n- User Flow: You → Claude API → Token Types\n\nPlus Volume/Cost weight toggle (separate button group).\nBoth use segmented button UI (.budget-switch-group).\nAll nodes properly connected — no dangling flows.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-038",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "f12ee90",
+      "commit_full": "f12ee90bbfbe065461baacdd7cbf26c97507a6bd",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: sankey uses log-scaled flows for even band distribution",
+      "detail": "- log10(1+pct) compression: 98%→2.0, 1%→1.3, 0.1%→1.0\n- Max ratio now ~2:1 instead of 33:1 (sqrt) or 980:1 (linear)\n- All four token bands visually distinct and readable\n- Removed min-flow clamp (log scale handles small values naturally)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-037",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "519eca2",
+      "commit_full": "519eca2c5a9f8665be2ef2c3aa24ffb226ab6392",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: sankey uses sqrt-scaled flow widths for balanced band visibility",
+      "detail": "- sqrt() compression: 98% flow becomes ~9.9 wide, 0.1% becomes ~0.3\n- Reduces dominant-to-smallest ratio from 980:1 to ~31:1\n- All four token type bands visible as distinct flows\n- Min band width 0.4 for tiny segments\n- Actual percentages still shown in labels and tooltips\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-036",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "d4f38d4",
+      "commit_full": "d4f38d4d3274e38c027971e254d8990f29ad883a",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: sankey uses percentage flows + proper labels + quota fix",
+      "detail": "- Flows normalized to percentages (0-100%) so all segments visible\n- Min flow 0.5% for tiny segments (input, output)\n- Labels show node names with token counts, not rgba() colors\n- Removed broken quota percentage calculation from blurb\n- Tooltips show flow % + raw token count\n- Node colors via proper colorFrom/colorTo functions\n- Aspect ratio 3.5 for better proportions\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-035",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "6dce60e",
+      "commit_full": "6dce60e4c6aec2f4b5773261cf0977cc9eaef2f0",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat: replace budget waterfall with Sankey flow diagram",
+      "detail": "- Added chartjs-chart-sankey plugin (CDN, ~9KB)\n- Sankey shows: Token Budget → Output/Input/Cache Read/Cache Creation → Productive/Overhead\n- Volume/Cost toggle switches between raw tokens and weighted quota cost\n- Gradient colors from source to destination nodes\n- Tooltips show flow values with smart formatting (K/M/B)\n- Node labels include percentage of total budget\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-034",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "2f975ba",
+      "commit_full": "2f975baea2b8981ba4cbafa8194bdd9ae5039505",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat: quota 5h/7d usage history in budget efficiency trend chart",
+      "detail": "- Merges proxy rate_limit snapshots per day into trend data\n- Purple line: 5h quota utilization % (filled area)\n- Pink dashed line: 7d quota utilization %\n- Both share right Y-axis with output % (0-100%)\n- Lines only appear when proxy quota data is available\n- Overhead factor remains on left Y-axis\n- Removed cache miss % (replaced by more useful quota lines)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-033",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "3504240",
+      "commit_full": "3504240569009cafbe8a3ee3fad5fb055e2a72f3",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat: budget waterfall with Volume/Cost toggle + quota relation",
+      "detail": "- Toggle button switches between raw token volume and weighted quota cost view\n- Cost weights: output=1x, input=0.33x, cache_read=0.03x, cache_creation=0.42x\n- Shows estimated quota usage % when proxy rate-limit data available\n- Single stacked bar with per-segment legend and detailed tooltips\n- Tooltip in cost mode shows both weighted cost and raw token count\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-032",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "1b63cb4",
+      "commit_full": "1b63cb4ef3b7683aa03f397c54ed95e5e1c83ac4",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat: budget efficiency section with waterfall + trend charts",
+      "detail": "New collapsible section between User Profile and Proxy Analytics:\n- 4 KPI cards: Effective Output %, Overhead Factor, Cache Miss Rate, Lost Signals\n- Waterfall chart: horizontal floating bars showing token budget breakdown\n  (Output → Cache Read → Input → Cache Creation)\n- Trend chart: daily overhead factor (line) + output % (area) + cache miss % (dashed)\n- All data aggregated client-side from existing day data (respects month filter)\n- i18n keys for DE/EN/KO (24 keys each)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-031",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "c488da5",
+      "commit_full": "c488da533fc46d0b110677fc95b298cbd026fe2a",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: align all 3 user profile charts horizontally",
+      "detail": "- Set consistent container height based on version count (28px per bar)\n- All 3 charts use maintainAspectRatio: false to respect container height\n- Unified Y-axis font settings across all charts\n- Y-axis labels now align horizontally across Version Health,\n  Client Type, and Release Stability\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-030",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "fce2c89",
+      "commit_full": "fce2c8994356dcc6470ad1f7dbf29a06cd204ffa",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: release stability chart as 3rd tile with version filter sync",
+      "detail": "- Chart now sits beside Version Health + Entrypoints (3-column grid)\n- Uses same sortedVers from version filter — filter clicks affect all 3 charts\n- Matches user versions against GitHub releases lookup\n- Unknown versions shown as grey bar\n- Removed unused .charts-full CSS class\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-029",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "3da0aaa",
+      "commit_full": "3da0aaa679ca60f921a68d6aa4d6e171fb6b5177",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat: release stability chart in User Profile section",
+      "detail": "Analyzes GitHub releases cache to visualize Anthropic's release patterns:\n- Horizontal stacked bar chart showing days active per release\n- Color-coded: green (stable), yellow (regression fix), red (same-day hotfix)\n- Tooltips with skipped patches, matched keywords, dates\n- Summary blurb with total releases, cadence, skipped/hotfix/regression counts\n- Server-side buildReleaseStabilityData() from existing releases cache\n- i18n keys for DE/EN/KO\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-028",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "5575cdb",
+      "commit_full": "5575cdbf2ab47bc2431b8521a6f3dc92988c9371",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: resolve SonarQube security hotspots",
+      "detail": "- Replace backtracking-prone regex with bounded/negated patterns\n- Default to https:// in URL fallbacks\n- Use dummy https base for URL parsing\n- Remove + quantifiers from trailing-slash regex\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/claude-data-sync-client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-http.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/usage-scan-roots.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-027",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "63b822b",
+      "commit_full": "63b822bb3dcfbd1b11a2ee25e40eb0474e385eda",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: resolve SonarQube security hotspots",
+      "detail": "- Replace backtracking-prone regex with bounded/negated patterns\n- Default to https:// in URL fallbacks\n- Use dummy https base for URL parsing\n- Remove + quantifiers from trailing-slash regex\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/claude-data-sync-client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-http.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/usage-scan-roots.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-026",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "2864f78",
+      "commit_full": "2864f7884abae6704ebce74cd5081ea9e88a879b",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: resolve remaining 36 SonarQube new-code violations",
+      "detail": "- Extract aggregateHourlyTotals, aggregateHourlyLatency, buildEfficiencyData\n- Extract mergeVersionEntry, maxKeyByValue helpers\n- Convert all proxy-trend for-loops to for-of\n- Replace data.proxy && data.proxy.proxy_days with optional chain\n- Fix empty catch blocks: use existsSync or log error\n- Rename _ignored catch params to error\n- Use replaceAll + String.raw for regex escape\n- Fix negated conditions with nullish coalescing\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-025",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "6e2ade8",
+      "commit_full": "6e2ade8037193005d605740810c22ac03281e61c",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: resolve 26 SonarQube new code violations",
+      "detail": "- Replace indexOf with startsWith, optional chaining, negated conditions\n- Extract renderVersionHealthChart/renderEntrypointsChart from renderUserProfileCharts\n- Extract collectFallbackVersionKeys, mergeEntrypointsInto, startupDevFull/Proxy\n- Use .dataset over getAttribute/setAttribute for data-* attrs\n- Use node.replaceWith over parent.replaceChild\n- Convert for-loops to for-of in miniMd and release history\n- Add comments to intentionally empty catch blocks\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-024",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "b3e46cc",
+      "commit_full": "b3e46cc43b4fc81d52a375a39b269d1a3f761327",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat: multi-day proxy trends + efficiency chart",
+      "detail": "- Model Distribution: stacked bar per day + latency line\n- Hourly Heatmap: aggregated across all proxy days\n- Hourly Latency: aggregated avg/max across all days\n- New: Error/429 Rate Trend (per day)\n- New: Cache Quality Trend (ratio + cold starts per day)\n- New: Efficiency Trend (JSONL/Proxy ratio + visible tokens/1%)\n- Remove JSONL comparison text (covered by efficiency chart)\n- Layout: trend charts in 3-col grid row\n- i18n: EN/DE/KO for all new charts and updated blurbs\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-023",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "f616921",
+      "commit_full": "f616921cb1337cc87505eb621cd8fbbdacf23370",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: entrypoints chart merge bug, chart sharpness, UI polish",
+      "detail": "- Fix aggregateVersionStats: handle entrypoints object merge (was 0+{})\n- Chart.js devicePixelRatio min 2 for sharp rendering on all displays\n- Add chart blurbs for Version Health + Client Type (EN/DE/KO)\n- Version filter: null=all, []=none, move controls above chart grid\n- Equalize sort/filter control sizing, add spacing to User Profile\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-022",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "9e964fa",
+      "commit_full": "9e964fa8af8dbf06f129a004792dc45cac629cf0",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: resolve SonarQube violations + add dev sonar pipeline",
+      "detail": "- Fix .sort() without compare (localeCompare), for→for-of, optional chaining\n- Extract helpers to reduce cognitive complexity\n- Add .woodpecker/sonar.yml (manual trigger, scan + QG only)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".woodpecker/sonar.yml",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-021",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "4bcae22",
+      "commit_full": "4bcae22e7e459d60dd9e04cb0da6073f0eacf504",
+      "status": "ABGESCHLOSSEN",
+      "description": "ci: configure SonarQube for Node.js (CUD quality gate, JS-only scan)",
+      "detail": "- sonar-project.properties: set QG=CUD, language=js, exclude coverage\n- .gitignore: exclude .woodpecker/.api and .woodpecker/.cli\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".gitignore",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "sonar-project.properties",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-020",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "a24d85f",
+      "commit_full": "a24d85f896417f0aba5836b9843834a6220809a1",
+      "status": "ABGESCHLOSSEN",
+      "description": "ci: add SonarQube Quality Gate check to prod pipeline",
+      "detail": "Pipeline aborts if QG status is not OK after sonar-scan.\nDev builds (feat/fix branches) are unaffected.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".woodpecker/app.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-019",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "7756c11",
+      "commit_full": "7756c11b64b8733d3f9a6dbab797174bc165965c",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: retry on 5xx during remote data fetch (dev mode)",
+      "detail": "devFetchRemoteUsage now retries up to 3x with 5s delay on 502/503/504\n(common after cache-reset when server is rescanning). Also checks\nstatusCode before JSON.parse to avoid cryptic parse errors on\nnon-JSON error pages (Bad Gateway, Authelia redirects, etc).\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-018",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "c52b76d",
+      "commit_full": "c52b76d12006b9711b946edb8c75426ecbed1a9a",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: move cache-reset to /api/debug/ path (bypasses Authelia)",
+      "detail": "Renamed /api/cache-reset → /api/debug/cache-reset so it uses the\nsame Traefik bypass as /api/debug/proxy-logs. Added DEBUG_API=1\nguard. Updated --no-cache remote call to use new path.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-017",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "3677ad2",
+      "commit_full": "3677ad21c7c8333b6830079a4224811363c512ab",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat: entrypoints per version chart (horizontal bar)",
+      "detail": "Server:\n- Track entrypoints per version in version_stats.entrypoints\n- Merge entrypoints sub-map in version_stats merge logic\n- Bump USAGE_DAY_CACHE_VERSION 6→7\n\nFrontend:\n- Replace timeline entrypoints chart with horizontal bar per version\n- Same sort/filter as Version Health chart (synced sortedVers)\n- Stacked by entrypoint (vscode=blue, cli=green, jetbrains=amber)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-016",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "079ec99",
+      "commit_full": "079ec999b5e74b8d33967555d3183eb9199af684",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: User Profile summary shows ? when latest day has no data",
+      "detail": "Find last day with actual version/entrypoint data instead of\nblindly using days[last]. Fixes ? · ? when today has 0 calls.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-015",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "d2b01ea",
+      "commit_full": "d2b01ea451ef339c9ecafe4e8c2efc8c93b213bd",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(i18n): add Korean language support with glossary tooltips",
+      "detail": "Based on ArkNill's PR (github.com/fgrosswig/claude-usage-dashboard/pull/1),\nintegrated into current codebase with our new features (version_stats,\nentrypoints, User Profile section).\n\n- tpl/ko/ui.tpl: 370 Korean UI keys (354 original + 16 new features)\n- Server: ko bundle in i18n pipeline (buildI18nBundles, getDashboardHtml)\n- Frontend: language detection/switching for ko, KO button in header\n- Glossary tooltips: 29 technical terms with hover popovers (ko only)\n  MutationObserver for SSE updates, first-occurrence-per-parent\n- README.ko.md with cross-language links\n- CSS: .tt dotted underline + #tt-pop fixed popover styling\n\nOriginal Korean translation by ArkNill (MJ Hwang)\nhttps://github.com/ArkNill\n\nCo-Authored-By: ArkNill <48707894+ArkNill@users.noreply.github.com>\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".gitignore",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "README.en.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "README.ko.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "README.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "CREATE",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-014",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "dd79250",
+      "commit_full": "dd792508bb85157a45be0455650bee403f9ad310",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat: POST /api/cache-reset endpoint + --no-cache remote support",
+      "detail": "Server:\n- POST /api/cache-reset deletes day-cache + today-index, triggers\n  full JSONL rescan, logs via serviceLog\n- --no-cache in DEV_MODE=full sends POST to remote /api/cache-reset\n  before first fetch, so remote rebuilds cache with latest fields\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-013",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "d184960",
+      "commit_full": "d18496096421fa679a08861f66376cc92787d5d3",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat: --no-cache CLI flag for one-shot cache invalidation",
+      "detail": "Maps to existing CLAUDE_USAGE_NO_CACHE=1 env var. Useful for local\ndev sessions: node start.js dashboard --no-cache\nForces full JSONL re-scan on startup without persisting the setting.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-012",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "40c3e4f",
+      "commit_full": "40c3e4fd463711115c163ff0fae9e1cecc25b7f8",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat: compact summary line, remove oversized cards, checkbox filter",
+      "detail": "- Replace large card grid with single-line summary in collapsible header\n  (version, entrypoint, count, anomaly rate, worst version — all inline)\n- Checkbox dropdown filter: toggle button, per-version checkboxes with\n  anomaly/call badges, All/None quick-select, click-outside-close\n- Remove #user-profile-cards div entirely\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-011",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "fd74a71",
+      "commit_full": "fd74a71980d5d9972212b4d1bd19fa47a362c387",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: bump USAGE_DAY_CACHE_VERSION to 6, remove kubectl exec hack",
+      "detail": "Server invalidates its own day-cache on startup when cache version\nmismatches (5 → 6). No need for kubectl exec from CI pipeline.\nTriggers full JSONL re-scan with version_stats + entrypoints.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".woodpecker/app.yml",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-010",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "c140bf8",
+      "commit_full": "c140bf8030d5c600aaa063b7d57be887a545f32a",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ci): invalidate day-cache BEFORE image rollout",
+      "detail": "Cache must be deleted on the OLD pod before setting the new image.\nOtherwise new pod starts, loads stale cache from PVC, and never\nre-scans with new fields. Also removes today-index.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".woodpecker/app.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-009",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "de1cce7",
+      "commit_full": "de1cce736971abdc4ffa4c402f7f0b0ca9bed8e8",
+      "status": "ABGESCHLOSSEN",
+      "description": "ci: invalidate day-cache after deploy",
+      "detail": "Removes usage-dashboard-days.json after rollout so new fields\n(version_stats, entrypoints) get populated on next scan.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".woodpecker/app.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-008",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "efb7231",
+      "commit_full": "efb723143cd4f0e94a21b52d8029c994d8c46010",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: Version Health Chart crash when version_stats empty",
+      "detail": "versionAnomalyTotal() and sortVersionKeys() crashed with TypeError\nwhen stats[ver] was undefined — happens when versions exist in the\nlegacy counter map but not yet in version_stats (e.g. remote server\nnot yet updated, or day-cache from before the feature).\n\nAdded null-guards to both functions.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-007",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "d8b2f59",
+      "commit_full": "d8b2f5999f68e61adbcb06a68fee44a48201aaa3",
+      "status": "ABGESCHLOSSEN",
+      "description": "ci: dev/prod build split in Woodpecker pipeline",
+      "detail": "- Dev Build (feat/**/fix/**): skip SonarQube, tag dev-<sha>, keep 1 dev image\n- Prod Build (main): SonarQube + tag latest+<sha>, keep 2 prod images\n- Deploy step auto-selects correct image tag per branch\n- GitHub mirror unchanged (only triggers on merged PR to main)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".woodpecker/app.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-006",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "22a7263",
+      "commit_full": "22a72630aad3319c0c818ed3fb89fda9247f2631",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat: Version Health Chart — per-version anomaly tracking",
+      "detail": "Server:\n- emptyVersionStats() + version_stats in pipeline (bucket/parse/merge/cache/API)\n- Track hit_limit, retry, interrupt, truncated, api_error per CLI version\n- api_error as new session signal in classifyJsonlSessionSignals\n\nFrontend:\n- renderUserProfileCharts() redesign: horizontal grouped bar (indexAxis:y)\n- Aggregate version_stats across filtered days\n- Sort by anomalies/newest/calls, version multi-filter\n- Cards: current version, anomaly rate, worst version, entrypoint\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-005",
+      "timestamp": "2026-04-08",
+      "session": "claude-opus-4.6",
+      "commit": "pending",
+      "status": "ABGESCHLOSSEN",
+      "type": "feat",
+      "description": "feat: Version Health Chart — per-version anomaly tracking",
+      "detail": "Versions-Chart komplett redesigned: statt einfacher Call-Counts jetzt pro-Version Anomalie-Metriken (hit_limit, retry, interrupt, truncated, api_error). Horizontales Grouped Bar mit Sortierung und Filter.",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "component": "server",
+          "op": "EDIT",
+          "detail": "feat: emptyVersionStats(), version_stats in emptyDailyBucket/processJsonlFile (usage+signals+hitlimit)/merge/cache/API. api_error als neues Session-Signal in classifyJsonlSessionSignals."
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "component": "frontend",
+          "op": "EDIT",
+          "detail": "feat: renderUserProfileCharts() Redesign — aggregateVersionStats(), horizontales Bar-Chart (indexAxis:y), Sortierung (anomalies/newest/calls), Version-Filter, Anomalie-Rate Cards, worstVer Card."
+        },
+        {
+          "file": "public/css/dashboard.css",
+          "component": "frontend",
+          "op": "EDIT",
+          "detail": "feat: .user-chart-controls + .user-chart-select Styling fuer Sort/Filter-Dropdowns."
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "component": "frontend",
+          "op": "EDIT",
+          "detail": "feat: Sort-Dropdown + Version-Filter-Select im User Profile Chart-Box."
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "component": "frontend",
+          "op": "EDIT",
+          "detail": "feat: 11 neue i18n-Keys (userVersionHealth*, userDS*, userSort*, userProfileCard*)."
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "component": "frontend",
+          "op": "EDIT",
+          "detail": "feat: 11 neue i18n-Keys (english)."
+        }
+      ]
+    },
+    {
+      "id": "TX-004",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "3363efd",
+      "commit_full": "3363efd68781a10a85753cba83cd20c4b93fb04c",
+      "status": "ABGESCHLOSSEN",
+      "type": "feat",
+      "description": "feat: User Profile Section — entrypoints tracking, version charts, SRI fix",
+      "detail": "Server: extractEntrypoint() + entrypoints Pipeline. Frontend: User Profile Section. Chart.js SRI.",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "component": "server",
+          "op": "EDIT",
+          "detail": "feat: extractEntrypoint(), entrypoints counter map through pipeline"
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "component": "frontend",
+          "op": "EDIT",
+          "detail": "feat: _userCharts, renderUserProfileCharts()"
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "component": "frontend",
+          "op": "EDIT",
+          "detail": "feat: User Profile Section + fix: Chart.js SRI (v4.4.9)"
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "component": "frontend",
+          "op": "EDIT",
+          "detail": "feat: 6 neue i18n-Keys"
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "component": "frontend",
+          "op": "EDIT",
+          "detail": "feat: 6 neue i18n-Keys"
+        },
+        {
+          "file": "README.md",
+          "component": "docs",
+          "op": "EDIT",
+          "detail": "chore: Community-URLs"
+        },
+        {
+          "file": "README.en.md",
+          "component": "docs",
+          "op": "EDIT",
+          "detail": "chore: Community-URLs"
+        },
+        {
+          "file": "docs/README.md",
+          "component": "docs",
+          "op": "EDIT",
+          "detail": "chore: Community-Referenzen"
+        }
+      ]
+    },
+    {
+      "id": "TX-003",
+      "timestamp": "2026-04-08",
+      "session": "claude-opus-4.6",
+      "commit": "pending",
+      "status": "OBSOLET",
+      "type": "feat",
+      "description": "feat: User Profile Section (manueller Draft, ersetzt durch TX-004)",
+      "detail": "Manuell angelegter Draft vor dem Commit. Durch auto-TX-004 ersetzt.",
+      "changes": []
+    },
+    {
+      "id": "TX-002",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "b87159b",
+      "commit_full": "b87159ba904662172444c97b3d6ea9d070b74b0f",
+      "status": "ABGESCHLOSSEN",
+      "type": "chore",
+      "description": "chore: generate-release-notes.js vom Repo ausschliessen",
+      "changes": [
+        {
+          "file": ".gitignore",
+          "component": "config",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-001",
+      "timestamp": "2026-04-08",
+      "session": "auto",
+      "commit": "8a7b91d",
+      "commit_full": "8a7b91d96c716bb8b6f28c755002de1e377dd25c",
+      "status": "ABGESCHLOSSEN",
+      "type": "chore",
+      "description": "chore: lokale tx-log Hooks und logs/ vom Repo ausschliessen",
+      "changes": [
+        {
+          "file": ".gitignore",
+          "component": "config",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    }
+  ]
+}

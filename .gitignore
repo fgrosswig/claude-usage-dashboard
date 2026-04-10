@@ -27,7 +27,8 @@
 /scripts/hooks/
 /scripts/update-tx-log.js
 
-/logs/
+!/logs/
+!/logs/**/*
 
 !/tpl/
 !/tpl/**/*
