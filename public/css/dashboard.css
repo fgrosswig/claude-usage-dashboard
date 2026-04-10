@@ -108,6 +108,7 @@ tr:hover td{background:#334155}
 .forensic-summary-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;flex-shrink:0}
 .forensic-summary-actions .forensic-host-filter-wrap{margin:0}
 .forensic-inner{padding:0 16px 16px;border-top:1px solid #334155}
+.economic-controls{padding-top:14px}
 .forensic-chart-disclosure{margin-top:12px;border:1px solid #334155;border-radius:8px;background:#1e293b;overflow:hidden}
 .forensic-chart-disclosure:first-child{margin-top:8px}
 .forensic-chart-disclosure--service{margin-top:14px}
