@@ -1867,7 +1867,7 @@ function renderDashboardCore(data) {
   }
   renderProxyAnalysis(data);
   renderBudgetEfficiency(data);
-  renderEconomicSection(data);
+  renderEconomicSection(data, getFilteredDays(data.days));
   __releaseStabilityData = data.release_stability || null;
   renderUserProfileCharts(getFilteredDays(data.days));
   updateMetaDetailsSummary(data);
@@ -8330,7 +8330,7 @@ function inlineMd(s) {
 var _econCharts = {};
 var _econData = null;
 
-function renderEconomicSection(data) {
+function renderEconomicSection(data, filteredDays) {
   var collapse = document.getElementById("economic-collapse");
   if (!collapse) return;
   var sumEl = document.getElementById("economic-summary-line");
@@ -8358,9 +8358,12 @@ function renderEconomicSection(data) {
   if (eB) eB.textContent = t("econEfficiencyBlurb");
   if (dB) dB.textContent = t("econDayCompareBlurb");
 
-  // Default date from day picker or today
-  var defaultDate = (data.days && data.days.length) ? data.days[data.days.length - 1].date : new Date().toISOString().slice(0, 10);
-  if (datePicker && !datePicker.value) datePicker.value = defaultDate;
+  // Sync with main day-picker selection
+  var mainPicker = document.getElementById("day-picker");
+  var defaultDate = (mainPicker && mainPicker.value) ? mainPicker.value
+    : (data.days && data.days.length) ? data.days[data.days.length - 1].date
+    : new Date().toISOString().slice(0, 10);
+  if (datePicker) datePicker.value = defaultDate;
 
   // Fetch session turns for selected date
   function fetchAndRender() {
@@ -8376,7 +8379,7 @@ function renderEconomicSection(data) {
           renderWasteCurve(session);
           renderEfficiencyTimeline(stData);
         }
-        renderDayComparison(data.days || []);
+        renderDayComparison(filteredDays || data.days || []);
       })
       .catch(function () {
         if (sumEl) sumEl.textContent = t("econSummaryNoData");
