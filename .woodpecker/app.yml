@@ -114,8 +114,8 @@ steps:
           echo "Siehe k8s/README.md (Pull-Secret aus Harbor-Robot). Beispiel: kubectl create secret docker-registry harbor-pull -n claude --docker-server=harbor.grosswig-it.de ..."
           exit 1
         fi
-        # Dev-Build: dev-<sha>, Prod-Build: <sha>
-        if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        # Dev-Build: dev-<sha>, Prod-Build: <sha> (tag events have no branch)
+        if [ "${CI_COMMIT_BRANCH:-}" = "main" ] || [ -n "${CI_COMMIT_TAG:-}" ]; then
           TAG="${CI_COMMIT_SHA:0:8}"
         else
           TAG="dev-${CI_COMMIT_SHA:0:8}"
@@ -141,7 +141,7 @@ steps:
         API="https://harbor.grosswig-it.de/api/v2.0/projects/claude/repositories/claude-usage-dashboard/artifacts"
         # Prod: keep 2 SHA-tags + latest
         # Dev: keep only 1 dev-* tag (latest dev build)
-        if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        if [ "${CI_COMMIT_BRANCH:-}" = "main" ] || [ -n "${CI_COMMIT_TAG:-}" ]; then
           KEEP=2
           TAGS=$(curl -s -u "$HARBOR_USER:$HARBOR_PASS" "$API?page_size=50&sort=-push_time" | jq -r '.[].tags[]?.name // empty' 2>/dev/null | grep -v latest | grep -v '^dev-')
         else
