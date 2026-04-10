@@ -2,6 +2,33 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-112",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "e24884e",
+      "commit_full": "e24884ef419115b6237eac532e8500af23bd5156",
+      "status": "ABGESCHLOSSEN",
+      "description": "ci(release): track logs/transactions.json for CI draft-release-notes",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": ".gitignore",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "logs/transactions.json",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "scripts/scrub-for-public.sh",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-111",
       "timestamp": "2026-04-11",
       "session": "auto",
