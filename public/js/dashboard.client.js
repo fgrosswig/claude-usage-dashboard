@@ -8934,15 +8934,25 @@ function renderCacheExplosion(session) {
       },
       splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
     },
-    yAxis: {
-      type: "value",
-      axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } },
-      splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
-    },
+    yAxis: [
+      {
+        type: "value",
+        axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } },
+        splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
+      },
+      {
+        type: "value",
+        position: "right",
+        axisLabel: { color: "#3b82f6", formatter: function (v) { return v.toFixed(0) + "\u00d7"; } },
+        splitLine: { show: false },
+        axisLine: { show: true, lineStyle: { color: "rgba(59,130,246,0.3)" } }
+      }
+    ],
     series: [
       {
         name: "Cost / Turn",
         type: "scatter",
+        yAxisIndex: 0,
         symbolSize: 4,
         data: scatterData,
         markArea: { silent: true, data: markAreaData },
@@ -8955,10 +8965,20 @@ function renderCacheExplosion(session) {
       {
         name: "Quadratic Fit",
         type: "line",
+        yAxisIndex: 0,
         lineStyle: { color: "rgba(251,191,36,0.7)", width: 2, type: "dashed" },
         symbol: "none",
         data: fitLine,
         z: 5
+      },
+      {
+        name: "Cost Factor",
+        type: "line",
+        yAxisIndex: 1,
+        lineStyle: { color: "rgba(59,130,246,0.6)", width: 1.5 },
+        symbol: "none",
+        data: cost.map(function (v) { return +(v / (cost[0] || 1)).toFixed(1); }),
+        z: 4
       }
     ]
   };
