@@ -13,5 +13,6 @@
 | 7 | 환경 변수, API, 배포, 원격 개발 | [07-config-api-deployment.md](07-config-api-deployment.md) |
 | 8 | 스크린샷 | [08-screenshots.md](08-screenshots.md) |
 | 9 | 데이터 형식 (JSONL 세션 로그, 프록시 NDJSON) | [09-data-formats.md](09-data-formats.md) |
+| 10 | UDAA 필드 스터디 — 익명화된 세션 내보내기, 데이터 공유 | [10-udaa-field-study.md](10-udaa-field-study.md) |
 
 Kubernetes 상세: **[k8s/README.md](../../k8s/README.md)**

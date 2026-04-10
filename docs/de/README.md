@@ -15,3 +15,4 @@ Inhalt in logischer Lesereihenfolge:
 | 7 | Umgebungsvariablen, API, Deployment, Docker, CI, Dev-Testing, GitHub-Spiegel | [07-umgebung-api-deployment-dev.md](07-umgebung-api-deployment-dev.md) |
 | 8 | Screenshots & Bildverzeichnis | [08-screenshots.md](08-screenshots.md) |
 | 9 | Datenformate (JSONL-Session-Logs, Proxy-NDJSON), Adapter-/Converter-Leitfaden | [09-datenformate.md](09-datenformate.md) |
+| 10 | UDAA Field Study — Anonymisierter Session-Export, Daten teilen | [10-udaa-feldstudie.md](10-udaa-feldstudie.md) |
