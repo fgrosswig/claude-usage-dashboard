@@ -8516,22 +8516,9 @@ function renderWasteCurve(session) {
   // Project forward: find turn where cumTotal hits a budget
   // Estimate daily budget from the session's actual total tokens consumed
   // Use session duration to extrapolate 5h budget
-  var sessionMs = 0;
-  if (turns.length >= 2 && turns[turns.length - 1].t_delta_ms != null) {
-    sessionMs = turns[turns.length - 1].t_delta_ms;
-  }
-  var fiveHoursMs = 5 * 3600 * 1000;
-  // Budget: if session ran for X ms and consumed Y tokens, 5h budget ≈ Y * (5h / X)
-  // But we don't know the real quota — use the actual total and extrapolate curve instead
-  // Show: actual curve + projected curve + where it doubles/triples
-
   // Build x-axis: actual turns + projected turns
-  var projectTurns = Math.max(Math.round(n * 0.5), 20); // project 50% further or at least 20 turns
+  var projectTurns = Math.max(Math.round(n * 0.5), 20);
   var totalTurns = n + projectTurns;
-  var xData = [];
-  var actualData = [];
-  var projectedData = [];
-  var fitData = [];
 
   // Build [x, y] pairs for value-axis (enables onZero)
   var actualPairs = [];
@@ -8568,7 +8555,6 @@ function renderWasteCurve(session) {
   var zeroCross = disc > 0 ? Math.round((-b + Math.sqrt(disc)) / (2 * a)) : -1;
 
   var yMin = fitMin < 0 ? Math.round(fitMin * 1.2) : undefined;
-  var posMax = cumTotal[n - 1] || 1;
 
   var option = {
     tooltip: {
@@ -8593,11 +8579,13 @@ function renderWasteCurve(session) {
         }
         // Burn Zone warning when in projected/burn area
         if (wallTurn > 0 && turnNum >= wallTurn) {
-          lines.push("");
-          lines.push("<span style='color:#ef4444'>\u26d4 <b>Burn Zone</b></span>");
-          lines.push("<span style='color:#ef4444'>Jeder Turn hier verbrennt Quota</span>");
-          lines.push("<span style='color:#ef4444'>ohne proportionalen Mehrwert.</span>");
-          lines.push("<span style='color:#ef4444'>Session splitten spart 60\u201375%.</span>");
+          lines.push(
+            "",
+            "<span style='color:#ef4444'>\u26d4 <b>Burn Zone</b></span>",
+            "<span style='color:#ef4444'>Jeder Turn hier verbrennt Quota</span>",
+            "<span style='color:#ef4444'>ohne proportionalen Mehrwert.</span>",
+            "<span style='color:#ef4444'>Session splitten spart 60\u201375%.</span>"
+          );
         }
         return lines.join("<br>");
       }
@@ -8832,7 +8820,6 @@ function renderCacheExplosion(session) {
                :                       "rgba(239,68,68,0.5)";
     // Classify: partial (cache_read dropped but >0) vs full rebuild (cache_read=0)
     var cType = (cTurn.cache_read || 0) === 0 ? "Rebuild" : "Compact";
-    var cDrop = turns[cIdx - 1] ? Math.round((1 - (cTurn.cache_read || 0) / (turns[cIdx - 1].cache_read || 1)) * 100) : 0;
     compactionLines.push({
       xAxis: cIdx,
       lineStyle: { color: cColor, type: "solid", width: 1 },
@@ -8880,16 +8867,18 @@ function renderCacheExplosion(session) {
   }
 
   // 10. Zone threshold lines
-  markLineData.push({
-    yAxis: threshYellow,
-    label: { formatter: warmupLabel + " / " + linearLabel, color: "#fbbf24", fontSize: 9, position: "insideEndTop" },
-    lineStyle: { color: "rgba(250,204,21,0.4)", type: "dashed", width: 1 }
-  });
-  markLineData.push({
-    yAxis: threshRed,
-    label: { formatter: linearLabel + " / " + drainLabel, color: "#ef4444", fontSize: 9, position: "insideEndTop" },
-    lineStyle: { color: "rgba(239,68,68,0.4)", type: "dashed", width: 1 }
-  });
+  markLineData.push(
+    {
+      yAxis: threshYellow,
+      label: { formatter: warmupLabel + " / " + linearLabel, color: "#fbbf24", fontSize: 9, position: "insideEndTop" },
+      lineStyle: { color: "rgba(250,204,21,0.4)", type: "dashed", width: 1 }
+    },
+    {
+      yAxis: threshRed,
+      label: { formatter: linearLabel + " / " + drainLabel, color: "#ef4444", fontSize: 9, position: "insideEndTop" },
+      lineStyle: { color: "rgba(239,68,68,0.4)", type: "dashed", width: 1 }
+    }
+  );
 
   var option = {
     tooltip: {
@@ -8903,12 +8892,16 @@ function renderCacheExplosion(session) {
         lines.push("Cost: " + fmt(val) + " (" + factor + "\u00d7)");
         if (idx < n) {
           var TT = turns[idx];
-          lines.push("out=" + fmt(TT.output || 0) + " cr=" + fmt(TT.cache_read || 0));
-          lines.push("cc=" + fmt(TT.cache_creation || 0) + " in=" + fmt(TT.input || 0));
+          lines.push(
+            "out=" + fmt(TT.output || 0) + " cr=" + fmt(TT.cache_read || 0),
+            "cc=" + fmt(TT.cache_creation || 0) + " in=" + fmt(TT.input || 0)
+          );
         }
         if (isCompaction[idx]) {
-          lines.push("<span style='color:#a855f7'>\u26a1 Compaction Rebuild</span>");
-          lines.push("<span style='color:#a855f7'>Cache invalidiert + neu geschrieben</span>");
+          lines.push(
+            "<span style='color:#a855f7'>\u26a1 Compaction Rebuild</span>",
+            "<span style='color:#a855f7'>Cache invalidiert + neu geschrieben</span>"
+          );
         } else {
           lines.push("Zone: " + zone);
         }
