@@ -2829,6 +2829,7 @@ function runScanAndBroadcast() {
       cachedData.scan_error = msg;
     } finally {
       scanInProgress = false;
+      invalidateSessionTurnsToday();
       broadcastSse();
       if (scanOk && cachedData && cachedData.days && cachedData.days.length) {
         backfillReleaseBodiesForDashboardDays(cachedData.days, function () {
@@ -3387,20 +3388,17 @@ function devFetchProxyLogs(cb) {
 // ── /api/session-turns: per-session turn-level token data for a given date ──
 
 var _sessionTurnsCache = Object.create(null);
-var _sessionTurnsCacheTTL = Object.create(null);
-var SESSION_TURNS_CACHE_TTL_PAST = 3600000;   // 1h for past days
-var SESSION_TURNS_CACHE_TTL_TODAY = 30000;     // 30s for today
 
 function getSessionTurnsCached(dateKey) {
-  var now = Date.now();
-  if (_sessionTurnsCache[dateKey] && _sessionTurnsCacheTTL[dateKey] > now) {
-    return _sessionTurnsCache[dateKey];
-  }
+  if (_sessionTurnsCache[dateKey]) return _sessionTurnsCache[dateKey];
   var result = buildSessionTurnsForDate(dateKey);
   _sessionTurnsCache[dateKey] = result;
-  var isToday = dateKey === new Date().toISOString().slice(0, 10);
-  _sessionTurnsCacheTTL[dateKey] = now + (isToday ? SESSION_TURNS_CACHE_TTL_TODAY : SESSION_TURNS_CACHE_TTL_PAST);
   return result;
+}
+
+function invalidateSessionTurnsToday() {
+  var today = new Date().toISOString().slice(0, 10);
+  delete _sessionTurnsCache[today];
 }
 
 function buildSessionTurnsForDate(dateKey) {

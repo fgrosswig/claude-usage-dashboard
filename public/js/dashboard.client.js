@@ -8362,31 +8362,43 @@ function renderEconomicSection(data, filteredDays) {
   if (eB) eB.textContent = t("econEfficiencyBlurb");
   if (dB) dB.textContent = t("econDayCompareBlurb");
 
-  // Use main day-picker date (synced from top nav)
-  var mainPicker = document.getElementById("day-picker");
-  var selectedDate = (mainPicker && mainPicker.value) ? mainPicker.value
-    : (data.days && data.days.length) ? data.days[data.days.length - 1].date
-    : new Date().toISOString().slice(0, 10);
-
-  // Day Comparison renders immediately from cached data (no async)
+  // Day Comparison renders immediately from cached data (no server call)
   renderDayComparison(filteredDays || data.days || []);
 
-  // Fetch session turns for selected date
-  fetch("/api/session-turns?date=" + encodeURIComponent(selectedDate))
-    .then(function (r) { return r.json(); })
-    .then(function (stData) {
-      _econData = stData;
-      populateSessionPicker(stData, sessPicker, infoEl, sumEl);
-      var sel = sessPicker ? sessPicker.value : "";
-      var session = findSession(stData, sel);
-      if (session) {
-        renderWasteCurve(session);
-        renderEfficiencyTimeline(stData);
-      }
-    })
-    .catch(function () {
-      if (sumEl) sumEl.textContent = t("econSummaryNoData");
+  // Session-turn charts: lazy-load only when section is opened
+  function fetchSessionTurns() {
+    var mainPicker = document.getElementById("day-picker");
+    var selectedDate = (mainPicker && mainPicker.value) ? mainPicker.value
+      : (data.days && data.days.length) ? data.days[data.days.length - 1].date
+      : new Date().toISOString().slice(0, 10);
+    if (sumEl) sumEl.textContent = tr("econSummaryLine", { sessions: "…", ratio: "…" });
+    fetch("/api/session-turns?date=" + encodeURIComponent(selectedDate))
+      .then(function (r) { return r.json(); })
+      .then(function (stData) {
+        _econData = stData;
+        populateSessionPicker(stData, sessPicker, infoEl, sumEl);
+        var sel = sessPicker ? sessPicker.value : "";
+        var session = findSession(stData, sel);
+        if (session) {
+          renderWasteCurve(session);
+          renderEfficiencyTimeline(stData);
+        }
+      })
+      .catch(function () {
+        if (sumEl) sumEl.textContent = t("econSummaryNoData");
+      });
+  }
+
+  // Lazy: only fetch when section is expanded (not on every render)
+  if (collapse.open && !_econData) {
+    fetchSessionTurns();
+  }
+  if (!collapse.dataset.bound) {
+    collapse.dataset.bound = "1";
+    collapse.addEventListener("toggle", function () {
+      if (collapse.open && !_econData) fetchSessionTurns();
     });
+  }
 
   if (sessPicker && !sessPicker.dataset.bound) {
     sessPicker.dataset.bound = "1";
