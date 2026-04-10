@@ -8856,7 +8856,7 @@ function renderDayComparison(days) {
     xAxis: { type: "category", data: xData, axisLabel: { color: "#64748b", rotate: 45, fontSize: 10 }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
     yAxis: [
       { type: "value", name: "%", axisLabel: { color: "#64748b" }, max: function (v) { return Math.max(v.max * 1.2, 1); }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
-      { type: "value", name: "%", axisLabel: { color: "#94a3b8" }, max: function (v) { return Math.max(v.max * 2, 1); }, splitLine: { show: false }, position: "right" }
+      { type: "value", show: false, max: function (v) { return Math.max(v.max * 1.8, 1); }, splitLine: { show: false }, position: "right" }
     ],
     series: [
       {
@@ -8876,7 +8876,7 @@ function renderDayComparison(days) {
         name: "Trend",
         type: "line",
         yAxisIndex: 1,
-        smooth: 0.4,
+        smooth: 0.6,
         lineStyle: { color: "rgba(148,163,184,0.7)", width: 2 },
         symbol: "none",
         data: ratioData
