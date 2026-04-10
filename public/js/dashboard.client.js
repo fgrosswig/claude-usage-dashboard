@@ -1867,6 +1867,7 @@ function renderDashboardCore(data) {
   }
   renderProxyAnalysis(data);
   renderBudgetEfficiency(data);
+  renderEconomicSection(data, getFilteredDays(data.days));
   __releaseStabilityData = data.release_stability || null;
   renderUserProfileCharts(getFilteredDays(data.days));
   updateMetaDetailsSummary(data);
@@ -8323,6 +8324,1068 @@ function inlineMd(s) {
   };
   xhr.send();
 })();
+
+// ── Ökonomische Nutzung — Session-Turn-Level Efficiency Charts ───────
+
+var _econCharts = {};
+var _econData = null;
+
+function renderEconomicSection(data, filteredDays) {
+  var collapse = document.getElementById("economic-collapse");
+  if (!collapse) return;
+  var sumEl = document.getElementById("economic-summary-line");
+  var sessPicker = document.getElementById("econ-session-picker");
+  var infoEl = document.getElementById("econ-session-info");
+
+  // Immediate header text (before async fetch)
+  if (sumEl) sumEl.textContent = t("econSummaryNoData");
+
+  // Set labels — hide redundant date picker, keep session picker
+  var lblSess = document.getElementById("lbl-econ-session");
+  if (lblSess) lblSess.textContent = t("econSessionLabel");
+  var lblDate = document.getElementById("lbl-econ-date");
+  var datePicker = document.getElementById("econ-date-picker");
+  if (lblDate) lblDate.style.display = "none";
+  if (datePicker) datePicker.style.display = "none";
+
+  // Section header titles
+  var wH = document.getElementById("econ-waste-h3");
+  var wmH = document.getElementById("econ-waste-month-h3");
+  var eH = document.getElementById("econ-efficiency-h3");
+  var dH = document.getElementById("econ-daycompare-h3");
+  var exH = document.getElementById("econ-explosion-h3");
+  if (wH) wH.textContent = t("econWasteTitle");
+  if (wmH) wmH.textContent = t("econWasteMonthTitle");
+  if (eH) eH.textContent = t("econEfficiencyTitle");
+  if (dH) dH.textContent = t("econDayCompareTitle");
+  if (exH) exH.textContent = t("econExplosionTitle");
+  var wB = document.getElementById("econ-waste-blurb");
+  var wmB = document.getElementById("econ-waste-month-blurb");
+  var eB = document.getElementById("econ-efficiency-blurb");
+  var dB = document.getElementById("econ-daycompare-blurb");
+  var exB = document.getElementById("econ-explosion-blurb");
+  if (wB) wB.textContent = t("econWasteBlurb");
+  if (wmB) wmB.textContent = t("econWasteMonthBlurbCache");
+  if (eB) eB.textContent = t("econEfficiencyBlurb");
+  if (dB) dB.textContent = t("econDayCompareBlurb");
+  if (exB) exB.textContent = t("econExplosionBlurb");
+
+  // These render immediately from cached data (no server call)
+  var econDays = filteredDays || data.days || [];
+  renderDayComparison(econDays);
+  initButterflyToggle();
+  renderMonthlyButterfly(econDays);
+
+  // Session-turn charts: lazy-load only when section is opened
+  function fetchSessionTurns() {
+    var mainPicker = document.getElementById("day-picker");
+    var selectedDate = (mainPicker && mainPicker.value) ? mainPicker.value
+      : (data.days && data.days.length) ? data.days[data.days.length - 1].date
+      : new Date().toISOString().slice(0, 10);
+    if (sumEl) sumEl.textContent = tr("econSummaryLine", { sessions: "…", ratio: "…" });
+    fetch("/api/session-turns?date=" + encodeURIComponent(selectedDate))
+      .then(function (r) { return r.json(); })
+      .then(function (stData) {
+        _econData = stData;
+        populateSessionPicker(stData, sessPicker, infoEl, sumEl);
+        var sel = sessPicker ? sessPicker.value : "";
+        var session = findSession(stData, sel);
+        if (session) {
+          renderWasteCurve(session);
+          renderCacheExplosion(session);
+          renderEfficiencyTimeline(stData);
+        }
+      })
+      .catch(function () {
+        if (sumEl) sumEl.textContent = t("econSummaryNoData");
+      });
+  }
+
+  // Reset session data when day changes so lazy-load re-fetches
+  var mainPicker2 = document.getElementById("day-picker");
+  var currentDay = (mainPicker2 && mainPicker2.value) ? mainPicker2.value : "";
+  if (_econData && _econData.date !== currentDay) _econData = null;
+
+  // Lazy: only fetch when section is expanded (not on every render)
+  if (collapse.open && !_econData) {
+    fetchSessionTurns();
+  }
+  if (!collapse.dataset.bound) {
+    collapse.dataset.bound = "1";
+    collapse.addEventListener("toggle", function () {
+      if (collapse.open && !_econData) fetchSessionTurns();
+    });
+  }
+
+  if (sessPicker && !sessPicker.dataset.bound) {
+    sessPicker.dataset.bound = "1";
+    sessPicker.addEventListener("change", function () {
+      var session = findSession(_econData, sessPicker.value);
+      if (session) {
+        updateSessionInfo(session, infoEl);
+        renderWasteCurve(session);
+        renderCacheExplosion(session);
+      }
+    });
+  }
+}
+
+function populateSessionPicker(stData, picker, infoEl, sumEl) {
+  if (!picker || !stData || !stData.sessions) return;
+  picker.innerHTML = "";
+  var sessions = stData.sessions;
+  for (var i = 0; i < sessions.length; i++) {
+    var s = sessions[i];
+    var opt = document.createElement("option");
+    opt.value = s.session_id_hash;
+    var timeRange = s.first_ts.slice(11, 16) + "–" + s.last_ts.slice(11, 16);
+    opt.textContent = s.session_id_hash.slice(0, 8) + " (" + timeRange + ", " + s.turn_count + " turns)";
+    picker.appendChild(opt);
+  }
+  if (sessions.length && !picker.value) picker.value = sessions[0].session_id_hash;
+  var sel = findSession(stData, picker.value);
+  if (sel) updateSessionInfo(sel, infoEl);
+
+  if (sumEl) {
+    if (!sessions.length) {
+      sumEl.textContent = t("econSummaryNoData");
+    } else {
+      var totalOut = sessions.reduce(function (s, x) { return s + x.total_output; }, 0);
+      var totalAll = sessions.reduce(function (s, x) { return s + x.total_all; }, 0);
+      var ratio = totalAll > 0 ? (totalOut / totalAll * 100).toFixed(2) : "0";
+      sumEl.textContent = tr("econSummaryLine", { sessions: sessions.length, ratio: ratio });
+    }
+  }
+}
+
+function findSession(stData, hash) {
+  if (!stData || !stData.sessions) return null;
+  for (var i = 0; i < stData.sessions.length; i++) {
+    if (stData.sessions[i].session_id_hash === hash) return stData.sessions[i];
+  }
+  return stData.sessions[0] || null;
+}
+
+function updateSessionInfo(session, infoEl) {
+  if (!infoEl || !session) return;
+  infoEl.textContent = tr("econSessionInfo", {
+    turns: session.turn_count,
+    output: fmt(session.total_output),
+    cacheRead: fmt(session.total_cache_read),
+    total: fmt(session.total_all)
+  });
+}
+
+function renderWasteCurve(session) {
+  if (typeof echarts === "undefined") return;
+  var el = document.getElementById("chart-shell-econ-waste");
+  if (!el || !session || !session.turns || !session.turns.length) return;
+
+  var turns = session.turns;
+  var n = turns.length;
+  var cumTotal = [];
+  var cT = 0;
+
+  for (var i = 0; i < n; i++) {
+    var T = turns[i];
+    cT += (T.output || 0) + (T.input || 0) + (T.cache_read || 0) + (T.cache_creation || 0);
+    cumTotal.push(cT);
+  }
+
+  // Quadratic fit: cumTotal ≈ a*t² + b*t + c via least-squares
+  // Using turn index as t (0-based)
+  var s1 = 0, s2 = 0, s3 = 0, s4 = 0, sy = 0, s1y = 0, s2y = 0;
+  for (var fi = 0; fi < n; fi++) {
+    var ti = fi;
+    var t2 = ti * ti;
+    s1 += ti; s2 += t2; s3 += t2 * ti; s4 += t2 * t2;
+    sy += cumTotal[fi]; s1y += ti * cumTotal[fi]; s2y += t2 * cumTotal[fi];
+  }
+  // Solve 3x3 normal equations for [c, b, a]
+  // | n   s1  s2 | |c|   |sy  |
+  // | s1  s2  s3 | |b| = |s1y |
+  // | s2  s3  s4 | |a|   |s2y |
+  var det = n * (s2 * s4 - s3 * s3) - s1 * (s1 * s4 - s3 * s2) + s2 * (s1 * s3 - s2 * s2);
+  var a = 0, b = 0, c = 0;
+  if (Math.abs(det) > 1e-10) {
+    c = (sy * (s2 * s4 - s3 * s3) - s1 * (s1y * s4 - s2y * s3) + s2 * (s1y * s3 - s2y * s2)) / det;
+    b = (n * (s1y * s4 - s2y * s3) - sy * (s1 * s4 - s3 * s2) + s2 * (s1 * s2y - s1y * s2)) / det;
+    a = (n * (s2 * s2y - s3 * s1y) - s1 * (s1 * s2y - s1y * s2) + sy * (s1 * s3 - s2 * s2)) / det;
+  }
+
+  // Project forward: find turn where cumTotal hits a budget
+  // Estimate daily budget from the session's actual total tokens consumed
+  // Use session duration to extrapolate 5h budget
+  var sessionMs = 0;
+  if (turns.length >= 2 && turns[turns.length - 1].t_delta_ms != null) {
+    sessionMs = turns[turns.length - 1].t_delta_ms;
+  }
+  var fiveHoursMs = 5 * 3600 * 1000;
+  // Budget: if session ran for X ms and consumed Y tokens, 5h budget ≈ Y * (5h / X)
+  // But we don't know the real quota — use the actual total and extrapolate curve instead
+  // Show: actual curve + projected curve + where it doubles/triples
+
+  // Build x-axis: actual turns + projected turns
+  var projectTurns = Math.max(Math.round(n * 0.5), 20); // project 50% further or at least 20 turns
+  var totalTurns = n + projectTurns;
+  var xData = [];
+  var actualData = [];
+  var projectedData = [];
+  var fitData = [];
+
+  // Build [x, y] pairs for value-axis (enables onZero)
+  var actualPairs = [];
+  var projectedPairs = [];
+  var fitPairs = [];
+  var fitMin = 0;
+
+  for (var xi = 0; xi < totalTurns; xi++) {
+    var turnNum = xi + 1;
+    var fitted = Math.round(a * xi * xi + b * xi + c);
+    if (fitted < fitMin) fitMin = fitted;
+    fitPairs.push([turnNum, fitted]);
+    if (xi < n) {
+      actualPairs.push([turnNum, cumTotal[xi]]);
+      if (xi === n - 1) projectedPairs.push([turnNum, cumTotal[xi]]);
+    } else {
+      projectedPairs.push([turnNum, fitted]);
+    }
+  }
+
+  // Find wall turn (2× current total)
+  var wallTurn = -1;
+  var currentTotal = cumTotal[n - 1];
+  for (var wi = n; wi < totalTurns; wi++) {
+    if (fitPairs[wi][1] >= currentTotal * 2) {
+      wallTurn = wi + 1;
+      break;
+    }
+  }
+  var remainLabel = wallTurn > 0 ? "~" + (wallTurn - n) + " turns to 2\u00d7" : "";
+
+  // Zero crossing turn
+  var disc = b * b - 4 * a * c;
+  var zeroCross = disc > 0 ? Math.round((-b + Math.sqrt(disc)) / (2 * a)) : -1;
+
+  var yMin = fitMin < 0 ? Math.round(fitMin * 1.2) : undefined;
+  var posMax = cumTotal[n - 1] || 1;
+
+  var option = {
+    tooltip: {
+      trigger: "axis",
+      formatter: function (params) {
+        if (!params || !params.length) return "";
+        var turnNum = params[0].value[0];
+        var turnIdx = turnNum - 1;
+        var lines = ["<b>Turn " + turnNum + "</b>"];
+        for (var p = 0; p < params.length; p++) {
+          if (params[p].value != null) {
+            lines.push(params[p].marker + " " + params[p].seriesName + ": " + fmt(params[p].value[1]));
+          }
+        }
+        if (turnIdx < n) {
+          var TT = turns[turnIdx];
+          if (TT) {
+            lines.push("<span style='color:#64748b'>out=" + fmt(TT.output || 0) + " cr=" + fmt(TT.cache_read || 0) + "</span>");
+          }
+        } else {
+          lines.push("<span style='color:#64748b'>(projected)</span>");
+        }
+        // Burn Zone warning when in projected/burn area
+        if (wallTurn > 0 && turnNum >= wallTurn) {
+          lines.push("");
+          lines.push("<span style='color:#ef4444'>\u26d4 <b>Burn Zone</b></span>");
+          lines.push("<span style='color:#ef4444'>Jeder Turn hier verbrennt Quota</span>");
+          lines.push("<span style='color:#ef4444'>ohne proportionalen Mehrwert.</span>");
+          lines.push("<span style='color:#ef4444'>Session splitten spart 60\u201375%.</span>");
+        }
+        return lines.join("<br>");
+      }
+    },
+    legend: { top: 4, textStyle: { color: "#94a3b8", fontSize: 11 } },
+    grid: { top: 40, right: "5%", bottom: "10%", left: "5%", containLabel: true },
+    xAxis: {
+      type: "value",
+      min: 1,
+      max: totalTurns,
+      name: "Turn",
+      nameLocation: "end",
+      nameTextStyle: { color: "#64748b", fontSize: 10 },
+      axisLine: { show: true, onZero: true, lineStyle: { color: "#94a3b8", width: 2 } },
+      axisLabel: { color: "#64748b" },
+      splitLine: { show: false }
+    },
+    yAxis: {
+      type: "value",
+      min: yMin,
+      axisLine: { show: true, onZero: true, lineStyle: { color: "#94a3b8", width: 2 } },
+      axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } },
+      splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
+    },
+    series: [
+      {
+        name: "Quadratic fit",
+        type: "line",
+        showSymbol: false,
+        lineStyle: { color: "#ef4444", width: 2, type: "dotted" },
+        z: 1,
+        data: fitPairs,
+        markPoint: {
+          data: [
+            zeroCross > 0 ? {
+              coord: [zeroCross, 0],
+              symbol: "circle",
+              symbolSize: 10,
+              itemStyle: { color: "#fbbf24", shadowBlur: 6, shadowColor: "rgba(251,191,36,0.5)" },
+              label: { show: false }
+            } : null,
+            {
+              coord: [n, cumTotal[n - 1]],
+              symbol: "circle",
+              symbolSize: 10,
+              itemStyle: { color: "#3b82f6", shadowBlur: 6, shadowColor: "rgba(59,130,246,0.5)" },
+              label: { show: false }
+            }
+          ].filter(Boolean)
+        },
+        markLine: wallTurn > 0 ? {
+          silent: true,
+          symbol: "none",
+          data: [{
+            xAxis: wallTurn,
+            lineStyle: { color: "#ef4444", type: "dashed", width: 1.5 },
+            label: { show: false }
+          }]
+        } : undefined,
+        // Burn Zone: red area from wallTurn to end
+        markArea: wallTurn > 0 ? {
+          silent: false,
+          itemStyle: { color: "rgba(239,68,68,0.07)" },
+          label: { show: true, formatter: "Burn Zone", color: "rgba(239,68,68,0.4)", fontSize: 11, position: "insideTop" },
+          emphasis: {
+            itemStyle: { color: "rgba(239,68,68,0.2)" },
+            label: { color: "#ef4444", fontSize: 13, fontWeight: "bold" }
+          },
+          data: [[{ xAxis: wallTurn }, { xAxis: totalTurns }]]
+        } : undefined
+      },
+      {
+        name: "Total (actual)",
+        type: "line",
+        showSymbol: false,
+        areaStyle: { color: "rgba(100,116,139,0.3)", origin: 0 },
+        lineStyle: { color: "#94a3b8", width: 2 },
+        z: 2,
+        data: actualPairs
+      },
+      {
+        name: "Total (projected)",
+        type: "line",
+        showSymbol: false,
+        areaStyle: { color: "rgba(239,68,68,0.15)", origin: 0 },
+        lineStyle: { color: "#ef4444", width: 2, type: "dashed" },
+        z: 3,
+        data: projectedPairs
+      }
+    ]
+  };
+
+  // Info box: hidden by default, toggled by clicking the blue position dot
+  var infoLines = [];
+  if (fitMin < 0) infoLines.push("\u26a0 Warmup: " + fmt(fitMin));
+  if (zeroCross > 0) infoLines.push("\u25cf Break-even: Turn " + zeroCross);
+  infoLines.push("\u25b2 You: Turn " + n + " (" + fmt(cumTotal[n - 1]) + ")");
+  var costFactor = n > 1 ? ((actualPairs[n - 1][1] / n) / (actualPairs[0][1])).toFixed(1) : "?";
+  infoLines.push("\u00d7 Cost Factor: " + costFactor + "\u00d7");
+  if (wallTurn > 0) infoLines.push("\u26d4 " + remainLabel);
+
+  option.graphic = [{
+    type: "group",
+    right: 60,
+    top: 28,
+    silent: false,
+    children: [{
+      type: "rect",
+      shape: { width: 200, height: 10 + infoLines.length * 16, r: 6 },
+      style: {
+        fill: "rgba(15,23,42,0.92)",
+        stroke: "rgba(59,130,246,0.5)",
+        lineWidth: 1,
+        shadowBlur: 10,
+        shadowColor: "rgba(59,130,246,0.3)"
+      }
+    }, {
+      type: "text",
+      style: {
+        text: infoLines.join("\n"),
+        fill: "#e2e8f0",
+        font: "11px monospace",
+        x: 10,
+        y: 6
+      }
+    }]
+  }];
+
+  __effInitOrSet("econWaste", el, option);
+}
+
+function renderCacheExplosion(session) {
+  if (typeof echarts === "undefined") return;
+  var el = document.getElementById("chart-shell-econ-explosion");
+  if (!el || !session || !session.turns || !session.turns.length) return;
+
+  var turns = session.turns;
+  var n = turns.length;
+
+  // 1. Per-turn cost
+  var cost = [];
+  for (var i = 0; i < n; i++) {
+    var T = turns[i];
+    cost.push((T.input || 0) + (T.output || 0) + (T.cache_read || 0) + (T.cache_creation || 0));
+  }
+
+  // 2. Quadratic least-squares fit on per-turn cost: g(t) = a*t² + b*t + c
+  var s1 = 0, s2 = 0, s3 = 0, s4 = 0, sy = 0, s1y = 0, s2y = 0;
+  for (var fi = 0; fi < n; fi++) {
+    var ti = fi, t2 = ti * ti;
+    s1 += ti; s2 += t2; s3 += t2 * ti; s4 += t2 * t2;
+    sy += cost[fi]; s1y += ti * cost[fi]; s2y += t2 * cost[fi];
+  }
+  var det = n * (s2 * s4 - s3 * s3) - s1 * (s1 * s4 - s3 * s2) + s2 * (s1 * s3 - s2 * s2);
+  var a = 0, b = 0, c = 0;
+  if (Math.abs(det) > 1e-10) {
+    c = (sy * (s2 * s4 - s3 * s3) - s1 * (s1y * s4 - s2y * s3) + s2 * (s1y * s3 - s2y * s2)) / det;
+    b = (n * (s1y * s4 - s2y * s3) - sy * (s1 * s4 - s3 * s2) + s2 * (s1 * s2y - s1y * s2)) / det;
+    a = (n * (s2 * s2y - s3 * s1y) - s1 * (s1 * s2y - s1y * s2) + sy * (s1 * s3 - s2 * s2)) / det;
+  }
+
+  // 3. Baseline: median of first min(50, n) turns
+  var baseN = Math.min(50, n);
+  var baseSorted = cost.slice(0, baseN).sort(function (x, y) { return x - y; });
+  var baseline = baseSorted[Math.floor(baseSorted.length / 2)];
+  if (baseline < 1) baseline = 1;
+
+  // 4. Zone thresholds
+  var threshYellow = baseline * 1.5;
+  var threshRed = baseline * 3;
+
+  // 5. Find split point: first turn where fit exceeds 3× baseline
+  var splitTurn = -1;
+  for (var si = 0; si < n; si++) {
+    var fitted = a * si * si + b * si + c;
+    if (fitted > threshRed && si > baseN) {
+      splitTurn = si;
+      break;
+    }
+  }
+
+  // 6. Detect compaction events
+  var compactions = [];
+  for (var ci = 1; ci < n; ci++) {
+    var prev = turns[ci - 1], cur = turns[ci];
+    var prevCR = prev.cache_read || 0, curCR = cur.cache_read || 0;
+    var curCC = cur.cache_creation || 0, prevCC = prev.cache_creation || 0;
+    if (prevCR > 10000 && curCR < prevCR * 0.3 && curCC > prevCC * 10) {
+      compactions.push(ci);
+    } else if (prevCR > 10000 && curCR === 0 && curCC > 50000) {
+      compactions.push(ci);
+    }
+  }
+
+  // 7. Build series data — scatter points colored by zone, compactions highlighted
+  var xData = [];
+  var scatterData = [];
+  var fitLine = [];
+  var isCompaction = {};
+  for (var cci = 0; cci < compactions.length; cci++) isCompaction[compactions[cci]] = true;
+
+  for (var di = 0; di < n; di++) {
+    xData.push(di + 1);
+    var val = cost[di];
+    var fitVal = Math.round(a * di * di + b * di + c);
+    var color;
+    if (isCompaction[di]) {
+      color = "rgba(168,85,247,0.9)"; // purple for compaction
+    } else if (val <= threshYellow) {
+      color = "rgba(34,197,94,0.7)";
+    } else if (val <= threshRed) {
+      color = "rgba(250,204,21,0.7)";
+    } else {
+      color = "rgba(239,68,68,0.7)";
+    }
+    scatterData.push({
+      value: val,
+      itemStyle: { color: color },
+      symbolSize: isCompaction[di] ? 8 : 4
+    });
+    fitLine.push(fitVal);
+  }
+
+  // 7b. Compaction vertical lines with labels
+  var compactionLines = [];
+  for (var cli = 0; cli < compactions.length; cli++) {
+    var cIdx = compactions[cli];
+    var cVal = cost[cIdx];
+    var cTurn = turns[cIdx];
+    var cColor = cVal <= threshYellow ? "rgba(34,197,94,0.5)"
+               : cVal <= threshRed   ? "rgba(250,204,21,0.5)"
+               :                       "rgba(239,68,68,0.5)";
+    // Classify: partial (cache_read dropped but >0) vs full rebuild (cache_read=0)
+    var cType = (cTurn.cache_read || 0) === 0 ? "Rebuild" : "Compact";
+    var cDrop = turns[cIdx - 1] ? Math.round((1 - (cTurn.cache_read || 0) / (turns[cIdx - 1].cache_read || 1)) * 100) : 0;
+    compactionLines.push({
+      xAxis: cIdx,
+      lineStyle: { color: cColor, type: "solid", width: 1 },
+      label: {
+        formatter: "C" + (cli + 1) + " " + cType,
+        color: "rgba(168,85,247,0.8)",
+        fontSize: 9,
+        position: "insideStartTop",
+        rotate: 90,
+        distance: 5
+      }
+    });
+  }
+
+  // 8. Zone label helpers
+  var warmupLabel = t("econExplosionWarmup") || "Warmup";
+  var linearLabel = t("econExplosionLinear") || "Linear";
+  var drainLabel  = t("econExplosionDrain")  || "Drain";
+
+  // 8. Build markAreas for zones (horizontal bands)
+  var yMax = Math.max.apply(null, cost) * 1.1;
+  var markAreaData = [
+    [{ yAxis: 0, itemStyle: { color: "rgba(34,197,94,0.06)" } },
+     { yAxis: threshYellow }],
+    [{ yAxis: threshYellow, itemStyle: { color: "rgba(250,204,21,0.06)" } },
+     { yAxis: threshRed }],
+    [{ yAxis: threshRed, itemStyle: { color: "rgba(239,68,68,0.06)" } },
+     { yAxis: yMax }]
+  ];
+
+  // 9. Split markLine
+  var splitLabel = "";
+  var markLineData = [];
+  if (splitTurn > 0) {
+    splitLabel = tr("econExplosionSplitAt", { turn: splitTurn + 1 }) || "Split at turn " + (splitTurn + 1);
+    markLineData.push({
+      xAxis: splitTurn,
+      label: {
+        formatter: splitLabel,
+        color: "#ef4444",
+        fontSize: 10,
+        position: "insideEndTop"
+      }
+    });
+  }
+
+  // 10. Zone threshold lines
+  markLineData.push({
+    yAxis: threshYellow,
+    label: { formatter: warmupLabel + " / " + linearLabel, color: "#fbbf24", fontSize: 9, position: "insideEndTop" },
+    lineStyle: { color: "rgba(250,204,21,0.4)", type: "dashed", width: 1 }
+  });
+  markLineData.push({
+    yAxis: threshRed,
+    label: { formatter: linearLabel + " / " + drainLabel, color: "#ef4444", fontSize: 9, position: "insideEndTop" },
+    lineStyle: { color: "rgba(239,68,68,0.4)", type: "dashed", width: 1 }
+  });
+
+  var option = {
+    tooltip: {
+      trigger: "axis",
+      formatter: function (params) {
+        var idx = params[0].dataIndex;
+        var lines = ["Turn " + (idx + 1)];
+        var val = cost[idx];
+        var factor = (baseline > 0) ? (val / baseline).toFixed(1) : "-";
+        var zone = val <= threshYellow ? warmupLabel : val <= threshRed ? linearLabel : drainLabel;
+        lines.push("Cost: " + fmt(val) + " (" + factor + "\u00d7)");
+        if (idx < n) {
+          var TT = turns[idx];
+          lines.push("out=" + fmt(TT.output || 0) + " cr=" + fmt(TT.cache_read || 0));
+          lines.push("cc=" + fmt(TT.cache_creation || 0) + " in=" + fmt(TT.input || 0));
+        }
+        if (isCompaction[idx]) {
+          lines.push("<span style='color:#a855f7'>\u26a1 Compaction Rebuild</span>");
+          lines.push("<span style='color:#a855f7'>Cache invalidiert + neu geschrieben</span>");
+        } else {
+          lines.push("Zone: " + zone);
+        }
+        if (params.length > 1 && params[1].value != null) {
+          lines.push("Fit: " + fmt(params[1].value));
+        }
+        return lines.join("<br>");
+      }
+    },
+    legend: {
+      top: 4,
+      textStyle: { color: "#94a3b8", fontSize: 11 },
+      data: ["Cost / Turn", "Quadratic Fit"]
+    },
+    grid: { top: 40, right: 20, bottom: 30, left: 60 },
+    xAxis: {
+      type: "category",
+      data: xData,
+      name: "Turn",
+      axisLabel: {
+        color: "#64748b",
+        interval: function (idx) { return idx % Math.ceil(n / 20) === 0; }
+      },
+      splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
+    },
+    yAxis: [
+      {
+        type: "value",
+        axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } },
+        splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
+      },
+      {
+        type: "value",
+        position: "right",
+        axisLabel: { color: "#3b82f6", formatter: function (v) { return v.toFixed(0) + "\u00d7"; } },
+        splitLine: { show: false },
+        axisLine: { show: true, lineStyle: { color: "rgba(59,130,246,0.3)" } }
+      }
+    ],
+    series: [
+      {
+        name: "Cost / Turn",
+        type: "scatter",
+        yAxisIndex: 0,
+        symbolSize: 4,
+        data: scatterData,
+        markArea: { silent: true, data: markAreaData },
+        markLine: {
+          silent: true,
+          symbol: "none",
+          data: markLineData.concat(compactionLines)
+        }
+      },
+      {
+        name: "Quadratic Fit",
+        type: "line",
+        yAxisIndex: 0,
+        lineStyle: { color: "rgba(251,191,36,0.7)", width: 2, type: "dashed" },
+        symbol: "none",
+        data: fitLine,
+        z: 5
+      },
+      {
+        name: "Cost Factor",
+        type: "line",
+        yAxisIndex: 1,
+        lineStyle: { color: "rgba(59,130,246,0.6)", width: 1.5 },
+        symbol: "none",
+        data: cost.map(function (v) { return +(v / (cost[0] || 1)).toFixed(1); }),
+        z: 4
+      }
+    ]
+  };
+
+  __effInitOrSet("econExplosion", el, option);
+}
+
+function renderEfficiencyTimeline(stData) {
+  if (typeof echarts === "undefined") return;
+  var el = document.getElementById("chart-shell-econ-efficiency");
+  if (!el || !stData || !stData.sessions) return;
+
+  // Aggregate all turns across sessions by hour
+  var hourly = {};
+  for (var si = 0; si < stData.sessions.length; si++) {
+    var turns = stData.sessions[si].turns;
+    for (var ti = 0; ti < turns.length; ti++) {
+      var T = turns[ti];
+      var h = parseInt(T.ts.slice(11, 13), 10);
+      if (!hourly[h]) hourly[h] = { output: 0, total: 0 };
+      hourly[h].output += T.output;
+      hourly[h].total += T.input + T.output + T.cache_read + T.cache_creation;
+    }
+  }
+
+  var hours = Object.keys(hourly).map(Number).sort(function (a, b) { return a - b; });
+  if (!hours.length) return;
+  var xData = hours.map(function (h) { return (h < 10 ? "0" : "") + h + ":00"; });
+  var outputData = hours.map(function (h) { return hourly[h].output; });
+  var totalData = hours.map(function (h) { return hourly[h].total; });
+
+  // Peak hours: 13-19 UTC = 15-21 MESZ (mark in UTC since timestamps are UTC)
+  var peakStart = 13;
+  var peakEnd = 19;
+
+  var option = {
+    tooltip: {
+      trigger: "axis",
+      formatter: function (params) {
+        var lines = [params[0].axisValue];
+        for (var p = 0; p < params.length; p++) {
+          lines.push(params[p].marker + " " + params[p].seriesName + ": " + fmt(params[p].value));
+        }
+        var idx = params[0].dataIndex;
+        var h = hours[idx];
+        if (h >= peakStart && h < peakEnd) lines.push("⚠ " + t("econEfficiencyPeakBand"));
+        var tot = totalData[idx];
+        var out = outputData[idx];
+        if (tot > 0) lines.push(t("econEfficiencyRatio") + ": " + (out / tot * 100).toFixed(2) + "%");
+        return lines.join("<br>");
+      }
+    },
+    legend: { top: 4, textStyle: { color: "#94a3b8", fontSize: 11 } },
+    grid: { top: 40, right: 60, bottom: 30, left: 60 },
+    xAxis: { type: "category", data: xData, axisLabel: { color: "#64748b" }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+    yAxis: [
+      { type: "value", name: t("econEfficiencyTotal"), axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } }, position: "left", splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+      { type: "value", name: t("econEfficiencyOutput"), axisLabel: { color: "#34d399", formatter: function (v) { return fmt(v); } }, position: "right", splitLine: { show: false } }
+    ],
+    series: [
+      {
+        name: t("econEfficiencyTotal"),
+        type: "bar",
+        yAxisIndex: 0,
+        itemStyle: {
+          color: function (params) {
+            var h = hours[params.dataIndex];
+            return (h >= peakStart && h < peakEnd) ? "rgba(251,146,60,0.5)" : "rgba(100,116,139,0.35)";
+          }
+        },
+        data: totalData
+      },
+      {
+        name: t("econEfficiencyOutput"),
+        type: "bar",
+        yAxisIndex: 1,
+        itemStyle: { color: "rgba(52,211,153,0.7)" },
+        data: outputData
+      }
+    ],
+    // Peak hours visual band
+    visualMap: undefined
+  };
+
+  __effInitOrSet("econEfficiency", el, option);
+}
+
+var _butterflyMode = "cache";
+var _butterflyDays = null;
+
+function renderMonthlyButterfly(days, mode) {
+  if (typeof echarts === "undefined") return;
+  var el = document.getElementById("chart-shell-econ-waste-month");
+  if (!el || !days || days.length < 2) return;
+
+  _butterflyDays = days;
+  if (mode) _butterflyMode = mode;
+
+  var xData = [];
+  var blurbKey;
+
+  // Update blurb text
+  var blurbEl = document.getElementById("econ-waste-month-blurb");
+
+  // Linear regression helper: returns { data: [...], slope: number }
+  function linReg(vals) {
+    var n = vals.length;
+    if (n < 2) return { data: vals.slice(), slope: 0 };
+    var sx = 0, sy = 0, sxy = 0, sxx = 0;
+    for (var k = 0; k < n; k++) { sx += k; sy += vals[k]; sxy += k * vals[k]; sxx += k * k; }
+    var sl = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+    var ic = (sy - sl * sx) / n;
+    var line = [];
+    for (var j = 0; j < n; j++) line.push(Math.round((ic + sl * j) * 100) / 100);
+    return { data: line, slope: sl };
+  }
+
+  for (var i = 0; i < days.length; i++) {
+    xData.push(days[i].date.slice(5));
+  }
+
+  var option;
+
+  if (_butterflyMode === "cache") {
+    // --- Cache mode: Creation-Anteil als % Bars + Regressionslinie ---
+    blurbKey = "econWasteMonthBlurbCache";
+    if (blurbEl) blurbEl.textContent = t(blurbKey);
+
+    var ratioData = [];
+    for (var ci = 0; ci < days.length; ci++) {
+      var cc = days[ci].cache_creation || 0;
+      var cr = days[ci].cache_read || 0;
+      var cTotal = cc + cr;
+      ratioData.push(cTotal > 0 ? Math.round(cc / cTotal * 10000) / 100 : 0);
+    }
+
+    var cacheTrend = linReg(ratioData);
+
+    option = {
+      tooltip: {
+        trigger: "axis",
+        formatter: function (params) {
+          var idx = params[0].dataIndex;
+          var d = days[idx];
+          var cc2 = d.cache_creation || 0;
+          var cr2 = d.cache_read || 0;
+          return d.date + "<br>"
+            + t("econMonthCacheCreate") + ": " + fmt(cc2) + "<br>"
+            + t("econMonthCacheRead") + ": " + fmt(cr2) + "<br>"
+            + "Creation %: " + ratioData[idx] + "%";
+        }
+      },
+      legend: {
+        top: 4,
+        textStyle: { color: "#94a3b8", fontSize: 11 },
+        data: ["Creation %"]
+      },
+      grid: { top: 40, right: 20, bottom: 40, left: 50 },
+      xAxis: {
+        type: "category",
+        data: xData,
+        axisLabel: { color: "#64748b", rotate: 45, fontSize: 10 },
+        splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
+      },
+      yAxis: {
+        type: "value",
+        name: "%",
+        axisLabel: { color: "#64748b", formatter: function (v) { return v + "%"; } },
+        max: function (v) { return Math.max(v.max * 1.3, 1); },
+        splitLine: { lineStyle: { color: "rgba(51,65,85,.2)" } }
+      },
+      series: [
+        {
+          name: "Creation %",
+          type: "bar",
+          itemStyle: {
+            color: function (params) {
+              var v = params.value;
+              return v > 5 ? "#ef4444" : v > 2 ? "#fbbf24" : "#34d399";
+            }
+          },
+          label: { show: true, position: "top", formatter: "{c}%", fontSize: 9, color: "#94a3b8" },
+          data: ratioData
+        },
+        {
+          name: "Trend",
+          type: "line",
+          smooth: false,
+          symbol: "none",
+          data: cacheTrend.data,
+          lineStyle: { color: cacheTrend.slope <= 0 ? "#34d399" : "#ef4444", width: 1.5 }
+        }
+      ]
+    };
+
+  } else {
+    // --- I/O mode: Butterfly (Input up / Output down) ---
+    blurbKey = "econWasteMonthBlurbIO";
+    if (blurbEl) blurbEl.textContent = t(blurbKey);
+
+    var upLabel = t("econMonthInput");
+    var downLabel = t("econMonthOutput");
+    var upRaw = [];
+    var downRaw = [];
+
+    for (var ii = 0; ii < days.length; ii++) {
+      upRaw.push(days[ii].input || 0);
+      downRaw.push(days[ii].output || 0);
+    }
+
+    var maxUp = Math.max.apply(null, upRaw) || 1;
+    var maxDown = Math.max.apply(null, downRaw) || 1;
+    var upNorm = upRaw.map(function (v) { return Math.round(v / maxUp * 1000) / 1000; });
+    var downNorm = downRaw.map(function (v) { return -Math.round(v / maxDown * 1000) / 1000; });
+
+    var upTrend = linReg(upNorm);
+    var downTrend = linReg(downNorm);
+
+    option = {
+      tooltip: {
+        trigger: "axis",
+        formatter: function (params) {
+          var idx = params[0].dataIndex;
+          var d = days[idx];
+          var lines = [d.date];
+          for (var p = 0; p < params.length; p++) {
+            var sn = params[p].seriesName;
+            if (sn === upLabel) lines.push(params[p].marker + " " + sn + ": " + fmt(upRaw[idx]));
+            else if (sn === downLabel) lines.push(params[p].marker + " " + sn + ": " + fmt(downRaw[idx]));
+          }
+          return lines.join("<br>");
+        }
+      },
+      legend: {
+        top: 4,
+        textStyle: { color: "#94a3b8", fontSize: 11 },
+        data: [upLabel, downLabel]
+      },
+      grid: { top: 40, right: 20, bottom: 40, left: 60 },
+      xAxis: {
+        type: "category",
+        data: xData,
+        axisLabel: { color: "#64748b", rotate: 45, fontSize: 10 },
+        axisLine: { lineStyle: { color: "rgba(148,163,184,.5)", width: 2 } },
+        splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
+      },
+      yAxis: {
+        type: "value",
+        min: -1,
+        max: 1,
+        axisLabel: {
+          color: "#64748b",
+          formatter: function (v) {
+            if (v === 0) return "0";
+            if (v > 0) return fmt(Math.round(v * maxUp));
+            return fmt(Math.round(Math.abs(v) * maxDown));
+          }
+        },
+        splitLine: { lineStyle: { color: "rgba(51,65,85,.2)" } }
+      },
+      series: [
+        {
+          name: upLabel,
+          type: "bar",
+          stack: "butterfly",
+          barWidth: "60%",
+          itemStyle: { color: "rgba(139,92,246,0.6)" },
+          data: upNorm
+        },
+        {
+          name: downLabel,
+          type: "bar",
+          stack: "butterfly",
+          barWidth: "60%",
+          itemStyle: { color: "rgba(52,211,153,0.7)" },
+          data: downNorm
+        },
+        {
+          name: "trend_up",
+          type: "line",
+          smooth: false,
+          symbol: "none",
+          showInLegend: false,
+          data: upTrend.data,
+          lineStyle: { color: upTrend.slope >= 0 ? "#34d399" : "#ef4444", width: 1.5 }
+        },
+        {
+          name: "trend_down",
+          type: "line",
+          smooth: false,
+          symbol: "none",
+          showInLegend: false,
+          data: downTrend.data,
+          lineStyle: { color: downTrend.slope <= 0 ? "#34d399" : "#ef4444", width: 1.5 }
+        }
+      ]
+    };
+  }
+
+  // notMerge: true to fully replace config when switching between cache/IO modes
+  if (!_effCharts["econWasteMonth"]) {
+    if (typeof echarts !== "undefined") {
+      _effCharts["econWasteMonth"] = echarts.init(el, null, { renderer: "canvas" });
+    }
+  }
+  if (_effCharts["econWasteMonth"]) {
+    _effCharts["econWasteMonth"].setOption(option, { notMerge: true, lazyUpdate: false });
+  }
+}
+
+function initButterflyToggle() {
+  var toggle = document.getElementById("econ-butterfly-toggle");
+  if (!toggle || toggle.dataset.bound) return;
+  toggle.dataset.bound = "1";
+  toggle.addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-mode]");
+    if (!btn) return;
+    var mode = btn.dataset.mode;
+    if (mode === _butterflyMode) return;
+    var buttons = toggle.querySelectorAll("button");
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].style.background = buttons[i] === btn ? "rgba(100,116,139,.3)" : "transparent";
+      buttons[i].style.color = buttons[i] === btn ? "#e2e8f0" : "#94a3b8";
+    }
+    renderMonthlyButterfly(_butterflyDays, mode);
+  });
+}
+
+function renderDayComparison(days) {
+  if (typeof echarts === "undefined") return;
+  var el = document.getElementById("chart-shell-econ-daycompare");
+  if (!el || !days || days.length < 2) return;
+
+  var xData = [];
+  var ratioData = [];
+  for (var i = 0; i < days.length; i++) {
+    var d = days[i];
+    var total = (d.input || 0) + (d.output || 0) + (d.cache_read || 0) + (d.cache_creation || 0);
+    var ratio = total > 0 ? (d.output || 0) / total * 100 : 0;
+    xData.push(d.date.slice(5));
+    ratioData.push(Math.round(ratio * 100) / 100);
+  }
+
+  var option = {
+    tooltip: {
+      trigger: "axis",
+      formatter: function (params) {
+        var idx = params[0].dataIndex;
+        var d = days[idx];
+        return d.date + "<br>" + t("econEfficiencyRatio") + ": " + params[0].value + "%<br>Output: " + fmt(d.output || 0) + "<br>Total: " + fmt((d.input || 0) + (d.output || 0) + (d.cache_read || 0) + (d.cache_creation || 0));
+      }
+    },
+    grid: { top: 30, right: 50, bottom: 40, left: 50 },
+    xAxis: { type: "category", data: xData, axisLabel: { color: "#64748b", rotate: 45, fontSize: 10 }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+    yAxis: [
+      { type: "value", name: "%", axisLabel: { color: "#64748b" }, max: function (v) { return Math.max(v.max * 1.2, 1); }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+      { type: "value", show: false, max: function (v) { return Math.max(v.max * 1.8, 1); }, splitLine: { show: false }, position: "right" }
+    ],
+    series: [
+      {
+        name: t("econEfficiencyRatio"),
+        type: "bar",
+        yAxisIndex: 0,
+        data: ratioData,
+        itemStyle: {
+          color: function (params) {
+            var v = params.value;
+            return v > 0.5 ? "#34d399" : v > 0.1 ? "#fbbf24" : "#ef4444";
+          }
+        },
+        label: { show: true, position: "top", formatter: "{c}%", fontSize: 9, color: "#94a3b8" }
+      },
+      {
+        name: "Trend",
+        type: "line",
+        yAxisIndex: 1,
+        smooth: false,
+        symbol: "none",
+        data: (function () {
+          var n = ratioData.length;
+          if (n < 2) return ratioData;
+          var sx = 0, sy = 0, sxy = 0, sxx = 0;
+          for (var i = 0; i < n; i++) {
+            sx += i; sy += ratioData[i]; sxy += i * ratioData[i]; sxx += i * i;
+          }
+          var _slope = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+          var intercept = (sy - _slope * sx) / n;
+          var line = [];
+          for (var j = 0; j < n; j++) line.push(Math.round((intercept + _slope * j) * 10000) / 10000);
+          return { slope: _slope, data: line };
+        })().data,
+        lineStyle: (function () {
+          var n = ratioData.length;
+          if (n < 2) return { color: "#94a3b8", width: 1.5 };
+          var sx = 0, sy = 0, sxy = 0, sxx = 0;
+          for (var i = 0; i < n; i++) {
+            sx += i; sy += ratioData[i]; sxy += i * ratioData[i]; sxx += i * i;
+          }
+          var s = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+          return { color: s >= 0 ? "#34d399" : "#ef4444", width: 1.5 };
+        })()
+      }
+    ]
+  };
+
+  __effInitOrSet("econDayCompare", el, option);
+}
 
 // ── Korean term tooltip system (ko locale only) ──────────────────────
 (function () {
