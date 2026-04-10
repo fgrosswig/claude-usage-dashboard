@@ -14,37 +14,32 @@
  * Manifest-Änderungen werden ausgelassen; bei gemischten Commits zählen Manifeste nicht für die Komponente.
  */
 'use strict';
-const { execSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+var { execSync } = require('node:child_process');
+var fs = require('node:fs');
+var path = require('node:path');
 
-const argv = process.argv.slice(2);
-const PUBLIC = argv.indexOf('--public') !== -1;
-const posArgs = argv.filter(function (a) {
-  return a !== '--public';
-});
-const sinceTagArg = posArgs[0] || null;
+var argv = process.argv.slice(2);
+var PUBLIC = argv.includes('--public');
+var posArgs = argv.find(function (a) { return a !== '--public'; }) || null;
+var sinceTagArg = posArgs;
 
-const ROOT = execSync('git rev-parse --show-toplevel').toString().trim();
-const LOG_PATH = path.join(ROOT, 'logs', 'transactions.json');
+var ROOT = execSync('git rev-parse --show-toplevel').toString().trim();
+var LOG_PATH = path.join(ROOT, 'logs', 'transactions.json');
 
-// Reine Manifeste unter k8s/k8 (kein generisches Markdown) — extern nicht kommunizieren
 var K8_MANIFEST_RE = /^(k8s|k8)\/.+\.(ya?ml)$/i;
 
-// Dateien die nur intern relevant sind (CI-Pipelines, Hooks, interne Scripts)
 var INTERNAL_ONLY_RE = /^\.woodpecker\/|^\.gitea\/|^\.gitignore$|^(k8s|k8)\/.+\.(ya?ml)$|^scripts\/hooks\/|^scripts\/generate-release-notes\.js$|^scripts\/update-tx-log\.js$|^scripts\/setup-sonarqube-webhook\.ps1$|^scripts\/scrub-for-public\.sh$|^sonar-project\.properties$|^sonar\.token$|^logs\//i;
 
 function isInternalOnlyTx(tx) {
   var changes = tx.changes || [];
   if (!changes.length) return false;
-  for (var i = 0; i < changes.length; i++) {
-    var f = (changes[i].file || '').replace(/\\/g, '/');
+  for (var change of changes) {
+    var f = (change.file || '').replaceAll('\\', '/');
     if (!INTERNAL_ONLY_RE.test(f)) return false;
   }
   return true;
 }
 
-// Reihenfolge: spezifisch zuerst (erste passende Regel gewinnt pro Datei)
 var COMPONENT_RULES = [
   { pattern: /^k8s\/.*\.md$|^k8\/.*\.md$/i, name: 'Docs' },
   { pattern: /^\.woodpecker\/|^\.gitea\/|^\.github\/|^k8s\/|^k8\//, name: 'CI / Infra' },
@@ -61,15 +56,14 @@ var COMPONENT_RULES = [
   { pattern: /^scripts\//, name: 'Server' }
 ];
 
-// Sortierung der Bullets innerhalb einer Sektion (feat/fix/…)
 var COMPONENT_ORDER = ['API', 'Proxy', 'Server', 'Dashboard', 'Docs', 'CI / Infra'];
 
 function componentSortKey(comp) {
   if (!comp) return '999|';
   var parts = comp.split(' + ');
   var best = 999;
-  for (var p = 0; p < parts.length; p++) {
-    var idx = COMPONENT_ORDER.indexOf(parts[p].trim());
+  for (var p of parts) {
+    var idx = COMPONENT_ORDER.indexOf(p.trim());
     if (idx !== -1 && idx < best) best = idx;
   }
   return String(best).padStart(3, '0') + '|' + comp;
@@ -80,18 +74,17 @@ var sinceTag = sinceTagArg;
 if (!sinceTag) {
   try {
     sinceTag = execSync('git tag --sort=-v:refname').toString().trim().split('\n')[0];
-  } catch (e) {}
+  } catch (_) { /* no tags */ }
 }
 if (!sinceTag) {
   console.error('Kein Git-Tag gefunden. Usage: node scripts/generate-release-notes.js [tag] [--public]');
   process.exit(1);
 }
 
-// SHA des Tags
 var tagSha;
 try {
   tagSha = execSync('git rev-list -1 ' + sinceTag).toString().trim();
-} catch (e) {
+} catch (_) {
   console.error('Tag ' + sinceTag + ' nicht gefunden.');
   process.exit(1);
 }
@@ -121,14 +114,12 @@ try {
   var logOut = execSync('git log --format=%H%n%h ' + sinceTag + '..HEAD')
     .toString().trim();
   if (logOut) {
-    var lines = logOut.split('\n');
-    for (var li = 0; li < lines.length; li++) sinceSet[lines[li]] = true;
+    for (var sha of logOut.split('\n')) sinceSet[sha] = true;
   }
-} catch (e) {}
+} catch (_) { /* empty range */ }
 
 var unreleased = [];
-for (var i = 0; i < txs.length; i++) {
-  var tx = txs[i];
+for (var tx of txs) {
   var cf = tx.commit_full || '';
   var cshort = tx.commit || '';
   if (!sinceSet[cf] && !sinceSet[cshort]) continue;
@@ -145,12 +136,12 @@ if (!unreleased.length) {
 function detectComponent(tx, isPublic) {
   var changes = tx.changes || [];
   var found = {};
-  for (var c = 0; c < changes.length; c++) {
-    var f = (changes[c].file || '').replace(/\\/g, '/');
+  for (var change of changes) {
+    var f = (change.file || '').replaceAll('\\', '/');
     if (isPublic && K8_MANIFEST_RE.test(f)) continue;
-    for (var r = 0; r < COMPONENT_RULES.length; r++) {
-      if (COMPONENT_RULES[r].pattern.test(f)) {
-        found[COMPONENT_RULES[r].name] = true;
+    for (var rule of COMPONENT_RULES) {
+      if (rule.pattern.test(f)) {
+        found[rule.name] = true;
         break;
       }
     }
@@ -162,8 +153,7 @@ function detectComponent(tx, isPublic) {
 // ── Nach Typ gruppieren ──────────────────────────────────
 var TYPE_RE = /^(feat|fix|chore|docs|ci|perf|refactor|test)(?:\([^)]*\))?[:\s]/;
 var groups = { feat: [], fix: [], chore: [], docs: [], other: [] };
-for (var j = 0; j < unreleased.length; j++) {
-  var txj = unreleased[j];
+for (var txj of unreleased) {
   if (PUBLIC && isInternalOnlyTx(txj)) continue;
   var desc = txj.description || '';
   var match = desc.match(TYPE_RE);
@@ -198,17 +188,16 @@ var labels = {
 var title = PUBLIC ? '## ' + sinceTag + '\n' : '## Changes since ' + sinceTag + '\n';
 console.log(title);
 var order = ['feat', 'fix', 'docs', 'chore', 'other'];
-for (var k = 0; k < order.length; k++) {
-  var key = order[k];
+for (var key of order) {
   var items = groups[key];
   if (!items.length) continue;
   console.log('### ' + labels[key]);
   items.sort(function (a, b) {
     return componentSortKey(a.component).localeCompare(componentSortKey(b.component));
   });
-  for (var l = 0; l < items.length; l++) {
-    var tag = items[l].component ? '**' + items[l].component + ':** ' : '';
-    console.log('- ' + tag + items[l].msg);
+  for (var item of items) {
+    var tag = item.component ? '**' + item.component + ':** ' : '';
+    console.log('- ' + tag + item.msg);
   }
   console.log('');
 }
