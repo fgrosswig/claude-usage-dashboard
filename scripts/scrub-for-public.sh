@@ -82,6 +82,7 @@ find . -type f ! -path './.git/*' -name '*.md' -print0 |
   done
 
 rm -f ./scripts/generate-release-notes.js
+rm -rf ./logs
 
 find . -type f ! -path './.git/*' \( -name 'Dockerfile' -o -name 'Dockerfile.*' \) -print0 |
   while IFS= read -r -d '' f; do
