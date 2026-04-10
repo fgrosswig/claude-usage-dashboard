@@ -3386,6 +3386,23 @@ function devFetchProxyLogs(cb) {
 
 // ── /api/session-turns: per-session turn-level token data for a given date ──
 
+var _sessionTurnsCache = Object.create(null);
+var _sessionTurnsCacheTTL = Object.create(null);
+var SESSION_TURNS_CACHE_TTL_PAST = 3600000;   // 1h for past days
+var SESSION_TURNS_CACHE_TTL_TODAY = 30000;     // 30s for today
+
+function getSessionTurnsCached(dateKey) {
+  var now = Date.now();
+  if (_sessionTurnsCache[dateKey] && _sessionTurnsCacheTTL[dateKey] > now) {
+    return _sessionTurnsCache[dateKey];
+  }
+  var result = buildSessionTurnsForDate(dateKey);
+  _sessionTurnsCache[dateKey] = result;
+  var isToday = dateKey === new Date().toISOString().slice(0, 10);
+  _sessionTurnsCacheTTL[dateKey] = now + (isToday ? SESSION_TURNS_CACHE_TTL_TODAY : SESSION_TURNS_CACHE_TTL_PAST);
+  return result;
+}
+
 function buildSessionTurnsForDate(dateKey) {
   var crypto = require('crypto');
   var collected = collectTaggedJsonlFiles();
@@ -3639,7 +3656,7 @@ var server = http.createServer(function (req, res) {
   } else if (pathname === '/api/session-turns') {
     var stUrl = new URL(req.url, 'http://localhost');
     var stDate = stUrl.searchParams.get('date') || new Date().toISOString().slice(0, 10);
-    var stResult = buildSessionTurnsForDate(stDate);
+    var stResult = getSessionTurnsCached(stDate);
     res.writeHead(200, {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
