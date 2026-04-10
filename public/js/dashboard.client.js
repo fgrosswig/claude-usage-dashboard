@@ -8653,17 +8653,23 @@ function renderButterflyChart(days) {
   if (!el || !days || days.length < 2) return;
 
   var xData = [];
-  var ratioData = [];
-  var outputData = [];
+  var rawRatio = [];
+  var rawOutput = [];
 
   for (var i = 0; i < days.length; i++) {
     var d = days[i];
     var out = d.output || 0;
     var total = (d.input || 0) + out + (d.cache_read || 0) + (d.cache_creation || 0);
     xData.push(d.date.slice(5));
-    ratioData.push(total > 0 ? Math.round(out / total * 10000) / 100 : 0);
-    outputData.push(-out);
+    rawRatio.push(total > 0 ? Math.round(out / total * 10000) / 100 : 0);
+    rawOutput.push(out);
   }
+
+  // Normalize both to 0..1 range, then mirror output to -1..0
+  var maxRatio = Math.max.apply(null, rawRatio) || 1;
+  var maxOutput = Math.max.apply(null, rawOutput) || 1;
+  var normRatio = rawRatio.map(function (v) { return Math.round(v / maxRatio * 1000) / 1000; });
+  var normOutput = rawOutput.map(function (v) { return -Math.round(v / maxOutput * 1000) / 1000; });
 
   var option = {
     tooltip: {
@@ -8674,64 +8680,59 @@ function renderButterflyChart(days) {
         var lines = [d.date];
         for (var p = 0; p < params.length; p++) {
           if (params[p].seriesName === t("econButterflyRatio")) {
-            lines.push(params[p].marker + " " + params[p].seriesName + ": " + params[p].value + "%");
+            lines.push(params[p].marker + " " + t("econButterflyRatio") + ": " + rawRatio[idx] + "%");
           } else {
-            lines.push(params[p].marker + " " + params[p].seriesName + ": " + fmt(Math.abs(params[p].value)));
+            lines.push(params[p].marker + " " + t("econButterflyOutput") + ": " + fmt(rawOutput[idx]));
           }
         }
         return lines.join("<br>");
       }
     },
     legend: { top: 4, textStyle: { color: "#94a3b8", fontSize: 11 } },
-    grid: { top: 40, right: 20, bottom: 40, left: 60 },
+    grid: { top: 40, right: 60, bottom: 40, left: 60 },
     xAxis: {
       type: "category",
       data: xData,
       axisLabel: { color: "#64748b", rotate: 45, fontSize: 10 },
-      axisLine: { lineStyle: { color: "rgba(51,65,85,.6)" } },
+      axisLine: { lineStyle: { color: "rgba(148,163,184,.5)", width: 2 } },
       splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
     },
-    yAxis: [
-      {
-        type: "value",
-        name: "%",
-        position: "left",
-        axisLabel: { color: "#34d399", formatter: function (v) { return v + "%"; } },
-        splitLine: { lineStyle: { color: "rgba(51,65,85,.2)" } },
-        min: 0
+    yAxis: {
+      type: "value",
+      min: -1,
+      max: 1,
+      axisLabel: {
+        color: "#64748b",
+        formatter: function (v) {
+          if (v === 0) return "0";
+          if (v > 0) return Math.round(v * maxRatio * 100) / 100 + "%";
+          return fmt(Math.round(Math.abs(v) * maxOutput));
+        }
       },
-      {
-        type: "value",
-        position: "right",
-        axisLabel: { color: "#60a5fa", formatter: function (v) { return fmt(Math.abs(v)); } },
-        splitLine: { show: false },
-        max: 0
-      }
-    ],
+      splitLine: { lineStyle: { color: "rgba(51,65,85,.2)" } }
+    },
     series: [
       {
         name: t("econButterflyRatio"),
         type: "line",
-        yAxisIndex: 0,
         smooth: false,
-        areaStyle: { color: "rgba(52,211,153,0.25)" },
+        areaStyle: { color: "rgba(52,211,153,0.2)", origin: "start" },
         lineStyle: { color: "#34d399", width: 2 },
         symbol: "circle",
         symbolSize: 4,
         itemStyle: { color: "#34d399" },
-        data: ratioData
+        data: normRatio
       },
       {
         name: t("econButterflyOutput"),
         type: "line",
-        yAxisIndex: 1,
         smooth: false,
-        areaStyle: { color: "rgba(96,165,250,0.25)" },
+        areaStyle: { color: "rgba(96,165,250,0.2)", origin: "start" },
         lineStyle: { color: "#60a5fa", width: 2 },
         symbol: "circle",
         symbolSize: 4,
         itemStyle: { color: "#60a5fa" },
-        data: outputData
+        data: normOutput
       }
     ]
   };
