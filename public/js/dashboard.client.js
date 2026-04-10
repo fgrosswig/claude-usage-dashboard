@@ -8398,8 +8398,6 @@ function renderEconomicSection(data, filteredDays) {
       }
     });
   }
-
-  fetchAndRender();
 }
 
 function populateSessionPicker(stData, picker, infoEl, sumEl) {
