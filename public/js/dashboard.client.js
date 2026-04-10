@@ -8883,7 +8883,7 @@ function renderDayComparison(days) {
         name: "Trend",
         type: "line",
         yAxisIndex: 1,
-        smooth: 0.6,
+        smooth: false,
         lineStyle: { color: "rgba(148,163,184,0.7)", width: 2 },
         symbol: "none",
         data: ratioData
