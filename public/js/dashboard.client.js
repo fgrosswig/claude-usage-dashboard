@@ -8718,6 +8718,7 @@ function renderMonthlyWasteCurve(days) {
         name: t("econEfficiencyRatio"),
         type: "line",
         yAxisIndex: 1,
+        smooth: 0.4,
         lineStyle: { color: "#34d399", width: 2, type: "dashed" },
         symbol: "circle",
         symbolSize: 4,
