@@ -3637,8 +3637,8 @@ var server = http.createServer(function (req, res) {
   } else if (pathname === '/api/claude-data-sync') {
     handleClaudeDataSyncRequest(req, res);
   } else if (pathname === '/api/session-turns') {
-    var stQuery = require('url').parse(req.url, true).query || {};
-    var stDate = stQuery.date || new Date().toISOString().slice(0, 10);
+    var stUrl = new URL(req.url, 'http://localhost');
+    var stDate = stUrl.searchParams.get('date') || new Date().toISOString().slice(0, 10);
     var stResult = buildSessionTurnsForDate(stDate);
     res.writeHead(200, {
       'Content-Type': 'application/json',
