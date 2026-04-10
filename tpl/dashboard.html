@@ -216,30 +216,36 @@
 <span id="econ-session-info" style="font-size:.72rem;color:#64748b"></span>
 </div>
 <div class="forensic-charts-stack">
-<!-- Row 1: 3 cumulative charts side by side -->
+<!-- Row 1: Cumulative (1/3) + Cache Explosion (2/3) -->
 <div style="display:flex;gap:12px">
 <div class="forensic-chart-panel" style="flex:1;min-width:0">
 <h4 id="econ-waste-h3" style="font-size:.8rem;color:#e2e8f0;margin:0 0 2px"></h4>
 <p id="econ-waste-blurb" style="font-size:.72rem;color:#94a3b8;margin:0 0 8px;line-height:1.4"></p>
 <div class="chart-shell chart-shell--forensic" id="chart-shell-econ-waste" style="height:300px"></div>
 </div>
-<div class="forensic-chart-panel" style="flex:1;min-width:0">
-<h4 id="econ-waste-month-h3" style="font-size:.8rem;color:#e2e8f0;margin:0 0 2px"></h4>
-<p id="econ-waste-month-blurb" style="font-size:.72rem;color:#94a3b8;margin:0 0 8px;line-height:1.4"></p>
-<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-waste-month" style="height:300px"></div>
-</div>
-<div class="forensic-chart-panel" style="flex:1;min-width:0">
-<h4 id="econ-butterfly-h3" style="font-size:.8rem;color:#e2e8f0;margin:0 0 2px"></h4>
-<p id="econ-butterfly-blurb" style="font-size:.72rem;color:#94a3b8;margin:0 0 8px;line-height:1.4"></p>
-<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-butterfly" style="height:300px"></div>
+<div class="forensic-chart-panel" style="flex:2;min-width:0">
+<h4 id="econ-explosion-h3" style="font-size:.8rem;color:#e2e8f0;margin:0 0 2px"></h4>
+<p id="econ-explosion-blurb" style="font-size:.72rem;color:#94a3b8;margin:0 0 8px;line-height:1.4"></p>
+<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-explosion" style="height:300px"></div>
 </div>
 </div>
-<!-- Row 2: Efficiency Timeline + Day Comparison -->
+<!-- Row 2: Efficiency Timeline + Token Butterfly + Day Comparison -->
 <div style="display:flex;gap:12px;margin-top:12px">
 <div class="forensic-chart-panel" style="flex:1;min-width:0">
 <h4 id="econ-efficiency-h3" style="font-size:.8rem;color:#e2e8f0;margin:0 0 2px"></h4>
 <p id="econ-efficiency-blurb" style="font-size:.72rem;color:#94a3b8;margin:0 0 8px;line-height:1.4"></p>
 <div class="chart-shell chart-shell--forensic" id="chart-shell-econ-efficiency" style="height:300px"></div>
+</div>
+<div class="forensic-chart-panel" style="flex:1;min-width:0">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+<h4 id="econ-waste-month-h3" style="font-size:.8rem;color:#e2e8f0;margin:0"></h4>
+<div id="econ-butterfly-toggle" style="display:inline-flex;border:1px solid rgba(100,116,139,.4);border-radius:4px;overflow:hidden;font-size:.68rem">
+<button data-mode="cache" style="padding:2px 8px;background:rgba(100,116,139,.3);color:#e2e8f0;border:none;cursor:pointer" class="active">Cache</button>
+<button data-mode="io" style="padding:2px 8px;background:transparent;color:#94a3b8;border:none;cursor:pointer">I/O</button>
+</div>
+</div>
+<p id="econ-waste-month-blurb" style="font-size:.72rem;color:#94a3b8;margin:0 0 8px;line-height:1.4"></p>
+<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-waste-month" style="height:300px"></div>
 </div>
 <div class="forensic-chart-panel" style="flex:1;min-width:0">
 <h4 id="econ-daycompare-h3" style="font-size:.8rem;color:#e2e8f0;margin:0 0 2px"></h4>
