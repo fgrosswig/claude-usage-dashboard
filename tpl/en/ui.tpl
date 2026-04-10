@@ -473,6 +473,8 @@
   "econWasteInput": "Input (cumulative)",
   "econWasteSplitHint": "Consider splitting session here",
   "econWasteMonthTitle": "Cumulative Usage Curve \u2014 Monthly",
+  "econWasteMonthTitle": "Token Consumption \u2014 Monthly",
+  "econWasteMonthBlurb": "Token consumption per day (Cache Read + Creation). Trend line shows efficiency ratio.",
   "econButterflyTitle": "Efficiency vs. Output \u2014 Monthly",
   "econButterflyBlurb": "Top: efficiency ratio (output/total). Bottom: absolute output. Counter-movement reveals: high output = low efficiency (longer sessions, more cache overhead).",
   "econButterflyRatio": "Efficiency %",

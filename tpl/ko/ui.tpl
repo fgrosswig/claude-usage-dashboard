@@ -473,6 +473,8 @@
   "econWasteInput": "입력 (누적)",
   "econWasteSplitHint": "여기서 세션 분할 고려",
   "econWasteMonthTitle": "누적 사용 곡선 — 월별",
+  "econWasteMonthTitle": "토큰 소비 — 월별",
+  "econWasteMonthBlurb": "일별 토큰 소비 (캐시 읽기 + 생성). 추세선은 효율 비율을 보여줍니다.",
   "econButterflyTitle": "효율 vs. 출력 — 월별",
   "econButterflyBlurb": "위: 효율 비율 (출력/전체). 아래: 절대 출력. 역방향 움직임: 높은 출력 = 낮은 효율 (긴 세션, 더 많은 캐시 오버헤드).",
   "econButterflyRatio": "효율 %",

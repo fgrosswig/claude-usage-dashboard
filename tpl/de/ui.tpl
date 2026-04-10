@@ -472,6 +472,8 @@
   "econWasteCacheCreate": "Cache Creation (kumulativ)",
   "econWasteInput": "Input (kumulativ)",
   "econWasteSplitHint": "Ab hier Session splitten erw\u00e4gen",
+  "econWasteMonthTitle": "Token-Verbrauch \u2014 Monat",
+  "econWasteMonthBlurb": "Token-Verbrauch pro Tag (Cache Read + Creation). Trendlinie zeigt Effizienz-Ratio.",
   "econButterflyTitle": "Effizienz vs. Output \u2014 Monat",
   "econButterflyBlurb": "Oben: Effizienz-Ratio (Output/Total). Unten: absoluter Output. Gegenl\u00e4ufigkeit zeigt: hoher Output = niedrige Effizienz (l\u00e4ngere Sessions, mehr Cache-Overhead).",
   "econButterflyRatio": "Effizienz %",
