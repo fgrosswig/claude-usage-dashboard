@@ -31,12 +31,15 @@ const LOG_PATH = path.join(ROOT, 'logs', 'transactions.json');
 // Reine Manifeste unter k8s/k8 (kein generisches Markdown) — extern nicht kommunizieren
 var K8_MANIFEST_RE = /^(k8s|k8)\/.+\.(ya?ml)$/i;
 
-function isInternalK8ManifestOnlyTx(tx) {
+// Dateien die nur intern relevant sind (CI-Pipelines, Hooks, interne Scripts)
+var INTERNAL_ONLY_RE = /^\.woodpecker\/|^\.gitea\/|^\.gitignore$|^(k8s|k8)\/.+\.(ya?ml)$|^scripts\/hooks\/|^scripts\/generate-release-notes\.js$|^scripts\/update-tx-log\.js$|^scripts\/setup-sonarqube-webhook\.ps1$|^scripts\/scrub-for-public\.sh$|^sonar-project\.properties$|^sonar\.token$|^logs\//i;
+
+function isInternalOnlyTx(tx) {
   var changes = tx.changes || [];
   if (!changes.length) return false;
   for (var i = 0; i < changes.length; i++) {
     var f = (changes[i].file || '').replace(/\\/g, '/');
-    if (!K8_MANIFEST_RE.test(f)) return false;
+    if (!INTERNAL_ONLY_RE.test(f)) return false;
   }
   return true;
 }
@@ -161,7 +164,7 @@ var TYPE_RE = /^(feat|fix|chore|docs|ci|perf|refactor|test)(?:\([^)]*\))?[:\s]/;
 var groups = { feat: [], fix: [], chore: [], docs: [], other: [] };
 for (var j = 0; j < unreleased.length; j++) {
   var txj = unreleased[j];
-  if (PUBLIC && isInternalK8ManifestOnlyTx(txj)) continue;
+  if (PUBLIC && isInternalOnlyTx(txj)) continue;
   var desc = txj.description || '';
   var match = desc.match(TYPE_RE);
   var type = match ? match[1] : 'other';
