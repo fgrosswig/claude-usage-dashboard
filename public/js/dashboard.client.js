@@ -8809,24 +8809,16 @@ function renderButterflyChart(days) {
     series: [
       {
         name: t("econButterflyRatio"),
-        type: "line",
-        smooth: false,
-        areaStyle: { color: "rgba(52,211,153,0.2)", origin: "auto" },
-        lineStyle: { color: "#34d399", width: 2 },
-        symbol: "circle",
-        symbolSize: 4,
-        itemStyle: { color: "#34d399" },
+        type: "bar",
+        barWidth: "60%",
+        itemStyle: { color: "rgba(52,211,153,0.7)" },
         data: normRatio
       },
       {
         name: t("econButterflyOutput"),
-        type: "line",
-        smooth: false,
-        areaStyle: { color: "rgba(96,165,250,0.2)", origin: "auto" },
-        lineStyle: { color: "#60a5fa", width: 2 },
-        symbol: "circle",
-        symbolSize: 4,
-        itemStyle: { color: "#60a5fa" },
+        type: "bar",
+        barWidth: "60%",
+        itemStyle: { color: "rgba(96,165,250,0.7)" },
         data: normOutput
       }
     ]
