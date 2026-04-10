@@ -8489,8 +8489,8 @@ function renderWasteCurve(session) {
     },
     legend: { top: 4, textStyle: { color: "#94a3b8", fontSize: 11 } },
     grid: { top: 40, right: 20, bottom: 30, left: 60 },
-    xAxis: { type: "category", data: xData, name: "Turn", axisLabel: { color: "#64748b" } },
-    yAxis: { type: "value", axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } } },
+    xAxis: { type: "category", data: xData, name: "Turn", axisLabel: { color: "#64748b" }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+    yAxis: { type: "value", axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
     series: [
       {
         name: t("econWasteCacheRead"),
@@ -8586,10 +8586,10 @@ function renderEfficiencyTimeline(stData) {
     },
     legend: { top: 4, textStyle: { color: "#94a3b8", fontSize: 11 } },
     grid: { top: 40, right: 60, bottom: 30, left: 60 },
-    xAxis: { type: "category", data: xData, axisLabel: { color: "#64748b" } },
+    xAxis: { type: "category", data: xData, axisLabel: { color: "#64748b" }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
     yAxis: [
-      { type: "value", name: t("econEfficiencyTotal"), axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } }, position: "left" },
-      { type: "value", name: t("econEfficiencyOutput"), axisLabel: { color: "#34d399", formatter: function (v) { return fmt(v); } }, position: "right" }
+      { type: "value", name: t("econEfficiencyTotal"), axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } }, position: "left", splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+      { type: "value", name: t("econEfficiencyOutput"), axisLabel: { color: "#34d399", formatter: function (v) { return fmt(v); } }, position: "right", splitLine: { show: false } }
     ],
     series: [
       {
@@ -8644,8 +8644,8 @@ function renderDayComparison(days) {
       }
     },
     grid: { top: 20, right: 20, bottom: 40, left: 50 },
-    xAxis: { type: "category", data: xData, axisLabel: { color: "#64748b", rotate: 45, fontSize: 10 } },
-    yAxis: { type: "value", name: "%", axisLabel: { color: "#64748b" }, max: function (v) { return Math.max(v.max * 1.2, 1); } },
+    xAxis: { type: "category", data: xData, axisLabel: { color: "#64748b", rotate: 45, fontSize: 10 }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+    yAxis: { type: "value", name: "%", axisLabel: { color: "#64748b" }, max: function (v) { return Math.max(v.max * 1.2, 1); }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
     series: [{
       type: "bar",
       data: ratioData,
