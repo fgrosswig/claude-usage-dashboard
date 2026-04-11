@@ -194,26 +194,17 @@ steps:
         echo "Commits since $LAST_TAG:"
         echo "$COMMITS" | head -10
         # 3. Determine bump type
-        BUMP="patch"
-        if echo "$COMMITS" | grep -qiE "BREAKING CHANGE|^[a-z]+(\([^)]*\))?!:"; then
-          BUMP="major"
-        elif echo "$COMMITS" | grep -qE "^feat(\([^)]*\))?:"; then
-          BUMP="minor"
-        fi
-        # 4. Parse + bump version
-        VER=$(echo "$LAST_TAG" | sed 's/^v//' | tr -d '\r\n ')
-        echo "Parsing version: [$VER]"
-        MAJOR=$(echo "$VER" | cut -d. -f1)
-        MINOR=$(echo "$VER" | cut -d. -f2)
-        PATCH=$(echo "$VER" | cut -d. -f3)
-        echo "Parsed: MAJOR=$MAJOR MINOR=$MINOR PATCH=$PATCH BUMP=$BUMP"
-        if [ "$BUMP" = "major" ]; then
-          NEW_TAG="v$((MAJOR + 1)).0.0"
-        elif [ "$BUMP" = "minor" ]; then
-          NEW_TAG="v${MAJOR}.$((MINOR + 1)).0"
-        else
-          NEW_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
-        fi
+        BUMP=patch
+        echo "$COMMITS" | grep -qiE "BREAKING CHANGE" && BUMP=major
+        echo "$COMMITS" | grep -qE "^feat(\([^)]*\))?:" && [ "$BUMP" != "major" ] && BUMP=minor
+        echo "Bump type: $BUMP"
+        # 4. Compute new tag (single awk — no intermediate shell vars)
+        NEW_TAG=$(echo "$LAST_TAG" | awk -F. -v bump="$BUMP" '{
+          gsub(/^v/,"",$1)
+          if(bump=="major") printf "v%d.0.0\n",$1+1
+          else if(bump=="minor") printf "v%s.%d.0\n",$1,$2+1
+          else printf "v%s.%s.%d\n",$1,$2,$3+1
+        }')
         echo "Last: $LAST_TAG → Bump: $BUMP → New: $NEW_TAG"
         # 5. Create tag via API
         curl -sf -X POST \
