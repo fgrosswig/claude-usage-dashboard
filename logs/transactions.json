@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-125",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "42ee34b",
+      "commit_full": "42ee34b5ddf5e37f65f25b671c0311795a86ff83",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ci): filter merge/tx-log commits from bump detection + sonar execFileSync",
+      "detail": "- Bump detection now ignores Merge and tx-log commits\n- execFileSync instead of execSync for tag-derived args (sonar finding)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".woodpecker/app.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-124",
       "timestamp": "2026-04-11",
       "session": "auto",
