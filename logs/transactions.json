@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-168",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "c41d824",
+      "commit_full": "c41d8244d270539b90a56c4c4065b62656c19997",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(session-turns): respect --no-cache / CLAUDE_USAGE_NO_CACHE for session-turns cache",
+      "detail": "When CLAUDE_USAGE_NO_CACHE=1, skip cache lookup and do not store results\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-167",
       "timestamp": "2026-04-12",
       "session": "auto",
