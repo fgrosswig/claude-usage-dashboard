@@ -321,7 +321,7 @@
             id: 'status-uptime',
             titleKey: 'chartStatusUptime',
             type: 'bar-stacked',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c-uptime-chart',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderStatus_uptime'
@@ -330,7 +330,7 @@
             id: 'status-incidents',
             titleKey: 'chartStatusIncidents',
             type: 'mixed',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c-incident-history',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderStatus_incidents'
@@ -339,7 +339,7 @@
             id: 'status-outage-scatter',
             titleKey: 'chartStatusOutageScatter',
             type: 'mixed',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c-anthropic-incidents',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderStatus_outageScatter'
@@ -348,7 +348,7 @@
             id: 'status-outage-timeline',
             titleKey: 'chartStatusOutageTimeline',
             type: 'bar-stacked',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c-outage-timeline',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderStatus_outageTimeline'

@@ -792,11 +792,11 @@ function freezeChartNoAnim(ch) {
 function __safeChartResize(ch) {
   if (!ch || typeof ch.resize !== "function") return;
   try {
-    var c = ch.canvas;
-    if (!c?.isConnected) return;
+    var dom = ch.getDom ? ch.getDom() : ch.canvas;
+    if (!dom?.isConnected) return;
     ch.resize();
-  } catch {
-    // canvas may have detached between isConnected check and resize()
+  } catch(e) {
+    // dom may have detached between isConnected check and resize()
   }
 }
 
@@ -6179,7 +6179,7 @@ function buildHealthScoreHistory(data) {
 
 // ── Uptime Chart (24h stacked by component status) ───────────────────────
 function renderUptimeChart(data) {
-  if (typeof Chart === "undefined") return;
+  if (typeof echarts === "undefined") return;
   var el = document.getElementById("c-uptime-chart");
   if (!el) return;
   var titleEl = document.getElementById("uptime-chart-title");
@@ -6257,51 +6257,38 @@ function renderUptimeChart(data) {
   }
 
   if (_proxyCharts.uptimeChart) {
-    _proxyCharts.uptimeChart.destroy();
+    _proxyCharts.uptimeChart.dispose();
     _proxyCharts.uptimeChart = null;
   }
 
-  _proxyCharts.uptimeChart = new Chart(el.getContext("2d"), {
-    type: "bar",
-    data: {
-      labels: labels,
-      datasets: [
-        { label: t("uptimeOperational"), data: opData, backgroundColor: "rgba(34,197,94,.3)", borderColor: "rgba(34,197,94,.5)", borderWidth: 1, stack: "s" },
-        { label: t("uptimeDegraded"), data: degData, backgroundColor: "rgba(245,158,11,.3)", borderColor: "rgba(245,158,11,.6)", borderWidth: 1, stack: "s" },
-        { label: t("uptimePartial"), data: partData, backgroundColor: "rgba(249,115,22,.35)", borderColor: "rgba(249,115,22,.7)", borderWidth: 1, stack: "s" },
-        { label: t("uptimeOutage"), data: outData, backgroundColor: "rgba(239,68,68,.4)", borderColor: "rgba(239,68,68,.7)", borderWidth: 1, stack: "s" },
-        { label: "", data: greyData, backgroundColor: "rgba(51,65,85,.45)", borderColor: "rgba(51,65,85,.55)", borderWidth: 1, stack: "s", hidden: false }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      layout: { padding: { left: 0, right: 2, top: 4, bottom: 0 } },
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { stacked: true, ticks: { color: "#cbd5e1", font: { size: _cf().tick } }, grid: { color: "rgba(51,65,85,.3)" } },
-        y: { stacked: true, max: 24, ticks: { color: "#cbd5e1", font: { size: _cf().tick }, stepSize: 6, callback: function(v) { return v + "h"; } }, grid: { color: "rgba(51,65,85,.3)" } }
-      },
-      plugins: {
-        legend: { labels: { color: "#f8fafc", boxWidth: 12, font: { size: _cf().legend } } },
-        tooltip: {
-          titleFont: { size: _cf().tooltip },
-          bodyFont: { size: _cf().tooltip },
-          callbacks: {
-            label: function(ctx) { return ctx.dataset.label + ": " + ctx.parsed.y + "h"; }
-          }
-        }
+  _proxyCharts.uptimeChart = echarts.init(el, null, { renderer: 'canvas' });
+  _proxyCharts.uptimeChart.setOption({
+    animation: false,
+    grid: { left: 40, right: 8, top: 30, bottom: 24 },
+    legend: { data: [t("uptimeOperational"), t("uptimeDegraded"), t("uptimePartial"), t("uptimeOutage")], textStyle: { color: '#f8fafc', fontSize: _cf().legend }, top: 2, itemWidth: 12, itemHeight: 10 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: _cf().tooltip },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel];
+        for (var pi = 0; pi < params.length; pi++) { if (params[pi].seriesName) lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + params[pi].value + 'h'); }
+        return lines.join('<br>');
       }
-    }
-  });
+    },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#cbd5e1', fontSize: _cf().tick }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
+    yAxis: { type: 'value', max: 24, min: 0, interval: 6, axisLabel: { color: '#cbd5e1', fontSize: _cf().tick, formatter: function(v) { return v + 'h'; } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
+    series: [
+      { name: t("uptimeOperational"), type: 'bar', stack: 's', data: opData, itemStyle: { color: 'rgba(34,197,94,0.3)', borderColor: 'rgba(34,197,94,0.5)', borderWidth: 1 } },
+      { name: t("uptimeDegraded"), type: 'bar', stack: 's', data: degData, itemStyle: { color: 'rgba(245,158,11,0.3)', borderColor: 'rgba(245,158,11,0.6)', borderWidth: 1 } },
+      { name: t("uptimePartial"), type: 'bar', stack: 's', data: partData, itemStyle: { color: 'rgba(249,115,22,0.35)', borderColor: 'rgba(249,115,22,0.7)', borderWidth: 1 } },
+      { name: t("uptimeOutage"), type: 'bar', stack: 's', data: outData, itemStyle: { color: 'rgba(239,68,68,0.4)', borderColor: 'rgba(239,68,68,0.7)', borderWidth: 1 } },
+      { name: '', type: 'bar', stack: 's', data: greyData, itemStyle: { color: 'rgba(51,65,85,0.45)', borderColor: 'rgba(51,65,85,0.55)', borderWidth: 1 } }
+    ]
+  }, true);
   __scheduleAnthropicHealthChartsResize();
 }
 
 // ── Incident History Chart ────────────────────────────────────────────────
 function renderIncidentHistory(data) {
-  if (typeof Chart === "undefined") return;
+  if (typeof echarts === "undefined") return;
   var el = document.getElementById("c-incident-history");
   if (!el) return;
   var titleEl = document.getElementById("incident-history-title");
@@ -6310,7 +6297,6 @@ function renderIncidentHistory(data) {
   var titleOT = document.getElementById("outage-timeline-title");
   if (titleOT) titleOT.textContent = t("outageTimelineTitle");
 
-  // Apply same month filter as other charts
   var srcDays = _outageTimelineMonthFilter ? (data.days || []) : getFilteredDays(data.days || []);
   var days = [];
   for (var fi = 0; fi < srcDays.length; fi++) {
@@ -6334,7 +6320,7 @@ function renderIncidentHistory(data) {
     var excludedH = 0;
     for (var si = 0; si < spans.length; si++) {
       var imp = spans[si].impact || "none";
-      if (imp === "none") continue; // none = uptime, skip
+      if (imp === "none") continue;
       var dur = (spans[si].to || 0) - (spans[si].from || 0);
       if (dur < 0) dur = 0;
       if (_outageImpactExclude[imp]) { excludedH += dur; continue; }
@@ -6347,59 +6333,51 @@ function renderIncidentHistory(data) {
   }
 
   if (_proxyCharts.incidentHistory) {
-    _proxyCharts.incidentHistory.destroy();
+    _proxyCharts.incidentHistory.dispose();
     _proxyCharts.incidentHistory = null;
   }
 
-  _proxyCharts.incidentHistory = new Chart(el.getContext("2d"), {
-    type: "bar",
-    data: {
-      labels: labels,
-      datasets: [
-        { label: "critical", data: critH, backgroundColor: "rgba(239,68,68,.4)", borderColor: "rgba(239,68,68,.7)", borderWidth: 1, yAxisID: "y", stack: "inc" },
-        { label: "major", data: majorH, backgroundColor: "rgba(249,115,22,.35)", borderColor: "rgba(249,115,22,.6)", borderWidth: 1, yAxisID: "y", stack: "inc" },
-        { label: "minor", data: minorH, backgroundColor: "rgba(245,158,11,.3)", borderColor: "rgba(245,158,11,.6)", borderWidth: 1, yAxisID: "y", stack: "inc" },
-        { label: "", data: greyH, backgroundColor: "rgba(51,65,85,.45)", borderColor: "rgba(51,65,85,.55)", borderWidth: 1, yAxisID: "y", stack: "inc", hidden: false },
-        { label: t("incidentDSHitLimits"), data: hitLimits, type: "line", borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.1)", yAxisID: "y1", tension: 0.3, pointRadius: 3, fill: true }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      layout: { padding: { left: 0, right: 4, top: 4, bottom: 0 } },
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { stacked: true, ticks: { color: "#cbd5e1", font: { size: _cf().tick } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { stacked: true, position: "left", ticks: { color: "#cbd5e1", font: { size: _cf().tick } }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, title: { display: true, text: t("incidentAxisOutage"), color: "#cbd5e1", font: { size: _cf().title } } },
-        y1: { position: "right", ticks: { color: "#f59e0b", font: { size: _cf().tick } }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: t("incidentAxisHitLimits"), color: "#f59e0b", font: { size: _cf().title } } }
-      },
-      plugins: {
-        legend: { labels: { color: "#f8fafc", boxWidth: 12, font: { size: _cf().legend }, filter: function(item) { return item.text !== ""; } } },
-        tooltip: {
-          titleFont: { size: _cf().tooltip },
-          bodyFont: { size: _cf().tooltip },
-          callbacks: {
-            label: function(ctx) { if (!ctx.dataset.label) return null; return ctx.dataset.label + ": " + ctx.parsed.y + (ctx.dataset.yAxisID === "y1" ? "" : "h"); }
-          }
+  _proxyCharts.incidentHistory = echarts.init(el, null, { renderer: 'canvas' });
+  _proxyCharts.incidentHistory.setOption({
+    animation: false,
+    grid: { left: 50, right: 50, top: 30, bottom: 24 },
+    legend: { data: ['critical', 'major', 'minor', t("incidentDSHitLimits")], textStyle: { color: '#f8fafc', fontSize: _cf().legend }, top: 2, itemWidth: 12, itemHeight: 10 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: _cf().tooltip },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel];
+        for (var pi = 0; pi < params.length; pi++) {
+          var p = params[pi];
+          if (!p.seriesName) continue;
+          var suffix = p.seriesType === 'line' ? '' : 'h';
+          lines.push(p.marker + ' ' + p.seriesName + ': ' + p.value + suffix);
         }
+        return lines.join('<br>');
       }
-    }
-  });
+    },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#cbd5e1', fontSize: _cf().tick }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.4)' } } },
+    yAxis: [
+      { type: 'value', min: 0, position: 'left', name: t("incidentAxisOutage"), nameTextStyle: { color: '#cbd5e1', fontSize: _cf().title }, axisLabel: { color: '#cbd5e1', fontSize: _cf().tick }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.4)' } } },
+      { type: 'value', min: 0, position: 'right', name: t("incidentAxisHitLimits"), nameTextStyle: { color: '#f59e0b', fontSize: _cf().title }, axisLabel: { color: '#f59e0b', fontSize: _cf().tick }, splitLine: { show: false } }
+    ],
+    series: [
+      { name: 'critical', type: 'bar', stack: 'inc', yAxisIndex: 0, data: critH, itemStyle: { color: 'rgba(239,68,68,0.4)', borderColor: 'rgba(239,68,68,0.7)', borderWidth: 1 } },
+      { name: 'major', type: 'bar', stack: 'inc', yAxisIndex: 0, data: majorH, itemStyle: { color: 'rgba(249,115,22,0.35)', borderColor: 'rgba(249,115,22,0.6)', borderWidth: 1 } },
+      { name: 'minor', type: 'bar', stack: 'inc', yAxisIndex: 0, data: minorH, itemStyle: { color: 'rgba(245,158,11,0.3)', borderColor: 'rgba(245,158,11,0.6)', borderWidth: 1 } },
+      { name: '', type: 'bar', stack: 'inc', yAxisIndex: 0, data: greyH, itemStyle: { color: 'rgba(51,65,85,0.45)', borderColor: 'rgba(51,65,85,0.55)', borderWidth: 1 } },
+      { name: t("incidentDSHitLimits"), type: 'line', yAxisIndex: 1, data: hitLimits, smooth: 0.3, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#f59e0b' }, itemStyle: { color: '#f59e0b' }, areaStyle: { color: 'rgba(245,158,11,0.1)' } }
+    ]
+  }, true);
   __scheduleAnthropicHealthChartsResize();
 }
 
 
 function updateAnthropicPopup(data) {
-  if (typeof Chart === "undefined") return;
+  if (typeof echarts === "undefined") return;
   var el = document.getElementById("c-anthropic-incidents");
   if (!el) return;
 
   var label = document.getElementById("anthropic-label");
   if (label) label.textContent = "Anthropic";
-
-
 
   var days = getFilteredDays(data.days || []);
   if (days.length < 2) return;
@@ -6408,47 +6386,36 @@ function updateAnthropicPopup(data) {
   var outageH = [];
   var outageColors = [];
   var incidentCounts = [];
+  var scatterData = [];
   for (var i = 0; i < days.length; i++) {
     var d = days[i];
     labels.push(d.date.slice(5));
     var oh = d.outage_hours || 0;
     outageH.push(oh);
-    outageColors.push(oh > 2 ? "rgba(239,68,68,.08)" : oh > 0 ? "rgba(245,158,11,.08)" : "rgba(51,65,85,.05)");
-    incidentCounts.push((d.outage_incidents || []).length);
+    outageColors.push(oh > 2 ? 'rgba(239,68,68,0.08)' : oh > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(51,65,85,0.05)');
+    var ic = (d.outage_incidents || []).length;
+    incidentCounts.push(ic);
+    if (ic > 0) scatterData.push([i, ic]);
   }
 
-  if (_proxyCharts.anthropicIncidents) {
-    freezeChartNoAnim(_proxyCharts.anthropicIncidents);
-    _proxyCharts.anthropicIncidents.data.labels = labels;
-    _proxyCharts.anthropicIncidents.data.datasets[0].data = outageH;
-    _proxyCharts.anthropicIncidents.data.datasets[0].backgroundColor = outageColors;
-    _proxyCharts.anthropicIncidents.data.datasets[1].data = incidentCounts;
-    _proxyCharts.anthropicIncidents.update("none");
-    return;
+  if (!_proxyCharts.anthropicIncidents) {
+    _proxyCharts.anthropicIncidents = echarts.init(el, null, { renderer: 'canvas' });
   }
-
-  _proxyCharts.anthropicIncidents = new Chart(el.getContext("2d"), {
-    type: "bar",
-    data: {
-      labels: labels,
-      datasets: [
-        { label: t("incidentDSOutageHours"), data: outageH, backgroundColor: outageColors, borderColor: outageColors.map(function(c) { return c.replace(/,[\d.]+\)/, ",0.8)"); }), borderWidth: 1, yAxisID: "y", borderRadius: 2, barPercentage: 0.35, categoryPercentage: 0.6 },
-        { label: "Incidents", data: incidentCounts, type: "scatter", borderColor: "rgba(239,68,68,.8)", backgroundColor: "rgba(239,68,68,.15)", pointRadius: function(ctx) { return ctx.parsed.y > 0 ? 4 : 0; }, pointBorderWidth: 2, pointStyle: "circle", yAxisID: "y1" }
-      ]
-    },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { ticks: { color: "#94a3b8", font: { size: 9 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { position: "left", ticks: { color: "#94a3b8" }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, title: { display: true, text: "Outage (h)", color: "#94a3b8", font: { size: 9 } } },
-        y1: { position: "right", ticks: { color: "#ef4444" }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: "Incidents", color: "#ef4444", font: { size: 9 } } }
-      },
-      plugins: { legend: { labels: { color: "#e2e8f0", boxWidth: 10, font: { size: 10 } } } }
-    }
-  });
+  _proxyCharts.anthropicIncidents.setOption({
+    animation: false,
+    grid: { left: 50, right: 50, top: 16, bottom: 24 },
+    legend: { data: [t("incidentDSOutageHours"), 'Incidents'], textStyle: { color: '#e2e8f0', fontSize: 10 }, top: 0, itemWidth: 10, itemHeight: 8 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 11 } },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 9 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.4)' } } },
+    yAxis: [
+      { type: 'value', min: 0, position: 'left', name: 'Outage (h)', nameTextStyle: { color: '#94a3b8', fontSize: 9 }, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.4)' } } },
+      { type: 'value', min: 0, position: 'right', name: 'Incidents', nameTextStyle: { color: '#ef4444', fontSize: 9 }, axisLabel: { color: '#ef4444' }, splitLine: { show: false } }
+    ],
+    series: [
+      { name: t("incidentDSOutageHours"), type: 'bar', yAxisIndex: 0, data: outageH, barWidth: '35%', itemStyle: { color: function(p) { return outageColors[p.dataIndex]; }, borderColor: function(p) { return outageColors[p.dataIndex].replace(/[\d.]+\)$/, '0.8)'); }, borderWidth: 1, borderRadius: 2 } },
+      { name: 'Incidents', type: 'scatter', yAxisIndex: 1, data: scatterData, symbolSize: 8, itemStyle: { color: 'rgba(239,68,68,0.15)', borderColor: 'rgba(239,68,68,0.8)', borderWidth: 2 } }
+    ]
+  }, true);
 }
 
 
@@ -6461,7 +6428,7 @@ var _outageTimelineMonthFilter = null;   // null = all, "2026-03" = single month
 var _outageImpactExclude = {};            // { "critical": true, "minor": true } = hidden
 var _outageStatusExclude = {};            // { "major_outage": true } = hidden (uptime chart)
 function renderOutageTimeline(data, monthFilter) {
-  if (typeof Chart === "undefined") return;
+  if (typeof echarts === "undefined") return;
   var el = document.getElementById("c-outage-timeline");
   if (!el) return;
   if (monthFilter !== undefined) _outageTimelineMonthFilter = monthFilter;
@@ -6475,7 +6442,6 @@ function renderOutageTimeline(data, monthFilter) {
   if (days.length < 1) days = getFilteredDays(data.days || []);
   if (days.length < 2 && !_outageTimelineMonthFilter) return;
 
-  // When filtering by month, pad to full month with empty (future) days
   var dayMap = {};
   for (var dm = 0; dm < days.length; dm++) dayMap[days[dm].date] = days[dm];
 
@@ -6506,7 +6472,6 @@ function renderOutageTimeline(data, monthFilter) {
     }
     var spans = d.outage_spans || [];
 
-    // Hours per severity
     var bySev = { critical: 0, major: 0, minor: 0, none: 0 };
     for (var si = 0; si < spans.length; si++) {
       var dur = (spans[si].to || 0) - (spans[si].from || 0);
@@ -6516,7 +6481,6 @@ function renderOutageTimeline(data, monthFilter) {
       else bySev.none += dur;
     }
 
-    // Cap total to 24h
     var totalInc = bySev.critical + bySev.major + bySev.minor + bySev.none;
     if (totalInc > 24) {
       var scale = 24 / totalInc;
@@ -6524,14 +6488,10 @@ function renderOutageTimeline(data, monthFilter) {
       totalInc = 24;
     }
 
-    // Uptime = 24h - all incident hours
     var uptimeH = 24 - totalInc;
     if (uptimeH < 0) uptimeH = 0;
-
-    // none severity = uptime (no impact = service was fine)
     bySev.none += uptimeH;
 
-    // Apply exclude filter: excluded severity → grey
     var greyH = 0;
     var visCrit = bySev.critical, visMajor = bySev.major, visMinor = bySev.minor, visNone = bySev.none;
     if (_outageImpactExclude["critical"]) { greyH += visCrit; visCrit = 0; }
@@ -6547,51 +6507,36 @@ function renderOutageTimeline(data, monthFilter) {
   }
 
   if (_proxyCharts.outageTimeline) {
-    _proxyCharts.outageTimeline.destroy();
+    _proxyCharts.outageTimeline.dispose();
     _proxyCharts.outageTimeline = null;
   }
 
-  // Always stacked bar — thin bars for many days
-  var barOpts = paddedDays.length > 31 ? { barPercentage: 0.95, categoryPercentage: 0.95 } : {};
-  var xTickOpts = paddedDays.length > 31
-    ? { color: "#cbd5e1", font: { size: Math.max(9, _cf().tick - 2) }, maxRotation: 45, autoSkip: true, maxTicksLimit: 25 }
-    : { color: "#cbd5e1", font: { size: _cf().tick } };
+  var xLabelOpts = paddedDays.length > 31
+    ? { color: '#cbd5e1', fontSize: Math.max(9, _cf().tick - 2), rotate: 45, interval: 0 }
+    : { color: '#cbd5e1', fontSize: _cf().tick };
 
-  var datasets = [
-    Object.assign({ label: "none", data: noneData, backgroundColor: "rgba(34,197,94,.25)", borderColor: "rgba(34,197,94,.5)", borderWidth: 1, stack: "s" }, barOpts),
-    Object.assign({ label: "critical", data: critData, backgroundColor: "rgba(239,68,68,.35)", borderColor: "rgba(239,68,68,.7)", borderWidth: 1, stack: "s" }, barOpts),
-    Object.assign({ label: "major", data: majorData, backgroundColor: "rgba(249,115,22,.3)", borderColor: "rgba(249,115,22,.6)", borderWidth: 1, stack: "s" }, barOpts),
-    Object.assign({ label: "minor", data: minorData, backgroundColor: "rgba(245,158,11,.25)", borderColor: "rgba(245,158,11,.6)", borderWidth: 1, stack: "s" }, barOpts),
-    Object.assign({ label: "", data: greyData, backgroundColor: "rgba(51,65,85,.45)", borderColor: "rgba(51,65,85,.55)", borderWidth: 1, stack: "s", hidden: false }, barOpts)
-  ];
-  var scaleOpts = {
-    x: { stacked: true, ticks: xTickOpts, grid: { color: "rgba(51,65,85,.3)" } },
-    y: { stacked: true, max: 24, ticks: { color: "#cbd5e1", font: { size: _cf().tick }, stepSize: 6, callback: function(v) { return v + "h"; } }, grid: { color: "rgba(51,65,85,.3)" } }
-  };
-
-  _proxyCharts.outageTimeline = new Chart(el.getContext("2d"), {
-    type: "bar",
-    data: { labels: labels, datasets: datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      layout: { padding: { left: 0, right: 2, top: 4, bottom: 0 } },
-      interaction: { mode: "index", intersect: false },
-      scales: scaleOpts,
-      plugins: {
-        legend: { labels: { color: "#f8fafc", boxWidth: 12, font: { size: _cf().legend }, filter: function(item) { return item.text !== ""; } } },
-        tooltip: {
-          titleFont: { size: _cf().tooltip },
-          bodyFont: { size: _cf().tooltip },
-          callbacks: {
-            label: function(ctx) { if (!ctx.dataset.label) return null; return ctx.dataset.label + ": " + ctx.parsed.y + "h"; }
-          }
-        }
+  _proxyCharts.outageTimeline = echarts.init(el, null, { renderer: 'canvas' });
+  _proxyCharts.outageTimeline.setOption({
+    animation: false,
+    grid: { left: 40, right: 8, top: 30, bottom: paddedDays.length > 31 ? 40 : 24 },
+    legend: { data: ['none', 'critical', 'major', 'minor'], textStyle: { color: '#f8fafc', fontSize: _cf().legend }, top: 2, itemWidth: 12, itemHeight: 10 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: _cf().tooltip },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel];
+        for (var pi = 0; pi < params.length; pi++) { if (params[pi].seriesName) lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + params[pi].value + 'h'); }
+        return lines.join('<br>');
       }
-    }
-  });
+    },
+    xAxis: { type: 'category', data: labels, axisLabel: xLabelOpts, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
+    yAxis: { type: 'value', max: 24, min: 0, interval: 6, axisLabel: { color: '#cbd5e1', fontSize: _cf().tick, formatter: function(v) { return v + 'h'; } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
+    series: [
+      { name: 'none', type: 'bar', stack: 's', data: noneData, itemStyle: { color: 'rgba(34,197,94,0.25)', borderColor: 'rgba(34,197,94,0.5)', borderWidth: 1 } },
+      { name: 'critical', type: 'bar', stack: 's', data: critData, itemStyle: { color: 'rgba(239,68,68,0.35)', borderColor: 'rgba(239,68,68,0.7)', borderWidth: 1 } },
+      { name: 'major', type: 'bar', stack: 's', data: majorData, itemStyle: { color: 'rgba(249,115,22,0.3)', borderColor: 'rgba(249,115,22,0.6)', borderWidth: 1 } },
+      { name: 'minor', type: 'bar', stack: 's', data: minorData, itemStyle: { color: 'rgba(245,158,11,0.25)', borderColor: 'rgba(245,158,11,0.6)', borderWidth: 1 } },
+      { name: '', type: 'bar', stack: 's', data: greyData, itemStyle: { color: 'rgba(51,65,85,0.45)', borderColor: 'rgba(51,65,85,0.55)', borderWidth: 1 } }
+    ]
+  }, true);
   __scheduleAnthropicHealthChartsResize();
 }
 
@@ -7132,9 +7077,9 @@ function renderAvailabilityKpis(data) {
   });
   if (typeof ResizeObserver === "undefined") return;
   var ids = ["c-uptime-chart", "c-incident-history", "c-outage-timeline"];
-  for (const id of ids) {
-    var cv = document.getElementById(id);
-    var host = cv?.parentElement;
+  for (var ri = 0; ri < ids.length; ri++) {
+    var chartEl = document.getElementById(ids[ri]);
+    var host = chartEl?.parentElement;
     if (host?.classList?.contains("health-chart-canvas-host")) {
       var ro = new ResizeObserver(__scheduleAnthropicHealthChartsResize);
       ro.observe(host);
