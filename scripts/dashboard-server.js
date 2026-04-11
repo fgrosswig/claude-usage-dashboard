@@ -3443,9 +3443,10 @@ function devFetchProxyLogs(cb) {
 var _sessionTurnsCache = Object.create(null);
 
 function getSessionTurnsCached(dateKey) {
+  var noCache = process.env.CLAUDE_USAGE_NO_CACHE === '1' || process.env.CLAUDE_USAGE_NO_CACHE === 'true';
   var t0 = Date.now();
   var today = new Date().toISOString().slice(0, 10);
-  var cached = _sessionTurnsCache[dateKey];
+  var cached = noCache ? null : _sessionTurnsCache[dateKey];
   if (cached && dateKey < today) {
     serviceLog.debug('session-turns', 'date=' + dateKey + ' historical HIT (0ms)');
     return cached.result;
@@ -3461,8 +3462,8 @@ function getSessionTurnsCached(dateKey) {
   var totalMs = Date.now() - t0;
   var sessions = result && result.sessions ? result.sessions.length : 0;
   var turns = result && result.total_turns ? result.total_turns : 0;
-  serviceLog.debug('session-turns', 'date=' + dateKey + ' REBUILD ' + collected.tagged.length + ' files → ' + sessions + ' sessions, ' + turns + ' turns (' + totalMs + 'ms, fp=' + fpMs + 'ms)');
-  _sessionTurnsCache[dateKey] = { result: result, fingerprint: fp };
+  serviceLog.debug('session-turns', 'date=' + dateKey + (noCache ? ' NO_CACHE REBUILD ' : ' REBUILD ') + collected.tagged.length + ' files → ' + sessions + ' sessions, ' + turns + ' turns (' + totalMs + 'ms, fp=' + fpMs + 'ms)');
+  if (!noCache) _sessionTurnsCache[dateKey] = { result: result, fingerprint: fp };
   return result;
 }
 
