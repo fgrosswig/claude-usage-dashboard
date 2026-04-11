@@ -8335,6 +8335,7 @@ function inlineMd(s) {
 
 var _econCharts = {};
 var _econData = null;
+var _econQdData = null;
 
 function renderEconomicSection(data, filteredDays) {
   var collapse = document.getElementById("economic-collapse");
