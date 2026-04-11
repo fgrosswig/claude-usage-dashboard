@@ -209,7 +209,7 @@
             id: 'budget-sankey',
             titleKey: 'chartBudgetSankey',
             type: 'sankey',
-            engine: 'google',
+            engine: 'echarts',
             canvasId: 'budget-sankey-container',
             size: { cols: 2, minHeight: 350 },
             renderFn: 'renderBudget_sankey'
@@ -218,7 +218,7 @@
             id: 'budget-trend',
             titleKey: 'chartBudgetTrend',
             type: 'line',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c-budget-trend',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderBudget_trend'
@@ -227,7 +227,7 @@
             id: 'budget-quota',
             titleKey: 'chartBudgetQuota',
             type: 'line',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c-budget-quota',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderBudget_quota'

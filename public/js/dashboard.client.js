@@ -4877,10 +4877,21 @@ function __budgetFuelGaugeHtml(tot, quota, t) {
   return fuelRows.join("");
 }
 
-/** Destroy waterfall + trend chart instances (called from empty-state handler). */
+/** Destroy waterfall + trend + quota chart instances (called from empty-state handler). */
 function __budgetDisposeCharts() {
-  if (_budgetCharts.waterfall) { _budgetCharts.waterfall.destroy(); _budgetCharts.waterfall = null; }
-  if (_budgetCharts.trend) { _budgetCharts.trend.destroy(); _budgetCharts.trend = null; }
+  if (_budgetCharts.waterfall) {
+    if (typeof _budgetCharts.waterfall.dispose === 'function') _budgetCharts.waterfall.dispose();
+    else if (typeof _budgetCharts.waterfall.destroy === 'function') _budgetCharts.waterfall.destroy();
+    _budgetCharts.waterfall = null;
+  }
+  if (_budgetCharts.trend) {
+    if (typeof _budgetCharts.trend.dispose === 'function') _budgetCharts.trend.dispose();
+    _budgetCharts.trend = null;
+  }
+  if (_budgetCharts.quota) {
+    if (typeof _budgetCharts.quota.dispose === 'function') _budgetCharts.quota.dispose();
+    _budgetCharts.quota = null;
+  }
 }
 
 /** Handle empty-data state: render 'no data' text and clean up charts. */
@@ -4996,138 +5007,13 @@ var __budgetFlowMode = "budget"; // "budget" | "api" | "user"
 var __budgetSankeyState = null;
 var __budgetFilteredHost = "";
 var __budgetSwitchesWired = false;
-var __googleChartsReady = false;
-var __budgetSankeyChart = null;
-var __budgetSankeyData = null;
-var __budgetSankeyRowCount = 0;
-var __budgetSankeyRo = null;
-var __budgetSankeyResizeDeb = null;
-var __budgetSankeyWindowResizeBound = false;
 
 function __budgetSankeyDispose() {
-  if (__budgetSankeyRo) {
-    try {
-      __budgetSankeyRo.disconnect();
-    } catch {
-      // ResizeObserver may already be disconnected
-    }
-    __budgetSankeyRo = null;
+  if (_budgetCharts.waterfall) {
+    if (typeof _budgetCharts.waterfall.dispose === 'function') _budgetCharts.waterfall.dispose();
+    _budgetCharts.waterfall = null;
   }
-  if (__budgetSankeyResizeDeb) {
-    clearTimeout(__budgetSankeyResizeDeb);
-    __budgetSankeyResizeDeb = null;
-  }
-  __budgetSankeyChart = null;
-  __budgetSankeyData = null;
-  __budgetSankeyRowCount = 0;
-}
-
-function __budgetSankeyMeasure(el, rowCount) {
-  var w = 0;
-  if (el?.getBoundingClientRect) {
-    w = Math.floor(el.getBoundingClientRect().width);
-  }
-  if (w < 48 && el?.closest) {
-    var box = el.closest(".chart-box");
-    if (box?.getBoundingClientRect) {
-      w = Math.floor(box.getBoundingClientRect().width - 36);
-    }
-  }
-  var win = globalThis.window;
-  if (w < 48 && win) {
-    w = Math.floor(win.innerWidth - 80);
-  }
-  // Kein Math.max(300, …): sonst wird beim Verkleinern nie schmaler neu gezeichnet.
-  w = Math.max(160, Math.min(w, 12000));
-  var rc = Math.max(rowCount, 1);
-  var pitch = Math.max(14, Math.min(26, Math.round(w / 26)));
-  var hFromRows = Math.max(220, rc * pitch);
-  var vh = win ? win.innerHeight : 700;
-  var hFromVp = Math.floor(Math.min(720, Math.max(220, vh * 0.42)));
-  var h = Math.min(780, Math.max(hFromRows, hFromVp));
-  return { width: w, height: h };
-}
-
-function __budgetSankeyDrawOptions(width, height) {
-  var fs = Math.max(10, Math.min(12, Math.round(width / 72)));
-  var pad = Math.max(10, Math.min(18, Math.round(width / 52)));
-  var nw = Math.max(22, Math.min(34, Math.round(width / 26)));
-  return {
-    width: width,
-    height: height,
-    sankey: {
-      node: {
-        label: { fontSize: fs, bold: true, color: "#e2e8f0" },
-        nodePadding: pad,
-        width: nw,
-        colors: ["#94a3b8", "#22c55e", "#3b82f6", "#22d3ee", "#f59e0b", "#f87171", "#a855f7", "#8b5cf6"]
-      },
-      link: {
-        color: { fill: "#94a3b8", fillOpacity: 0.18 },
-        colorMode: "gradient"
-      }
-    }
-  };
-}
-
-function __budgetSankeyRedraw() {
-  if (!__budgetSankeyChart || !__budgetSankeyData || !globalThis.google?.visualization) return;
-  var el = document.getElementById("c-budget-sankey");
-  if (!el) return;
-  var m = __budgetSankeyMeasure(el, __budgetSankeyRowCount || 1);
-  try {
-    if (typeof __budgetSankeyChart.clearChart === "function") __budgetSankeyChart.clearChart();
-  } catch {
-    // Google Charts may throw on repeat clearChart
-  }
-  el.style.minWidth = "";
-  el.style.width = "100%";
-  __budgetSankeyChart.draw(__budgetSankeyData, __budgetSankeyDrawOptions(m.width, m.height));
-}
-
-function __budgetSankeyBindResize(el) {
-  if (typeof ResizeObserver !== "undefined") {
-    if (__budgetSankeyRo) {
-      try {
-        __budgetSankeyRo.disconnect();
-      } catch {
-        // already disconnected
-      }
-      __budgetSankeyRo = null;
-    }
-    __budgetSankeyRo = new ResizeObserver(function() {
-      if (__budgetSankeyResizeDeb) clearTimeout(__budgetSankeyResizeDeb);
-      __budgetSankeyResizeDeb = setTimeout(__budgetSankeyRedraw, 100);
-    });
-    __budgetSankeyRo.observe(el);
-    var box = el.closest?.(".chart-box");
-    if (box && box !== el) __budgetSankeyRo.observe(box);
-  }
-  var winB = globalThis.window;
-  if (winB && !__budgetSankeyWindowResizeBound) {
-    __budgetSankeyWindowResizeBound = true;
-    winB.addEventListener("resize", function() {
-      if (__budgetSankeyResizeDeb) clearTimeout(__budgetSankeyResizeDeb);
-      __budgetSankeyResizeDeb = setTimeout(__budgetSankeyRedraw, 120);
-    });
-  }
-}
-
-// Load Google Charts Sankey package
-(function() {
-  if (globalThis.google?.charts) {
-    globalThis.google.charts.load("current", { packages: ["sankey"] });
-    globalThis.google.charts.setOnLoadCallback(function() { __googleChartsReady = true; });
-  } else {
-    var iv = setInterval(function() {
-      if (globalThis.google?.charts) {
-        clearInterval(iv);
-        globalThis.google.charts.load("current", { packages: ["sankey"] });
-        globalThis.google.charts.setOnLoadCallback(function() { __googleChartsReady = true; });
-      }
-    }, 200);
-  }
-})();
+};
 
 function __renderBudgetGroup(el, modes, current, setter) {
   el.innerHTML = "";
@@ -5306,13 +5192,6 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
   var blurb = document.getElementById("budget-waterfall-blurb");
   if (!el) return;
 
-  if (!__googleChartsReady || !globalThis.google?.visualization) {
-    __budgetSankeyDispose();
-    el.innerHTML = "<div style='text-align:center;padding:2rem;color:#94a3b8'>Loading Google Charts...</div>";
-    setTimeout(function() { if (__budgetSankeyState) renderBudgetWaterfall(__budgetSankeyState.tot, __budgetSankeyState.quota, __budgetSankeyState.hostTotals); }, 500);
-    return;
-  }
-
   if (tot.total <= 0) {
     __budgetSankeyDispose();
     el.innerHTML = "<div style='text-align:center;padding:2rem;color:#94a3b8'>" + t("budgetNoData") + "</div>";
@@ -5336,13 +5215,11 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
     blurb.textContent = isCost ? t("budgetWaterfallBlurbCost") : t("budgetWaterfallBlurb");
   }
 
-  // Build Google DataTable rows: [From, To, Weight]
   var nOut = t("budgetWfOutput") + " " + pctOf(src.out) + "%";
   var nInp = t("budgetWfInput") + " " + pctOf(src.inp) + "%";
   var nCr  = t("budgetWfCacheRead") + " " + pctOf(src.cr) + "%";
   var nCc  = t("budgetWfCacheCreate") + " " + pctOf(src.cc) + "%";
 
-  // Compressed weights: log-scaled (see __budgetSankeyWeights)
   var sw2 = __budgetSankeyWeights(src);
   var wOf = sw2.wOf;
   var wOut = sw2.wOut, wInp = sw2.wInp, wCr = sw2.wCr, wCc = sw2.wCc;
@@ -5369,96 +5246,96 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
     return;
   }
 
-  var data = new globalThis.google.visualization.DataTable();
-  data.addColumn("string", "From");
-  data.addColumn("string", "To");
-  data.addColumn("number", "Weight");
-  data.addRows(rows);
-
-  if (!__budgetSankeyChart) {
-    el.innerHTML = "";
-    __budgetSankeyChart = new globalThis.google.visualization.Sankey(el);
-    __budgetSankeyBindResize(el);
+  // Convert [From, To, Weight] rows to ECharts sankey nodes + links
+  var nodeSet = {};
+  var links = [];
+  var nodeColors = { '#94a3b8': 0, '#22c55e': 1, '#3b82f6': 2, '#22d3ee': 3, '#f59e0b': 4, '#f87171': 5, '#a855f7': 6, '#8b5cf6': 7 };
+  var palette = ['#94a3b8', '#22c55e', '#3b82f6', '#22d3ee', '#f59e0b', '#f87171', '#a855f7', '#8b5cf6'];
+  for (var ri = 0; ri < rows.length; ri++) {
+    var from = rows[ri][0], to = rows[ri][1], weight = rows[ri][2];
+    if (!nodeSet[from]) nodeSet[from] = { name: from, itemStyle: { color: palette[Object.keys(nodeSet).length % palette.length] } };
+    if (!nodeSet[to]) nodeSet[to] = { name: to, itemStyle: { color: palette[Object.keys(nodeSet).length % palette.length] } };
+    links.push({ source: from, target: to, value: weight });
   }
-  __budgetSankeyData = data;
-  __budgetSankeyRowCount = rows.length;
-  var m0 = __budgetSankeyMeasure(el, rows.length);
-  __budgetSankeyChart.draw(data, __budgetSankeyDrawOptions(m0.width, m0.height));
+  var nodes = [];
+  for (var nk in nodeSet) {
+    if (Object.prototype.hasOwnProperty.call(nodeSet, nk)) nodes.push(nodeSet[nk]);
+  }
+
+  // ECharts Sankey
+  if (!_budgetCharts.waterfall) {
+    el.innerHTML = "";
+    _budgetCharts.waterfall = echarts.init(el, null, { renderer: 'canvas' });
+  }
+  var chart = _budgetCharts.waterfall;
+  var rc = Math.max(rows.length, 1);
+  var h = Math.max(300, Math.min(780, rc * 22));
+  el.style.height = h + 'px';
+  chart.resize();
+  chart.setOption({
+    animation: false,
+    tooltip: {
+      trigger: 'item',
+      triggerOn: 'mousemove',
+      backgroundColor: 'rgba(15,23,42,0.95)',
+      borderColor: '#334155',
+      textStyle: { color: '#e2e8f0' }
+    },
+    series: [{
+      type: 'sankey',
+      layout: 'none',
+      emphasis: { focus: 'adjacency' },
+      nodeWidth: 28,
+      nodeGap: 14,
+      layoutIterations: 32,
+      label: { color: '#e2e8f0', fontSize: 11 },
+      lineStyle: { color: 'gradient', curveness: 0.5, opacity: 0.25 },
+      data: nodes,
+      links: links
+    }]
+  }, true);
 }
 
 function __budgetDrawTrendEfficiencyChart(el, labels, dailyTrend, t) {
   if (!el || !dailyTrend.length) return;
+  if (_budgetCharts.trend) { _budgetCharts.trend.dispose(); _budgetCharts.trend = null; }
+  var chart = echarts.init(el, null, { renderer: 'canvas' });
+  _budgetCharts.trend = chart;
   var outputPctData = dailyTrend.map(function(d) { return d.output_pct; });
   var overheadInvData = dailyTrend.map(function(d) { return d.overhead > 0 ? -Math.min(d.overhead, 100) : 0; });
   var cacheMissData = dailyTrend.map(function(d) { return d.cache_miss_rate; });
-  _budgetCharts.trend = new Chart(el, {
-    type: "line",
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: t("budgetTrendOutputPct"),
-          data: outputPctData,
-          borderColor: "rgba(34,197,94,0.9)",
-          backgroundColor: "rgba(34,197,94,0.15)",
-          tension: 0.3,
-          fill: "origin",
-          pointRadius: 3
-        },
-        {
-          label: t("budgetTrendOverhead"),
-          data: overheadInvData,
-          borderColor: "rgba(248,113,113,0.9)",
-          backgroundColor: "rgba(248,113,113,0.15)",
-          tension: 0.3,
-          fill: "origin",
-          pointRadius: 3
-        },
-        {
-          label: t("budgetTrendCacheMiss"),
-          data: cacheMissData,
-          borderColor: "rgba(245,158,11,0.8)",
-          backgroundColor: "transparent",
-          tension: 0.3,
-          fill: false,
-          borderDash: [5, 3],
-          pointRadius: 2
+  chart.setOption({
+    animation: false,
+    grid: { left: 50, right: 20, top: 40, bottom: 40 },
+    legend: { data: [t("budgetTrendOutputPct"), t("budgetTrendOverhead"), t("budgetTrendCacheMiss")], textStyle: { color: '#cbd5e1' }, top: 4 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel];
+        for (var i = 0; i < params.length; i++) {
+          var p = params[i];
+          var val = p.value;
+          if (val == null) continue;
+          var fmt = p.seriesIndex === 1 ? Math.abs(val) + 'x' : val + '%';
+          lines.push(p.marker + ' ' + p.seriesName + ': ' + fmt);
         }
-      ]
-    },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { grid: { color: "rgba(51,65,85,0.3)" }, ticks: { color: "#94a3b8", maxRotation: 45 } },
-        y: {
-          grid: { color: "rgba(51,65,85,0.3)" },
-          ticks: {
-            color: "#94a3b8",
-            callback: function(v) {
-              if (v >= 0) return v + "%";
-              return Math.abs(v) + "x";
-            }
-          },
-          suggestedMin: -20,
-          suggestedMax: 50
-        }
-      },
-      plugins: {
-        legend: { labels: { color: "#cbd5e1" } },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) {
-              if (ctx.raw == null) return null;
-              if (ctx.datasetIndex === 1) return ctx.dataset.label + ": " + Math.abs(ctx.raw) + "x";
-              return ctx.dataset.label + ": " + ctx.raw + "%";
-            }
-          }
-        }
+        return lines.join('<br>');
       }
-    }
+    },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', rotate: 45 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
+    yAxis: { type: 'value', min: -20, max: function(v) { return Math.max(50, v.max + 5); },
+      axisLabel: { color: '#94a3b8', formatter: function(v) { return v >= 0 ? v + '%' : Math.abs(v) + 'x'; } },
+      splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } }
+    },
+    series: [
+      { name: t("budgetTrendOutputPct"), type: 'line', data: outputPctData, smooth: 0.3, symbol: 'circle', symbolSize: 6,
+        lineStyle: { color: 'rgba(34,197,94,0.9)' }, itemStyle: { color: 'rgba(34,197,94,0.9)' },
+        areaStyle: { color: 'rgba(34,197,94,0.15)' } },
+      { name: t("budgetTrendOverhead"), type: 'line', data: overheadInvData, smooth: 0.3, symbol: 'circle', symbolSize: 6,
+        lineStyle: { color: 'rgba(248,113,113,0.9)' }, itemStyle: { color: 'rgba(248,113,113,0.9)' },
+        areaStyle: { color: 'rgba(248,113,113,0.15)' } },
+      { name: t("budgetTrendCacheMiss"), type: 'line', data: cacheMissData, smooth: 0.3, symbol: 'circle', symbolSize: 4,
+        lineStyle: { color: 'rgba(245,158,11,0.8)', type: 'dashed' }, itemStyle: { color: 'rgba(245,158,11,0.8)' } }
+    ]
   });
 }
 
@@ -5522,41 +5399,55 @@ function __budgetDrawQuotaUsageChart(el2, labels, qDatasets) {
     return;
   }
   el2.parentElement.style.display = "";
-  _budgetCharts.quota = new Chart(el2, {
-    type: "line",
-    data: { labels: labels, datasets: qDatasets },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { grid: { color: "rgba(51,65,85,0.3)" }, ticks: { color: "#94a3b8", maxRotation: 45 } },
-        y: {
-          grid: { color: "rgba(51,65,85,0.3)" },
-          ticks: { color: "#a855f7", callback: function(v) { return v + "%"; } },
-          min: 0,
-          suggestedMax: 100
-        }
-      },
-      plugins: {
-        legend: { labels: { color: "#cbd5e1" } },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) {
-              if (ctx.raw == null) return null;
-              return ctx.dataset.label + ": " + ctx.raw + "%";
-            }
-          }
-        }
-      }
+  if (_budgetCharts.quota) { _budgetCharts.quota.dispose(); _budgetCharts.quota = null; }
+  var chart = echarts.init(el2, null, { renderer: 'canvas' });
+  _budgetCharts.quota = chart;
+  var series = [];
+  var legendNames = [];
+  for (var i = 0; i < qDatasets.length; i++) {
+    var ds = qDatasets[i];
+    legendNames.push(ds.label);
+    var s = {
+      name: ds.label,
+      type: 'line',
+      data: ds.data,
+      smooth: 0.3,
+      symbol: ds.pointStyle === 'triangle' ? 'triangle' : ds.pointStyle === 'star' ? 'diamond' : 'roundRect',
+      symbolSize: (ds.pointRadius || 3) * 2,
+      lineStyle: { color: ds.borderColor, width: ds.borderWidth || 2 },
+      itemStyle: { color: ds.borderColor },
+      connectNulls: ds.spanGaps || false
+    };
+    if (ds.borderDash) s.lineStyle.type = 'dashed';
+    if (ds.fill && ds.backgroundColor !== 'transparent') {
+      s.areaStyle = { color: ds.backgroundColor };
     }
+    series.push(s);
+  }
+  chart.setOption({
+    animation: false,
+    grid: { left: 50, right: 20, top: 40, bottom: 40 },
+    legend: { data: legendNames, textStyle: { color: '#cbd5e1' }, top: 4 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel];
+        for (var pi = 0; pi < params.length; pi++) {
+          if (params[pi].value == null) continue;
+          lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + params[pi].value + '%');
+        }
+        return lines.join('<br>');
+      }
+    },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', rotate: 45 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
+    yAxis: { type: 'value', min: 0, max: 100,
+      axisLabel: { color: '#a855f7', formatter: '{value}%' },
+      splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } }
+    },
+    series: series
   });
 }
 
 function renderBudgetTrend(dailyTrend) {
-  if (_budgetCharts.trend) { _budgetCharts.trend.destroy(); _budgetCharts.trend = null; }
-  if (_budgetCharts.quota) { _budgetCharts.quota.destroy(); _budgetCharts.quota = null; }
 
   var labels = dailyTrend.map(function(d) { return d.date; });
 
@@ -5594,11 +5485,18 @@ function __effResizeAll() {
     }
   }
 }
+function __budgetResizeAll() {
+  for (var bk in _budgetCharts) {
+    if (_budgetCharts[bk] && typeof _budgetCharts[bk].resize === 'function') {
+      try { _budgetCharts[bk].resize(); } catch (e) { /* detached */ }
+    }
+  }
+}
 var __effWin = globalThis.window;
 if (__effWin) {
   __effWin.addEventListener("resize", function () {
     if (__effResizeT) clearTimeout(__effResizeT);
-    __effResizeT = setTimeout(__effResizeAll, 120);
+    __effResizeT = setTimeout(function() { __effResizeAll(); __budgetResizeAll(); }, 120);
   });
 }
 
