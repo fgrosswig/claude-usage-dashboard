@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-130",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "e281e97",
+      "commit_full": "e281e97aa3b5da365a9dc117cc0d94c4e9417bd6",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(api): add /api/quota-divisor endpoint for per-request quota analysis",
+      "detail": "Correlates Anthropic rate-limit q5 deltas with full token costs\n(including cache_read/cache_creation) to compute implied quota divisors.\nAlso enriches q5_samples with cache token data for future analysis.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-129",
       "timestamp": "2026-04-11",
       "session": "auto",
