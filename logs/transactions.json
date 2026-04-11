@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-171",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "ea7792a",
+      "commit_full": "ea7792aaea4de62975e46c8056ee2fedc6c58e08",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(session-turns): add /api/debug/session-turns endpoint for Authelia bypass",
+      "detail": "DEV_MODE=full proxy now uses /api/debug/session-turns (Authelia-exempt) instead of /api/session-turns (401)\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-170",
       "timestamp": "2026-04-12",
       "session": "auto",
