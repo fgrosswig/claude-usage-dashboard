@@ -1647,27 +1647,32 @@ function mergeDayBucketInto(target, src) {
     var v = vk[vi];
     target.versions[v] = (target.versions[v] || 0) + (src.versions[v] || 0);
   }
-  for (var e of Object.keys(src.entrypoints || {})) {
-    target.entrypoints[e] = (target.entrypoints[e] || 0) + (src.entrypoints[e] || 0);
+  var epKeys = Object.keys(src.entrypoints || {});
+  for (var ei = 0; ei < epKeys.length; ei++) {
+    target.entrypoints[epKeys[ei]] = (target.entrypoints[epKeys[ei]] || 0) + (src.entrypoints[epKeys[ei]] || 0);
   }
   mergeVersionStatsInto(target, src.version_stats);
 }
 
 function mergeEntrypointsInto(tgt, srcEntrypoints) {
   if (!tgt.entrypoints) tgt.entrypoints = {};
-  for (var ek of Object.keys(srcEntrypoints || {})) {
-    tgt.entrypoints[ek] = (tgt.entrypoints[ek] || 0) + (srcEntrypoints[ek] || 0);
+  var ekKeys = Object.keys(srcEntrypoints || {});
+  for (var eki = 0; eki < ekKeys.length; eki++) {
+    tgt.entrypoints[ekKeys[eki]] = (tgt.entrypoints[ekKeys[eki]] || 0) + (srcEntrypoints[ekKeys[eki]] || 0);
   }
 }
 
 function mergeVersionStatsInto(target, srcVersionStats) {
   if (!srcVersionStats) return;
   if (!target.version_stats) target.version_stats = {};
-  for (var vsKey of Object.keys(srcVersionStats)) {
+  var vsKeys = Object.keys(srcVersionStats);
+  for (var vsi = 0; vsi < vsKeys.length; vsi++) {
+    var vsKey = vsKeys[vsi];
     if (!target.version_stats[vsKey]) target.version_stats[vsKey] = emptyVersionStats();
     var tgt = target.version_stats[vsKey];
     var srcVs = srcVersionStats[vsKey];
-    for (var f of Object.keys(srcVs)) {
+    var fKeys = Object.keys(srcVs);
+    for (var fki = 0; fki < fKeys.length; fki++) { var f = fKeys[fki];
       if (f === 'entrypoints') {
         mergeEntrypointsInto(tgt, srcVs.entrypoints);
       } else {
@@ -1841,8 +1846,8 @@ function processJsonlFile(fileRef, daily, onlyDate, isolateTodayFrag, fileTodayF
               if (!dSig.version_stats) dSig.version_stats = {};
               if (!dSig.version_stats[sigVer]) dSig.version_stats[sigVer] = emptyVersionStats();
               var svs = dSig.version_stats[sigVer];
-              for (var st of sigTags) {
-                if (svs[st] != null) svs[st]++;
+              for (var sti2 = 0; sti2 < sigTags.length; sti2++) {
+                if (svs[sigTags[sti2]] != null) svs[sigTags[sti2]]++;
               }
             }
             if (!dSig.hosts) dSig.hosts = {};
@@ -2034,8 +2039,8 @@ function __releaseParseTagEntry(r) {
   var patch = Number.parseInt(parts[2], 10) || 0;
   var body = (r.body || '').toLowerCase();
   var matchedKeywords = [];
-  for (const kw of REVERT_KEYWORDS) {
-    if (body.includes(kw)) matchedKeywords.push(kw);
+  for (var kwi = 0; kwi < REVERT_KEYWORDS.length; kwi++) {
+    if (body.includes(REVERT_KEYWORDS[kwi])) matchedKeywords.push(REVERT_KEYWORDS[kwi]);
   }
   return {
     tag: r.tag_name || '',
@@ -2051,8 +2056,8 @@ function __releaseParseTagEntry(r) {
 
 function __releaseBuildEntries(sorted) {
   var entries = [];
-  for (const r of sorted) {
-    var ent = __releaseParseTagEntry(r);
+  for (var ri = 0; ri < sorted.length; ri++) {
+    var ent = __releaseParseTagEntry(sorted[ri]);
     if (ent) entries.push(ent);
   }
   return entries;
@@ -2830,6 +2835,12 @@ function runScanAndBroadcast() {
     } finally {
       scanInProgress = false;
       broadcastSse();
+      setImmediate(function () {
+        var preloadDay = new Date().toISOString().slice(0, 10);
+        var pt0 = Date.now();
+        getSessionTurnsCached(preloadDay);
+        serviceLog.info('session-turns', 'background preload date=' + preloadDay + ' (' + (Date.now() - pt0) + 'ms)');
+      });
       if (scanOk && cachedData && cachedData.days && cachedData.days.length) {
         backfillReleaseBodiesForDashboardDays(cachedData.days, function () {
           cachedData.generated = new Date().toISOString();
@@ -3386,6 +3397,14 @@ function devFetchRemoteUsage(cb, retryCount) {
         }
         cachedData = remote;
         cachedData.release_stability = buildReleaseStabilityData();
+        var remoteSt = parsed.session_turns;
+        if (remoteSt) {
+          var stKeys = Object.keys(remoteSt);
+          for (var sti = 0; sti < stKeys.length; sti++) {
+            _sessionTurnsCache[stKeys[sti]] = { result: remoteSt[stKeys[sti]], fingerprint: 'remote' };
+          }
+          serviceLog.info('dev', 'session-turns preloaded: ' + stKeys.length + ' days from remote');
+        }
         serviceLog.info('dev', 'remote data fetched: ' + (remote.days || []).length + ' days, proxy_days=' + (remote.proxy && remote.proxy.proxy_days ? remote.proxy.proxy_days.length : 0));
         broadcastSse();
       } catch (e) {
@@ -3479,7 +3498,8 @@ function buildSessionTurnsForDate(dateKey) {
 
   // Pass 1: collect all turns for dateKey + adjacent days, grouped by sessionId
   var allSessions = Object.create(null); // sid -> [{ts, day, ...}]
-  for (var file of files) {
+  for (var fi = 0; fi < files.length; fi++) {
+    var file = files[fi];
     try {
       forEachJsonlLineSync(file.path, function (line) {
         if (!line) return;
@@ -3693,7 +3713,7 @@ var server = http.createServer(function (req, res) {
     });
     var proxyNdjsonExport = [];
     var proxyPathsExport = collectProxyNdjsonFiles();
-    for (const proxyPath of proxyPathsExport) {
+    for (var pxi = 0; pxi < proxyPathsExport.length; pxi++) { var proxyPath = proxyPathsExport[pxi];
       try {
         proxyNdjsonExport.push({
           name: path.basename(proxyPath),
@@ -3706,7 +3726,12 @@ var server = http.createServer(function (req, res) {
         );
       }
     }
-    res.end(JSON.stringify({ usage: cachedData, files: proxyNdjsonExport }));
+    var stByDate = {};
+    for (var stDi = 0; stDi < 7; stDi++) {
+      var stD = new Date(Date.now() - stDi * 86400000).toISOString().slice(0, 10);
+      stByDate[stD] = getSessionTurnsCached(stD);
+    }
+    res.end(JSON.stringify({ usage: cachedData, files: proxyNdjsonExport, session_turns: stByDate }));
   } else if (pathname === '/api/debug/sync-proxy-logs' && __devMode && __devSource) {
     // Manual trigger: re-fetch data from remote
     var corsSync = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
