@@ -3318,6 +3318,17 @@ function devFetchRemoteUsage(cb, retryCount) {
           serviceLog.warn('dev', 'remote has old format (no usage key) — need deploy with new /api/debug/proxy-logs');
           return cb();
         }
+        // Persist proxy NDJSON files locally so /api/quota-divisor can parse per-request data
+        var remoteFiles = parsed.files || [];
+        if (remoteFiles.length > 0) {
+          var logDir = path.join(os.tmpdir(), 'claude-proxy-logs-dev');
+          if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+          for (var pfi = 0; pfi < remoteFiles.length; pfi++) {
+            fs.writeFileSync(path.join(logDir, remoteFiles[pfi].name), remoteFiles[pfi].content, 'utf8');
+          }
+          process.env.ANTHROPIC_PROXY_LOG_DIR = logDir;
+          serviceLog.info('dev', 'persisted ' + remoteFiles.length + ' proxy log files to ' + logDir);
+        }
         remote.dev_source = __devSource;
         remote.generated = new Date().toISOString();
         // Re-enrich outage spans with comp_status from local outage cache
