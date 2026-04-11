@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-123",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "80c2db1",
+      "commit_full": "80c2db138e98da1b05595467b40211e81bfa2d72",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ci): release notes use previous tag as base + fetch tags in pipeline",
+      "detail": "- generate-release-notes.js: when called with latest tag, diff against\n  previous tag instead of current..HEAD (which yields 0 commits)\n- draft-release-notes step: fetch tags with auth before generating notes\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".woodpecker/app.yml",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/generate-release-notes.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-122",
       "timestamp": "2026-04-11",
       "session": "auto",
