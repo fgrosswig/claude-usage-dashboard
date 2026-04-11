@@ -2,6 +2,33 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-140",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "7ebe386",
+      "commit_full": "7ebe3860988060fe62041fe8ebbe26f010000ea9",
+      "status": "ABGESCHLOSSEN",
+      "description": "docs: add cnighswonger/claude-code-cache-fix to README (DE/EN/KO)",
+      "detail": "Attribution for Q5 quota validation, cache discount proof, quota\ndivisor hypothesis, and NDJSON interop adapter.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "README.en.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "README.ko.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "README.md",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-139",
       "timestamp": "2026-04-11",
       "session": "auto",
