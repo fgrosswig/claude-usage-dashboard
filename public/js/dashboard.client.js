@@ -9613,6 +9613,7 @@ function renderBudgetDrain(stData, qdData) {
   var drainBlurb = document.getElementById("econ-drain-blurb");
   if (drainBlurb) drainBlurb.textContent = t("econDrainBlurb");
 
+  var dateKey = stData.date || "";
   var sessions = stData.sessions.slice().sort(function (a, b) { return a.first_ts < b.first_ts ? -1 : 1; });
   var dayTotal = sessions.reduce(function (s, x) { return s + x.total_all; }, 0);
   if (dayTotal === 0) return;
@@ -9653,7 +9654,9 @@ function renderBudgetDrain(stData, qdData) {
 
     for (var si = 0; si < win.length; si++) {
       var sess = win[si];
-      var turns = sess.turns || [];
+      var rawTurns = sess.turns || [];
+      // Filter turns to selected day (edge sessions may span midnight)
+      var turns = dateKey ? rawTurns.filter(function (tt) { return tt.ts && tt.ts.slice(0, 10) === dateKey; }) : rawTurns;
       if (!turns.length) continue;
       var sessFirstTurn = turnCounter + 1; // first turn number of this session
 
@@ -9747,7 +9750,7 @@ function renderBudgetDrain(stData, qdData) {
       sessionSpans.push({
         firstTurn: sessFirstTurn,
         lastTurn: turnCounter,
-        label: (sess.edge_start ? "\u2192 " : "") + "S" + (sessIdx + 1) + " " + sess.first_ts.slice(11, 16) + "\u2013" + sess.last_ts.slice(11, 16) + (sess.edge_end ? " \u2192" : ""),
+        label: (sess.edge_start ? "\u2192 " : "") + "S" + (sessIdx + 1) + " " + turns[0].ts.slice(11, 16) + "\u2013" + turns[turns.length - 1].ts.slice(11, 16) + (sess.edge_end ? " \u2192" : ""),
         turns: turns.length,
         total: sess.total_all,
         forced: forced,
@@ -9955,7 +9958,11 @@ function renderBudgetDrain(stData, qdData) {
         var ss2 = stData.sessions.slice().sort(function (a2, b2) { return a2.first_ts < b2.first_ts ? -1 : 1; });
         for (var s2i = 0; s2i < ss2.length; s2i++) {
           var st2 = ss2[s2i].turns || [];
-          for (var t2i = 0; t2i < st2.length; t2i++) tt2.push(st2[t2i].ts || "");
+          for (var t2i = 0; t2i < st2.length; t2i++) {
+            var tts2 = st2[t2i].ts || "";
+            if (dateKey && tts2.slice(0, 10) !== dateKey) continue;
+            tt2.push(tts2);
+          }
         }
         for (var q2i = 0; q2i < ohPairs2.length; q2i++) {
           var qp2 = ohPairs2[q2i];
@@ -10001,6 +10008,7 @@ function renderBudgetDrain(stData, qdData) {
         for (var s3i = 0; s3i < ss3.length; s3i++) {
           var t3 = ss3[s3i].turns || [];
           for (var t3i = 0; t3i < t3.length; t3i++) {
+            if (dateKey && t3[t3i].ts && t3[t3i].ts.slice(0, 10) !== dateKey) continue;
             dayTokTotal += (t3[t3i].cache_read || 0) + (t3[t3i].cache_creation || 0) + (t3[t3i].output || 0);
           }
         }
@@ -10009,6 +10017,7 @@ function renderBudgetDrain(stData, qdData) {
           for (var s3i = 0; s3i < ss3.length; s3i++) {
             var t3 = ss3[s3i].turns || [];
             for (var t3i = 0; t3i < t3.length; t3i++) {
+              if (dateKey && t3[t3i].ts && t3[t3i].ts.slice(0, 10) !== dateKey) continue;
               cumTok += (t3[t3i].cache_read || 0) + (t3[t3i].cache_creation || 0) + (t3[t3i].output || 0);
               tIdx++;
               if (tIdx % 5 === 0 || tIdx === 1) {
