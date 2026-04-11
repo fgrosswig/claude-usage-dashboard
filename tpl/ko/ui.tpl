@@ -517,5 +517,6 @@
   "econOverheadForced": "강제 재시작",
   "econOverheadSummary": "Q5: {actual}% 실제 vs {ideal}% 이상 — {ratio}% Q5 오버헤드 ({gap}%가 {events}개 패널티 이벤트로 손실). 가시적 토큰 오버헤드: ~3.5% — 차이는 숨겨진 비용입니다.",
   "econDrainTitle": "예산 소모 — 일일 세션 영향",
-  "econDrainBlurb": "하루 동안의 남은 할당량. 빨간 블록은 강제 재시작으로 인한 리빌드 비용 — 이미 구축된 컨텍스트에 낭비된 토큰입니다."
+  "econDrainBlurb": "하루 동안의 남은 할당량. 빨간 블록은 강제 재시작으로 인한 리빌드 비용 — 이미 구축된 컨텍스트에 낭비된 토큰입니다.",
+  "econDrainNoProxyLogs": "{date}에 대한 프록시 로그가 없습니다. Q5 상관 패널은 숨겨집니다."
 }

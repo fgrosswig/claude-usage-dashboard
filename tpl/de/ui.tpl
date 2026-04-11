@@ -517,5 +517,6 @@
   "econOverheadForced": "Forced Restart",
   "econOverheadSummary": "Q5: {actual}% tatsaechlich vs {ideal}% ideal — {ratio}% Q5-Overhead ({gap}% verloren durch {events} Penalty-Events). Sichtbarer Token-Overhead: ~3.5% — die Luecke sind versteckte Kosten.",
   "econDrainTitle": "Budget Drain — Tages-Session-Impact",
-  "econDrainBlurb": "Verbleibende Quota ueber den Tag. Rote Bloecke zeigen Rebuild-Kosten durch erzwungene Neustarts — Tokens die fuer bereits aufgebauten Kontext verschwendet wurden."
+  "econDrainBlurb": "Verbleibende Quota ueber den Tag. Rote Bloecke zeigen Rebuild-Kosten durch erzwungene Neustarts — Tokens die fuer bereits aufgebauten Kontext verschwendet wurden.",
+  "econDrainNoProxyLogs": "Keine Proxy-Logs fuer {date}. Die Q5-Korrelationsgrafik ist ausgeblendet."
 }

@@ -7127,9 +7127,7 @@ function renderEconomicSection(data, filteredDays) {
           .then(function (r) { return r.json(); })
           .then(function (qdData) {
             _econQdData = qdData;
-            if (qdData && qdData.request_pairs && qdData.request_pairs.length > 0) {
-              renderBudgetDrain(stData, qdData);
-            }
+            renderBudgetDrain(stData, qdData);
           })
           .catch(function () { /* no proxy data — keep single-grid */ });
       })
@@ -8309,13 +8307,17 @@ function renderBudgetDrain(stData, qdData) {
   if (typeof echarts === "undefined") return;
   var el = document.getElementById("chart-shell-econ-drain");
   if (!el || !stData || !stData.sessions || !stData.sessions.length) return;
-  el.style.height = "650px";
   var drainH3 = document.getElementById("econ-drain-h3");
   if (drainH3) drainH3.textContent = t("econDrainTitle");
   var drainBlurb = document.getElementById("econ-drain-blurb");
   if (drainBlurb) drainBlurb.textContent = t("econDrainBlurb");
 
   var dateKey = stData.date || "";
+  var proxyMsgEl = document.getElementById("econ-drain-proxy-msg");
+  var hasQ5Overlay = !!(qdData && qdData.request_pairs && qdData.request_pairs.length > 0);
+  var useDualGrid = hasQ5Overlay;
+  var msgDateStr = (qdData && qdData.requested_date) ? qdData.requested_date : dateKey;
+  var showNoProxyMsg = !!(qdData && !hasQ5Overlay && Array.isArray(qdData.request_pairs) && qdData.request_pairs.length === 0 && msgDateStr);
   var sessions = stData.sessions.slice().sort(function (a, b) { return a.first_ts < b.first_ts ? -1 : 1; });
   var dayTotal = sessions.reduce(function (s, x) { return s + x.total_all; }, 0);
   if (dayTotal === 0) return;
@@ -8471,6 +8473,44 @@ function renderBudgetDrain(stData, qdData) {
     }
   }
 
+  var blurbOhEarly = document.getElementById("econ-overhead-blurb");
+  if (blurbOhEarly && !hasQ5Overlay) blurbOhEarly.textContent = "";
+
+  if (useDualGrid) el.style.height = "650px";
+  else el.style.height = "440px";
+
+  var gridCfg = useDualGrid
+    ? [
+      { top: 30, right: 20, height: "38%", left: 60 },
+      { top: "50%", right: 20, height: "42%", left: 60 }
+    ]
+    : [{ top: 30, right: 20, bottom: 50, left: 60 }];
+  var xAxisCfg = useDualGrid
+    ? [
+      { type: "value", gridIndex: 0, min: 1, max: turnCounter, axisLabel: { show: false }, splitLine: { show: false } },
+      { type: "value", gridIndex: 1, min: 1, max: turnCounter, axisLabel: { color: "#64748b", fontSize: 9 }, splitLine: { show: false } }
+    ]
+    : [{ type: "value", gridIndex: 0, min: 1, max: turnCounter, axisLabel: { color: "#64748b", fontSize: 9 }, splitLine: { show: false } }];
+  var yAxisCfg = useDualGrid
+    ? [
+      { type: "value", gridIndex: 0, min: 0, max: 100, axisLabel: { color: "#64748b", formatter: "{value}%" }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+      { type: "value", gridIndex: 0, position: "right", min: 0, max: 100, axisLabel: { show: false }, splitLine: { show: false } },
+      { type: "value", gridIndex: 1, axisLabel: { color: "#f97316", fontSize: 8, formatter: "{value}%" }, splitLine: { lineStyle: { color: "rgba(51,65,85,.2)" } } }
+    ]
+    : [
+      { type: "value", gridIndex: 0, min: 0, max: 100, axisLabel: { color: "#64748b", formatter: "{value}%" }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+      { type: "value", gridIndex: 0, position: "right", min: 0, max: 100, axisLabel: { show: false }, splitLine: { show: false } }
+    ];
+  var legendCfg = useDualGrid
+    ? {
+      data: ["Q5 Actual", "Q5 Ideal", "Q5 Penalty Lower", "Token Visible"],
+      top: "48%",
+      right: 10,
+      textStyle: { color: "#94a3b8", fontSize: 9 },
+      itemWidth: 14, itemHeight: 8
+    }
+    : { show: false };
+
   var option = {
     tooltip: {
       trigger: "axis",
@@ -8524,26 +8564,10 @@ function renderBudgetDrain(stData, qdData) {
       link: [{ xAxisIndex: "all" }],
       lineStyle: { color: "#94a3b8", width: 1, type: "dashed" }
     },
-    legend: {
-      data: ["Q5 Actual", "Q5 Ideal", "Q5 Penalty Lower", "Token Visible"],
-      top: "48%",
-      right: 10,
-      textStyle: { color: "#94a3b8", fontSize: 9 },
-      itemWidth: 14, itemHeight: 8
-    },
-    grid: [
-      { top: 30, right: 20, height: "38%", left: 60 },
-      { top: "50%", right: 20, height: "42%", left: 60 }
-    ],
-    xAxis: [
-      { type: "value", gridIndex: 0, min: 1, max: turnCounter, axisLabel: { show: false }, splitLine: { show: false } },
-      { type: "value", gridIndex: 1, min: 1, max: turnCounter, axisLabel: { color: "#64748b", fontSize: 9 }, splitLine: { show: false } }
-    ],
-    yAxis: [
-      { type: "value", gridIndex: 0, min: 0, max: 100, axisLabel: { color: "#64748b", formatter: "{value}%" }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
-      { type: "value", gridIndex: 0, position: "right", min: 0, max: 100, axisLabel: { show: false }, splitLine: { show: false } },
-      { type: "value", gridIndex: 1, axisLabel: { color: "#f97316", fontSize: 8, formatter: "{value}%" }, splitLine: { lineStyle: { color: "rgba(51,65,85,.2)" } } }
-    ],
+    legend: legendCfg,
+    grid: gridCfg,
+    xAxis: xAxisCfg,
+    yAxis: yAxisCfg,
     series: (function () {
       var allSeries = [];
       // Per quota-window: one series with continuous green→red gradient
@@ -8777,6 +8801,18 @@ function renderBudgetDrain(stData, qdData) {
   });
   el.style.position = "relative";
   el.appendChild(overlay);
+
+  if (proxyMsgEl) {
+    if (showNoProxyMsg) {
+      proxyMsgEl.removeAttribute("hidden");
+      proxyMsgEl.classList.add("econ-drain-proxy-msg--visible");
+      proxyMsgEl.textContent = tr("econDrainNoProxyLogs", { date: msgDateStr });
+    } else {
+      proxyMsgEl.setAttribute("hidden", "hidden");
+      proxyMsgEl.classList.remove("econ-drain-proxy-msg--visible");
+      proxyMsgEl.textContent = "";
+    }
+  }
 }
 
 // ── Session Overhead — Heavy User Tax ────────────────────────────────

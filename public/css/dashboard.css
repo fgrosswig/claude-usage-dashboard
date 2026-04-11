@@ -216,6 +216,10 @@ tr:hover td{background:#334155}
 .service-chart-canvas-wrap{position:relative}
 .chart-shell{position:relative;min-height:220px;border-radius:8px}
 .chart-shell--forensic{min-height:200px}
+.econ-drain-proxy-msg{
+  display:none;font-size:.72rem;color:#94a3b8;margin:8px 0 0;line-height:1.45;max-width:42rem;
+}
+.econ-drain-proxy-msg.econ-drain-proxy-msg--visible{display:block}
 .chart-shell .chart-shell-ph{
   position:absolute;inset:0;border-radius:inherit;z-index:3;
   background:linear-gradient(105deg,#1e293b 0%,#334155 50%,#1e293b 100%);

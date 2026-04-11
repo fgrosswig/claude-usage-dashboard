@@ -3888,6 +3888,8 @@ var server = http.createServer(function (req, res) {
     var qdResult = {
       pricing: PRICE,
       note: 'implied_divisor = API_cost / q5_delta. If constant, quota is a simple linear mapping of cost.',
+      requested_date: qdDate || null,
+      no_proxy_logs: !!(qdDate && requestPairs.length === 0),
       date_summaries: dateSummaries,
       request_pairs: requestPairs.length > 2000 ? requestPairs.slice(0, 2000) : requestPairs,
       truncated: requestPairs.length > 2000
