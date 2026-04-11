@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-164",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "21cd0fb",
+      "commit_full": "21cd0fbe9420451dba33bd5387ffb74ebd03b21f",
+      "status": "ABGESCHLOSSEN",
+      "description": "refactor(charts): remove Chart.js dead code and fix for-const for SonarQube",
+      "detail": "- Remove __mainChartTransitions, __chartTransitionsOff, freezeChartNoAnim (unused)\n\n- Remove Chart.js globals block (Chart.defaults, animation, DPR)\n\n- Remove VLine plugin (usageUpdateVerticalLines) targeting dead canvas c-service\n\n- Remove chartTickXToParentLeft, chartAreaTopInParent, chartAreaBottomInParent, chartYInParent (Chart.js canvas helpers)\n\n- Remove layoutFsUpdateOverlay, layoutMainChartsUpdateOverlay (Chart.js overlay positioning)\n\n- Keep layoutUpdateGuideOverlays as no-op stub (still called from renderDashboardCore)\n\n- Fix __safeChartResize to use getDom() only, drop .canvas fallback\n\n- Replace 72x for(const...) with for(var...) for SonarQube QG compliance\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-163",
       "timestamp": "2026-04-12",
       "session": "auto",
