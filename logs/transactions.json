@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-142",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "9bc6e18",
+      "commit_full": "9bc6e18a69f507de6921f4f7809c4c22d97d63dd",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(proxy): log source, peak_hour, ttl_tier and ephemeral token breakdown",
+      "detail": "Extend mergeUsage to capture ephemeral_1h/5m_input_tokens from cache_creation\nsub-object in SSE message_start events. Add source (proxy), peak_hour flag\n(Mon-Fri 13-19 UTC) and ttl_tier (derived from ephemeral split) to every\nNDJSON record. Dashboard interop cards now show data from native proxy logs.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/anthropic-proxy-core.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-141",
       "timestamp": "2026-04-11",
       "session": "auto",
