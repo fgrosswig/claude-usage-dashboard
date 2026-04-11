@@ -2,6 +2,33 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-146",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "b1de0d8",
+      "commit_full": "b1de0d81db7a77dd5aaf4f94a99a7870f4e7928d",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(migration): migrate Token Stats section to ECharts (CUD-13)",
+      "detail": "Migrate all 9 Token Stats charts (c1, c1-hosts, c2, c3, c4) from Chart.js\nto ECharts. Eliminates all reuse-check logic (c1Reuse, c2Reuse etc.) —\nECharts setOption handles update-in-place natively. HTML canvas → div.\nAdd resize handler for main charts. Stats: 17 Chart.js + 20 ECharts remaining.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-registry.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-145",
       "timestamp": "2026-04-11",
       "session": "auto",
