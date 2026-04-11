@@ -1168,7 +1168,6 @@ function initMetaDetailsPanel() {
     } catch (e2) {}
   });
 }
-function layoutUpdateGuideOverlays() {}
 /** Stunden 0–24 als HH:MM (UTC-Tag wie serverseitige outage_spans). */
 function fmtUtcHmFromDayHour(h) {
   if (h == null || isNaN(h)) return "?";
@@ -1478,21 +1477,6 @@ function initUpdateSlideoutOnce() {
     if (e.key === "Escape") closeUpdateSlideout();
   });
 }
-var __layoutOvTimer = null;
-/** Overlay-Marker erst nach stabilem Chart-Layout; entkoppelt von Resize/SSE, vermeidet Resize-Feedback. */
-function scheduleLayoutUpdateGuideOverlays() {
-  clearTimeout(window.__dashLayoutAfterCore);
-  window.__dashLayoutAfterCore = setTimeout(function () {
-    window.__dashLayoutAfterCore = null;
-    requestAnimationFrame(function () {
-      requestAnimationFrame(layoutUpdateGuideOverlays);
-    });
-  }, 140);
-}
-window.addEventListener("resize", function () {
-  clearTimeout(__layoutOvTimer);
-  __layoutOvTimer = setTimeout(scheduleLayoutUpdateGuideOverlays, 200);
-});
 
 // ── Date Range + Host Filter ──────────────────────────────────────────────
 function getFilteredDays(days) {
@@ -1710,11 +1694,6 @@ function renderDashboardCore(data) {
   updateMetaDetailsSummary(data);
   var days = getFilteredDays(data.days);
   if(!days.length){
-    window.__usageVersionDayIndices = [];
-    var fsO = document.getElementById("fs-update-overlay");
-    var mO = document.getElementById("main-charts-update-overlay");
-    if (fsO) fsO.innerHTML = "";
-    if (mO) mO.innerHTML = "";
     var meta0=document.getElementById("meta");
     var ls0=document.getElementById("limit-source");
     if(ls0) ls0.textContent = apiNote(data, "limit_source_note", "limit_source_note_en");
@@ -2029,10 +2008,6 @@ function renderDashboardCore(data) {
       else if (typeof _charts.c1hosts.destroy === 'function') _charts.c1hosts.destroy();
     } catch (eHs) {}
     _charts.c1hosts = null;
-  }
-  window.__usageVersionDayIndices = [];
-  for (var uxi = 0; uxi < days.length; uxi++) {
-    if (days[uxi].version_change) window.__usageVersionDayIndices.push(uxi);
   }
 
   // Haupt-Chart-Boxen stehen in tpl/dashboard.html (c1–c4); nur Host-Box ggf. einfügen.
@@ -2396,7 +2371,7 @@ function renderDashboardCore(data) {
     }
   }
   
-  /** Während Scan: SSE feuert oft → Chart.update flimmert. Pro Chart separat drosseln (Service nicht an Forensic koppeln). */
+  /** Während Scan: SSE feuert oft → ECharts .setOption flimmert. Pro Chart separat drosseln (Service nicht an Forensic koppeln). */
   var spForensic = data.scan_progress;
   var scanInProgForensic =
     data.scanning && spForensic && spForensic.total > 0 && spForensic.done < spForensic.total;
@@ -2558,8 +2533,6 @@ function renderDashboardCore(data) {
     }
   }
   initUpdateSlideoutOnce();
-  /** Overlay leert DOM → sichtbares Flackern; nur nach echtem Service-Chart-Repaint (nicht während Drossel). */
-  if (!skipServicePaint) scheduleLayoutUpdateGuideOverlays();
 }
 
 // (renderTimelineChart entfernt)
@@ -3417,7 +3390,7 @@ function renderUserProfileCharts(days) {
     : allVers;
   var sortedVers = sortVersionKeys(filteredVers, stats, __userVersionSort);
 
-  // Nur der Canvas-Host bekommt die Plot-Höhe — nicht die ganze .chart-box (sonst stimmt Chart.js-Layout vs. h3+Blurb nicht).
+  // Nur der Canvas-Host bekommt die Plot-Höhe — nicht die ganze .chart-box (sonst stimmt ECharts-Layout vs. h3+Blurb nicht).
   var barPitch = 30;
   var chartCanvasH = Math.max(240, sortedVers.length * barPitch + 56);
   var hosts = document.querySelectorAll("#user-profile-charts .user-chart-canvas-host");
@@ -5153,7 +5126,7 @@ function buildEfficiencyData(proxyDays, mainDays) {
 // ── Efficiency Trend: ECharts PoC (issue #166, Phase 1) ────────────────
 // 1 Heatmap Matrix (metric x day, per-row min-max normalized) +
 // 3 Small Multiples (JSONL/Proxy Ratio, Visible Tokens/1%, Cache Miss %).
-// Synced tooltips via echarts.connect(). No Chart.js here.
+// Synced tooltips via echarts.connect().
 
 function __effNormalizeRow(row) {
   var min = Infinity, max = -Infinity;

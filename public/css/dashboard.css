@@ -214,7 +214,6 @@ tr:hover td{background:#334155}
 .forensic-host-chip.active{background:#3b82f6;border-color:#2563eb;color:#fff}
 .forensic-host-chip:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}
 .service-chart-canvas-wrap{position:relative}
-.service-chart-canvas-wrap canvas{position:relative;z-index:1}
 .chart-shell{position:relative;min-height:220px;border-radius:8px}
 .chart-shell--forensic{min-height:200px}
 .chart-shell .chart-shell-ph{
@@ -253,18 +252,12 @@ tr:hover td{background:#334155}
     background-position:50% 0;
   }
 }
-.fs-update-overlay,.main-charts-update-overlay{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:4;overflow:visible}
 .main-charts-wrap{position:relative}
 .main-charts-wrap>#charts,.main-charts-wrap>#charts-host-sub{position:relative;z-index:1}
 .main-charts-wrap.main-charts-loading #charts,
 .main-charts-wrap.main-charts-loading #charts-host-sub{
   display:none!important;
 }
-.fs-update-mark,.fs-model-mark{position:absolute;margin:0;padding:0;border:none;background:transparent;cursor:pointer;pointer-events:auto;transform:translate(-50%,0);font-size:13px;line-height:1;font-weight:700;z-index:2}
-.fs-update-mark{color:#4ade80;text-shadow:0 0 8px rgba(0,0,0,.75),0 1px 2px rgba(0,0,0,.9)}
-.fs-update-mark:hover{color:#86efac;filter:brightness(1.15)}
-.fs-model-mark{color:#22d3ee;text-shadow:0 0 8px rgba(0,0,0,.75),0 1px 2px rgba(0,0,0,.9)}
-.fs-model-mark:hover{color:#67e8f9;filter:brightness(1.15)}
 .update-sl-backdrop{display:none;position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.35)}
 .update-sl-backdrop.open{display:block}
 .update-sl{position:fixed;top:0;right:0;width:min(420px,92vw);max-height:100vh;height:100vh;z-index:9600;background:#0f172a;border-left:1px solid #334155;box-shadow:-12px 0 40px rgba(0,0,0,.55);transform:translateX(100%);transition:transform .28s ease;overflow:hidden;display:flex;flex-direction:column}
