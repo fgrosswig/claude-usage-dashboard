@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-160",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "49e4767",
+      "commit_full": "49e4767868b289c812e6e972c8b23e33dc66cb0d",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(proxy-charts): fix layout issues and hourly-latency Y-axis scale",
+      "detail": "- Equalize Row 2 heights (hourly-latency 200px -> 260px to match latency-per-day)\n\n- Move Efficiency Trend out of 3-col grid into own full-width row to prevent clipping of small multiples and eliminate empty space in columns 1-2\n\n- Add P95-based Y-axis cap in aggregateHourlyLatency to handle outlier spikes that blow up the scale (only when max > 5x avg)\n\n- Increase grid.bottom 30 -> 38 for X-axis label room in hourly latency chart\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-159",
       "timestamp": "2026-04-12",
       "session": "auto",
