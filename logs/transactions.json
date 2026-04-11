@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-150",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "0144536",
+      "commit_full": "01445365f7c84d34e03c943199c6a7a41f9349ee",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(forensic): axis name positioning with nameLocation center + nameGap",
+      "detail": "Y-axis names were clipped at default position (end). Use nameLocation\ncenter with adequate nameGap so full labels like \"Signals + outage\n(h, bar scaled)\" are visible. Apply consistently to all 3 forensic charts.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-149",
       "timestamp": "2026-04-12",
       "session": "auto",
