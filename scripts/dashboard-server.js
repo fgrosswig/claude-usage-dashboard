@@ -3418,9 +3418,14 @@ function buildSessionTurnsForDate(dateKey) {
   var crypto = require('node:crypto');
   var collected = collectTaggedJsonlFiles();
   var files = collected.tagged;
-  var sessions = Object.create(null);
-  var totalParsed = 0;
 
+  // Compute adjacent day keys for edge-session detection
+  var d = new Date(dateKey + 'T00:00:00Z');
+  var prevDay = new Date(d.getTime() - 86400000).toISOString().slice(0, 10);
+  var nextDay = new Date(d.getTime() + 86400000).toISOString().slice(0, 10);
+
+  // Pass 1: collect all turns for dateKey + adjacent days, grouped by sessionId
+  var allSessions = Object.create(null); // sid -> [{ts, day, ...}]
   for (var file of files) {
     try {
       forEachJsonlLineSync(file.path, function (line) {
@@ -3431,7 +3436,8 @@ function buildSessionTurnsForDate(dateKey) {
         if (rec.isSidechain) return;
         var ts = rec.timestamp;
         if (!ts || typeof ts !== 'string' || ts.length < 19) return;
-        if (ts.slice(0, 10) !== dateKey) return;
+        var turnDay = ts.slice(0, 10);
+        if (turnDay !== dateKey && turnDay !== prevDay && turnDay !== nextDay) return;
         var msg = rec.message || {};
         var usage = msg.usage;
         if (!usage) return;
@@ -3442,10 +3448,10 @@ function buildSessionTurnsForDate(dateKey) {
         if (input + output + cacheRead + cacheCreation === 0) return;
         var sid = rec.sessionId;
         if (!sid) return;
-        totalParsed++;
-        if (!sessions[sid]) sessions[sid] = [];
-        sessions[sid].push({
+        if (!allSessions[sid]) allSessions[sid] = [];
+        allSessions[sid].push({
           ts: ts,
+          day: turnDay,
           input: input,
           output: output,
           cache_read: cacheRead,
@@ -3456,11 +3462,35 @@ function buildSessionTurnsForDate(dateKey) {
     } catch (_e) { /* skip unreadable files */ }
   }
 
+  // Pass 2: select sessions that have at least one turn on dateKey
+  var sessions = Object.create(null);
+  var totalParsed = 0;
+  var sids = Object.keys(allSessions);
+  for (var si = 0; si < sids.length; si++) {
+    var sid = sids[si];
+    var turns = allSessions[sid];
+    var hasDateKey = false;
+    for (var ti = 0; ti < turns.length; ti++) {
+      if (turns[ti].day === dateKey) { hasDateKey = true; break; }
+    }
+    if (!hasDateKey) continue;
+    sessions[sid] = turns;
+    totalParsed += turns.length;
+  }
+
   var result = [];
-  var sids = Object.keys(sessions);
-  for (var sid of sids) {
+  var resultSids = Object.keys(sessions);
+  for (var ri = 0; ri < resultSids.length; ri++) {
+    var sid = resultSids[ri];
     var turns = sessions[sid];
     turns.sort(function (a, b) { return a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0; });
+
+    // Determine edge flags
+    var firstDay = turns[0].day;
+    var lastDay = turns[turns.length - 1].day;
+    var edgeStart = firstDay < dateKey;   // session started on previous day
+    var edgeEnd = lastDay > dateKey;      // session continues into next day
+
     var mapped = [];
     for (var ti = 0; ti < turns.length; ti++) {
       mapped.push({
@@ -3474,7 +3504,7 @@ function buildSessionTurnsForDate(dateKey) {
       });
     }
     var hash = crypto.createHash('sha256').update(sid).digest('hex').slice(0, 12);
-    result.push({
+    var entry = {
       session_id_hash: hash,
       turn_count: mapped.length,
       first_ts: turns[0].ts,
@@ -3483,7 +3513,10 @@ function buildSessionTurnsForDate(dateKey) {
       total_cache_read: turns.reduce(function (s, t) { return s + t.cache_read; }, 0),
       total_all: turns.reduce(function (s, t) { return s + t.input + t.output + t.cache_read + t.cache_creation; }, 0),
       turns: mapped
-    });
+    };
+    if (edgeStart) entry.edge_start = true;  // started on previous day
+    if (edgeEnd) entry.edge_end = true;      // continues into next day
+    result.push(entry);
   }
   result.sort(function (a, b) { return b.total_all - a.total_all; });
   return { date: dateKey, session_count: result.length, total_turns: totalParsed, sessions: result };

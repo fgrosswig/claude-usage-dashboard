@@ -8498,7 +8498,7 @@ function populateSessionPicker(stData, picker, infoEl, sumEl) {
     var s = sessions[i];
     var opt = document.createElement("option");
     opt.value = s.session_id_hash;
-    var timeRange = s.first_ts.slice(11, 16) + "–" + s.last_ts.slice(11, 16);
+    var timeRange = (s.edge_start ? "\u2192 " : "") + s.first_ts.slice(11, 16) + "\u2013" + s.last_ts.slice(11, 16) + (s.edge_end ? " \u2192" : "");
     opt.textContent = s.session_id_hash.slice(0, 8) + " (" + timeRange + ", " + s.turn_count + " turns)";
     picker.appendChild(opt);
   }
@@ -9742,7 +9742,7 @@ function renderBudgetDrain(stData, qdData) {
       sessionSpans.push({
         firstTurn: sessFirstTurn,
         lastTurn: turnCounter,
-        label: "S" + (sessIdx + 1) + " " + sess.first_ts.slice(11, 16) + "–" + sess.last_ts.slice(11, 16),
+        label: (sess.edge_start ? "\u2192 " : "") + "S" + (sessIdx + 1) + " " + sess.first_ts.slice(11, 16) + "\u2013" + sess.last_ts.slice(11, 16) + (sess.edge_end ? " \u2192" : ""),
         turns: turns.length,
         total: sess.total_all,
         forced: forced,
