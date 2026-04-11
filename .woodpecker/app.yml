@@ -206,13 +206,16 @@ steps:
         MAJOR=$(echo "$VER" | cut -d. -f1)
         MINOR=$(echo "$VER" | cut -d. -f2)
         PATCH=$(echo "$VER" | cut -d. -f3)
-        echo "Parsed: MAJOR=$MAJOR MINOR=$MINOR PATCH=$PATCH"
-        case "$BUMP" in
-          major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
-          minor) MINOR=$((MINOR+1)); PATCH=0 ;;
-          patch) PATCH=$((PATCH+1)) ;;
-        esac
+        echo "Parsed: MAJOR=$MAJOR MINOR=$MINOR PATCH=$PATCH BUMP=$BUMP"
+        if [ "$BUMP" = "major" ]; then
+          MAJOR=$(expr $MAJOR + 1); MINOR=0; PATCH=0
+        elif [ "$BUMP" = "minor" ]; then
+          MINOR=$(expr $MINOR + 1); PATCH=0
+        else
+          PATCH=$(expr $PATCH + 1)
+        fi
         NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+        echo "After bump: $NEW_TAG"
         echo "Last: $LAST_TAG → Bump: $BUMP → New: $NEW_TAG"
         # 5. Create tag via API
         curl -sf -X POST \
