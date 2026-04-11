@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-149",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "12c1868",
+      "commit_full": "12c1868e17d3cf5d37d12f653ec93c40423420c3",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(forensic): restore hit-limit chart disclosure (collapsed by default)",
+      "detail": "The hit-limit chart dominates the section — keep it collapsible (closed\nby default) while signals + service stay always visible. Add ECharts\nresize trigger on disclosure toggle. Increase hit-limit to 420px.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-148",
       "timestamp": "2026-04-12",
       "session": "auto",
