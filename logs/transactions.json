@@ -2,6 +2,43 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-141",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "7b059e7",
+      "commit_full": "7b059e79aafa7b4629086105e9eb81b5d19c4614",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(interop): integrate claude-code-cache-fix fields into proxy analytics",
+      "detail": "Parse ttl_tier, ephemeral token breakdown, peak_hour flag and data source\nfrom NDJSON records written by cnighswonger's claude-code-cache-fix interceptor.\nShows source badge (Proxy/Interceptor/Both) in summary line, TTL tier card\n(1h vs 5m distribution) and peak/off-peak request split as new proxy cards.\nFully backward-compatible — new cards only appear when interceptor data present.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-140",
       "timestamp": "2026-04-11",
       "session": "auto",
