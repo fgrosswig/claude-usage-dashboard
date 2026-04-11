@@ -7173,7 +7173,6 @@ function renderEconomicSection(data, filteredDays) {
     mainPicker2.addEventListener("change", function () {
       _econData = null;
       if (sumEl) sumEl.textContent = "Loading sessions…";
-      if (collapse.open) setTimeout(fetchSessionTurns, 50);
     });
   }
 

@@ -2829,7 +2829,6 @@ function runScanAndBroadcast() {
       cachedData.scan_error = msg;
     } finally {
       scanInProgress = false;
-      invalidateSessionTurnsToday();
       broadcastSse();
       if (scanOk && cachedData && cachedData.days && cachedData.days.length) {
         backfillReleaseBodiesForDashboardDays(cachedData.days, function () {
@@ -3444,15 +3443,15 @@ function devFetchProxyLogs(cb) {
 var _sessionTurnsCache = Object.create(null);
 
 function getSessionTurnsCached(dateKey) {
-  if (_sessionTurnsCache[dateKey]) return _sessionTurnsCache[dateKey];
-  var result = buildSessionTurnsForDate(dateKey);
-  _sessionTurnsCache[dateKey] = result;
-  return result;
-}
-
-function invalidateSessionTurnsToday() {
   var today = new Date().toISOString().slice(0, 10);
-  delete _sessionTurnsCache[today];
+  var cached = _sessionTurnsCache[dateKey];
+  if (cached && dateKey < today) return cached.result;
+  var collected = collectTaggedJsonlFiles();
+  var fp = buildTaggedJsonlFingerprintSync(collected.tagged);
+  if (cached && cached.fingerprint === fp) return cached.result;
+  var result = buildSessionTurnsForDate(dateKey);
+  _sessionTurnsCache[dateKey] = { result: result, fingerprint: fp };
+  return result;
 }
 
 function buildSessionTurnsForDate(dateKey) {
