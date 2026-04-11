@@ -166,21 +166,40 @@ steps:
       event: push
     commands:
       - |
-        apk add --no-cache git curl jq
-        git fetch --tags origin
-        LAST_TAG=$(git tag --sort=-v:refname | head -1)
+        apk add --no-cache curl jq
+        API="https://gitea.grosswig-it.de/api/v1/repos/GRO/Claude-Usage-Dashboard"
+        AUTH="-H \"Authorization: token $GITEA_TOKEN\""
+        # 1. Last tag via API (no local git tags needed)
+        LAST_TAG=$(curl -sf -H "Authorization: token $GITEA_TOKEN" \
+          "$API/tags?limit=1" | jq -r '.[0].name // empty')
         if [ -z "$LAST_TAG" ]; then LAST_TAG="v0.0.0"; fi
-        COMMITS=$(git log ${LAST_TAG}..HEAD --format="%s" 2>/dev/null || echo "")
+        TAG_SHA=$(curl -sf -H "Authorization: token $GITEA_TOKEN" \
+          "$API/tags/$LAST_TAG" | jq -r '.commit.sha // empty')
+        echo "Last tag: $LAST_TAG ($TAG_SHA)"
+        # 2. Commits since tag via API
+        if [ "$TAG_SHA" = "$CI_COMMIT_SHA" ]; then
+          echo "HEAD is already tagged — skipping"
+          exit 0
+        fi
+        COMMITS=$(curl -sf -H "Authorization: token $GITEA_TOKEN" \
+          "$API/commits?sha=main&limit=50" \
+          | jq -r --arg stop "$TAG_SHA" '
+            [.[] | select(.sha != $stop) | .commit.message | split("\n")[0]] |
+            if length == 0 then empty else .[] end')
         if [ -z "$COMMITS" ]; then
           echo "No new commits since $LAST_TAG — skipping"
           exit 0
         fi
+        echo "Commits since $LAST_TAG:"
+        echo "$COMMITS" | head -10
+        # 3. Determine bump type
         BUMP="patch"
-        if git log ${LAST_TAG}..HEAD --format="%s%n%b" | grep -qiE "BREAKING CHANGE|^[a-z]+(\([^)]*\))?!:"; then
+        if echo "$COMMITS" | grep -qiE "BREAKING CHANGE|^[a-z]+(\([^)]*\))?!:"; then
           BUMP="major"
         elif echo "$COMMITS" | grep -qE "^feat(\([^)]*\))?:"; then
           BUMP="minor"
         fi
+        # 4. Parse + bump version
         VER=$(echo "$LAST_TAG" | sed 's/^v//')
         MAJOR=$(echo "$VER" | cut -d. -f1)
         MINOR=$(echo "$VER" | cut -d. -f2)
@@ -192,10 +211,11 @@ steps:
         esac
         NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
         echo "Last: $LAST_TAG → Bump: $BUMP → New: $NEW_TAG"
+        # 5. Create tag via API
         curl -sf -X POST \
           -H "Authorization: token $GITEA_TOKEN" \
           -H "Content-Type: application/json" \
-          "https://gitea.grosswig-it.de/api/v1/repos/GRO/Claude-Usage-Dashboard/tags" \
+          "$API/tags" \
           -d "$(jq -n --arg tag "$NEW_TAG" --arg sha "$CI_COMMIT_SHA" \
             '{tag_name: $tag, target: $sha}')"
         echo "Tag $NEW_TAG created — draft-release-notes will trigger on tag event"
