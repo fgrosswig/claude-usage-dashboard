@@ -292,7 +292,7 @@ tr:hover td{background:#334155}
 /* ── Proxy Analytics ─────────────────────────────────── */
 .proxy-details{margin-bottom:14px}
 .proxy-summary{background:rgba(30,41,59,.55);border-color:#334155}
-.proxy-charts-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:16px;align-items:stretch}
+.proxy-charts-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:16px;align-items:start}
 .proxy-charts-grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:16px;align-items:start}
 .proxy-section-blurb{font-size:.75rem;color:#94a3b8;margin:0 0 10px;line-height:1.45}
 .proxy-chart-blurb{font-size:.7rem;color:#64748b;margin:4px 0 8px;line-height:1.4}
