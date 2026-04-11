@@ -2,6 +2,38 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-162",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "26e1ab7",
+      "commit_full": "26e1ab7844e2bcdece3398e22b8233eb9b27c456",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(migration): migrate Anthropic Status section to ECharts (4/4 charts)",
+      "detail": "- Uptime Chart: stacked bar (operational/degraded/partial/outage/grey)\n\n- Incident History: stacked bar + line overlay (hit_limits) dual Y-axis\n\n- Outage Scatter (popup): bar + scatter dual Y-axis\n\n- Outage Timeline: stacked bar (none/critical/major/minor/grey)\n\n- HTML: canvas -> div for all 3 health charts\n\n- CSS: remove canvas max-width rule\n\n- Resize handler: __safeChartResize uses getDom() for ECharts compat\n\n- Widget Registry: all 4 entries engine chartjs -> echarts\n\n- Migration complete: 37/37 charts now ECharts\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-registry.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-161",
       "timestamp": "2026-04-12",
       "session": "auto",
