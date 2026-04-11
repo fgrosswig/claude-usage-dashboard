@@ -2,6 +2,33 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-165",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "5bcf44c",
+      "commit_full": "5bcf44cbf94bc8221adfbe60184231640f58da43",
+      "status": "ABGESCHLOSSEN",
+      "description": "refactor(charts): remove Chart.js CDN and all remaining legacy artifacts",
+      "detail": "- Remove Chart.js 4.4.9 CDN script tag from dashboard.html\n\n- Remove fs-update-overlay and main-charts-update-overlay HTML elements\n\n- Remove overlay CSS (.fs-update-overlay, .fs-update-mark, .fs-model-mark)\n\n- Remove .service-chart-canvas-wrap canvas CSS rule\n\n- Remove __usageVersionDayIndices (only used by removed VLine plugin)\n\n- Remove scheduleLayoutUpdateGuideOverlays, layoutUpdateGuideOverlays and resize listener\n\n- Update stale Chart.js references in comments to ECharts\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-164",
       "timestamp": "2026-04-12",
       "session": "auto",
