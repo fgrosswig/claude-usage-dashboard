@@ -41,7 +41,7 @@
             id: 'token-hourly',
             titleKey: 'chartTokenHourly',
             type: 'bar-stacked',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c1',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderTokenStats_c1_hourly'
@@ -50,7 +50,7 @@
             id: 'token-daily',
             titleKey: 'chartTokenDaily',
             type: 'bar-stacked',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c1',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderTokenStats_c1_daily'
@@ -59,7 +59,7 @@
             id: 'token-hosts',
             titleKey: 'chartTokenHosts',
             type: 'bar-stacked',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c1-hosts',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderTokenStats_c1hosts'
@@ -68,7 +68,7 @@
             id: 'cache-ratio-hourly',
             titleKey: 'chartCacheRatioHourly',
             type: 'line',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c2',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderTokenStats_c2_hourly'
@@ -77,7 +77,7 @@
             id: 'cache-ratio-daily',
             titleKey: 'chartCacheRatioDaily',
             type: 'line',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c2',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderTokenStats_c2_daily'
@@ -86,7 +86,7 @@
             id: 'api-events-hourly',
             titleKey: 'chartApiEventsHourly',
             type: 'bar',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c3',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderTokenStats_c3_hourly'
@@ -95,7 +95,7 @@
             id: 'api-events-daily',
             titleKey: 'chartApiEventsDaily',
             type: 'bar',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c3',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderTokenStats_c3_daily'
@@ -104,7 +104,7 @@
             id: 'signals-hourly',
             titleKey: 'chartSignalsHourly',
             type: 'bar-stacked',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c4',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderTokenStats_c4_hourly'
@@ -113,7 +113,7 @@
             id: 'signals-daily',
             titleKey: 'chartSignalsDaily',
             type: 'bar',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c4',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderTokenStats_c4_daily'

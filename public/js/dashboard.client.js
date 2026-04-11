@@ -431,7 +431,8 @@ function destroyMainChartIfScopeMismatch(mainScope, chartKey) {
   var ch = _charts[chartKey];
   if (ch && ch._dashScope !== mainScope) {
     try {
-      ch.destroy();
+      if (typeof ch.dispose === 'function') ch.dispose();
+      else if (typeof ch.destroy === 'function') ch.destroy();
     } catch (eD) {}
     _charts[chartKey] = null;
   }
@@ -2225,180 +2226,54 @@ function renderDashboardCore(data) {
     elc2.previousElementSibling.textContent = hourlyMode ? t("chartCacheRatioHourly") : t("chartCacheRatio");
   }
 
-  var c1Reuse = false;
-  if (hourlyMode) {
-    c1Reuse =
-      _charts.c1 &&
-      _charts.c1.data.datasets.length === 3 &&
-      _charts.c1.data.datasets[0].label === t("chartDS_cacheRead") &&
-      chartXLabelsMatch(_charts.c1, hourLabs);
-    if (c1Reuse) {
-      _charts.c1.options.transitions = __mainChartTransitions;
-      _charts.c1.options.resizeDelay = 200;
-      _charts.c1.data.labels = hourLabs.slice();
-      var c1dh = _charts.c1.data.datasets;
-      c1dh[0].data = estimatedFieldPerHourHost(dayForHourly, mainHostKey, "cache_read");
-      c1dh[1].data = estimatedFieldPerHourHost(dayForHourly, mainHostKey, "output");
-      c1dh[2].data = estimatedFieldPerHourHost(dayForHourly, mainHostKey, "cache_creation");
-      _charts.c1.update("none");
-    } else {
-      if (_charts.c1) {
-        try {
-          _charts.c1.destroy();
-        } catch (eC1h) {}
-        _charts.c1 = null;
-      }
-      _charts.c1 = new Chart(elc1, {
-        type: "bar",
-        data: {
-          labels: hourLabs,
-          datasets: [
-            {
-              label: t("chartDS_cacheRead"),
-              data: estimatedFieldPerHourHost(dayForHourly, mainHostKey, "cache_read"),
-              backgroundColor: "rgba(139,92,246,0.7)",
-              stack: "tok",
-              yAxisID: "y"
-            },
-            {
-              label: t("chartDS_output"),
-              data: estimatedFieldPerHourHost(dayForHourly, mainHostKey, "output"),
-              backgroundColor: "rgba(59,130,246,0.9)",
-              stack: "tok",
-              yAxisID: "y"
-            },
-            {
-              label: t("chartDS_cacheCreate"),
-              data: estimatedFieldPerHourHost(dayForHourly, mainHostKey, "cache_creation"),
-              backgroundColor: "rgba(6,182,212,0.5)",
-              stack: "tok",
-              yAxisID: "y"
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          resizeDelay: 200,
-          animation: false,
-          transitions: __mainChartTransitions,
-          interaction: { mode: "index", intersect: false },
-          scales: {
-            x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" } },
-            y: {
-              stacked: true,
-              position: "left",
-              ticks: { callback: function (v) { return fmt(v); } },
-              grid: { color: "rgba(51,65,85,0.5)" },
-              title: { display: true, text: t("unifiedAxisTokens"), color: "#94a3b8" }
-            }
-          },
-          plugins: {
-            legend: { labels: { color: "#cbd5e1" } },
-            tooltip: {
-              callbacks: {
-                label: function (c) { return c.dataset.label + ": " + fmt(c.raw); },
-                footer: function () {
-                  return (
-                    t("chartTooltipHourlyTokenEst") +
-                    " | C:O " +
-                    String(dayForHourly.cache_output_ratio || 0) +
-                    "x (" +
-                    dayForHourly.date +
-                    ")"
-                  );
-                }
-              }
-            }
-          }
+  // ── c1: Token Breakdown (stacked bar) — ECharts ──
+  if (!_charts.c1) _charts.c1 = echarts.init(elc1, null, { renderer: 'canvas' });
+  var c1Labels = hourlyMode ? hourLabs : labels;
+  var c1CacheRead = hourlyMode
+    ? estimatedFieldPerHourHost(dayForHourly, mainHostKey, "cache_read")
+    : days.map(function (d) { return dayNumericForMainCharts(d, mainHostKey, "cache_read"); });
+  var c1Output = hourlyMode
+    ? estimatedFieldPerHourHost(dayForHourly, mainHostKey, "output")
+    : days.map(function (d) { return dayNumericForMainCharts(d, mainHostKey, "output"); });
+  var c1CacheCreate = hourlyMode
+    ? estimatedFieldPerHourHost(dayForHourly, mainHostKey, "cache_creation")
+    : days.map(function (d) { return dayNumericForMainCharts(d, mainHostKey, "cache_creation"); });
+  _charts.c1.setOption({
+    animation: false,
+    grid: { left: 60, right: 16, top: 36, bottom: 30 },
+    legend: { data: [t("chartDS_cacheRead"), t("chartDS_output"), t("chartDS_cacheCreate")], textStyle: { color: '#cbd5e1' }, top: 4 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel];
+        for (var pi = 0; pi < params.length; pi++) lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + fmt(params[pi].value));
+        if (hourlyMode) lines.push(t("chartTooltipHourlyTokenEst") + ' | C:O ' + (dayForHourly.cache_output_ratio || 0) + 'x');
+        else {
+          var di1 = params[0].dataIndex;
+          lines.push(tr("chartTooltipCoDay", { ratio: String(dayRatioCacheOutForMainCharts(days[di1], mainHostKey)) }));
         }
-      });
-    }
-  } else {
-    c1Reuse =
-      _charts.c1 &&
-      _charts.c1.data.datasets.length === 3 &&
-      _charts.c1.data.datasets[0].label === t("chartDS_cacheRead") &&
-      (chartXLabelsMatch(_charts.c1, labels) || chartLabelsPrefixMatch(_charts.c1, labels));
-    if (c1Reuse) {
-      _charts.c1.options.transitions = __mainChartTransitions;
-      _charts.c1.options.resizeDelay = 200;
-      _charts.c1.data.labels = labels.slice();
-      var c1d = _charts.c1.data.datasets;
-      c1d[0].data = days.map(function (d) { return dayNumericForMainCharts(d, mainHostKey, "cache_read"); });
-      c1d[1].data = days.map(function (d) { return dayNumericForMainCharts(d, mainHostKey, "output"); });
-      c1d[2].data = days.map(function (d) { return dayNumericForMainCharts(d, mainHostKey, "cache_creation"); });
-      _charts.c1.update("none");
-    } else {
-      if (_charts.c1) {
-        try {
-          _charts.c1.destroy();
-        } catch (eC1) {}
-        _charts.c1 = null;
+        return lines.join('<br>');
       }
-      _charts.c1 = new Chart(elc1, {
-        type: "bar",
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: t("chartDS_cacheRead"),
-              data: days.map(function (d) { return dayNumericForMainCharts(d, mainHostKey, "cache_read"); }),
-              backgroundColor: "rgba(139,92,246,0.7)",
-              stack: "tok",
-              yAxisID: "y"
-            },
-            {
-              label: t("chartDS_output"),
-              data: days.map(function (d) { return dayNumericForMainCharts(d, mainHostKey, "output"); }),
-              backgroundColor: "rgba(59,130,246,0.9)",
-              stack: "tok",
-              yAxisID: "y"
-            },
-            {
-              label: t("chartDS_cacheCreate"),
-              data: days.map(function (d) { return dayNumericForMainCharts(d, mainHostKey, "cache_creation"); }),
-              backgroundColor: "rgba(6,182,212,0.5)",
-              stack: "tok",
-              yAxisID: "y"
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          resizeDelay: 200,
-          animation: false,
-          transitions: __mainChartTransitions,
-          interaction: { mode: "index", intersect: false },
-          scales: {
-            x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" } },
-            y: { stacked: true, position: "left", ticks: { callback: function (v) { return fmt(v); } }, grid: { color: "rgba(51,65,85,0.5)" }, title: { display: true, text: t("unifiedAxisTokens"), color: "#94a3b8" } }
-          },
-          plugins: {
-            legend: { labels: { color: "#cbd5e1" } },
-            tooltip: {
-              callbacks: {
-                label: function (c) { return c.dataset.label + ": " + fmt(c.raw); },
-                footer: function (items) {
-                  if (!items.length) return "";
-                  var di = items[0].dataIndex;
-                  return tr("chartTooltipCoDay", { ratio: String(dayRatioCacheOutForMainCharts(days[di], mainHostKey)) });
-                }
-              }
-            }
-          }
-        }
-      });
-    }
-  }
-  if (_charts.c1) _charts.c1._dashScope = mainScope;
+    },
+    xAxis: { type: 'category', data: c1Labels, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: { type: 'value', name: t("unifiedAxisTokens"), nameTextStyle: { color: '#94a3b8' },
+      axisLabel: { color: '#94a3b8', formatter: function(v) { return fmt(v); } },
+      splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    series: [
+      { name: t("chartDS_cacheRead"), type: 'bar', stack: 'tok', data: c1CacheRead, itemStyle: { color: 'rgba(139,92,246,0.7)' } },
+      { name: t("chartDS_output"), type: 'bar', stack: 'tok', data: c1Output, itemStyle: { color: 'rgba(59,130,246,0.9)' } },
+      { name: t("chartDS_cacheCreate"), type: 'bar', stack: 'tok', data: c1CacheCreate, itemStyle: { color: 'rgba(6,182,212,0.5)' } }
+    ]
+  }, true);
+  _charts.c1._dashScope = mainScope;
 
+  // ── c1-hosts: Per-Host Token Breakdown (stacked bar) — ECharts ──
   var hostBarColors = ["rgba(59,130,246,0.88)","rgba(167,139,250,0.88)","rgba(52,211,153,0.88)","rgba(251,191,36,0.88)","rgba(249,115,22,0.88)","rgba(236,72,153,0.88)"];
   if (multiHost && !hourlyMode && !mainHostKey) {
     if (!document.getElementById("c1-hosts")) {
       var ch1h = document.createElement("div");
       ch1h.className = "chart-box";
       ch1h.id = "chart-host-wrap";
-      ch1h.innerHTML = "<h3></h3><p style=\"font-size:.72rem;color:#94a3b8;margin:4px 0 10px;line-height:1.4\"></p><canvas id=\"c1-hosts\"></canvas>";
+      ch1h.innerHTML = "<h3></h3><p style=\"font-size:.72rem;color:#94a3b8;margin:4px 0 10px;line-height:1.4\"></p><div id=\"c1-hosts\" style=\"width:100%;min-height:260px\"></div>";
       var pairIns = document.getElementById("charts-host-sub");
       if (pairIns) {
         if (pairIns.firstChild) pairIns.insertBefore(ch1h, pairIns.firstChild);
@@ -2415,80 +2290,43 @@ function renderDashboardCore(data) {
       if (h3h) h3h.textContent = t("chartHostTitle");
       if (ph) ph.textContent = t("chartHostBlurb");
     }
-    var dsH = [];
-    for (var hli = 0; hli < hLabs.length; hli++) {
-      var lb0 = hLabs[hli];
-      dsH.push({label: lb0,data: days.map(function(d){ var x = d.hosts && d.hosts[lb0]; return x ? (x.total || 0) : 0;}),backgroundColor: hostBarColors[hli % hostBarColors.length],stack: "h"});
-    }
-    var c1hReuse =
-      _charts.c1hosts &&
-      _charts.c1hosts.data.datasets.length === hLabs.length &&
-      (chartXLabelsMatch(_charts.c1hosts, labels) || chartLabelsPrefixMatch(_charts.c1hosts, labels));
-    if (c1hReuse) {
-      for (var hci = 0; hci < hLabs.length; hci++) {
-        if (_charts.c1hosts.data.datasets[hci].label !== hLabs[hci]) {
-          c1hReuse = false;
-          break;
-        }
-      }
-    }
-    if (c1hReuse) {
-      _charts.c1hosts.options.transitions = __mainChartTransitions;
-      _charts.c1hosts.options.resizeDelay = 200;
-      _charts.c1hosts.data.labels = labels.slice();
-      for (var hliU = 0; hliU < hLabs.length; hliU++) {
-        var lbU = hLabs[hliU];
-        _charts.c1hosts.data.datasets[hliU].data = days.map(function (d) {
-          var x = d.hosts && d.hosts[lbU];
-          return x ? (x.total || 0) : 0;
+    var hostEl = document.getElementById("c1-hosts");
+    if (hostEl) {
+      if (!_charts.c1hosts) _charts.c1hosts = echarts.init(hostEl, null, { renderer: 'canvas' });
+      var hostSeries = [];
+      for (var hli = 0; hli < hLabs.length; hli++) {
+        var lb0 = hLabs[hli];
+        hostSeries.push({
+          name: lb0, type: 'bar', stack: 'h',
+          data: days.map(function(d) { var x = d.hosts && d.hosts[lb0]; return x ? (x.total || 0) : 0; }),
+          itemStyle: { color: hostBarColors[hli % hostBarColors.length] }
         });
       }
-      _charts.c1hosts.update("none");
-    } else {
-      if (_charts.c1hosts) {
-        try { _charts.c1hosts.destroy(); } catch (e1h) {}
-        _charts.c1hosts = null;
-      }
-      _charts.c1hosts = new Chart(document.getElementById("c1-hosts"), {
-        type: "bar",
-        data: { labels: labels, datasets: dsH },
-        options: {
-          responsive: true,
-          resizeDelay: 200,
-          animation: false,
-          transitions: __mainChartTransitions,
-          scales: {
-            x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" } },
-            y: { stacked: true, ticks: { callback: function (v) { return fmt(v); } }, grid: { color: "rgba(51,65,85,0.5)" } }
-          },
-          plugins: {
-            legend: { labels: { color: "#cbd5e1" } },
-            tooltip: {
-              callbacks: {
-                label: function (c) { return c.dataset.label + ": " + fmt(c.parsed.y); },
-                footer: function (tipItems) {
-                  if (!tipItems.length) return "";
-                  var di = tipItems[0].dataIndex;
-                  var segs = [];
-                  for (var ci = 0; ci < tipItems.length; ci++) {
-                    var L = tipItems[ci].dataset.label;
-                    var hh = days[di].hosts && days[di].hosts[L];
-                    if (hh) segs.push(tr("chartTooltipCoHostLine", { host: L, ratio: String(hh.cache_output_ratio) }));
-                  }
-                  var s = 0;
-                  for (var fi = 0; fi < tipItems.length; fi++) s += tipItems[fi].parsed.y || 0;
-                  return (segs.length ? segs.join(" · ") + " | " : "") + t("hostStackFooter") + fmt(s);
-                }
-              }
+      _charts.c1hosts.setOption({
+        animation: false,
+        grid: { left: 60, right: 16, top: 36, bottom: 30 },
+        legend: { data: hLabs, textStyle: { color: '#cbd5e1' }, top: 4 },
+        tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+          formatter: function(params) {
+            var lines = [params[0].axisValueLabel];
+            var total = 0;
+            for (var pi = 0; pi < params.length; pi++) {
+              lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + fmt(params[pi].value));
+              total += params[pi].value || 0;
             }
+            lines.push(t("hostStackFooter") + fmt(total));
+            return lines.join('<br>');
           }
-        }
-      });
+        },
+        xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+        yAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: function(v) { return fmt(v); } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+        series: hostSeries
+      }, true);
+      _charts.c1hosts._dashScope = mainScope;
     }
-    if (_charts.c1hosts) _charts.c1hosts._dashScope = mainScope;
   } else {
     if (_charts.c1hosts) {
-      try { _charts.c1hosts.destroy(); } catch (eH0) {}
+      try { _charts.c1hosts.dispose(); } catch (eH0) {}
       _charts.c1hosts = null;
     }
     var chw2 = document.getElementById("chart-host-wrap");
@@ -2497,122 +2335,39 @@ function renderDashboardCore(data) {
     if (pairBar2) pairBar2.classList.add("no-host-chart");
   }
 
-  var c2Reuse = false;
-  if (hourlyMode) {
-    c2Reuse =
-      _charts.c2 &&
-      _charts.c2.data.datasets.length === 1 &&
-      _charts.c2.data.datasets[0].label === t("chartLineCacheOut") &&
-      chartXLabelsMatch(_charts.c2, hourLabs);
-    if (c2Reuse) {
-      _charts.c2.options.transitions = __mainChartTransitions;
-      _charts.c2.options.resizeDelay = 200;
-      _charts.c2.data.labels = hourLabs.slice();
-      _charts.c2.data.datasets[0].data = hourlyCacheOutRatioEstHost(dayForHourly, mainHostKey);
-      _charts.c2.update("none");
-    } else {
-      if (_charts.c2) {
-        try {
-          _charts.c2.destroy();
-        } catch (eC2h) {}
-        _charts.c2 = null;
-      }
-      _charts.c2 = new Chart(elc2, {
-        type: "line",
-        data: {
-          labels: hourLabs,
-          datasets: [
-            {
-              label: t("chartLineCacheOut"),
-              data: hourlyCacheOutRatioEstHost(dayForHourly, mainHostKey),
-              borderColor: "#f59e0b",
-              backgroundColor: "rgba(245,158,11,0.1)",
-              fill: true,
-              tension: 0.3
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          resizeDelay: 200,
-          animation: false,
-          transitions: __mainChartTransitions,
-          scales: { y: { beginAtZero: true } },
-          plugins: {
-            tooltip: {
-              callbacks: {
-                label: function (c) { return c.raw + "x"; },
-                footer: function () {
-                  return t("chartTooltipHourlyTokenEst");
-                }
-              }
-            }
+  // ── c2: Cache:Output Ratio (line) — ECharts ──
+  if (!_charts.c2) _charts.c2 = echarts.init(elc2, null, { renderer: 'canvas' });
+  var c2Labels = hourlyMode ? hourLabs : labels;
+  var c2Data = hourlyMode
+    ? hourlyCacheOutRatioEstHost(dayForHourly, mainHostKey)
+    : days.map(function (d) { return dayRatioCacheOutForMainCharts(d, mainHostKey); });
+  _charts.c2.setOption({
+    animation: false,
+    grid: { left: 50, right: 16, top: 20, bottom: 30 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) {
+        var p = params[0];
+        var line = p.axisValueLabel + '<br>' + p.marker + ' ' + p.seriesName + ': ' + p.value + 'x';
+        if (hourlyMode) { line += '<br>' + t("chartTooltipHourlyTokenEst"); }
+        else {
+          var d2 = days[p.dataIndex];
+          if (d2) {
+            var hx = mainHostKey && d2.hosts && d2.hosts[mainHostKey] ? d2.hosts[mainHostKey] : d2;
+            line += '<br>' + tr("chartTooltipOutCacheDay", { out: fmt(hx.output), cache: fmt(hx.cache_read) });
           }
         }
-      });
-    }
-  } else {
-    c2Reuse =
-      _charts.c2 &&
-      _charts.c2.data.datasets.length === 1 &&
-      _charts.c2.data.datasets[0].label === t("chartLineCacheOut") &&
-      (chartXLabelsMatch(_charts.c2, labels) || chartLabelsPrefixMatch(_charts.c2, labels));
-    if (c2Reuse) {
-      _charts.c2.options.transitions = __mainChartTransitions;
-      _charts.c2.options.resizeDelay = 200;
-      _charts.c2.data.labels = labels.slice();
-      _charts.c2.data.datasets[0].data = days.map(function (d) { return dayRatioCacheOutForMainCharts(d, mainHostKey); });
-      _charts.c2.update("none");
-    } else {
-      if (_charts.c2) {
-        try {
-          _charts.c2.destroy();
-        } catch (eC2) {}
-        _charts.c2 = null;
+        return line;
       }
-      _charts.c2 = new Chart(elc2, {
-        type: "line",
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: t("chartLineCacheOut"),
-              data: days.map(function (d) { return dayRatioCacheOutForMainCharts(d, mainHostKey); }),
-              borderColor: "#f59e0b",
-              backgroundColor: "rgba(245,158,11,0.1)",
-              fill: true,
-              tension: 0.3
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          resizeDelay: 200,
-          animation: false,
-          transitions: __mainChartTransitions,
-          scales: { y: { beginAtZero: true } },
-          plugins: {
-            tooltip: {
-              callbacks: {
-                label: function (c) { return c.raw + "x"; },
-                footer: function (items) {
-                  if (!items.length) return "";
-                  var di = items[0].dataIndex;
-                  var d = days[di];
-                  if (mainHostKey && d.hosts && d.hosts[mainHostKey]) {
-                    var hh = d.hosts[mainHostKey];
-                    return tr("chartTooltipOutCacheDay", { out: fmt(hh.output), cache: fmt(hh.cache_read) });
-                  }
-                  return tr("chartTooltipOutCacheDay", { out: fmt(d.output), cache: fmt(d.cache_read) });
-                }
-              }
-            }
-          }
-        }
-      });
-    }
-  }
-  if (_charts.c2) _charts.c2._dashScope = mainScope;
+    },
+    xAxis: { type: 'category', data: c2Labels, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8', formatter: '{value}x' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    series: [{
+      name: t("chartLineCacheOut"), type: 'line', data: c2Data, smooth: 0.3,
+      lineStyle: { color: '#f59e0b' }, itemStyle: { color: '#f59e0b' },
+      areaStyle: { color: 'rgba(245,158,11,0.1)' }
+    }]
+  }, true);
+  _charts.c2._dashScope = mainScope;
 
   var elc3 = document.getElementById("c3");
   if (elc3 && elc3.previousElementSibling && elc3.previousElementSibling.tagName === "H3") {
@@ -2623,311 +2378,96 @@ function renderDashboardCore(data) {
     elc4.previousElementSibling.textContent = hourlyMode ? t("chartSubCachePctHourly") : t("chartSubCachePct");
   }
 
-  var c3Reuse = false;
+  // ── c3: Output per Hour / API Events (bar) — ECharts ──
+  if (!_charts.c3) _charts.c3 = echarts.init(elc3, null, { renderer: 'canvas' });
+  var c3Labels, c3Data, c3Name;
   if (hourlyMode) {
     var hwC = mainHostKey
       ? dayHourCallWeights({
-          hours:
-            (dayForHourly.hosts &&
-              dayForHourly.hosts[mainHostKey] &&
-              dayForHourly.hosts[mainHostKey].hours) ||
-            {},
-          calls:
-            dayForHourly.hosts &&
-            dayForHourly.hosts[mainHostKey] &&
-            dayForHourly.hosts[mainHostKey].calls != null
-              ? dayForHourly.hosts[mainHostKey].calls
-              : dayForHourly.calls || 0
+          hours: (dayForHourly.hosts && dayForHourly.hosts[mainHostKey] && dayForHourly.hosts[mainHostKey].hours) || {},
+          calls: dayForHourly.hosts && dayForHourly.hosts[mainHostKey] && dayForHourly.hosts[mainHostKey].calls != null
+            ? dayForHourly.hosts[mainHostKey].calls : dayForHourly.calls || 0
         })
       : dayHourCallWeights(dayForHourly);
-    c3Reuse =
-      _charts.c3 &&
-      _charts.c3.data.datasets.length === 1 &&
-      _charts.c3.data.datasets[0].label === t("chartHourlyApiEventsLabel") &&
-      chartXLabelsMatch(_charts.c3, hourLabs);
-    if (c3Reuse) {
-      _charts.c3.options.transitions = __mainChartTransitions;
-      _charts.c3.options.resizeDelay = 200;
-      _charts.c3.data.labels = hourLabs.slice();
-      _charts.c3.data.datasets[0].data = hwC.w.slice();
-      _charts.c3.update("none");
-    } else {
-      if (_charts.c3) {
-        try {
-          _charts.c3.destroy();
-        } catch (eC3h) {}
-        _charts.c3 = null;
-      }
-      _charts.c3 = new Chart(elc3, {
-        type: "bar",
-        data: {
-          labels: hourLabs,
-          datasets: [
-            {
-              label: t("chartHourlyApiEventsLabel"),
-              data: hwC.w.slice(),
-              backgroundColor: "rgba(34,197,94,0.7)"
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          resizeDelay: 200,
-          animation: false,
-          transitions: __mainChartTransitions,
-          scales: {
-            y: { beginAtZero: true, ticks: { callback: function (v) { return fmt(v); } } }
-          },
-          plugins: { tooltip: { callbacks: { label: function (c) { return fmt(c.raw) + "/h"; } } } }
-        }
-      });
-    }
+    c3Labels = hourLabs; c3Data = hwC.w.slice(); c3Name = t("chartHourlyApiEventsLabel");
   } else {
-    c3Reuse =
-      _charts.c3 &&
-      _charts.c3.data.datasets.length === 1 &&
-      _charts.c3.data.datasets[0].label === t("chartOutPerHLabel") &&
-      (chartXLabelsMatch(_charts.c3, labels) || chartLabelsPrefixMatch(_charts.c3, labels));
-    if (c3Reuse) {
-      _charts.c3.options.transitions = __mainChartTransitions;
-      _charts.c3.options.resizeDelay = 200;
-      _charts.c3.data.labels = labels.slice();
-      _charts.c3.data.datasets[0].data = days.map(function (d) { return dayOutputPerHourForMainCharts(d, mainHostKey); });
-      _charts.c3.update("none");
-    } else {
-      if (_charts.c3) {
-        try {
-          _charts.c3.destroy();
-        } catch (eC3) {}
-        _charts.c3 = null;
-      }
-      _charts.c3 = new Chart(elc3, {
-        type: "bar",
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: t("chartOutPerHLabel"),
-              data: days.map(function (d) { return dayOutputPerHourForMainCharts(d, mainHostKey); }),
-              backgroundColor: "rgba(34,197,94,0.7)"
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          resizeDelay: 200,
-          animation: false,
-          transitions: __mainChartTransitions,
-          scales: { y: { ticks: { callback: function (v) { return fmt(v); } } } },
-          plugins: { tooltip: { callbacks: { label: function (c) { return fmt(c.raw) + "/h"; } } } }
-        }
-      });
-    }
+    c3Labels = labels;
+    c3Data = days.map(function (d) { return dayOutputPerHourForMainCharts(d, mainHostKey); });
+    c3Name = t("chartOutPerHLabel");
   }
-  if (_charts.c3) _charts.c3._dashScope = mainScope;
+  _charts.c3.setOption({
+    animation: false,
+    grid: { left: 50, right: 16, top: 20, bottom: 30 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) { return params[0].axisValueLabel + '<br>' + params[0].marker + ' ' + fmt(params[0].value) + '/h'; }
+    },
+    xAxis: { type: 'category', data: c3Labels, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8', formatter: function(v) { return fmt(v); } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    series: [{ name: c3Name, type: 'bar', data: c3Data, itemStyle: { color: 'rgba(34,197,94,0.7)' } }]
+  }, true);
+  _charts.c3._dashScope = mainScope;
 
+  // ── c4: Signals / Sub-Cache % (stacked bar) — ECharts ──
+  if (!_charts.c4) _charts.c4 = echarts.init(elc4, null, { renderer: 'canvas' });
+  var c4Series = [];
+  var c4Leg = [];
   if (hourlyMode) {
-    var c4Rh =
-      _charts.c4 &&
-      _charts.c4.data.datasets.length === 4 &&
-      _charts.c4.data.datasets[0].label === t("forensicDS_continueStack") &&
-      chartXLabelsMatch(_charts.c4, hourLabs);
-    if (c4Rh) {
-      _charts.c4.options.transitions = __mainChartTransitions;
-      _charts.c4.options.resizeDelay = 200;
-      _charts.c4.data.labels = hourLabs.slice();
-      var d4h = _charts.c4.data.datasets;
-      d4h[0].data = hourSignalsArrayForHost(dayForHourly, mainHostKey, "continue");
-      d4h[1].data = hourSignalsArrayForHost(dayForHourly, mainHostKey, "resume");
-      d4h[2].data = hourSignalsArrayForHost(dayForHourly, mainHostKey, "retry");
-      d4h[3].data = hourSignalsArrayForHost(dayForHourly, mainHostKey, "interrupt");
-      _charts.c4.update("none");
-    } else {
-      if (_charts.c4) {
-        try {
-          _charts.c4.destroy();
-        } catch (eC4h) {}
-        _charts.c4 = null;
-      }
-      _charts.c4 = new Chart(elc4, {
-        type: "bar",
-        data: {
-          labels: hourLabs,
-          datasets: [
-            {
-              label: t("forensicDS_continueStack"),
-              data: hourSignalsArrayForHost(dayForHourly, mainHostKey, "continue"),
-              backgroundColor: "rgba(59,130,246,0.75)",
-              stack: "hsig"
-            },
-            {
-              label: t("forensicDS_resumeStack"),
-              data: hourSignalsArrayForHost(dayForHourly, mainHostKey, "resume"),
-              backgroundColor: "rgba(6,182,212,0.7)",
-              stack: "hsig"
-            },
-            {
-              label: t("forensicDS_retryStack"),
-              data: hourSignalsArrayForHost(dayForHourly, mainHostKey, "retry"),
-              backgroundColor: "rgba(239,68,68,0.65)",
-              stack: "hsig"
-            },
-            {
-              label: t("forensicDS_interruptStack"),
-              data: hourSignalsArrayForHost(dayForHourly, mainHostKey, "interrupt"),
-              backgroundColor: "rgba(251,191,36,0.55)",
-              stack: "hsig"
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          resizeDelay: 200,
-          animation: false,
-          transitions: __mainChartTransitions,
-          scales: {
-            x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" } },
-            y: { stacked: true, beginAtZero: true, ticks: { precision: 0 }, grid: { color: "rgba(51,65,85,0.5)" } }
-          },
-          plugins: {
-            legend: { labels: { color: "#cbd5e1", boxWidth: 12 } },
-            tooltip: {
-              callbacks: {
-                label: function (c) {
-                  return c.dataset.label + ": " + c.raw;
-                }
-              }
-            }
-          }
-        }
+    c4Leg = [t("forensicDS_continueStack"), t("forensicDS_resumeStack"), t("forensicDS_retryStack"), t("forensicDS_interruptStack")];
+    var sigColors = ['rgba(59,130,246,0.75)', 'rgba(6,182,212,0.7)', 'rgba(239,68,68,0.65)', 'rgba(251,191,36,0.55)'];
+    var sigKeys = ['continue', 'resume', 'retry', 'interrupt'];
+    for (var si4 = 0; si4 < 4; si4++) {
+      c4Series.push({ name: c4Leg[si4], type: 'bar', stack: 'sig', data: hourSignalsArrayForHost(dayForHourly, mainHostKey, sigKeys[si4]), itemStyle: { color: sigColors[si4] } });
+    }
+    _charts.c4.setOption({
+      animation: false,
+      grid: { left: 50, right: 16, top: 36, bottom: 30 },
+      legend: { data: c4Leg, textStyle: { color: '#cbd5e1' }, top: 4 },
+      tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' } },
+      xAxis: { type: 'category', data: hourLabs, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+      yAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+      series: c4Series
+    }, true);
+  } else if (c4TimelineHostStack) {
+    for (var c4i = 0; c4i < hLabs.length; c4i++) {
+      var lb4 = hLabs[c4i];
+      c4Leg.push(lb4);
+      c4Series.push({
+        name: lb4, type: 'bar', stack: 'subcache',
+        data: days.map(function (d) { var cr = d.cache_read || 0; var x = d.hosts && d.hosts[lb4]; if (!x || cr <= 0) return 0; return Math.round(((x.sub_cache || 0) / cr) * 100); }),
+        itemStyle: { color: hostBarColors[c4i % hostBarColors.length] }
       });
     }
-    if (_charts.c4) _charts.c4._dashScope = mainScope;
+    _charts.c4.setOption({
+      animation: false,
+      grid: { left: 50, right: 16, top: 36, bottom: 30 },
+      legend: { data: c4Leg, textStyle: { color: '#cbd5e1' }, top: 4 },
+      tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+        formatter: function(params) {
+          var lines = [params[0].axisValueLabel];
+          for (var pi = 0; pi < params.length; pi++) lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + params[pi].value + '%');
+          return lines.join('<br>');
+        }
+      },
+      xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+      yAxis: { type: 'value', max: 100, axisLabel: { color: '#94a3b8', formatter: '{value}%' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+      series: c4Series
+    }, true);
   } else {
-    var c4Reuse = false;
-    if (c4TimelineHostStack) {
-      c4Reuse =
-        _charts.c4 &&
-        _charts.c4.data.datasets.length === hLabs.length &&
-        _charts.c4.data.datasets[0] &&
-        _charts.c4.data.datasets[0].stack === "subcache" &&
-        (chartXLabelsMatch(_charts.c4, labels) || chartLabelsPrefixMatch(_charts.c4, labels));
-      if (c4Reuse) {
-        for (var c4j = 0; c4j < hLabs.length; c4j++) {
-          if (_charts.c4.data.datasets[c4j].label !== hLabs[c4j]) {
-            c4Reuse = false;
-            break;
-          }
-        }
-      }
-    } else {
-      c4Reuse =
-        _charts.c4 &&
-        _charts.c4.data.datasets.length === 1 &&
-        _charts.c4.data.datasets[0].label === t("chartSubCachePct") &&
-        !_charts.c4.data.datasets[0].stack &&
-        (chartXLabelsMatch(_charts.c4, labels) || chartLabelsPrefixMatch(_charts.c4, labels));
-    }
-
-    if (c4Reuse) {
-      _charts.c4.options.transitions = __mainChartTransitions;
-      _charts.c4.options.resizeDelay = 200;
-      _charts.c4.data.labels = labels.slice();
-      if (c4TimelineHostStack) {
-        for (var c4k = 0; c4k < hLabs.length; c4k++) {
-          var lbC = hLabs[c4k];
-          _charts.c4.data.datasets[c4k].data = days.map(function (d) {
-            var cr = d.cache_read || 0;
-            var x = d.hosts && d.hosts[lbC];
-            if (!x || cr <= 0) return 0;
-            return Math.round(((x.sub_cache || 0) / cr) * 100);
-          });
-        }
-      } else {
-        var dsC0 = _charts.c4.data.datasets[0];
-        dsC0.data = days.map(function (d) { return subCachePctForDayMainCharts(d, mainHostKey); });
-        dsC0.backgroundColor = days.map(function (d) {
-          var p = subCachePctForDayMainCharts(d, mainHostKey);
-          return p > 50 ? "rgba(239,68,68,0.7)" : "rgba(100,116,139,0.5)";
-        });
-      }
-      _charts.c4.update("none");
-    } else {
-      if (_charts.c4) {
-        try { _charts.c4.destroy(); } catch (eC4) {}
-        _charts.c4 = null;
-      }
-      var c4Data;
-      var c4Opts;
-      if (c4TimelineHostStack) {
-      var ds4 = [];
-      for (var c4i = 0; c4i < hLabs.length; c4i++) {
-        var lb4 = hLabs[c4i];
-        ds4.push({
-          label: lb4,
-          stack: "subcache",
-          data: days.map(function (d) {
-            var cr = d.cache_read || 0;
-            var x = d.hosts && d.hosts[lb4];
-            if (!x || cr <= 0) return 0;
-            return Math.round(((x.sub_cache || 0) / cr) * 100);
-          }),
-          backgroundColor: hostBarColors[c4i % hostBarColors.length]
-        });
-      }
-      c4Data = { labels: labels, datasets: ds4 };
-      c4Opts = {
-        responsive: true,
-        resizeDelay: 200,
-        animation: false,
-        transitions: __mainChartTransitions,
-        scales: {
-          x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" } },
-          y: { max: 100, stacked: true, ticks: { callback: function (v) { return v + "%"; } }, grid: { color: "rgba(51,65,85,0.5)" } }
-        },
-        plugins: {
-          legend: { labels: { color: "#cbd5e1" } },
-          tooltip: {
-            callbacks: {
-              label: function (c) {
-                return c.dataset.label + ": " + c.raw + "% " + t("chartTooltipSubCacheOfDay");
-              },
-              footer: function (items) {
-                if (!items.length) return "";
-                var di = items[0].dataIndex;
-                return tr("chartTooltipSubCacheStackTotal", { pct: String(days[di].sub_cache_pct) });
-              }
-            }
-          }
-        }
-      };
-    } else {
-      c4Data = {
-        labels: labels,
-        datasets: [
-          {
-            label: t("chartSubCachePct"),
-            data: days.map(function (d) { return subCachePctForDayMainCharts(d, mainHostKey); }),
-            backgroundColor: days.map(function (d) {
-              var p = subCachePctForDayMainCharts(d, mainHostKey);
-              return p > 50 ? "rgba(239,68,68,0.7)" : "rgba(100,116,139,0.5)";
-            })
-          }
-        ]
-      };
-      c4Opts = {
-        responsive: true,
-        resizeDelay: 200,
-        animation: false,
-        transitions: __mainChartTransitions,
-        scales: { y: { max: 100, ticks: { callback: function (v) { return v + "%"; } } } },
-        plugins: { tooltip: { callbacks: { label: function (c) { return c.raw + "%"; } } } }
-      };
-      }
-      _charts.c4 = new Chart(elc4, { type: "bar", data: c4Data, options: c4Opts });
-    }
-    if (_charts.c4) _charts.c4._dashScope = mainScope;
+    var c4Vals = days.map(function (d) { return subCachePctForDayMainCharts(d, mainHostKey); });
+    var c4Colors = c4Vals.map(function(p) { return p > 50 ? 'rgba(239,68,68,0.7)' : 'rgba(100,116,139,0.5)'; });
+    _charts.c4.setOption({
+      animation: false,
+      grid: { left: 50, right: 16, top: 20, bottom: 30 },
+      tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+        formatter: function(params) { return params[0].axisValueLabel + '<br>' + params[0].value + '%'; }
+      },
+      xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+      yAxis: { type: 'value', max: 100, axisLabel: { color: '#94a3b8', formatter: '{value}%' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+      series: [{ name: t("chartSubCachePct"), type: 'bar', data: c4Vals,
+        itemStyle: { color: function(params) { return c4Colors[params.dataIndex]; } } }]
+    }, true);
   }
+  _charts.c4._dashScope = mainScope;
   var crSig = document.getElementById("charts");
   if (crSig) crSig.classList.remove("has-session-row");
   
@@ -5492,11 +5032,19 @@ function __budgetResizeAll() {
     }
   }
 }
+function __mainChartsResizeAll() {
+  var keys = ['c1', 'c2', 'c3', 'c4', 'c1hosts'];
+  for (var mi = 0; mi < keys.length; mi++) {
+    if (_charts[keys[mi]] && typeof _charts[keys[mi]].resize === 'function') {
+      try { _charts[keys[mi]].resize(); } catch (e) { /* detached */ }
+    }
+  }
+}
 var __effWin = globalThis.window;
 if (__effWin) {
   __effWin.addEventListener("resize", function () {
     if (__effResizeT) clearTimeout(__effResizeT);
-    __effResizeT = setTimeout(function() { __effResizeAll(); __budgetResizeAll(); }, 120);
+    __effResizeT = setTimeout(function() { __effResizeAll(); __budgetResizeAll(); __mainChartsResizeAll(); }, 120);
   });
 }
 
