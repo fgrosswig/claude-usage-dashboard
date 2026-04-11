@@ -8412,6 +8412,7 @@ function renderEconomicSection(data, filteredDays) {
           renderCacheExplosion(session);
           renderEfficiencyTimeline(stData);
           renderBudgetDrain(stData);
+          renderEconOverhead(stData);
         }
       })
       .catch(function () {
@@ -8443,6 +8444,7 @@ function renderEconomicSection(data, filteredDays) {
           renderCacheExplosion(session);
           renderEfficiencyTimeline(_econData);
           renderBudgetDrain(_econData);
+          renderEconOverhead(_econData);
         }
       }
     });
@@ -9932,6 +9934,206 @@ function renderBudgetDrain(stData) {
       t.style.display = "none";
       b.style.display = "";
     }
+  });
+  el.style.position = "relative";
+  el.appendChild(overlay);
+}
+
+// ── Session Overhead — Heavy User Tax ────────────────────────────────
+
+function renderEconOverhead(stData) {
+  if (typeof echarts === "undefined") return;
+  var el = document.getElementById("chart-shell-econ-overhead");
+  if (!el || !stData || !stData.sessions || !stData.sessions.length) return;
+
+  var sessions = stData.sessions.slice().sort(function (a, b) { return a.first_ts < b.first_ts ? -1 : 1; });
+
+  var labels = [];      // y-axis: "S1 14:23–14:44"
+  var productive = [];  // green: output tokens
+  var warmup = [];      // yellow: initial cache_creation
+  var compaction = [];   // orange: cache_creation after compaction drops
+  var forcedRestart = [];// red: warmup cost of forced-restart sessions
+
+  var totalProductive = 0, totalWarmup = 0, totalCompaction = 0, totalForced = 0;
+
+  for (var si = 0; si < sessions.length; si++) {
+    var sess = sessions[si];
+    var turns = sess.turns || [];
+    if (!turns.length) continue;
+
+    // Session label
+    var t0 = sess.first_ts || "";
+    var t1 = sess.last_ts || "";
+    var hh0 = t0.length >= 16 ? t0.slice(11, 16) : "?";
+    var hh1 = t1.length >= 16 ? t1.slice(11, 16) : "?";
+    labels.push("S" + (si + 1) + " " + hh0 + "–" + hh1);
+
+    // Detect forced restart (gap < 5min to previous session)
+    var forced = false;
+    if (si > 0) {
+      var prevEnd = new Date(sessions[si - 1].last_ts).getTime();
+      var thisStart = new Date(sess.first_ts).getTime();
+      forced = (thisStart - prevEnd) <= 5 * 60000 && (thisStart - prevEnd) >= 0;
+    }
+
+    // Classify each turn
+    var sessOutput = 0, sessWarmup = 0, sessCompaction = 0;
+    var warmupDone = false;
+    var prevCacheRead = 0;
+
+    for (var ti = 0; ti < turns.length; ti++) {
+      var T = turns[ti];
+      var cc = T.cache_creation || 0;
+      var cr = T.cache_read || 0;
+      var out = T.output || 0;
+
+      sessOutput += out;
+
+      // Phase 1: Warmup — cache_creation dominates until cache_read > cache_creation
+      if (!warmupDone) {
+        if (cr > cc && ti > 0) {
+          warmupDone = true;
+        } else {
+          sessWarmup += cc;
+          continue;
+        }
+      }
+
+      // Phase 2: Compaction detection — cache_read drops >60% from previous turn
+      if (prevCacheRead > 10000 && cr < prevCacheRead * 0.4) {
+        // Compaction detected — count this and next few turns as rebuild
+        sessCompaction += cc;
+      } else if (sessCompaction > 0 && cc > cr) {
+        // Still rebuilding after compaction
+        sessCompaction += cc;
+      }
+
+      prevCacheRead = cr > 0 ? cr : prevCacheRead;
+    }
+
+    // For forced restarts: warmup cost goes to forced category instead
+    if (forced) {
+      productive.push(sessOutput);
+      warmup.push(0);
+      compaction.push(sessCompaction);
+      forcedRestart.push(sessWarmup);
+      totalForced += sessWarmup;
+    } else {
+      productive.push(sessOutput);
+      warmup.push(sessWarmup);
+      compaction.push(sessCompaction);
+      forcedRestart.push(0);
+      totalWarmup += sessWarmup;
+    }
+    totalProductive += sessOutput;
+    totalCompaction += sessCompaction;
+  }
+
+  var grandTotal = totalProductive + totalWarmup + totalCompaction + totalForced;
+  var overheadPct = grandTotal > 0 ? Math.round((totalWarmup + totalCompaction + totalForced) / grandTotal * 100) : 0;
+
+  // Update header with overhead percentage
+  var h3 = document.getElementById("econ-overhead-h3");
+  if (h3) h3.textContent = t("econOverheadTitle") + " — " + overheadPct + "% Overhead";
+
+  var option = {
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "shadow" },
+      formatter: function (params) {
+        if (!params || !params.length) return "";
+        var tip = '<div style="font-size:11px">' + params[0].name;
+        var total = 0;
+        for (var k = 0; k < params.length; k++) total += (params[k].value || 0);
+        for (var k = 0; k < params.length; k++) {
+          var p = params[k];
+          if (!p.value) continue;
+          var pct = total > 0 ? Math.round(p.value / total * 100) : 0;
+          tip += "<br>" + p.marker + " " + p.seriesName + ": " + fmt(p.value) + " (" + pct + "%)";
+        }
+        tip += "<br><b>Total: " + fmt(total) + "</b></div>";
+        return tip;
+      }
+    },
+    legend: {
+      data: [t("econOverheadProductive"), t("econOverheadWarmup"), t("econOverheadCompaction"), t("econOverheadForced")],
+      top: 0, right: 10,
+      textStyle: { color: "#94a3b8", fontSize: 10 },
+      itemWidth: 12, itemHeight: 8
+    },
+    grid: { left: 90, right: 20, top: 30, bottom: 20, containLabel: false },
+    xAxis: {
+      type: "value",
+      axisLabel: {
+        color: "#94a3b8", fontSize: 9,
+        formatter: function (v) { return v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : v >= 1e3 ? Math.round(v / 1e3) + "K" : v; }
+      },
+      splitLine: { lineStyle: { color: "rgba(100,116,139,0.15)" } }
+    },
+    yAxis: {
+      type: "category",
+      data: labels,
+      inverse: true,
+      axisLabel: { color: "#cbd5e1", fontSize: 9 }
+    },
+    series: [
+      {
+        name: t("econOverheadProductive"),
+        type: "bar", stack: "total",
+        data: productive,
+        itemStyle: { color: "#34d399" },
+        emphasis: { itemStyle: { color: "#6ee7b7" } }
+      },
+      {
+        name: t("econOverheadWarmup"),
+        type: "bar", stack: "total",
+        data: warmup,
+        itemStyle: { color: "#facc15" },
+        emphasis: { itemStyle: { color: "#fde047" } }
+      },
+      {
+        name: t("econOverheadCompaction"),
+        type: "bar", stack: "total",
+        data: compaction,
+        itemStyle: { color: "#f97316" },
+        emphasis: { itemStyle: { color: "#fb923c" } }
+      },
+      {
+        name: t("econOverheadForced"),
+        type: "bar", stack: "total",
+        data: forcedRestart,
+        itemStyle: { color: "#ef4444" },
+        emphasis: { itemStyle: { color: "#f87171" } }
+      }
+    ]
+  };
+
+  __effInitOrSet("econOverhead", el, option, true);
+
+  // Info overlay
+  var existingOverlay = el.querySelector(".overhead-info-overlay");
+  if (existingOverlay) existingOverlay.remove();
+
+  var infoLines = [
+    "Productive: " + fmt(totalProductive) + " (" + (grandTotal > 0 ? Math.round(totalProductive / grandTotal * 100) : 0) + "%)",
+    "Warmup: " + fmt(totalWarmup) + " (" + (grandTotal > 0 ? Math.round(totalWarmup / grandTotal * 100) : 0) + "%)",
+    "Compaction: " + fmt(totalCompaction) + " (" + (grandTotal > 0 ? Math.round(totalCompaction / grandTotal * 100) : 0) + "%)",
+    "Forced Restart: " + fmt(totalForced) + " (" + (grandTotal > 0 ? Math.round(totalForced / grandTotal * 100) : 0) + "%)",
+    "─────────────────",
+    "Total Overhead: " + overheadPct + "%"
+  ];
+
+  var overlay = document.createElement("div");
+  overlay.className = "overhead-info-overlay";
+  overlay.style.cssText = "position:absolute;right:8px;top:35px;z-index:10;cursor:pointer;user-select:none";
+  var tab = '<div class="overhead-info-tab" style="background:rgba(15,23,42,0.85);border:1px solid rgba(100,116,139,0.3);border-radius:4px 0 0 4px;padding:6px 4px;font:bold 9px monospace;color:#94a3b8;line-height:1.3;text-align:center">\u25C0<br>I<br>N<br>F<br>O</div>';
+  var box = '<div class="overhead-info-box" style="display:none;background:rgba(15,23,42,0.9);border:1px solid rgba(100,116,139,0.3);border-radius:4px;padding:6px 8px;font:10px monospace;color:#cbd5e1;white-space:pre;line-height:1.4">' + infoLines.join("\n") + ' <span style="color:#64748b">\u25B6</span></div>';
+  overlay.innerHTML = tab + box;
+  overlay.addEventListener("click", function () {
+    var tt = overlay.querySelector(".overhead-info-tab");
+    var bb = overlay.querySelector(".overhead-info-box");
+    if (tt.style.display === "none") { tt.style.display = ""; bb.style.display = "none"; }
+    else { tt.style.display = "none"; bb.style.display = ""; }
   });
   el.style.position = "relative";
   el.appendChild(overlay);

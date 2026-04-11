@@ -500,5 +500,11 @@
   "econBurnZoneLine2": "비례적 가치 없이.",
   "econBurnZoneLine3": "세션 분할로 60\u201375% 절약.",
   "econCompactionLabel": "\u26a1 압축 리빌드",
-  "econCompactionDetail": "캐시 무효화 + 재구축"
+  "econCompactionDetail": "캐시 무효화 + 재구축",
+  "econOverheadTitle": "세션 오버헤드 — 헤비 유저 세금",
+  "econOverheadBlurb": "세션별 분석: 생산적 출력 vs. 워밍업, 압축 리빌드, 강제 재시작 오버헤드. 헤비 유저는 할당량 예산의 23\u201353%를 구조적 오버헤드로 잃습니다.",
+  "econOverheadProductive": "생산적 출력",
+  "econOverheadWarmup": "캐시 워밍업",
+  "econOverheadCompaction": "압축 리빌드",
+  "econOverheadForced": "강제 재시작"
 }

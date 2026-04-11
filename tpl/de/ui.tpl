@@ -500,5 +500,11 @@
   "econBurnZoneLine2": "ohne proportionalen Mehrwert.",
   "econBurnZoneLine3": "Session splitten spart 60\u201375%.",
   "econCompactionLabel": "\u26a1 Compaction Rebuild",
-  "econCompactionDetail": "Cache invalidiert + neu geschrieben"
+  "econCompactionDetail": "Cache invalidiert + neu geschrieben",
+  "econOverheadTitle": "Session Overhead — Heavy User Tax",
+  "econOverheadBlurb": "Aufschluesselung pro Session: produktiver Output vs. Warmup, Compaction-Rebuild und Forced-Restart-Overhead. Heavy User verlieren 23\u201353% ihres Quota-Budgets an strukturellen Overhead.",
+  "econOverheadProductive": "Produktiver Output",
+  "econOverheadWarmup": "Cache Warmup",
+  "econOverheadCompaction": "Compaction Rebuild",
+  "econOverheadForced": "Forced Restart"
 }
