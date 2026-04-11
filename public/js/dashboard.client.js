@@ -8604,23 +8604,20 @@ function renderWasteCurve(session) {
   var yMin = fitMin < 0 ? Math.round(fitMin * 1.2) : undefined;
 
   // Check if session day had hit limits + detect forced restart gap
-  var sessionDate = session.first_ts ? session.first_ts.slice(0, 10) : "";
+  var sessionDate = session.first_ts?.slice(0, 10) || "";
   var dayHitLimit = 0;
-  var _udata = typeof __lastUsageData !== "undefined" ? __lastUsageData : null;
-  if (sessionDate && _udata && _udata.days) {
-    for (var di = 0; di < _udata.days.length; di++) {
-      if (_udata.days[di].date === sessionDate) { dayHitLimit = _udata.days[di].hit_limit || 0; break; }
-    }
+  var _udata = globalThis.__lastUsageData || null;
+  if (sessionDate && _udata?.days) {
+    var _matchDay = _udata.days.find(function (d) { return d.date === sessionDate; });
+    if (_matchDay) dayHitLimit = _matchDay.hit_limit || 0;
   }
   var _nextGapMin = -1;
-  if (_econData && _econData.sessions && session.last_ts) {
+  if (_econData?.sessions && session.last_ts) {
     var lastMs = new Date(session.last_ts).getTime();
     var minGap = Infinity;
-    for (var ni = 0; ni < _econData.sessions.length; ni++) {
-      var ns = _econData.sessions[ni];
-      if (ns.session_id_hash === session.session_id_hash) continue;
-      var startMs = new Date(ns.first_ts).getTime();
-      var gap = startMs - lastMs;
+    for (var ni of _econData.sessions) {
+      if (ni.session_id_hash === session.session_id_hash) continue;
+      var gap = new Date(ni.first_ts).getTime() - lastMs;
       if (gap > 0 && gap < minGap) minGap = gap;
     }
     if (minGap < Infinity) _nextGapMin = Math.round(minGap / 60000);
@@ -8699,8 +8696,18 @@ function renderWasteCurve(session) {
               coord: [n, cumTotal[n - 1]],
               symbol: "circle",
               symbolSize: 10,
-              itemStyle: { color: _forcedRestart ? "#ef4444" : dayHitLimit > 0 ? "#f59e0b" : "#3b82f6", shadowBlur: 6, shadowColor: _forcedRestart ? "rgba(239,68,68,0.5)" : dayHitLimit > 0 ? "rgba(245,158,11,0.5)" : "rgba(59,130,246,0.5)" },
-              label: { show: true, formatter: _forcedRestart ? "Forced End (" + _nextGapMin + "min)" : dayHitLimit > 0 ? "Session End (Limit Day)" : "Session End", position: "top", color: _forcedRestart ? "#f87171" : dayHitLimit > 0 ? "#fbbf24" : "#93c5fd", fontSize: 10 }
+              itemStyle: (function () {
+                var c = "#3b82f6", sc = "rgba(59,130,246,0.5)";
+                if (_forcedRestart) { c = "#ef4444"; sc = "rgba(239,68,68,0.5)"; }
+                else if (dayHitLimit > 0) { c = "#f59e0b"; sc = "rgba(245,158,11,0.5)"; }
+                return { color: c, shadowBlur: 6, shadowColor: sc };
+              })(),
+              label: (function () {
+                var txt = "Session End", col = "#93c5fd";
+                if (_forcedRestart) { txt = "Forced End (" + _nextGapMin + "min)"; col = "#f87171"; }
+                else if (dayHitLimit > 0) { txt = "Session End (Limit Day)"; col = "#fbbf24"; }
+                return { show: true, formatter: txt, position: "top", color: col, fontSize: 10 };
+              })()
             }
           ].filter(Boolean)
         },
@@ -8943,19 +8950,17 @@ function renderCacheExplosion(session) {
   var _isRebuiltSession = false;
   var _rebuildTurns = 0;
   var _rebuildCostExp = 0;
-  var _udataExp = typeof __lastUsageData !== "undefined" ? __lastUsageData : null;
-  var _sessionDateExp = session.first_ts ? session.first_ts.slice(0, 10) : "";
+  var _udataExp = globalThis.__lastUsageData || null;
+  var _sessionDateExp = session.first_ts?.slice(0, 10) || "";
   var _dayHitExp = 0;
-  if (_sessionDateExp && _udataExp && _udataExp.days) {
-    for (var dhi = 0; dhi < _udataExp.days.length; dhi++) {
-      if (_udataExp.days[dhi].date === _sessionDateExp) { _dayHitExp = _udataExp.days[dhi].hit_limit || 0; break; }
-    }
+  if (_sessionDateExp && _udataExp?.days) {
+    var _matchDayExp = _udataExp.days.find(function (d) { return d.date === _sessionDateExp; });
+    if (_matchDayExp) _dayHitExp = _matchDayExp.hit_limit || 0;
   }
-  if (_dayHitExp > 0 && _econData && _econData.sessions && session.first_ts) {
+  if (_dayHitExp > 0 && _econData?.sessions && session.first_ts) {
     var _thisStart = new Date(session.first_ts).getTime();
     var _prevGap = Infinity;
-    for (var pi = 0; pi < _econData.sessions.length; pi++) {
-      var _ps = _econData.sessions[pi];
+    for (var _ps of _econData.sessions) {
       if (_ps.session_id_hash === session.session_id_hash) continue;
       var _pEnd = new Date(_ps.last_ts).getTime();
       var _pg = _thisStart - _pEnd;
