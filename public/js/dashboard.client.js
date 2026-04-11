@@ -5137,7 +5137,12 @@ function aggregateHourlyLatency(proxyDays) {
     avgData.push(a?.count > 0 ? Math.round(a.sum / a.count) : 0);
     maxData.push(a?.max || 0);
   }
-  return { labels: labels, avgData: avgData, maxData: maxData };
+  var nonZeroMax = maxData.filter(function(v) { return v > 0; }).sort(function(a, b) { return a - b; });
+  var avgMean = avgData.reduce(function(s, v) { return s + v; }, 0) / (avgData.length || 1);
+  var actualMax = nonZeroMax.length ? nonZeroMax[nonZeroMax.length - 1] : 0;
+  var p95 = nonZeroMax.length ? nonZeroMax[Math.floor(nonZeroMax.length * 0.95)] : 0;
+  var yCap = (p95 > 0 && actualMax > avgMean * 5) ? Math.ceil(p95 * 1.3) : undefined;
+  return { labels: labels, avgData: avgData, maxData: maxData, yCap: yCap };
 }
 
 function renderProxyHourlyLatency(data) {
@@ -5150,9 +5155,15 @@ function renderProxyHourlyLatency(data) {
   chartShellSetLoading("c-proxy-hourly-latency", false);
   if (!_proxyCharts.hourlyLatency) _proxyCharts.hourlyLatency = echarts.init(el, null, { renderer: 'canvas' });
   function fmtMs(v) { return v >= 1000 ? (v/1000).toFixed(1) + "s" : Math.round(v) + "ms"; }
+  var yOpts = { type: 'value', min: 0, axisLabel: { color: '#94a3b8', formatter: function(v) { return fmtMs(v); } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } };
+  if (ld.yCap) yOpts.max = ld.yCap;
+  var maxSeries = { name: t("proxyDSMaxLatency"), type: 'bar', data: ld.maxData, barGap: '-100%', z: 1, itemStyle: { color: 'rgba(239,68,68,0.25)', borderRadius: [2, 2, 0, 0] } };
+  if (ld.yCap) {
+    maxSeries.markLine = { silent: true, symbol: 'none', data: [{ yAxis: ld.yCap, lineStyle: { color: '#ef4444', type: 'dashed', width: 1 }, label: { show: true, position: 'insideEndTop', color: '#ef4444', fontSize: 9, formatter: 'outlier cap ' + fmtMs(ld.yCap) } }] };
+  }
   _proxyCharts.hourlyLatency.setOption({
     animation: false,
-    grid: { left: 60, right: 16, top: 36, bottom: 30 },
+    grid: { left: 60, right: 16, top: 36, bottom: 38 },
     legend: { data: [t("proxyDSAvgLatency"), t("proxyDSMaxLatency")], textStyle: { color: '#cbd5e1' }, top: 4 },
     tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
       formatter: function(params) {
@@ -5161,10 +5172,10 @@ function renderProxyHourlyLatency(data) {
         return lines.join('<br>');
       }
     },
-    xAxis: { type: 'category', data: ld.labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
-    yAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8', formatter: function(v) { return fmtMs(v); } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    xAxis: { type: 'category', data: ld.labels, axisLabel: { color: '#94a3b8', fontSize: 10, rotate: 0 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: yOpts,
     series: [
-      { name: t("proxyDSMaxLatency"), type: 'bar', data: ld.maxData, barGap: '-100%', z: 1, itemStyle: { color: 'rgba(239,68,68,0.25)', borderRadius: [2, 2, 0, 0] } },
+      maxSeries,
       { name: t("proxyDSAvgLatency"), type: 'bar', data: ld.avgData, z: 2, itemStyle: { color: 'rgba(59,130,246,0.7)', borderRadius: [2, 2, 0, 0] } }
     ]
   }, true);
