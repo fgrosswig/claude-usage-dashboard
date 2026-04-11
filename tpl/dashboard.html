@@ -157,15 +157,17 @@
 <div class="grid" id="forensic-cards"></div>
 <div class="forensic-charts-stack" id="forensic-charts-stack">
 <div class="forensic-charts-host-scope">
-<!-- Row 1: Forensic & Hit Limit (full width) -->
-<div class="chart-box">
-<h3 id="forensic-chart-h3">Forensic &amp; Hit Limit pro Tag</h3>
+<!-- Row 1: Forensic & Hit Limit (full width, collapsible) -->
+<details class="forensic-chart-disclosure">
+<summary class="forensic-chart-summary"><span id="forensic-chart-h3">Forensic &amp; Hit Limit pro Tag</span></summary>
+<div class="forensic-chart-panel">
 <p id="forensic-chart-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"><strong style="color:#ef4444">Rot (Balken)</strong> = Hit-Limit-Zeilen in JSONL. <strong style="color:#f59e0b">Linie</strong> = Score 3=? · 2=HIT · 1=&lt;&lt;P.</p>
 <div class="chart-shell chart-shell--forensic is-loading" id="chart-shell-forensic">
 <div class="chart-shell-ph" aria-hidden="true"></div>
-<div id="c-forensic" style="width:100%;min-height:340px"></div>
+<div id="c-forensic" style="width:100%;min-height:420px"></div>
 </div>
 </div>
+</details>
 </div>
 <!-- Row 2: Session-Signale + Service Impact (side by side) -->
 <div class="forensic-charts-pair">

@@ -2614,6 +2614,16 @@ function renderDashboardCore(data) {
     } finally {
       chartShellSetLoading("c-forensic", false);
     }
+    // Resize on disclosure toggle (ECharts needs non-zero container)
+    var forensicDisc = elF.closest('.forensic-chart-disclosure');
+    if (forensicDisc && !forensicDisc.dataset.bound) {
+      forensicDisc.dataset.bound = '1';
+      forensicDisc.addEventListener('toggle', function() {
+        if (forensicDisc.open && _charts.cForensic) {
+          setTimeout(function() { _charts.cForensic.resize(); }, 50);
+        }
+      });
+    }
   }
 
   // ─── Forensic: Session Signals Stacked + Cache Read Line — ECharts ───
