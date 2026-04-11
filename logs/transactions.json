@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-158",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "56c569a",
+      "commit_full": "56c569a765b3ce6dd4a5c14a65b2b4d62dca2719",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(user-profile): ECharts div height:100% instead of min-height:300px",
+      "detail": "Charts now fill their JS-computed host height instead of having a fixed\nmin-height that conflicts with the container sizing.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-157",
       "timestamp": "2026-04-12",
       "session": "auto",
