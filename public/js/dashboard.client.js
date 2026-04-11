@@ -8370,11 +8370,28 @@ function renderEconomicSection(data, filteredDays) {
   if (dB) dB.textContent = t("econDayCompareBlurb");
   if (exB) exB.textContent = t("econExplosionBlurb");
 
-  // These render immediately from cached data (no server call)
+  // Range charts: render on toggle open (collapsed by default)
   var econDays = filteredDays || data.days || [];
-  renderDayComparison(econDays);
-  initButterflyToggle();
-  renderMonthlyButterfly(econDays);
+  var rangeCollapse = document.getElementById("econ-range-collapse");
+  function _renderRangeCharts() {
+    renderDayComparison(econDays);
+    initButterflyToggle();
+    renderMonthlyButterfly(econDays);
+    renderEfficiencyTimeline(_econData);
+  }
+  if (rangeCollapse) {
+    if (rangeCollapse.open) _renderRangeCharts();
+    if (!rangeCollapse.dataset.bound) {
+      rangeCollapse.dataset.bound = "1";
+      rangeCollapse.addEventListener("toggle", function () {
+        if (rangeCollapse.open) _renderRangeCharts();
+      });
+    }
+  } else {
+    renderDayComparison(econDays);
+    initButterflyToggle();
+    renderMonthlyButterfly(econDays);
+  }
 
   // Session-turn charts: lazy-load only when section is opened
   function fetchSessionTurns() {
@@ -8394,6 +8411,7 @@ function renderEconomicSection(data, filteredDays) {
           renderWasteCurve(session);
           renderCacheExplosion(session);
           renderEfficiencyTimeline(stData);
+          renderBudgetDrain(stData);
         }
       })
       .catch(function () {
@@ -8424,8 +8442,19 @@ function renderEconomicSection(data, filteredDays) {
           renderWasteCurve(session);
           renderCacheExplosion(session);
           renderEfficiencyTimeline(_econData);
+          renderBudgetDrain(_econData);
         }
       }
+    });
+  }
+
+  // Re-fetch session data when day-picker changes
+  if (mainPicker2 && !mainPicker2.dataset.econBound) {
+    mainPicker2.dataset.econBound = "1";
+    mainPicker2.addEventListener("change", function () {
+      _econData = null;
+      if (sumEl) sumEl.textContent = "Loading sessions…";
+      if (collapse.open) setTimeout(fetchSessionTurns, 50);
     });
   }
 
@@ -8555,22 +8584,48 @@ function renderWasteCurve(session) {
     }
   }
 
-  // Find wall turn (2× current total)
-  var wallTurn = -1;
+  // Find burn start: turn where projected cumulative hits 1.5× current total
   var currentTotal = cumTotal[n - 1];
+  var burnThresh = currentTotal * 1.5;
+  var burnStart = -1;
   for (var wi = n; wi < totalTurns; wi++) {
-    if (fitPairs[wi][1] >= currentTotal * 2) {
-      wallTurn = wi + 1;
+    if (fitPairs[wi] && fitPairs[wi][1] >= burnThresh) {
+      burnStart = wi + 1;
       break;
     }
   }
-  var remainLabel = wallTurn > 0 ? "~" + (wallTurn - n) + " turns to 2\u00d7" : "";
+  var wallTurn = burnStart;
+  var remainLabel = wallTurn > 0 ? "~" + (wallTurn - n) + " turns to burn" : "";
 
   // Zero crossing turn
   var disc = b * b - 4 * a * c;
   var zeroCross = disc > 0 ? Math.round((-b + Math.sqrt(disc)) / (2 * a)) : -1;
 
   var yMin = fitMin < 0 ? Math.round(fitMin * 1.2) : undefined;
+
+  // Check if session day had hit limits + detect forced restart gap
+  var sessionDate = session.first_ts ? session.first_ts.slice(0, 10) : "";
+  var dayHitLimit = 0;
+  var _udata = typeof __lastUsageData !== "undefined" ? __lastUsageData : null;
+  if (sessionDate && _udata && _udata.days) {
+    for (var di = 0; di < _udata.days.length; di++) {
+      if (_udata.days[di].date === sessionDate) { dayHitLimit = _udata.days[di].hit_limit || 0; break; }
+    }
+  }
+  var _nextGapMin = -1;
+  if (_econData && _econData.sessions && session.last_ts) {
+    var lastMs = new Date(session.last_ts).getTime();
+    var minGap = Infinity;
+    for (var ni = 0; ni < _econData.sessions.length; ni++) {
+      var ns = _econData.sessions[ni];
+      if (ns.session_id_hash === session.session_id_hash) continue;
+      var startMs = new Date(ns.first_ts).getTime();
+      var gap = startMs - lastMs;
+      if (gap > 0 && gap < minGap) minGap = gap;
+    }
+    if (minGap < Infinity) _nextGapMin = Math.round(minGap / 60000);
+  }
+  var _forcedRestart = dayHitLimit > 0 && _nextGapMin >= 0 && _nextGapMin <= 5;
 
   var option = {
     tooltip: {
@@ -8607,16 +8662,13 @@ function renderWasteCurve(session) {
       }
     },
     legend: { top: 4, textStyle: { color: "#94a3b8", fontSize: 11 } },
-    grid: { top: 40, right: "5%", bottom: "10%", left: "5%", containLabel: true },
+    grid: { top: 50, right: 20, bottom: 40, left: 60 },
     xAxis: {
       type: "value",
       min: 1,
       max: totalTurns,
-      name: "Turn",
-      nameLocation: "end",
-      nameTextStyle: { color: "#64748b", fontSize: 10 },
       axisLine: { show: true, onZero: true, lineStyle: { color: "#94a3b8", width: 2 } },
-      axisLabel: { color: "#64748b" },
+      axisLabel: { color: "#64748b", fontSize: 9 },
       splitLine: { show: false }
     },
     yAxis: {
@@ -8647,8 +8699,8 @@ function renderWasteCurve(session) {
               coord: [n, cumTotal[n - 1]],
               symbol: "circle",
               symbolSize: 10,
-              itemStyle: { color: "#3b82f6", shadowBlur: 6, shadowColor: "rgba(59,130,246,0.5)" },
-              label: { show: false }
+              itemStyle: { color: _forcedRestart ? "#ef4444" : dayHitLimit > 0 ? "#f59e0b" : "#3b82f6", shadowBlur: 6, shadowColor: _forcedRestart ? "rgba(239,68,68,0.5)" : dayHitLimit > 0 ? "rgba(245,158,11,0.5)" : "rgba(59,130,246,0.5)" },
+              label: { show: true, formatter: _forcedRestart ? "Forced End (" + _nextGapMin + "min)" : dayHitLimit > 0 ? "Session End (Limit Day)" : "Session End", position: "top", color: _forcedRestart ? "#f87171" : dayHitLimit > 0 ? "#fbbf24" : "#93c5fd", fontSize: 10 }
             }
           ].filter(Boolean)
         },
@@ -8661,17 +8713,30 @@ function renderWasteCurve(session) {
             label: { show: false }
           }]
         } : undefined,
-        // Burn Zone: red area from wallTurn to end
-        markArea: wallTurn > 0 ? {
-          silent: false,
-          itemStyle: { color: "rgba(239,68,68,0.07)" },
-          label: { show: true, formatter: "Burn Zone", color: "rgba(239,68,68,0.4)", fontSize: 11, position: "insideTop" },
-          emphasis: {
-            itemStyle: { color: "rgba(239,68,68,0.2)" },
-            label: { color: "#ef4444", fontSize: 13, fontWeight: "bold" }
-          },
-          data: [[{ xAxis: wallTurn }, { xAxis: totalTurns }]]
-        } : undefined
+        markArea: (function () {
+          var areas = [];
+          // Safe Headroom: yellow zone between session end and burn zone
+          if (wallTurn > 0 && wallTurn > n + 1) {
+            areas.push([
+              { xAxis: n, name: "Safe (" + (wallTurn - n) + " turns)", itemStyle: { color: "rgba(250,204,21,0.10)" }, label: { color: "rgba(250,204,21,0.5)" } },
+              { xAxis: wallTurn }
+            ]);
+          }
+          // Burn Zone: red area from wallTurn to end
+          if (wallTurn > 0) {
+            areas.push([
+              { xAxis: wallTurn, name: "Burn Zone", itemStyle: { color: "rgba(239,68,68,0.12)" }, label: { color: "rgba(239,68,68,0.4)" } },
+              { xAxis: totalTurns }
+            ]);
+          }
+          if (!areas.length) return undefined;
+          return {
+            silent: false,
+            label: { show: true, color: "rgba(148,163,184,0.6)", fontSize: 11, position: "insideTop" },
+            emphasis: { label: { fontSize: 13, fontWeight: "bold" } },
+            data: areas
+          };
+        })()
       },
       {
         name: "Total (actual)",
@@ -8698,39 +8763,72 @@ function renderWasteCurve(session) {
   var infoLines = [];
   if (fitMin < 0) infoLines.push("\u26a0 Warmup: " + fmt(fitMin));
   if (zeroCross > 0) infoLines.push("\u25cf Break-even: Turn " + zeroCross);
-  infoLines.push("\u25b2 You: Turn " + n + " (" + fmt(cumTotal[n - 1]) + ")");
+  infoLines.push("\u25b2 Session End: Turn " + n + " (" + fmt(cumTotal[n - 1]) + ")");
+  if (_forcedRestart) {
+    // Find next session's warmup cost (first 10 turns total tokens)
+    var _nextSession = null;
+    if (_econData && _econData.sessions && session.last_ts) {
+      var _lastMs = new Date(session.last_ts).getTime();
+      var _bestGap = Infinity;
+      for (var nsi = 0; nsi < _econData.sessions.length; nsi++) {
+        var _ns = _econData.sessions[nsi];
+        if (_ns.session_id_hash === session.session_id_hash) continue;
+        var _g = new Date(_ns.first_ts).getTime() - _lastMs;
+        if (_g > 0 && _g < _bestGap) { _bestGap = _g; _nextSession = _ns; }
+      }
+    }
+    var rebuildCost = 0;
+    if (_nextSession && _nextSession.turns) {
+      var warmupN = Math.min(10, _nextSession.turns.length);
+      for (var wi2 = 0; wi2 < warmupN; wi2++) {
+        var wt = _nextSession.turns[wi2];
+        rebuildCost += (wt.input || 0) + (wt.output || 0) + (wt.cache_read || 0) + (wt.cache_creation || 0);
+      }
+    }
+    // Waste = rebuild cost + lost safe headroom (tokens you paid to build context but can't use)
+    var lastTurnCost = n > 1 ? cumTotal[n - 1] - cumTotal[n - 2] : cumTotal[0];
+    var contextInvestment = cumTotal[n - 1] - (n * cumTotal[0]); // tokens above baseline = context you built
+    infoLines.push("\u26a0 Forced End \u2192 " + _nextGapMin + "min \u2192 cold restart");
+    infoLines.push("\u274c Context lost: " + fmt(contextInvestment));
+    infoLines.push("\u274c Rebuild cost: " + fmt(rebuildCost));
+  } else if (dayHitLimit > 0) {
+    infoLines.push("\u26a0 Limit Day (" + dayHitLimit + "\u00d7 hits)");
+  }
   var costFactor = n > 1 ? ((actualPairs[n - 1][1] / n) / (actualPairs[0][1])).toFixed(1) : "?";
   infoLines.push("\u00d7 Cost Factor: " + costFactor + "\u00d7");
-  if (wallTurn > 0) infoLines.push("\u26d4 " + remainLabel);
-
-  option.graphic = [{
-    type: "group",
-    right: 60,
-    top: 28,
-    silent: false,
-    children: [{
-      type: "rect",
-      shape: { width: 200, height: 10 + infoLines.length * 16, r: 6 },
-      style: {
-        fill: "rgba(15,23,42,0.92)",
-        stroke: "rgba(59,130,246,0.5)",
-        lineWidth: 1,
-        shadowBlur: 10,
-        shadowColor: "rgba(59,130,246,0.3)"
-      }
-    }, {
-      type: "text",
-      style: {
-        text: infoLines.join("\n"),
-        fill: "#e2e8f0",
-        font: "11px monospace",
-        x: 10,
-        y: 6
-      }
-    }]
-  }];
+  if (wallTurn > 0 && wallTurn > n) {
+    var safeTokens = Math.round(a * (wallTurn - 1) * (wallTurn - 1) + b * (wallTurn - 1) + c) - cumTotal[n - 1];
+    infoLines.push("\u2705 Safe: " + (wallTurn - n) + " turns (" + fmt(safeTokens) + ")");
+    infoLines.push("\u26d4 " + remainLabel);
+  } else if (wallTurn > 0) {
+    infoLines.push("\u26d4 in burn zone");
+  }
 
   __effInitOrSet("econWaste", el, option, true);
+
+  // HTML overlay for collapsible info box
+  var existingWasteOverlay = el.querySelector(".waste-info-overlay");
+  if (existingWasteOverlay) existingWasteOverlay.remove();
+
+  var wasteOverlay = document.createElement("div");
+  wasteOverlay.className = "waste-info-overlay";
+  wasteOverlay.style.cssText = "position:absolute;left:8px;top:8px;z-index:10;cursor:pointer;user-select:none";
+  var wasteTab = '<div class="waste-info-tab" style="background:rgba(15,23,42,0.85);border:1px solid rgba(59,130,246,0.3);border-radius:4px;padding:4px 6px;font:bold 9px monospace;color:#93c5fd">\u25bc INFO</div>';
+  var wasteBox = '<div class="waste-info-box" style="display:none;background:rgba(15,23,42,0.92);border:1px solid rgba(59,130,246,0.4);border-radius:6px;padding:6px 10px;font:10px monospace;color:#e2e8f0;white-space:pre;line-height:1.5;box-shadow:0 0 10px rgba(59,130,246,0.2)">' + infoLines.join("\n") + '</div>';
+  wasteOverlay.innerHTML = wasteTab + wasteBox;
+  wasteOverlay.addEventListener("click", function () {
+    var wt = wasteOverlay.querySelector(".waste-info-tab");
+    var wb = wasteOverlay.querySelector(".waste-info-box");
+    if (wt.style.display === "none") {
+      wt.style.display = "";
+      wb.style.display = "none";
+    } else {
+      wt.style.display = "none";
+      wb.style.display = "";
+    }
+  });
+  el.style.position = "relative";
+  el.appendChild(wasteOverlay);
 }
 
 function renderCacheExplosion(session) {
@@ -8773,15 +8871,6 @@ function renderCacheExplosion(session) {
   var threshYellow = baseline * 1.5;
   var threshRed = baseline * 3;
 
-  // 5. Find split point: first turn where fit exceeds 3× baseline
-  var splitTurn = -1;
-  for (var si = 0; si < n; si++) {
-    var fitted = a * si * si + b * si + c;
-    if (fitted > threshRed && si > baseN) {
-      splitTurn = si;
-      break;
-    }
-  }
 
   // 6. Detect compaction events
   var compactions = [];
@@ -8850,6 +8939,39 @@ function renderCacheExplosion(session) {
     });
   }
 
+  // 7c. Detect if THIS session is a forced restart (previous session ended by hit limit)
+  var _isRebuiltSession = false;
+  var _rebuildTurns = 0;
+  var _rebuildCostExp = 0;
+  var _udataExp = typeof __lastUsageData !== "undefined" ? __lastUsageData : null;
+  var _sessionDateExp = session.first_ts ? session.first_ts.slice(0, 10) : "";
+  var _dayHitExp = 0;
+  if (_sessionDateExp && _udataExp && _udataExp.days) {
+    for (var dhi = 0; dhi < _udataExp.days.length; dhi++) {
+      if (_udataExp.days[dhi].date === _sessionDateExp) { _dayHitExp = _udataExp.days[dhi].hit_limit || 0; break; }
+    }
+  }
+  if (_dayHitExp > 0 && _econData && _econData.sessions && session.first_ts) {
+    var _thisStart = new Date(session.first_ts).getTime();
+    var _prevGap = Infinity;
+    for (var pi = 0; pi < _econData.sessions.length; pi++) {
+      var _ps = _econData.sessions[pi];
+      if (_ps.session_id_hash === session.session_id_hash) continue;
+      var _pEnd = new Date(_ps.last_ts).getTime();
+      var _pg = _thisStart - _pEnd;
+      if (_pg > 0 && _pg < _prevGap) _prevGap = _pg;
+    }
+    if (_prevGap < 5 * 60000) { // previous session ended < 5 min before this one started
+      _isRebuiltSession = true;
+      // Find rebuild zone: turns until cost stabilizes below baseline * 1.5
+      for (var ri = 0; ri < Math.min(50, n); ri++) {
+        _rebuildCostExp += cost[ri];
+        if (ri > 3 && cost[ri] <= baseline * 1.2) { _rebuildTurns = ri + 1; break; }
+      }
+      if (_rebuildTurns === 0) _rebuildTurns = Math.min(10, n);
+    }
+  }
+
   // 8. Zone label helpers
   var warmupLabel = t("econExplosionWarmup") || "Warmup";
   var linearLabel = t("econExplosionLinear") || "Linear";
@@ -8866,23 +8988,16 @@ function renderCacheExplosion(session) {
      { yAxis: yMax }]
   ];
 
-  // 9. Split markLine
-  var splitLabel = "";
-  var markLineData = [];
-  if (splitTurn > 0) {
-    splitLabel = tr("econExplosionSplitAt", { turn: splitTurn + 1 }) || "Split at turn " + (splitTurn + 1);
-    markLineData.push({
-      xAxis: splitTurn,
-      label: {
-        formatter: splitLabel,
-        color: "#ef4444",
-        fontSize: 10,
-        position: "insideEndTop"
-      }
-    });
+  // 8b. Rebuild zone overlay (vertical band for first N turns if forced restart)
+  if (_isRebuiltSession && _rebuildTurns > 0) {
+    markAreaData.push([
+      { xAxis: 0, name: "Rebuild (" + fmt(_rebuildCostExp) + ")", itemStyle: { color: "rgba(245,158,11,0.12)" }, label: { color: "rgba(245,158,11,0.6)", fontSize: 10, position: "insideTop" } },
+      { xAxis: _rebuildTurns }
+    ]);
   }
 
-  // 10. Zone threshold lines
+  // 9. Zone threshold lines
+  var markLineData = [];
   markLineData.push(
     {
       yAxis: threshYellow,
@@ -8914,9 +9029,12 @@ function renderCacheExplosion(session) {
           );
         }
         if (isCompaction[idx]) {
+          var prevCR2 = idx > 0 ? (turns[idx - 1].cache_read || 0) : 0;
+          var curCR2 = turns[idx].cache_read || 0;
+          var lossP = prevCR2 > 0 ? Math.round((1 - curCR2 / prevCR2) * 100) : 0;
           lines.push(
             "<span style='color:#a855f7'>" + t("econCompactionLabel") + "</span>",
-            "<span style='color:#a855f7'>" + t("econCompactionDetail") + "</span>"
+            "<span style='color:#38bdf8'>Context lost: " + lossP + "% (" + fmt(prevCR2) + " \u2192 " + fmt(curCR2) + ")</span>"
           );
         } else {
           lines.push("Zone: " + zone);
@@ -8930,15 +9048,27 @@ function renderCacheExplosion(session) {
     legend: {
       top: 4,
       textStyle: { color: "#94a3b8", fontSize: 11 },
-      data: ["Cost / Turn", "Quadratic Fit"]
+      data: ["Cost / Turn", "Quadratic Fit", "Context Size", "Cost Factor"],
+      tooltip: {
+        show: true,
+        formatter: function (p) {
+          var tips = {
+            "Cost / Turn": "Token cost per turn. Background zones: Green = cheap (< 1.5\u00d7 baseline), Yellow = linear growth (1.5\u20133\u00d7), Red = quadratic drain (> 3\u00d7)",
+            "Quadratic Fit": "Least-squares quadratic curve fitted to per-turn costs. Shows the acceleration trend.",
+            "Context Size": "Cache read size relative to peak. Drops = compaction events where 78\u201391% of context is lost and must be rebuilt.",
+            "Cost Factor": "Current turn cost divided by first turn cost. Shows how much more expensive each turn has become."
+          };
+          return tips[p.name] || "";
+        }
+      }
     },
-    grid: { top: 40, right: 20, bottom: 30, left: 60 },
+    grid: { top: 50, right: 20, bottom: 40, left: 60 },
     xAxis: {
       type: "category",
       data: xData,
-      name: "Turn",
       axisLabel: {
         color: "#64748b",
+        fontSize: 9,
         interval: function (idx) { return idx % Math.ceil(n / 20) === 0; }
       },
       splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
@@ -8952,9 +9082,9 @@ function renderCacheExplosion(session) {
       {
         type: "value",
         position: "right",
-        axisLabel: { color: "#3b82f6", formatter: function (v) { return v.toFixed(0) + "\u00d7"; } },
+        axisLabel: { color: "#ec4899", fontSize: 9, inside: true, formatter: function (v) { return v.toFixed(0) + "\u00d7"; } },
         splitLine: { show: false },
-        axisLine: { show: true, lineStyle: { color: "rgba(59,130,246,0.3)" } }
+        axisLine: { show: true, lineStyle: { color: "rgba(236,72,153,0.3)" } }
       }
     ],
     series: [
@@ -8981,13 +9111,53 @@ function renderCacheExplosion(session) {
         z: 5
       },
       {
+        name: "Context Size",
+        type: "line",
+        yAxisIndex: 1,
+        lineStyle: { color: "rgba(56,189,248,0.5)", width: 1, type: "dotted" },
+        areaStyle: { color: "rgba(56,189,248,0.05)" },
+        symbol: "none",
+        data: (function () {
+          // Cache health: cache_read / (cache_read + cache_creation) scaled to right axis
+          return turns.map(function (T) {
+            var cIO = (T.cache_read || 0) + (T.cache_creation || 0);
+            var health = cIO > 0 ? (T.cache_read || 0) / cIO : 0;
+            return +(health * 15).toFixed(1);
+          });
+        })(),
+        z: 2
+      },
+      {
         name: "Cost Factor",
         type: "line",
         yAxisIndex: 1,
-        lineStyle: { color: "rgba(59,130,246,0.6)", width: 1.5 },
+        lineStyle: { color: "rgba(236,72,153,0.6)", width: 1.5 },
         symbol: "none",
         data: cost.map(function (v) { return +(v / (cost[0] || 1)).toFixed(1); }),
         z: 4
+      },
+      {
+        name: "Context Loss",
+        type: "scatter",
+        yAxisIndex: 1,
+        symbol: "circle",
+        symbolSize: 10,
+        itemStyle: { color: "#38bdf8", borderColor: "#fff", borderWidth: 1.5 },
+        z: 15,
+        data: (function () {
+          var pts = [];
+          for (var cl2 = 1; cl2 < n; cl2++) {
+            var prevCR = turns[cl2 - 1].cache_read || 0;
+            var curCR = turns[cl2].cache_read || 0;
+            if (prevCR > 10000 && curCR < prevCR * 0.5) {
+              var cIO = curCR + (turns[cl2].cache_creation || 0);
+              var health = cIO > 0 ? curCR / cIO : 0;
+              var loss = Math.round((1 - curCR / prevCR) * 100);
+              pts.push({ value: [cl2, +(health * 15).toFixed(1)], loss: loss, prevCR: prevCR, curCR: curCR });
+            }
+          }
+          return pts;
+        })()
       }
     ]
   };
@@ -9041,24 +9211,25 @@ function renderEfficiencyTimeline(stData) {
       }
     },
     legend: { top: 4, textStyle: { color: "#94a3b8", fontSize: 11 } },
-    grid: { top: 40, right: 60, bottom: 30, left: 60 },
-    xAxis: { type: "category", data: xData, axisLabel: { color: "#64748b" }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+    grid: { top: 50, right: 50, bottom: 40, left: 60 },
+    xAxis: { type: "category", data: xData, axisLabel: { color: "#64748b", fontSize: 9, rotate: 45 }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
     yAxis: [
       { type: "value", name: t("econEfficiencyTotal"), axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } }, position: "left", splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
-      { type: "value", name: t("econEfficiencyOutput"), axisLabel: { color: "#34d399", formatter: function (v) { return fmt(v); } }, position: "right", splitLine: { show: false } }
+      { type: "value", name: t("econEfficiencyOutput"), axisLabel: { color: "#34d399", fontSize: 9, formatter: function (v) { return fmt(v); } }, position: "right", splitLine: { show: false } }
     ],
     series: [
       {
         name: t("econEfficiencyTotal"),
         type: "bar",
         yAxisIndex: 0,
-        itemStyle: {
-          color: function (params) {
-            var h = hours[params.dataIndex];
-            return (h >= peakStart && h < peakEnd) ? "rgba(251,146,60,0.5)" : "rgba(100,116,139,0.35)";
-          }
-        },
-        data: totalData
+        itemStyle: { color: "rgba(100,116,139,0.45)" },
+        data: totalData,
+        markArea: {
+          silent: true,
+          itemStyle: { color: "rgba(251,146,60,0.1)" },
+          label: { show: true, formatter: t("econEfficiencyPeakBand"), color: "rgba(251,146,60,0.5)", fontSize: 9, position: "insideTop" },
+          data: [[{ xAxis: (peakStart < 10 ? "0" : "") + peakStart + ":00" }, { xAxis: (peakEnd < 10 ? "0" : "") + peakEnd + ":00" }]]
+        }
       },
       {
         name: t("econEfficiencyOutput"),
@@ -9067,9 +9238,7 @@ function renderEfficiencyTimeline(stData) {
         itemStyle: { color: "rgba(52,211,153,0.7)" },
         data: outputData
       }
-    ],
-    // Peak hours visual band
-    visualMap: undefined
+    ]
   };
 
   __effInitOrSet("econEfficiency", el, option, true);
@@ -9124,7 +9293,21 @@ function renderMonthlyButterfly(days, mode) {
       ratioData.push(cTotal > 0 ? Math.round(cc / cTotal * 10000) / 100 : 0);
     }
 
-    var cacheTrend = linReg(ratioData);
+    var cacheTrend = (function () {
+      var n = ratioData.length;
+      if (n < 3) return linReg(ratioData);
+      var s1=0,s2=0,s3=0,s4=0,sy=0,s1y=0,s2y=0;
+      for(var i=0;i<n;i++){var t2=i*i;s1+=i;s2+=t2;s3+=t2*i;s4+=t2*t2;sy+=ratioData[i];s1y+=i*ratioData[i];s2y+=t2*ratioData[i];}
+      var det=n*(s2*s4-s3*s3)-s1*(s1*s4-s3*s2)+s2*(s1*s3-s2*s2);
+      if(Math.abs(det)<1e-10) return linReg(ratioData);
+      var qc=(sy*(s2*s4-s3*s3)-s1*(s1y*s4-s2y*s3)+s2*(s1y*s3-s2y*s2))/det;
+      var qb=(n*(s1y*s4-s2y*s3)-sy*(s1*s4-s3*s2)+s2*(s1*s2y-s1y*s2))/det;
+      var qa=(n*(s2*s2y-s3*s1y)-s1*(s1*s2y-s1y*s2)+sy*(s1*s3-s2*s2))/det;
+      var line=[];
+      for(var j=0;j<n;j++) line.push(Math.round((qa*j*j+qb*j+qc)*100)/100);
+      var trend=line[n-1]-line[0];
+      return { data: line, slope: trend };
+    })();
 
     option = {
       tooltip: {
@@ -9143,7 +9326,10 @@ function renderMonthlyButterfly(days, mode) {
       legend: {
         top: 4,
         textStyle: { color: "#94a3b8", fontSize: 11 },
-        data: ["Creation %"]
+        data: [
+          { name: "Creation %", icon: "roundRect", itemStyle: { color: "#fbbf24" } },
+          { name: "Trend" }
+        ]
       },
       grid: { top: 40, right: 20, bottom: 40, left: 50 },
       xAxis: {
@@ -9175,7 +9361,7 @@ function renderMonthlyButterfly(days, mode) {
         {
           name: "Trend",
           type: "line",
-          smooth: false,
+          smooth: true,
           symbol: "none",
           data: cacheTrend.data,
           lineStyle: { color: cacheTrend.slope <= 0 ? "#34d399" : "#ef4444", width: 1.5 }
@@ -9340,7 +9526,7 @@ function renderDayComparison(days) {
         return d.date + "<br>" + t("econEfficiencyRatio") + ": " + params[0].value + "%<br>Output: " + fmt(d.output || 0) + "<br>Total: " + fmt((d.input || 0) + (d.output || 0) + (d.cache_read || 0) + (d.cache_creation || 0));
       }
     },
-    grid: { top: 30, right: 50, bottom: 40, left: 50 },
+    grid: { top: 30, right: 20, bottom: 40, left: 60 },
     xAxis: { type: "category", data: xData, axisLabel: { color: "#64748b", rotate: 45, fontSize: 10 }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
     yAxis: [
       { type: "value", name: "%", axisLabel: { color: "#64748b" }, max: function (v) { return Math.max(v.max * 1.2, 1); }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
@@ -9360,40 +9546,390 @@ function renderDayComparison(days) {
         },
         label: { show: true, position: "top", formatter: "{c}%", fontSize: 9, color: "#94a3b8" }
       },
-      {
-        name: "Trend",
-        type: "line",
-        yAxisIndex: 1,
-        smooth: false,
-        symbol: "none",
-        data: (function () {
-          var n = ratioData.length;
-          if (n < 2) return ratioData;
-          var sx = 0, sy = 0, sxy = 0, sxx = 0;
-          for (var i = 0; i < n; i++) {
-            sx += i; sy += ratioData[i]; sxy += i * ratioData[i]; sxx += i * i;
-          }
-          var _slope = (n * sxy - sx * sy) / (n * sxx - sx * sx);
-          var intercept = (sy - _slope * sx) / n;
-          var line = [];
-          for (var j = 0; j < n; j++) line.push(Math.round((intercept + _slope * j) * 10000) / 10000);
-          return { slope: _slope, data: line };
-        })().data,
-        lineStyle: (function () {
-          var n = ratioData.length;
-          if (n < 2) return { color: "#94a3b8", width: 1.5 };
-          var sx = 0, sy = 0, sxy = 0, sxx = 0;
-          for (var i = 0; i < n; i++) {
-            sx += i; sy += ratioData[i]; sxy += i * ratioData[i]; sxx += i * i;
-          }
-          var s = (n * sxy - sx * sy) / (n * sxx - sx * sx);
-          return { color: s >= 0 ? "#34d399" : "#ef4444", width: 1.5 };
-        })()
-      }
+      (function () {
+        var n = ratioData.length;
+        if (n < 2) return { name: "Trend", type: "line", yAxisIndex: 1, smooth: true, symbol: "none", data: ratioData, lineStyle: { color: "#94a3b8", width: 1.5 } };
+        // Quadratic fit: ratio ≈ a*t² + b*t + c (same method as renderWasteCurve)
+        var s1 = 0, s2 = 0, s3 = 0, s4 = 0, sy = 0, s1y = 0, s2y = 0;
+        for (var i = 0; i < n; i++) {
+          var t2 = i * i;
+          s1 += i; s2 += t2; s3 += t2 * i; s4 += t2 * t2;
+          sy += ratioData[i]; s1y += i * ratioData[i]; s2y += t2 * ratioData[i];
+        }
+        var det = n * (s2 * s4 - s3 * s3) - s1 * (s1 * s4 - s3 * s2) + s2 * (s1 * s3 - s2 * s2);
+        var qa = 0, qb = 0, qc = 0;
+        if (Math.abs(det) > 1e-10) {
+          qc = (sy * (s2 * s4 - s3 * s3) - s1 * (s1y * s4 - s2y * s3) + s2 * (s1y * s3 - s2y * s2)) / det;
+          qb = (n * (s1y * s4 - s2y * s3) - sy * (s1 * s4 - s3 * s2) + s2 * (s1 * s2y - s1y * s2)) / det;
+          qa = (n * (s2 * s2y - s3 * s1y) - s1 * (s1 * s2y - s1y * s2) + sy * (s1 * s3 - s2 * s2)) / det;
+        }
+        var line = [];
+        for (var j = 0; j < n; j++) line.push(Math.round((qa * j * j + qb * j + qc) * 10000) / 10000);
+        var trend = line[n - 1] - line[0];
+        return {
+          name: "Trend",
+          type: "line",
+          yAxisIndex: 1,
+          smooth: true,
+          symbol: "none",
+          data: line,
+          lineStyle: { color: trend >= 0 ? "#34d399" : "#ef4444", width: 1.5 }
+        };
+      })()
     ]
   };
 
   __effInitOrSet("econDayCompare", el, option);
+}
+
+function renderBudgetDrain(stData) {
+  if (typeof echarts === "undefined") return;
+  var el = document.getElementById("chart-shell-econ-drain");
+  if (!el || !stData || !stData.sessions || !stData.sessions.length) return;
+
+  var sessions = stData.sessions.slice().sort(function (a, b) { return a.first_ts < b.first_ts ? -1 : 1; });
+  var dayTotal = sessions.reduce(function (s, x) { return s + x.total_all; }, 0);
+  if (dayTotal === 0) return;
+
+  // 1. Group into quota windows (gap > 30 min)
+  var windows = [];
+  var curWin = [];
+  for (var i = 0; i < sessions.length; i++) {
+    if (curWin.length > 0) {
+      var prevEnd = new Date(curWin[curWin.length - 1].last_ts).getTime();
+      var thisStart = new Date(sessions[i].first_ts).getTime();
+      if ((thisStart - prevEnd) > 30 * 60000) { windows.push(curWin); curWin = []; }
+    }
+    curWin.push(sessions[i]);
+  }
+  if (curWin.length) windows.push(curWin);
+
+  // 2. Build turn-based data with time mapping for 2nd axis
+  var xData = [];         // turn numbers (primary x)
+  var timeLabels = [];    // HH:MM for each sampled turn (2nd x-axis)
+  var remaining = [];     // y values
+  var sessionAreas = [];
+  var rebuildAreas = [];
+  var compactionPoints = [];
+  var sessionBoundaries = [];
+  var totalRebuild = 0;
+  var forcedCount = 0;
+  var turnCounter = 0;
+  var sessionColors = ["rgba(59,130,246,0.10)", "rgba(34,197,94,0.10)", "rgba(250,204,21,0.10)", "rgba(168,85,247,0.10)", "rgba(236,72,153,0.10)"];
+  var sessionSpans = []; // {firstTurn, lastTurn, label, forced, color}
+  var rebuildMarkers = []; // {turn, cost} for graphic overlay
+  var cacheRebuildData = []; // [turn, cacheCreationPct] for rebuild overlay series
+
+  for (var wi = 0; wi < windows.length; wi++) {
+    var win = windows[wi];
+    var winTotal = win.reduce(function (s, x) { return s + x.total_all; }, 0);
+    var winConsumed = 0;
+
+    for (var si = 0; si < win.length; si++) {
+      var sess = win[si];
+      var turns = sess.turns || [];
+      if (!turns.length) continue;
+      var sessFirstTurn = turnCounter + 1; // first turn number of this session
+
+      var forced = false;
+      if (si > 0) {
+        var pEnd = new Date(win[si - 1].last_ts).getTime();
+        var gap = new Date(sess.first_ts).getTime() - pEnd;
+        forced = gap <= 5 * 60000;
+      }
+
+      var sessIdx = sessions.indexOf(sess);
+
+      // Forced restart rebuild
+      var rebuildCost = 0;
+      if (forced && turns.length) {
+        forcedCount++;
+        var warmupN = Math.min(10, turns.length);
+        for (var ti = 0; ti < warmupN; ti++) {
+          var T = turns[ti];
+          rebuildCost += (T.input || 0) + (T.output || 0) + (T.cache_read || 0) + (T.cache_creation || 0);
+        }
+        totalRebuild += rebuildCost;
+        rebuildMarkers.push({ turn: turnCounter + 1, cost: rebuildCost });
+        rebuildAreas.push([
+          { xAxis: turnCounter + 1, itemStyle: { color: "rgba(239,68,68,0.15)" }, label: { show: false } },
+          { xAxis: turnCounter + warmupN }
+        ]);
+      }
+
+      // Session start boundary — vertical line with rebuild badge
+      sessionBoundaries.push({
+        _rawTurn: sessFirstTurn,
+        lineStyle: { color: forced ? "#ef4444" : "#3b82f6", type: "solid", width: forced ? 2 : 1.5 },
+        label: forced && rebuildCost > 0 ? {
+          show: true,
+          formatter: "Rebuild " + fmt(rebuildCost),
+          color: "#fff",
+          fontSize: 8,
+          backgroundColor: "rgba(239,68,68,0.8)",
+          borderRadius: 3,
+          padding: [2, 5],
+          position: "insideEndTop",
+          rotate: 90,
+          distance: 5
+        } : { show: false }
+      });
+
+      // Detect compactions
+      var compactIdx = {};
+      for (var ci = 1; ci < turns.length; ci++) {
+        var cPrev = turns[ci - 1], cCur = turns[ci];
+        var cPrevCR = cPrev.cache_read || 0, cCurCR = cCur.cache_read || 0;
+        var cCurCC = cCur.cache_creation || 0, cPrevCC = cPrev.cache_creation || 0;
+        if (cPrevCR > 10000 && cCurCR < cPrevCR * 0.3 && cCurCC > cPrevCC * 10) compactIdx[ci] = true;
+        else if (cPrevCR > 10000 && cCurCR === 0 && cCurCC > 50000) compactIdx[ci] = true;
+      }
+
+      // Add turns
+      for (var ti2 = 0; ti2 < turns.length; ti2++) {
+        var T2 = turns[ti2];
+        var turnCost = (T2.input || 0) + (T2.output || 0) + (T2.cache_read || 0) + (T2.cache_creation || 0);
+        winConsumed += turnCost;
+        var pct = Math.max(0, Math.round((1 - winConsumed / winTotal) * 10000) / 100);
+        turnCounter++;
+
+        if (compactIdx[ti2]) {
+          compactionPoints.push({ turn: turnCounter, pct: pct, type: (T2.cache_read || 0) === 0 ? "Rebuild" : "Compact" });
+        }
+        // Cache health: cache_read / (cache_read + cache_creation) — 100% = fully warm, 0% = cold rebuild
+        var cacheIO = (T2.cache_read || 0) + (T2.cache_creation || 0);
+        var cacheHealth = cacheIO > 0 ? Math.round((T2.cache_read || 0) / cacheIO * 100) : 0;
+        cacheRebuildData.push([turnCounter, cacheHealth]);
+        // Sample for performance — always keep first, last, compactions
+        var isEdge = ti2 === 0 || ti2 === turns.length - 1;
+        if (turns.length > 200 && ti2 % 3 !== 0 && !isEdge && !compactIdx[ti2]) continue;
+        remaining.push([turnCounter, pct]);
+        timeLabels.push({ turn: turnCounter, time: T2.ts.slice(11, 16) });
+        // Also store per-session data for individual gradient series
+        if (!sess._drainData) sess._drainData = [];
+        sess._drainData.push([turnCounter, pct]);
+      }
+
+      // Session end boundary line — no label
+      sessionBoundaries.push({
+        _rawTurn: turnCounter,
+        lineStyle: { color: "rgba(100,116,139,0.3)", type: "dotted", width: 1 },
+        label: { show: false }
+      });
+
+      // Collect span for top bracket
+      sessionSpans.push({
+        firstTurn: sessFirstTurn,
+        lastTurn: turnCounter,
+        label: "S" + (sessIdx + 1) + " " + sess.first_ts.slice(11, 16) + "–" + sess.last_ts.slice(11, 16),
+        turns: turns.length,
+        total: sess.total_all,
+        forced: forced,
+        color: forced ? "#ef4444" : "#3b82f6"
+      });
+    }
+  }
+
+  var rebuildPct = dayTotal > 0 ? Math.round(totalRebuild / dayTotal * 10000) / 100 : 0;
+
+  // Resolve _rawTurn to xAxis value (direct turn number for value axis)
+  for (var ri = 0; ri < sessionBoundaries.length; ri++) {
+    if (sessionBoundaries[ri]._rawTurn) {
+      sessionBoundaries[ri].xAxis = sessionBoundaries[ri]._rawTurn;
+      delete sessionBoundaries[ri]._rawTurn;
+    }
+  }
+
+  var option = {
+    tooltip: {
+      trigger: "axis",
+      formatter: function (params) {
+        if (!params || !params.length) return "";
+        var lines = [];
+        for (var p = 0; p < params.length; p++) {
+          if (params[p].seriesName === "Compaction") {
+            lines.push("<span style='color:#a855f7'>\u25c6 " + params[p].data[2] + "</span>");
+          } else if (params[p].seriesName === "Cache Health") {
+            var chVal = params[p].data[1];
+            var chLabel = chVal > 80 ? "Warm" : chVal > 40 ? "Cooling" : chVal > 10 ? "Cold" : "Frozen";
+            lines.push("<span style='color:#f59e0b'>Cache: " + chVal + "% (" + chLabel + ")</span>");
+          } else if (params[p].seriesName === "Cold Cache") {
+            lines.push("<span style='color:#f59e0b'>\u26a0 Cold Cache: " + params[p].data[1] + "% — rebuild in progress</span>");
+            if (params[p].data[2]) lines.push("<span style='color:#94a3b8'>" + params[p].data[2] + "</span>");
+          } else if (p === 0) {
+            var turn = params[p].data[0];
+            // Find time for this turn
+            var time = "";
+            for (var tli = 0; tli < timeLabels.length; tli++) {
+              if (timeLabels[tli].turn === turn) { time = timeLabels[tli].time; break; }
+              if (timeLabels[tli].turn > turn) { time = timeLabels[tli > 0 ? tli - 1 : 0].time; break; }
+            }
+            lines.push("<b>" + time + "</b> (Turn " + turn + ")<br>Window remaining: " + params[p].data[1] + "%");
+          }
+        }
+        return lines.join("<br>");
+      }
+    },
+    legend: { show: false },
+    grid: { top: 30, right: 20, bottom: 40, left: 60 },
+    xAxis: {
+      type: "value",
+      min: 1,
+      max: turnCounter,
+      axisLabel: { color: "#64748b", fontSize: 9 },
+      splitLine: { show: false }
+    },
+    yAxis: [{
+      type: "value",
+      min: 0,
+      max: 100,
+      axisLabel: { color: "#64748b", formatter: "{value}%" },
+      splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
+    }, {
+      type: "value",
+      position: "right",
+      min: 0,
+      max: 100,
+      axisLabel: { show: false },
+      splitLine: { show: false }
+    }],
+    series: (function () {
+      var allSeries = [];
+      // Per quota-window: one series with continuous green→red gradient
+      var winDataMap = {}; // windowIndex → [[turn,pct], ...]
+      for (var ssi = 0; ssi < sessions.length; ssi++) {
+        var sess = sessions[ssi];
+        var sData = sess._drainData || [];
+        delete sess._drainData;
+        if (!sData.length) continue;
+        // Find which window this session belongs to
+        var wIdx = 0;
+        for (var wwi = 0; wwi < windows.length; wwi++) {
+          if (windows[wwi].indexOf(sess) >= 0) { wIdx = wwi; break; }
+        }
+        if (!winDataMap[wIdx]) winDataMap[wIdx] = [];
+        winDataMap[wIdx] = winDataMap[wIdx].concat(sData);
+      }
+      var winKeys = Object.keys(winDataMap);
+      for (var wki = 0; wki < winKeys.length; wki++) {
+        var wData = winDataMap[winKeys[wki]];
+        var isFirst = wki === 0;
+        allSeries.push({
+          name: "W" + (parseInt(winKeys[wki]) + 1),
+          type: "line",
+          showSymbol: false,
+          areaStyle: {
+            color: {
+              type: "linear", x: 0, y: 0, x2: 1, y2: 0,
+              colorStops: [
+                { offset: 0, color: "rgba(34,197,94,0.3)" },
+                { offset: 0.4, color: "rgba(250,204,21,0.2)" },
+                { offset: 0.75, color: "rgba(239,120,68,0.25)" },
+                { offset: 1, color: "rgba(239,68,68,0.4)" }
+              ]
+            }
+          },
+          lineStyle: { color: "#86efac", width: 2 },
+          data: wData,
+          markLine: isFirst ? { silent: true, symbol: "none", data: sessionBoundaries } : undefined,
+          markArea: isFirst ? {
+            silent: false,
+            label: { show: true, fontSize: 9, position: "insideTop" },
+            data: rebuildAreas.concat(sessionSpans.map(function (sp2) {
+              return [
+                { xAxis: sp2.firstTurn, yAxis: 100, name: sp2.label, itemStyle: { color: sp2.forced ? "rgba(239,68,68,0.06)" : "rgba(59,130,246,0.04)" }, label: { color: sp2.color, fontSize: 9, position: "insideTop", fontWeight: sp2.forced ? "bold" : "normal" } },
+                { xAxis: sp2.lastTurn, yAxis: 92 }
+              ];
+            }))
+          } : undefined
+        });
+      }
+      // Cache health line — high = warm cache, drops to 0 at forced restarts
+      // Find cold spikes (cache health < 20%) for scatter overlay
+      var coldSpikes = [];
+      for (var csi = 0; csi < cacheRebuildData.length; csi++) {
+        var ch = cacheRebuildData[csi][1];
+        if (ch < 50) {
+          var cTurn = cacheRebuildData[csi][0];
+          // Find which session this belongs to
+          var cSessLabel = "";
+          for (var csj = 0; csj < sessionSpans.length; csj++) {
+            if (cTurn >= sessionSpans[csj].firstTurn && cTurn <= sessionSpans[csj].lastTurn) {
+              cSessLabel = sessionSpans[csj].label;
+              break;
+            }
+          }
+          coldSpikes.push([cTurn, ch, cSessLabel]);
+        }
+      }
+      allSeries.push({
+        name: "Cache Health",
+        type: "line",
+        yAxisIndex: 1,
+        showSymbol: false,
+        lineStyle: { color: "rgba(245,158,11,0.5)", width: 1, type: "dotted" },
+        areaStyle: { color: "rgba(245,158,11,0.08)" },
+        data: cacheRebuildData,
+        z: 1
+      });
+      // Cold cache spikes as hoverable points
+      allSeries.push({
+        name: "Cold Cache",
+        type: "scatter",
+        yAxisIndex: 1,
+        symbol: "circle",
+        symbolSize: 8,
+        itemStyle: { color: "#f59e0b", borderColor: "#fff", borderWidth: 1 },
+        z: 15,
+        data: coldSpikes
+      });
+
+      // Compaction scatter
+      allSeries.push({
+        name: "Compaction",
+        type: "scatter",
+        symbol: "diamond",
+        symbolSize: 10,
+        z: 10,
+        itemStyle: { color: "#a855f7", shadowBlur: 4, shadowColor: "rgba(168,85,247,0.5)" },
+        label: { show: true, formatter: function (p) { return p.data[2]; }, position: "top", color: "#a855f7", fontSize: 8 },
+        data: compactionPoints
+      });
+      return allSeries;
+    })(),
+    graphic: []
+  };
+
+  __effInitOrSet("econDrain", el, option, true);
+
+  // HTML overlay for collapsible info box
+  var existingOverlay = el.querySelector(".drain-info-overlay");
+  if (existingOverlay) existingOverlay.remove();
+
+  var infoText = forcedCount + " forced | Tax: " + fmt(totalRebuild) + " (" + rebuildPct + "%)\n" + sessionSpans.map(function (sp) {
+    return sp.label + " " + sp.turns + "t " + fmt(sp.total) + (sp.forced ? " \u26a0" : "");
+  }).join("\n");
+
+  var overlay = document.createElement("div");
+  overlay.className = "drain-info-overlay";
+  overlay.style.cssText = "position:absolute;right:8px;top:55px;z-index:10;cursor:pointer;user-select:none";
+  // Start collapsed
+  var tab = '<div class="drain-info-tab" style="background:rgba(15,23,42,0.85);border:1px solid rgba(100,116,139,0.3);border-radius:4px 0 0 4px;padding:6px 4px;font:bold 9px monospace;color:#94a3b8;line-height:1.3;text-align:center">\u25c0<br>I<br>N<br>F<br>O</div>';
+  var box = '<div class="drain-info-box" style="display:none;background:rgba(15,23,42,0.9);border:1px solid rgba(100,116,139,0.3);border-radius:4px;padding:6px 8px;font:10px monospace;color:#cbd5e1;white-space:pre;line-height:1.4">' + infoText + ' <span style="color:#64748b">\u25b6</span></div>';
+  overlay.innerHTML = tab + box;
+  overlay.addEventListener("click", function () {
+    var t = overlay.querySelector(".drain-info-tab");
+    var b = overlay.querySelector(".drain-info-box");
+    if (t.style.display === "none") {
+      t.style.display = "";
+      b.style.display = "none";
+    } else {
+      t.style.display = "none";
+      b.style.display = "";
+    }
+  });
+  el.style.position = "relative";
+  el.appendChild(overlay);
 }
 
 // ── Korean term tooltip system (ko locale only) ──────────────────────

@@ -2,6 +2,60 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-128",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "4fdeaa6",
+      "commit_full": "4fdeaa646a28b7207aa5f3ace1aeccdef906d725",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(economic): remove split recommendation, collapsible info boxes",
+      "detail": "- Remove misleading \"Split recommended at turn X\" from Cache Explosion\n  (too simplistic, doesn't account for rebuild costs — proper Split-Advisor\n  planned as CUD-10)\n- Cumulative Usage: replace ECharts graphic info box with collapsible\n  HTML overlay (left-aligned, click to expand/collapse)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-127",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "d5162d7",
+      "commit_full": "d5162d78600e88c40b0facf49897238ae113f125",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(economic): Budget Drain chart, Burn Zone fixes, Cache Health overlay",
+      "detail": "- fix(#198): Day Comparison trend uses quadratic fit instead of linear regression\n- fix(#199): Burn Zone starts at 1.5× current total, Session End marker with\n  Hit Limit detection, Forced Restart detection (gap < 5min), context loss + rebuild cost\n- feat: Budget Drain chart — daily session impact with quota windows, forced restart\n  rebuild badges, cache health line, cold cache spikes, compaction markers, collapsible\n  HTML info overlay\n- feat: Cache Explosion — Context Size overlay (cache health ratio), Context Loss scatter\n  points at compaction drops with loss % in tooltip, Cost Factor line (pink), legend tooltips\n- feat: Efficiency Range section collapsible with HR separator\n- fix: Day-Picker change triggers Economic section re-fetch with loading indicator\n- fix: Grid alignment across all Economic charts (consistent left/right margins)\n- i18n: Range titles for Butterfly/Efficiency/DayCompare (DE/EN/KO)\n- perf: #200 created for sync JSONL parse blocking\n\nCloses #197, closes #198, closes #199\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-126",
       "timestamp": "2026-04-11",
       "session": "auto",
