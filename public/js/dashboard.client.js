@@ -3878,7 +3878,8 @@ function generateForensicReportMd(data) {
       totOutageH += bd.outage_hours || 0;
     }
     var bOverhead = totOut > 0 ? (totAll / totOut).toFixed(1) : "?";
-    var bOutputPct = totAll > 0 ? Math.round(totOut / totAll * 100) : 0;
+    var bOutputPctRaw = totAll > 0 ? totOut / totAll * 100 : 0;
+    var bOutputPct = bOutputPctRaw >= 1 ? Math.round(bOutputPctRaw) : bOutputPctRaw > 0 ? bOutputPctRaw.toFixed(2) : "0";
     var bCmr = (totCc + totCr) > 0 ? Math.round(totCc / (totCc + totCr) * 100) : 0;
 
     md.push(
