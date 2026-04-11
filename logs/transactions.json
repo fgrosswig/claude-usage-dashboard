@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-126",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "dbe14d9",
+      "commit_full": "dbe14d92fcb1145a47441fb11acafe0633bd1b5d",
+      "status": "ABGESCHLOSSEN",
+      "description": "ci(pipeline): restrict sonar/build/deploy to push events only",
+      "detail": "Tag events now only trigger draft-release-notes, not the full\nbuild pipeline. Saves CI time and avoids redundant sonar scans.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".woodpecker/app.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-125",
       "timestamp": "2026-04-11",
       "session": "auto",
