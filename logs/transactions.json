@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-166",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "33cbd27",
+      "commit_full": "33cbd27c38d4dac020e792d7241cd1b5d74b06bb",
+      "status": "ABGESCHLOSSEN",
+      "description": "perf(econ): fix double-fetch on day change and add fingerprint-based session-turns cache",
+      "detail": "- Remove duplicate setTimeout(fetchSessionTurns, 50) from econ day-change handler\n\n- Replace naive _sessionTurnsCache with mtime+size fingerprint validation\n\n- Historical dates: instant cache hit (0ms, no stat calls)\n\n- Today: stat-only check (~5ms) instead of full JSONL re-parse (~500-2000ms)\n\n- Remove invalidateSessionTurnsToday() from scan cycle (fingerprint handles staleness)\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-165",
       "timestamp": "2026-04-12",
       "session": "auto",
