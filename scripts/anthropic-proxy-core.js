@@ -231,10 +231,18 @@ function alignToJsonl(proxyEndIso, usage, roots, opts) {
 
 function extractUsageFromJson(obj) {
   if (!obj || typeof obj !== 'object') return null;
-  if (obj.usage && typeof obj.usage === 'object') return obj.usage;
-  if (obj.message && obj.message.usage) return obj.message.usage;
-  if (obj.delta && obj.delta.usage) return obj.delta.usage;
-  return null;
+  var u = null;
+  if (obj.usage && typeof obj.usage === 'object') u = obj.usage;
+  else if (obj.message && obj.message.usage) u = obj.message.usage;
+  else if (obj.delta && obj.delta.usage) u = obj.delta.usage;
+  if (!u) return null;
+  // Promote ephemeral sub-fields from cache_creation (message_start event)
+  var cc = u.cache_creation;
+  if (cc && typeof cc === 'object') {
+    if (cc.ephemeral_1h_input_tokens != null) u.ephemeral_1h_input_tokens = cc.ephemeral_1h_input_tokens;
+    if (cc.ephemeral_5m_input_tokens != null) u.ephemeral_5m_input_tokens = cc.ephemeral_5m_input_tokens;
+  }
+  return u;
 }
 
 function mergeUsage(into, add) {
@@ -244,7 +252,9 @@ function mergeUsage(into, add) {
     'input_tokens',
     'output_tokens',
     'cache_creation_input_tokens',
-    'cache_read_input_tokens'
+    'cache_read_input_tokens',
+    'ephemeral_1h_input_tokens',
+    'ephemeral_5m_input_tokens'
   ];
   for (var i = 0; i < keys.length; i++) {
     var k = keys[i];
@@ -532,7 +542,23 @@ module.exports = {
               usage: usage,
               cache_read_ratio: ratio,
               cache_health: cacheHealthLabel(ratio, usage),
-              response_hints: respHints
+              response_hints: respHints,
+              source: 'proxy',
+              peak_hour: (function() {
+                var d = new Date(endedIso);
+                var h = d.getUTCHours();
+                var wd = d.getUTCDay();
+                return wd >= 1 && wd <= 5 && h >= 13 && h < 19;
+              })(),
+              ttl_tier: (function() {
+                if (!usage) return 'unknown';
+                var e1h = usage.ephemeral_1h_input_tokens || 0;
+                var e5m = usage.ephemeral_5m_input_tokens || 0;
+                if (e1h > 0 && e5m === 0) return '1h';
+                if (e5m > 0 && e1h === 0) return '5m';
+                if (e1h > 0 && e5m > 0) return 'mixed';
+                return 'unknown';
+              })()
             };
             if (alignJsonl && usage) {
               try {
