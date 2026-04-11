@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-135",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "d0eb7e1",
+      "commit_full": "d0eb7e1e889ffaead145a69ba8ad8901bdf0dfca",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(economic): edge-session support for cross-midnight sessions (#205)",
+      "detail": "Sessions spanning midnight now include turns from adjacent days.\nEdge flags (edge_start, edge_end) mark sessions that started on the\nprevious day or continue into the next. Session labels show arrows\nfor edge sessions (e.g. \"S5 23:19-01:33 →\").\n\nFixes session-turns API cutting sessions at day boundaries.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-134",
       "timestamp": "2026-04-11",
       "session": "auto",
