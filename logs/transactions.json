@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-116",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "0103096",
+      "commit_full": "01030969d48c45c3dea4c042adab95c81d426f27",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ci): fetch tags before auto-semver detection",
+      "detail": "Woodpecker clone uses --no-tags, so git tag list was empty.\nExplicit git fetch --tags before version detection.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".woodpecker/app.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-115",
       "timestamp": "2026-04-11",
       "session": "auto",
