@@ -167,6 +167,7 @@ steps:
     commands:
       - |
         apk add --no-cache git curl jq
+        git fetch --tags origin
         LAST_TAG=$(git tag --sort=-v:refname | head -1)
         if [ -z "$LAST_TAG" ]; then LAST_TAG="v0.0.0"; fi
         COMMITS=$(git log ${LAST_TAG}..HEAD --format="%s" 2>/dev/null || echo "")
