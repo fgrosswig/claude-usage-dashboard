@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-133",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "b295f89",
+      "commit_full": "b295f89935bb6e092371bd87a90e04ab198d8645",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(economic): Session Overhead chart with Q5 + Token dual view (#203)",
+      "detail": "Shows actual Q5 consumption vs ideal (without overhead events) from\nproxy data, overlaid with visible token overhead from JSONL. The gap\nbetween Q5 and token curves reveals hidden phantom costs (58% vs 3.5%).\nFalls back gracefully when no proxy data is available.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-132",
       "timestamp": "2026-04-11",
       "session": "auto",
