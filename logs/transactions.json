@@ -2,6 +2,33 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-147",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "4be2000",
+      "commit_full": "4be20004978c51972af82aa375e3f448ca380c56",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(migration): migrate Forensic section to ECharts (CUD-12)",
+      "detail": "Migrate 3 Forensic charts (hit-limit, signals, service impact) from\nChart.js to ECharts. Eliminate reuse-check logic, replace destroy()\nwith dispose() across all cleanup paths. HTML canvas → div.\nStats: 14 Chart.js + 23 ECharts remaining.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-registry.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-146",
       "timestamp": "2026-04-11",
       "session": "auto",
