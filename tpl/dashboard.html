@@ -382,19 +382,19 @@
 <div class="grid" id="proxy-cards"></div>
 <!-- Row 1: Token Cost + Model Breakdown + Hourly Heatmap (3-col) -->
 <div class="proxy-charts-grid-3">
-<div class="chart-box"><h3 id="proxy-token-chart-h3"></h3><p id="proxy-token-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-tokens"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-tokens"></canvas></div></div>
-<div class="chart-box"><h3 id="proxy-model-h3"></h3><p id="proxy-model-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-models"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-models"></canvas></div></div>
-<div class="chart-box"><h3 id="proxy-hourly-h3"></h3><p id="proxy-hourly-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-hourly"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-hourly"></canvas></div></div>
+<div class="chart-box"><h3 id="proxy-token-chart-h3"></h3><p id="proxy-token-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-tokens"><div class="chart-shell-ph" aria-hidden="true"></div><div id="c-proxy-tokens" style="width:100%;min-height:260px"></div></div></div>
+<div class="chart-box"><h3 id="proxy-model-h3"></h3><p id="proxy-model-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-models"><div class="chart-shell-ph" aria-hidden="true"></div><div id="c-proxy-models" style="width:100%;min-height:260px"></div></div></div>
+<div class="chart-box"><h3 id="proxy-hourly-h3"></h3><p id="proxy-hourly-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-hourly"><div class="chart-shell-ph" aria-hidden="true"></div><div id="c-proxy-hourly" style="width:100%;min-height:200px"></div></div></div>
 </div>
 <!-- Row 2: API Latency + Hourly Latency (2-col) -->
 <div class="proxy-charts-grid">
-<div class="chart-box"><h3 id="proxy-latency-chart-h3"></h3><p id="proxy-latency-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-latency"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-latency"></canvas></div></div>
-<div class="chart-box"><h3 id="proxy-hourly-latency-h3"></h3><p id="proxy-hourly-latency-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-hourly-latency"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-hourly-latency"></canvas></div></div>
+<div class="chart-box"><h3 id="proxy-latency-chart-h3"></h3><p id="proxy-latency-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-latency"><div class="chart-shell-ph" aria-hidden="true"></div><div id="c-proxy-latency" style="width:100%;min-height:260px"></div></div></div>
+<div class="chart-box"><h3 id="proxy-hourly-latency-h3"></h3><p id="proxy-hourly-latency-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-hourly-latency"><div class="chart-shell-ph" aria-hidden="true"></div><div id="c-proxy-hourly-latency" style="width:100%;min-height:200px"></div></div></div>
 </div>
 <!-- Row 3: Trend Charts (3-col) -->
 <div class="proxy-charts-grid-3">
-<div class="chart-box"><h3 id="proxy-error-trend-h3"></h3><p id="proxy-error-trend-blurb" class="user-chart-blurb"></p><canvas id="c-proxy-error-trend"></canvas></div>
-<div class="chart-box"><h3 id="proxy-cache-trend-h3"></h3><p id="proxy-cache-trend-blurb" class="user-chart-blurb"></p><canvas id="c-proxy-cache-trend"></canvas></div>
+<div class="chart-box"><h3 id="proxy-error-trend-h3"></h3><p id="proxy-error-trend-blurb" class="user-chart-blurb"></p><div id="c-proxy-error-trend" style="width:100%;min-height:200px"></div></div>
+<div class="chart-box"><h3 id="proxy-cache-trend-h3"></h3><p id="proxy-cache-trend-blurb" class="user-chart-blurb"></p><div id="c-proxy-cache-trend" style="width:100%;min-height:200px"></div></div>
 <div class="chart-box"><h3 id="proxy-efficiency-trend-h3"></h3><p id="proxy-efficiency-trend-blurb" class="user-chart-blurb"></p>
 <div id="c-proxy-efficiency-heatmap" style="width:100%;height:140px"></div>
 <div class="efficiency-small-multiples" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">

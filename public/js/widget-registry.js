@@ -247,7 +247,7 @@
             id: 'proxy-tokens',
             titleKey: 'proxyTokenChartTitle',
             type: 'bar-stacked',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c-proxy-tokens',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderProxy_tokens'
@@ -256,7 +256,7 @@
             id: 'proxy-latency',
             titleKey: 'proxyLatencyChartTitle',
             type: 'line',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c-proxy-latency',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderProxy_latency'
@@ -265,7 +265,7 @@
             id: 'proxy-hourly',
             titleKey: 'proxyHourlyTitle',
             type: 'bar',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c-proxy-hourly',
             size: { cols: 1, minHeight: 200 },
             renderFn: 'renderProxy_hourly'
@@ -274,7 +274,7 @@
             id: 'proxy-models',
             titleKey: 'proxyModelTitle',
             type: 'mixed',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c-proxy-models',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderProxy_models'
@@ -283,7 +283,7 @@
             id: 'proxy-hourly-latency',
             titleKey: 'proxyHourlyLatencyTitle',
             type: 'bar',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c-proxy-hourly-latency',
             size: { cols: 1, minHeight: 200 },
             renderFn: 'renderProxy_hourlyLatency'
@@ -292,7 +292,7 @@
             id: 'proxy-error-trend',
             titleKey: 'proxyErrorTrendTitle',
             type: 'line',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c-proxy-error-trend',
             size: { cols: 1, minHeight: 200 },
             renderFn: 'renderProxy_errorTrend'
@@ -301,7 +301,7 @@
             id: 'proxy-cache-trend',
             titleKey: 'proxyCacheTrendTitle',
             type: 'mixed',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c-proxy-cache-trend',
             size: { cols: 1, minHeight: 200 },
             renderFn: 'renderProxy_cacheTrend'

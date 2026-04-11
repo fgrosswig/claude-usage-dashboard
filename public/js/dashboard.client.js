@@ -4608,11 +4608,18 @@ function __mainChartsResizeAll() {
     }
   }
 }
+function __proxyChartsResizeAll() {
+  for (var k in _proxyCharts) {
+    if (_proxyCharts[k] && typeof _proxyCharts[k].resize === 'function') {
+      try { _proxyCharts[k].resize(); } catch (e) { /* detached */ }
+    }
+  }
+}
 var __effWin = globalThis.window;
 if (__effWin) {
   __effWin.addEventListener("resize", function () {
     if (__effResizeT) clearTimeout(__effResizeT);
-    __effResizeT = setTimeout(function() { __effResizeAll(); __budgetResizeAll(); __mainChartsResizeAll(); }, 120);
+    __effResizeT = setTimeout(function() { __effResizeAll(); __budgetResizeAll(); __mainChartsResizeAll(); __proxyChartsResizeAll(); }, 120);
   });
 }
 
@@ -4623,7 +4630,19 @@ function getProxyDay(data) {
 }
 
 var __lastProxyFingerprint = "";
+var __proxyToggleBound = false;
+function __bindProxyToggleResize() {
+  if (__proxyToggleBound) return;
+  var det = document.getElementById("proxy-collapse");
+  if (!det) return;
+  __proxyToggleBound = true;
+  det.addEventListener("toggle", function() {
+    if (det.open) setTimeout(function() { __proxyChartsResizeAll(); __effResizeAll(); }, 60);
+  });
+}
+
 function renderProxyAnalysis(data) {
+  __bindProxyToggleResize();
   var sumEl = document.getElementById("proxy-summary-line");
   var noteEl = document.getElementById("proxy-note");
   var cardsEl = document.getElementById("proxy-cards");
@@ -4814,7 +4833,7 @@ function renderProxyAnalysis(data) {
 
 function destroyProxyCharts() {
   for (var k in _proxyCharts) {
-    if (_proxyCharts[k]) { try { _proxyCharts[k].destroy(); } catch (e) {} _proxyCharts[k] = null; }
+    if (_proxyCharts[k]) { try { _proxyCharts[k].dispose(); } catch (e) {} _proxyCharts[k] = null; }
   }
 }
 
@@ -4826,14 +4845,11 @@ function gaugeColor(pct) {
 
 
 function renderProxyTokenChart(data) {
-  if (typeof Chart === "undefined") return;
+  if (typeof echarts === "undefined") return;
   var proxyDays = data.proxy?.proxy_days || [];
   if (!proxyDays.length) { chartShellSetLoading("c-proxy-tokens", false); return; }
 
-  var labels = [];
-  var cacheRead = [];
-  var cacheCreate = [];
-  var output = [];
+  var labels = [], cacheRead = [], cacheCreate = [], output = [];
   for (var i = 0; i < proxyDays.length; i++) {
     var d = proxyDays[i];
     labels.push(d.date ? d.date.slice(5) : String(i));
@@ -4845,56 +4861,34 @@ function renderProxyTokenChart(data) {
   chartShellSetLoading("c-proxy-tokens", false);
   var el = document.getElementById("c-proxy-tokens");
   if (!el) return;
-
-  if (_proxyCharts.tokens) {
-    _proxyCharts.tokens.data.labels = labels;
-    _proxyCharts.tokens.data.datasets[0].data = cacheRead;
-    _proxyCharts.tokens.data.datasets[1].data = cacheCreate;
-    _proxyCharts.tokens.data.datasets[2].data = output;
-    freezeChartNoAnim(_proxyCharts.tokens);
-    _proxyCharts.tokens.update("none");
-    return;
-  }
-
-  _proxyCharts.tokens = new Chart(el.getContext("2d"), {
-    type: "bar",
-    data: {
-      labels: labels,
-      datasets: [
-        { label: t("proxyDSCacheRead"), data: cacheRead, backgroundColor: "rgba(139,92,246,.7)", stack: "s" },
-        { label: t("proxyDSCacheCreate"), data: cacheCreate, backgroundColor: "rgba(6,182,212,.6)", stack: "s" },
-        { label: t("proxyDSOutput"), data: output, backgroundColor: "rgba(34,197,94,.7)", stack: "s" }
-      ]
-    },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { stacked: true, ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { stacked: true, ticks: { color: "#94a3b8", callback: function (v) { return fmt(v); } }, grid: { color: "rgba(51,65,85,.4)" } }
-      },
-      plugins: {
-        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
-        tooltip: {
-          callbacks: {
-            label: function (ctx) { return ctx.dataset.label + ": " + fmt(ctx.parsed.y); }
-          }
-        }
+  if (!_proxyCharts.tokens) _proxyCharts.tokens = echarts.init(el, null, { renderer: 'canvas' });
+  _proxyCharts.tokens.setOption({
+    animation: false,
+    grid: { left: 60, right: 16, top: 36, bottom: 30 },
+    legend: { data: [t("proxyDSCacheRead"), t("proxyDSCacheCreate"), t("proxyDSOutput")], textStyle: { color: '#cbd5e1' }, top: 4 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel];
+        for (var pi = 0; pi < params.length; pi++) lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + fmt(params[pi].value));
+        return lines.join('<br>');
       }
-    }
-  });
+    },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: function(v) { return fmt(v); } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    series: [
+      { name: t("proxyDSCacheRead"), type: 'bar', stack: 's', data: cacheRead, itemStyle: { color: 'rgba(139,92,246,0.7)' } },
+      { name: t("proxyDSCacheCreate"), type: 'bar', stack: 's', data: cacheCreate, itemStyle: { color: 'rgba(6,182,212,0.6)' } },
+      { name: t("proxyDSOutput"), type: 'bar', stack: 's', data: output, itemStyle: { color: 'rgba(34,197,94,0.7)' } }
+    ]
+  }, true);
 }
 
 function renderProxyLatencyChart(data) {
-  if (typeof Chart === "undefined") return;
+  if (typeof echarts === "undefined") return;
   var proxyDays = data.proxy?.proxy_days || [];
   if (!proxyDays.length) { chartShellSetLoading("c-proxy-latency", false); return; }
 
-  var labels = [];
-  var avg = [];
-  var mn = [];
+  var labels = [], avg = [], mn = [];
   for (var i = 0; i < proxyDays.length; i++) {
     var d = proxyDays[i];
     labels.push(d.date ? d.date.slice(5) : String(i));
@@ -4905,47 +4899,26 @@ function renderProxyLatencyChart(data) {
   chartShellSetLoading("c-proxy-latency", false);
   var el = document.getElementById("c-proxy-latency");
   if (!el) return;
-
-  if (_proxyCharts.latency) {
-    _proxyCharts.latency.data.labels = labels;
-    _proxyCharts.latency.data.datasets[0].data = avg;
-    _proxyCharts.latency.data.datasets[1].data = mn;
-    freezeChartNoAnim(_proxyCharts.latency);
-    _proxyCharts.latency.update("none");
-    return;
-  }
-
-  _proxyCharts.latency = new Chart(el.getContext("2d"), {
-    type: "line",
-    data: {
-      labels: labels,
-      datasets: [
-        { label: t("proxyDSAvgLatency"), data: avg, borderColor: "#3b82f6", backgroundColor: "rgba(59,130,246,.15)", fill: true, tension: .3, pointRadius: 3, borderWidth: 2 },
-        { label: t("proxyDSMinLatency"), data: mn, borderColor: "#22c55e", borderDash: [4, 2], tension: .3, pointRadius: 2, borderWidth: 1 }
-      ]
-    },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { ticks: { color: "#94a3b8", callback: function (v) { return v >= 1000 ? (v/1000).toFixed(1) + "s" : v + "ms"; } }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true }
-      },
-      plugins: {
-        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
-        tooltip: {
-          callbacks: {
-            label: function (ctx) {
-              var v = ctx.parsed.y;
-              return ctx.dataset.label + ": " + (v >= 1000 ? (v/1000).toFixed(1) + "s" : Math.round(v) + "ms");
-            }
-          }
-        }
+  if (!_proxyCharts.latency) _proxyCharts.latency = echarts.init(el, null, { renderer: 'canvas' });
+  function fmtMs(v) { return v >= 1000 ? (v/1000).toFixed(1) + "s" : Math.round(v) + "ms"; }
+  _proxyCharts.latency.setOption({
+    animation: false,
+    grid: { left: 60, right: 16, top: 36, bottom: 30 },
+    legend: { data: [t("proxyDSAvgLatency"), t("proxyDSMinLatency")], textStyle: { color: '#cbd5e1' }, top: 4 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel];
+        for (var pi = 0; pi < params.length; pi++) lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + fmtMs(params[pi].value));
+        return lines.join('<br>');
       }
-    }
-  });
+    },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8', formatter: function(v) { return fmtMs(v); } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    series: [
+      { name: t("proxyDSAvgLatency"), type: 'line', data: avg, smooth: 0.3, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#3b82f6', width: 2 }, itemStyle: { color: '#3b82f6' }, areaStyle: { color: 'rgba(59,130,246,0.15)' } },
+      { name: t("proxyDSMinLatency"), type: 'line', data: mn, smooth: 0.3, symbol: 'circle', symbolSize: 4, lineStyle: { color: '#22c55e', width: 1, type: [4, 2] }, itemStyle: { color: '#22c55e' } }
+    ]
+  }, true);
 }
 
 // ── Phase 2: Invisible Cost Indicator ─────────────────────────────────────
@@ -4994,64 +4967,39 @@ function aggregateHourlyTotals(proxyDays) {
 }
 
 function renderProxyHourlyHeatmap(data) {
-  if (typeof Chart === "undefined") return;
+  if (typeof echarts === "undefined") return;
   var el = document.getElementById("c-proxy-hourly");
   if (!el) return;
   var proxyDays = data.proxy?.proxy_days || [];
   var hd = aggregateHourlyTotals(proxyDays);
 
   chartShellSetLoading("c-proxy-hourly", false);
-
-  if (_proxyCharts.hourly) {
-    _proxyCharts.hourly.data.datasets[0].data = hd.values;
-    _proxyCharts.hourly.data.datasets[0].backgroundColor = hd.bgColors;
-    freezeChartNoAnim(_proxyCharts.hourly);
-    _proxyCharts.hourly.update("none");
-    return;
-  }
-
-  _proxyCharts.hourly = new Chart(el.getContext("2d"), {
-    type: "bar",
-    data: {
-      labels: hd.labels,
-      datasets: [{
-        label: t("proxyDSRequestsPerHour"),
-        data: hd.values,
-        backgroundColor: hd.bgColors,
-        borderRadius: 3
-      }]
+  if (!_proxyCharts.hourly) _proxyCharts.hourly = echarts.init(el, null, { renderer: 'canvas' });
+  var nDays = proxyDays.length;
+  _proxyCharts.hourly.setOption({
+    animation: false,
+    grid: { left: 40, right: 16, top: 12, bottom: 30 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) { var p = params[0]; return p.name + ':00 UTC<br>' + p.value + ' requests (' + nDays + ' days)'; }
     },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      scales: {
-        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { ticks: { color: "#94a3b8" }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true }
-      },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            title: function (ctx) { return ctx[0].label + ":00 UTC"; },
-            label: function (ctx) { return ctx.parsed.y + " requests (" + proxyDays.length + " days)"; }
-          }
-        }
-      }
-    }
-  });
+    xAxis: { type: 'category', data: hd.labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    series: [{
+      type: 'bar', data: hd.values,
+      itemStyle: { color: function(p) { return hd.bgColors[p.dataIndex]; }, borderRadius: [3, 3, 0, 0] }
+    }]
+  }, true);
 }
 
 
 // ── Phase 5: Model Breakdown ──────────────────────────────────────────────
 function renderProxyModelChart(data) {
-  if (typeof Chart === "undefined") return;
+  if (typeof echarts === "undefined") return;
   var el = document.getElementById("c-proxy-models");
   if (!el) return;
   var proxyDays = data.proxy?.proxy_days || [];
   if (!proxyDays.length) return;
   var colors = ["#8b5cf6", "#3b82f6", "#06b6d4", "#22c55e", "#f59e0b", "#ef4444", "#ec4899"];
-  // Collect all model keys across all days
   var allModels = {};
   for (const pd of proxyDays) {
     var dm = pd.models || {};
@@ -5059,54 +5007,42 @@ function renderProxyModelChart(data) {
   }
   var modelKeys = Object.keys(allModels).sort(function(a, b) { return a.localeCompare(b); });
   var labels = proxyDays.map(function(d) { return d.date ? d.date.slice(5) : "?"; });
-  // Build stacked bar datasets per model + latency line
-  var datasets = [];
+  var series = [];
+  var legendData = [];
   for (var mi = 0; mi < modelKeys.length; mi++) {
     var mKey = modelKeys[mi];
     var short = mKey.replace("claude-", "").replace(/-\d{8}$/, "");
-    var mData = proxyDays.map(function(d) { return d.models?.[mKey]?.requests || 0; });
-    datasets.push({ label: short, data: mData, backgroundColor: colors[mi % colors.length], stack: "models", yAxisID: "y", borderRadius: 2 });
+    legendData.push(short);
+    series.push({ name: short, type: 'bar', stack: 'models', yAxisIndex: 0, data: proxyDays.map(function(d) { return d.models?.[mKey]?.requests || 0; }), itemStyle: { color: colors[mi % colors.length], borderRadius: [2, 2, 0, 0] } });
   }
-  // Avg latency line across all models per day
-  var latData = proxyDays.map(function(d) { return d.avg_duration_ms || 0; });
-  datasets.push({ label: t("proxyDSModelLatency"), data: latData, type: "line", borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.15)", yAxisID: "y1", tension: 0.3, pointRadius: 3 });
+  var latLabel = t("proxyDSModelLatency");
+  legendData.push(latLabel);
+  series.push({ name: latLabel, type: 'line', yAxisIndex: 1, data: proxyDays.map(function(d) { return d.avg_duration_ms || 0; }), smooth: 0.3, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#f59e0b' }, itemStyle: { color: '#f59e0b' }, areaStyle: { color: 'rgba(245,158,11,0.15)' } });
 
   chartShellSetLoading("c-proxy-models", false);
-
-  if (_proxyCharts.models) {
-    _proxyCharts.models.data.labels = labels;
-    _proxyCharts.models.data.datasets = datasets;
-    freezeChartNoAnim(_proxyCharts.models);
-    _proxyCharts.models.update("none");
-    return;
-  }
-
-  _proxyCharts.models = new Chart(el.getContext("2d"), {
-    type: "bar",
-    data: { labels: labels, datasets: datasets },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { stacked: true, ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { stacked: true, position: "left", ticks: { color: "#94a3b8" }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, title: { display: true, text: "Requests", color: "#94a3b8", font: { size: 10 } } },
-        y1: { position: "right", ticks: { color: "#f59e0b", callback: function (v) { return v >= 1000 ? (v / 1000).toFixed(1) + "s" : v + "ms"; } }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: "Latency", color: "#f59e0b", font: { size: 10 } } }
-      },
-      plugins: {
-        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
-        tooltip: {
-          callbacks: {
-            label: function (ctx) {
-              if (ctx.dataset.yAxisID === "y1") return ctx.dataset.label + ": " + (ctx.parsed.y >= 1000 ? (ctx.parsed.y / 1000).toFixed(1) + "s" : Math.round(ctx.parsed.y) + "ms");
-              return ctx.dataset.label + ": " + ctx.parsed.y;
-            }
-          }
+  if (!_proxyCharts.models) _proxyCharts.models = echarts.init(el, null, { renderer: 'canvas' });
+  function fmtMs(v) { return v >= 1000 ? (v/1000).toFixed(1) + "s" : Math.round(v) + "ms"; }
+  _proxyCharts.models.setOption({
+    animation: false,
+    grid: { left: 50, right: 60, top: 36, bottom: 30 },
+    legend: { data: legendData, textStyle: { color: '#cbd5e1', fontSize: 10 }, top: 4 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel];
+        for (var pi = 0; pi < params.length; pi++) {
+          var p = params[pi];
+          lines.push(p.marker + ' ' + p.seriesName + ': ' + (p.seriesType === 'line' ? fmtMs(p.value) : p.value));
         }
+        return lines.join('<br>');
       }
-    }
-  });
+    },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: [
+      { type: 'value', min: 0, position: 'left', name: 'Requests', nameTextStyle: { color: '#94a3b8', fontSize: 10 }, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+      { type: 'value', min: 0, position: 'right', name: 'Latency', nameTextStyle: { color: '#f59e0b', fontSize: 10 }, axisLabel: { color: '#f59e0b', formatter: function(v) { return fmtMs(v); } }, splitLine: { show: false } }
+    ],
+    series: series
+  }, true);
 }
 
 // ── P3.2 Cold-Start Detection ─────────────────────────────────────────────
@@ -5205,55 +5141,38 @@ function aggregateHourlyLatency(proxyDays) {
 }
 
 function renderProxyHourlyLatency(data) {
-  if (typeof Chart === "undefined") return;
+  if (typeof echarts === "undefined") return;
   var el = document.getElementById("c-proxy-hourly-latency");
   if (!el) return;
   var proxyDays = data.proxy?.proxy_days || [];
   var ld = aggregateHourlyLatency(proxyDays);
 
   chartShellSetLoading("c-proxy-hourly-latency", false);
-
-  if (_proxyCharts.hourlyLatency) {
-    _proxyCharts.hourlyLatency.data.datasets[0].data = ld.avgData;
-    _proxyCharts.hourlyLatency.data.datasets[1].data = ld.maxData;
-    freezeChartNoAnim(_proxyCharts.hourlyLatency);
-    _proxyCharts.hourlyLatency.update("none");
-    return;
-  }
-
-  _proxyCharts.hourlyLatency = new Chart(el.getContext("2d"), {
-    type: "bar",
-    data: {
-      labels: ld.labels,
-      datasets: [
-        { label: t("proxyDSAvgLatency"), data: ld.avgData, backgroundColor: "rgba(59,130,246,.6)", borderRadius: 2 },
-        { label: t("proxyDSMaxLatency"), data: ld.maxData, backgroundColor: "rgba(239,68,68,.35)", borderRadius: 2 }
-      ]
-    },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { ticks: { color: "#94a3b8", callback: function(v) { return v >= 1000 ? (v/1000).toFixed(1)+"s" : v+"ms"; } }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true }
-      },
-      plugins: {
-        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) { return ctx.dataset.label + ": " + (ctx.parsed.y >= 1000 ? (ctx.parsed.y/1000).toFixed(1)+"s" : ctx.parsed.y+"ms"); }
-          }
-        }
+  if (!_proxyCharts.hourlyLatency) _proxyCharts.hourlyLatency = echarts.init(el, null, { renderer: 'canvas' });
+  function fmtMs(v) { return v >= 1000 ? (v/1000).toFixed(1) + "s" : Math.round(v) + "ms"; }
+  _proxyCharts.hourlyLatency.setOption({
+    animation: false,
+    grid: { left: 60, right: 16, top: 36, bottom: 30 },
+    legend: { data: [t("proxyDSAvgLatency"), t("proxyDSMaxLatency")], textStyle: { color: '#cbd5e1' }, top: 4 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel + ':00'];
+        for (var pi = 0; pi < params.length; pi++) lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + fmtMs(params[pi].value));
+        return lines.join('<br>');
       }
-    }
-  });
+    },
+    xAxis: { type: 'category', data: ld.labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8', formatter: function(v) { return fmtMs(v); } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    series: [
+      { name: t("proxyDSAvgLatency"), type: 'bar', data: ld.avgData, itemStyle: { color: 'rgba(59,130,246,0.6)', borderRadius: [2, 2, 0, 0] } },
+      { name: t("proxyDSMaxLatency"), type: 'bar', data: ld.maxData, itemStyle: { color: 'rgba(239,68,68,0.35)', borderRadius: [2, 2, 0, 0] } }
+    ]
+  }, true);
 }
 
 // ── Error/429 Rate Trend ─────────────────────────────────────────────────
 function renderProxyErrorTrend(data) {
-  if (typeof Chart === "undefined") return;
+  if (typeof echarts === "undefined") return;
   var el = document.getElementById("c-proxy-error-trend");
   if (!el) return;
   var proxyDays = data.proxy?.proxy_days || [];
@@ -5268,44 +5187,30 @@ function renderProxyErrorTrend(data) {
   var blurb = document.getElementById("proxy-error-trend-blurb");
   if (blurb) blurb.textContent = t("proxyErrorTrendBlurb");
 
-  if (_proxyCharts.errorTrend) {
-    _proxyCharts.errorTrend.data.labels = labels;
-    _proxyCharts.errorTrend.data.datasets[0].data = errRate;
-    _proxyCharts.errorTrend.data.datasets[1].data = f429;
-    freezeChartNoAnim(_proxyCharts.errorTrend);
-    _proxyCharts.errorTrend.update("none");
-    return;
-  }
-
-  _proxyCharts.errorTrend = new Chart(el.getContext("2d"), {
-    type: "line",
-    data: {
-      labels: labels,
-      datasets: [
-        { label: t("proxyDSErrorRate"), data: errRate, borderColor: "#ef4444", backgroundColor: "rgba(239,68,68,.1)", fill: true, tension: 0.3, pointRadius: 3 },
-        { label: t("proxyDSFalse429Rate"), data: f429, borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.1)", fill: true, tension: 0.3, pointRadius: 3 }
-      ]
-    },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { ticks: { color: "#94a3b8", callback: function(v) { return v + "%"; } }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true }
-      },
-      plugins: {
-        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
-        tooltip: { callbacks: { label: function(ctx) { return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(1) + "%"; } } }
+  if (!_proxyCharts.errorTrend) _proxyCharts.errorTrend = echarts.init(el, null, { renderer: 'canvas' });
+  _proxyCharts.errorTrend.setOption({
+    animation: false,
+    grid: { left: 46, right: 16, top: 36, bottom: 30 },
+    legend: { data: [t("proxyDSErrorRate"), t("proxyDSFalse429Rate")], textStyle: { color: '#cbd5e1' }, top: 4 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel];
+        for (var pi = 0; pi < params.length; pi++) lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + params[pi].value.toFixed(1) + '%');
+        return lines.join('<br>');
       }
-    }
-  });
+    },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8', formatter: function(v) { return v + '%'; } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    series: [
+      { name: t("proxyDSErrorRate"), type: 'line', data: errRate, smooth: 0.3, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#ef4444' }, itemStyle: { color: '#ef4444' }, areaStyle: { color: 'rgba(239,68,68,0.1)' } },
+      { name: t("proxyDSFalse429Rate"), type: 'line', data: f429, smooth: 0.3, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#f59e0b' }, itemStyle: { color: '#f59e0b' }, areaStyle: { color: 'rgba(245,158,11,0.1)' } }
+    ]
+  }, true);
 }
 
 // ── Cache Quality Trend ──────────────────────────────────────────────────
 function renderProxyCacheTrend(data) {
-  if (typeof Chart === "undefined") return;
+  if (typeof echarts === "undefined") return;
   var el = document.getElementById("c-proxy-cache-trend");
   if (!el) return;
   var proxyDays = data.proxy?.proxy_days || [];
@@ -5320,47 +5225,31 @@ function renderProxyCacheTrend(data) {
   var blurb = document.getElementById("proxy-cache-trend-blurb");
   if (blurb) blurb.textContent = t("proxyCacheTrendBlurb");
 
-  if (_proxyCharts.cacheTrend) {
-    _proxyCharts.cacheTrend.data.labels = labels;
-    _proxyCharts.cacheTrend.data.datasets[0].data = ratio;
-    _proxyCharts.cacheTrend.data.datasets[1].data = coldStarts;
-    freezeChartNoAnim(_proxyCharts.cacheTrend);
-    _proxyCharts.cacheTrend.update("none");
-    return;
-  }
-
-  _proxyCharts.cacheTrend = new Chart(el.getContext("2d"), {
-    type: "line",
-    data: {
-      labels: labels,
-      datasets: [
-        { label: t("proxyDSCacheRatio"), data: ratio, borderColor: "#22c55e", backgroundColor: "rgba(34,197,94,.1)", fill: true, tension: 0.3, pointRadius: 3, yAxisID: "y" },
-        { label: t("proxyDSColdStarts"), data: coldStarts, type: "bar", backgroundColor: "rgba(59,130,246,.5)", borderRadius: 2, yAxisID: "y1" }
-      ]
-    },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { position: "left", ticks: { color: "#22c55e", callback: function(v) { return v + "%"; } }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, max: 100, title: { display: true, text: "Cache Ratio", color: "#22c55e", font: { size: 10 } } },
-        y1: { position: "right", ticks: { color: "#3b82f6" }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: "Cold Starts", color: "#3b82f6", font: { size: 10 } } }
-      },
-      plugins: {
-        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) {
-              if (ctx.dataset.yAxisID === "y") return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(1) + "%";
-              return ctx.dataset.label + ": " + ctx.parsed.y;
-            }
-          }
+  if (!_proxyCharts.cacheTrend) _proxyCharts.cacheTrend = echarts.init(el, null, { renderer: 'canvas' });
+  _proxyCharts.cacheTrend.setOption({
+    animation: false,
+    grid: { left: 50, right: 60, top: 36, bottom: 30 },
+    legend: { data: [t("proxyDSCacheRatio"), t("proxyDSColdStarts")], textStyle: { color: '#cbd5e1' }, top: 4 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel];
+        for (var pi = 0; pi < params.length; pi++) {
+          var p = params[pi];
+          lines.push(p.marker + ' ' + p.seriesName + ': ' + (p.seriesType === 'line' ? p.value.toFixed(1) + '%' : p.value));
         }
+        return lines.join('<br>');
       }
-    }
-  });
+    },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: [
+      { type: 'value', min: 0, max: 100, position: 'left', name: 'Cache Ratio', nameTextStyle: { color: '#22c55e', fontSize: 10 }, axisLabel: { color: '#22c55e', formatter: function(v) { return v + '%'; } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+      { type: 'value', min: 0, position: 'right', name: 'Cold Starts', nameTextStyle: { color: '#3b82f6', fontSize: 10 }, axisLabel: { color: '#3b82f6' }, splitLine: { show: false } }
+    ],
+    series: [
+      { name: t("proxyDSCacheRatio"), type: 'line', yAxisIndex: 0, data: ratio, smooth: 0.3, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#22c55e' }, itemStyle: { color: '#22c55e' }, areaStyle: { color: 'rgba(34,197,94,0.1)' } },
+      { name: t("proxyDSColdStarts"), type: 'bar', yAxisIndex: 1, data: coldStarts, itemStyle: { color: 'rgba(59,130,246,0.5)', borderRadius: [2, 2, 0, 0] } }
+    ]
+  }, true);
 }
 
 // ── Efficiency Trend (JSONL Ratio + Visible/1% + Cache Miss aus JSONL) ───
