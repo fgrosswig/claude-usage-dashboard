@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-143",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "6095d2c",
+      "commit_full": "6095d2cea6a2efc7081882d0569b70ddf764109a",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(proxy): write ephemeral tokens as top-level NDJSON fields",
+      "detail": "Ephemeral 1h/5m token counts were only inside the usage sub-object but\nthe dashboard reads them as top-level fields (matching cache-fix format).\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/anthropic-proxy-core.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-142",
       "timestamp": "2026-04-11",
       "session": "auto",
