@@ -193,10 +193,13 @@ steps:
         fi
         echo "Commits since $LAST_TAG:"
         echo "$COMMITS" | head -10
-        # 3. Determine bump type
+        # 3. Determine bump type (filter out merge commits + tx-log)
+        REAL_COMMITS=$(echo "$COMMITS" | grep -vE "^Merge |^\[tx-log\]|^chore: tx-log")
+        echo "Real commits for bump detection:"
+        echo "$REAL_COMMITS"
         BUMP=patch
-        echo "$COMMITS" | grep -qiE "BREAKING CHANGE" && BUMP=major
-        echo "$COMMITS" | grep -qE "^feat(\([^)]*\))?:" && [ "$BUMP" != "major" ] && BUMP=minor
+        echo "$REAL_COMMITS" | grep -qiE "BREAKING CHANGE" && BUMP=major
+        echo "$REAL_COMMITS" | grep -qE "^feat(\([^)]*\))?:" && [ "$BUMP" != "major" ] && BUMP=minor
         echo "Bump type: $BUMP"
         # 4. Compute new tag (single awk — no intermediate shell vars)
         NEW_TAG=$(echo "$LAST_TAG" | awk -F. -v bump="$BUMP" '{
