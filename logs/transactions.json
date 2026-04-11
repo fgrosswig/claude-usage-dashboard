@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-170",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "78b1b31",
+      "commit_full": "78b1b318d9dab47f11c9fff68abf8685e4bc3c35",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(session-turns): proxy /api/session-turns to remote in DEV_MODE=full",
+      "detail": "In DEV_MODE=full, local JSONL files don't exist — session-turns must be fetched from the remote pod instead of parsing locally\n\nLogs: REMOTE proxy/date/timing visible at info level\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-169",
       "timestamp": "2026-04-12",
       "session": "auto",
