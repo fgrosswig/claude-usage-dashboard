@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-154",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "627a244",
+      "commit_full": "627a2449069c1b0ad82ba724f6c7dc6c52114ba3",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(proxy): chart sizing and hourly-latency overlay layout",
+      "detail": "- Remove min-height from chart-shell--proxy (ECharts manages own height)\n- Grid row 3 align-items:start to prevent stretching to efficiency box\n- Hourly-latency: overlay bars (barGap -100%) so avg visible over max\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-153",
       "timestamp": "2026-04-12",
       "session": "auto",
