@@ -14,7 +14,8 @@
  * Manifest-Änderungen werden ausgelassen; bei gemischten Commits zählen Manifeste nicht für die Komponente.
  */
 'use strict';
-var { execSync } = require('node:child_process');
+var child_process = require('node:child_process');
+var execSync = child_process.execSync;
 var fs = require('node:fs');
 var path = require('node:path');
 
@@ -97,7 +98,7 @@ if (tagIdx === 0 && allTags.length > 1) {
 
 var tagSha;
 try {
-  tagSha = execSync('git rev-list -1 ' + sinceTag).toString().trim();
+  tagSha = child_process.execFileSync('git', ['rev-list', '-1', sinceTag]).toString().trim();
 } catch (_) {
   console.error('Tag ' + sinceTag + ' nicht gefunden.');
   process.exit(1);
@@ -125,7 +126,7 @@ if (!txs.length) {
 // ── Einträge seit Tag filtern ────────────────────────────
 var sinceSet = Object.create(null);
 try {
-  var logOut = execSync('git log --format=%H%n%h ' + sinceTag + '..HEAD')
+  var logOut = child_process.execFileSync('git', ['log', '--format=%H%n%h', sinceTag + '..HEAD'])
     .toString().trim();
   if (logOut) {
     for (var sha of logOut.split('\n')) sinceSet[sha] = true;
