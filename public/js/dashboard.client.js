@@ -8804,34 +8804,31 @@ function renderWasteCurve(session) {
     infoLines.push("\u26d4 in burn zone");
   }
 
-  option.graphic = [{
-    type: "group",
-    left: "33%",
-    top: 38,
-    silent: false,
-    children: [{
-      type: "rect",
-      shape: { width: 230, height: 10 + infoLines.length * 16, r: 6 },
-      style: {
-        fill: "rgba(15,23,42,0.92)",
-        stroke: "rgba(59,130,246,0.5)",
-        lineWidth: 1,
-        shadowBlur: 10,
-        shadowColor: "rgba(59,130,246,0.3)"
-      }
-    }, {
-      type: "text",
-      style: {
-        text: infoLines.join("\n"),
-        fill: "#e2e8f0",
-        font: "11px monospace",
-        x: 10,
-        y: 6
-      }
-    }]
-  }];
-
   __effInitOrSet("econWaste", el, option, true);
+
+  // HTML overlay for collapsible info box
+  var existingWasteOverlay = el.querySelector(".waste-info-overlay");
+  if (existingWasteOverlay) existingWasteOverlay.remove();
+
+  var wasteOverlay = document.createElement("div");
+  wasteOverlay.className = "waste-info-overlay";
+  wasteOverlay.style.cssText = "position:absolute;left:8px;top:8px;z-index:10;cursor:pointer;user-select:none";
+  var wasteTab = '<div class="waste-info-tab" style="background:rgba(15,23,42,0.85);border:1px solid rgba(59,130,246,0.3);border-radius:4px;padding:4px 6px;font:bold 9px monospace;color:#93c5fd">\u25bc INFO</div>';
+  var wasteBox = '<div class="waste-info-box" style="display:none;background:rgba(15,23,42,0.92);border:1px solid rgba(59,130,246,0.4);border-radius:6px;padding:6px 10px;font:10px monospace;color:#e2e8f0;white-space:pre;line-height:1.5;box-shadow:0 0 10px rgba(59,130,246,0.2)">' + infoLines.join("\n") + '</div>';
+  wasteOverlay.innerHTML = wasteTab + wasteBox;
+  wasteOverlay.addEventListener("click", function () {
+    var wt = wasteOverlay.querySelector(".waste-info-tab");
+    var wb = wasteOverlay.querySelector(".waste-info-box");
+    if (wt.style.display === "none") {
+      wt.style.display = "";
+      wb.style.display = "none";
+    } else {
+      wt.style.display = "none";
+      wb.style.display = "";
+    }
+  });
+  el.style.position = "relative";
+  el.appendChild(wasteOverlay);
 }
 
 function renderCacheExplosion(session) {
@@ -8874,15 +8871,6 @@ function renderCacheExplosion(session) {
   var threshYellow = baseline * 1.5;
   var threshRed = baseline * 3;
 
-  // 5. Find split point: first turn where fit exceeds 3× baseline
-  var splitTurn = -1;
-  for (var si = 0; si < n; si++) {
-    var fitted = a * si * si + b * si + c;
-    if (fitted > threshRed && si > baseN) {
-      splitTurn = si;
-      break;
-    }
-  }
 
   // 6. Detect compaction events
   var compactions = [];
@@ -9008,23 +8996,8 @@ function renderCacheExplosion(session) {
     ]);
   }
 
-  // 9. Split markLine
-  var splitLabel = "";
+  // 9. Zone threshold lines
   var markLineData = [];
-  if (splitTurn > 0) {
-    splitLabel = tr("econExplosionSplitAt", { turn: splitTurn + 1 }) || "Split at turn " + (splitTurn + 1);
-    markLineData.push({
-      xAxis: splitTurn,
-      label: {
-        formatter: splitLabel,
-        color: "#ef4444",
-        fontSize: 10,
-        position: "insideEndTop"
-      }
-    });
-  }
-
-  // 10. Zone threshold lines
   markLineData.push(
     {
       yAxis: threshYellow,
