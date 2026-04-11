@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-118",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "287e5e6",
+      "commit_full": "287e5e6613a8d24b0f61e5ca7f3ea070cf3a71a3",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ci): debug auto-tag API response + extract tag SHA from list",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".woodpecker/app.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-117",
       "timestamp": "2026-04-11",
       "session": "auto",
