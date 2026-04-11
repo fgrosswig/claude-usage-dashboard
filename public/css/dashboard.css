@@ -64,9 +64,7 @@ h1{font-size:1.5rem;margin-bottom:4px;color:#f8fafc}
 /* User-Profile: Canvas nur im Host — Höhe in JS; sonst misst Chart.js die volle .chart-box inkl. h3+Blurb → Balken versetzt / abgeschnitten */
 #user-profile-charts .user-profile-chart-box{display:flex;flex-direction:column;min-height:0;overflow:hidden}
 #user-profile-charts .user-chart-canvas-host{flex:0 0 auto;width:100%;position:relative}
-/* Kein width:!important auf Chart-Canvas — sonst kann Chart.js display-Größe nicht setzen → Balken/Grid horizontal versetzt */
 #user-profile-charts .user-chart-canvas-host>div{display:block;max-width:100%}
-canvas{display:block;max-width:100%}
 table{width:100%;border-collapse:collapse;font-size:.8rem}
 th{text-align:left;color:#94a3b8;font-weight:500;padding:8px 6px;border-bottom:1px solid #334155;position:sticky;top:0;background:#1e293b}
 td{padding:6px;border-bottom:1px solid #1e293b;color:#cbd5e1;font-variant-numeric:tabular-nums}

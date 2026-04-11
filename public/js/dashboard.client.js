@@ -2189,7 +2189,8 @@ function renderDashboardCore(data) {
   destroyMainChartIfScopeMismatch(mainScope, "c4");
   if (_charts.c1hosts && _charts.c1hosts._dashScope !== mainScope) {
     try {
-      _charts.c1hosts.destroy();
+      if (typeof _charts.c1hosts.dispose === 'function') _charts.c1hosts.dispose();
+      else if (typeof _charts.c1hosts.destroy === 'function') _charts.c1hosts.destroy();
     } catch (eHs) {}
     _charts.c1hosts = null;
   }
