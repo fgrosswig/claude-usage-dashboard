@@ -2,6 +2,43 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-117",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "c4b32a0",
+      "commit_full": "c4b32a04714b99c162b2a38bef108abbc7573ebf",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard,ci): i18n economic tooltips + auto-tag via Gitea API",
+      "detail": "- Replace hardcoded German strings in Burn Zone and Compaction tooltips\n  with i18n keys (econBurnZone*, econCompaction*) for DE/EN/KO\n- Fix auto-tag step: use Gitea API for tag lookup + commit comparison\n  instead of git CLI (Woodpecker clone has no tags)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".woodpecker/app.yml",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-116",
       "timestamp": "2026-04-11",
       "session": "auto",
