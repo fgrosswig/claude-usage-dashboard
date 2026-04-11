@@ -133,7 +133,7 @@
             id: 'forensic-hitlimit',
             titleKey: 'chartForensicHitLimit',
             type: 'mixed',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c-forensic',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderForensic_main'
@@ -142,7 +142,7 @@
             id: 'forensic-signals',
             titleKey: 'chartForensicSignals',
             type: 'bar-stacked',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c-forensic-signals',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderForensic_signals'
@@ -151,7 +151,7 @@
             id: 'forensic-service',
             titleKey: 'chartForensicService',
             type: 'bar-stacked',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c-service',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderForensic_service'

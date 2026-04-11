@@ -1896,9 +1896,9 @@ function renderDashboardCore(data) {
       var fnS=document.getElementById("forensic-note");if(fnS)fnS.textContent=tr("metaForensicNoteFirst",{sec:data.refresh_sec||180});
       document.getElementById("cards").innerHTML="";
       var fcS=document.getElementById("forensic-cards");if(fcS)fcS.innerHTML="";
-      if(_charts.cForensic){try{_charts.cForensic.destroy();}catch(e){}_charts.cForensic=null;}
-      if(_charts.cForensicSignals){try{_charts.cForensicSignals.destroy();}catch(e){}_charts.cForensicSignals=null;}
-      if(_charts.cService){try{_charts.cService.destroy();}catch(e){}_charts.cService=null;}
+      if(_charts.cForensic){try{_charts.cForensic.dispose();}catch(e){}_charts.cForensic=null;}
+      if(_charts.cForensicSignals){try{_charts.cForensicSignals.dispose();}catch(e){}_charts.cForensicSignals=null;}
+      if(_charts.cService){try{_charts.cService.dispose();}catch(e){}_charts.cService=null;}
       chartShellSetLoading("c-forensic", true);
       chartShellSetLoading("c-forensic-signals", true);
       chartShellSetLoading("c-service", true);
@@ -1918,9 +1918,9 @@ function renderDashboardCore(data) {
     var fn0=document.getElementById("forensic-note");if(fn0)fn0.textContent="";
     var fc0=document.getElementById("forensic-cards");if(fc0)fc0.innerHTML="";
     document.getElementById("cards").innerHTML="";
-    if(_charts.cForensic){try{_charts.cForensic.destroy();}catch(e){}_charts.cForensic=null;}
-    if(_charts.cForensicSignals){try{_charts.cForensicSignals.destroy();}catch(e){}_charts.cForensicSignals=null;}
-    if(_charts.cService){try{_charts.cService.destroy();}catch(e){}_charts.cService=null;}
+    if(_charts.cForensic){try{_charts.cForensic.dispose();}catch(e){}_charts.cForensic=null;}
+    if(_charts.cForensicSignals){try{_charts.cForensicSignals.dispose();}catch(e){}_charts.cForensicSignals=null;}
+    if(_charts.cService){try{_charts.cService.dispose();}catch(e){}_charts.cService=null;}
     chartShellSetLoading("c-forensic", false);
     chartShellSetLoading("c-forensic-signals", false);
     chartShellSetLoading("c-service", false);
@@ -2573,7 +2573,7 @@ function renderDashboardCore(data) {
     else window.__dashForensicSvcPaintUntilMs = 0;
   }
 
-  // ─── Forensic Chart (Original: Hit-Limit Bars + Score Line) ───
+  // ─── Forensic Chart (Hit-Limit Bars + Score Line) — ECharts ───
   var fhForensic = getForensicHostFilterForCharts();
   function hitLimitBarForChart(d) {
     if (!fhForensic) return d.hit_limit || 0;
@@ -2587,333 +2587,77 @@ function renderDashboardCore(data) {
   if(elF){
     try {
     if (!skipForensicPaint) {
-    var forensicReuse =
-      _charts.cForensic &&
-      _charts.cForensic.data.datasets.length === 2 &&
-      (chartXLabelsMatch(_charts.cForensic, labels) || chartLabelsPrefixMatch(_charts.cForensic, labels));
-    if (forensicReuse) {
-      freezeChartNoAnim(_charts.cForensic);
-      _charts.cForensic.data.labels = labels.slice();
-      var fh0 = _charts.cForensic.data.datasets[0];
-      fh0.data = days.map(hitLimitBarForChart);
-      fh0.backgroundColor = days.map(function (d) {
-        return hitLimitBarForChart(d) > 0 ? "rgba(248,113,113,0.55)" : "rgba(71,85,105,0.35)";
-      });
-      fh0.borderColor = days.map(function (d) {
-        return hitLimitBarForChart(d) > 0 ? "#f87171" : "transparent";
-      });
-      _charts.cForensic.data.datasets[1].data = days.map(forensicScoreDay);
-      _charts.cForensic.data.datasets[1].hidden = !!fhForensic;
-      if (_charts.cForensic.options.scales && _charts.cForensic.options.scales.y1) {
-        _charts.cForensic.options.scales.y1.display = !fhForensic;
-      }
-      _charts.cForensic.update("none");
-    } else {
-      if (_charts.cForensic) {
-        try {
-          _charts.cForensic.destroy();
-        } catch (e) {}
-      }
-      _charts.cForensic = new Chart(elF, {
-      data:{
-        labels:labels,
-        datasets:[
-          {
-            type:"bar",
-            stack:"hitlim",
-            yAxisID:"y",
-            label:t("forensicDS_hitLimit"),
-            data:days.map(hitLimitBarForChart),
-            backgroundColor:days.map(function(d){return hitLimitBarForChart(d)>0?"rgba(248,113,113,0.55)":"rgba(71,85,105,0.35)"}),
-            borderColor:days.map(function(d){return hitLimitBarForChart(d)>0?"#f87171":"transparent"}),
-            borderWidth:1
-          },
-          {
-            type:"line",
-            label:t("forensicDS_score"),
-            hidden:!!fhForensic,
-            data:days.map(forensicScoreDay),
-            borderColor:"#f59e0b",
-            backgroundColor:"rgba(245,158,11,0.12)",
-            pointBackgroundColor:"#fbbf24",
-            pointRadius:4,
-            tension:0.25,
-            yAxisID:"y1",
-            borderWidth:2
-          }
+      if (!_charts.cForensic) _charts.cForensic = echarts.init(elF, null, { renderer: 'canvas' });
+      var fHitData = days.map(hitLimitBarForChart);
+      var fScoreData = days.map(forensicScoreDay);
+      var fHitColors = fHitData.map(function(v) { return v > 0 ? 'rgba(248,113,113,0.55)' : 'rgba(71,85,105,0.35)'; });
+      _charts.cForensic.setOption({
+        animation: false,
+        grid: { left: 50, right: fhForensic ? 16 : 60, top: 36, bottom: 30 },
+        legend: { data: [t("forensicDS_hitLimit"), t("forensicDS_score")], textStyle: { color: '#cbd5e1' }, top: 4 },
+        tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' } },
+        xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+        yAxis: [
+          { type: 'value', name: t("forensicAxisCounts"), nameTextStyle: { color: '#94a3b8' }, min: 0, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+          { type: 'value', name: fhForensic ? '' : t("forensicAxisForensic"), nameTextStyle: { color: '#fbbf24' }, min: 0, max: 3.5, show: !fhForensic,
+            axisLabel: { color: '#94a3b8' }, splitLine: { show: false } }
+        ],
+        series: [
+          { name: t("forensicDS_hitLimit"), type: 'bar', data: fHitData, yAxisIndex: 0,
+            itemStyle: { color: function(p) { return fHitColors[p.dataIndex]; }, borderColor: function(p) { return fHitData[p.dataIndex] > 0 ? '#f87171' : 'transparent'; } } },
+          { name: t("forensicDS_score"), type: 'line', data: fScoreData, yAxisIndex: 1, smooth: 0.25, symbol: 'circle', symbolSize: 8,
+            lineStyle: { color: '#f59e0b', width: 2 }, itemStyle: { color: '#fbbf24' },
+            areaStyle: { color: 'rgba(245,158,11,0.12)' }, show: !fhForensic }
         ]
-      },
-      options:{
-        responsive:true,
-        resizeDelay:120,
-        animation:false,
-        transitions: __chartTransitionsOff,
-        maintainAspectRatio:true,
-        aspectRatio:2.4,
-        interaction:{mode:"index",intersect:false},
-        scales:{
-          x:{stacked:true,grid:{color:"rgba(51,65,85,0.5)"}},
-          y:{
-            stacked:true,
-            position:"left",
-            beginAtZero:true,
-            title:{display:true,text:t("forensicAxisCounts"),color:"#94a3b8"},
-            ticks:{color:"#94a3b8",precision:0},
-            grid:{color:"rgba(51,65,85,0.5)"}
-          },
-          y1:{
-            display:!fhForensic,
-            position:"right",
-            min:0,max:3.5,
-            title:{display:true,text:t("forensicAxisForensic"),color:"#fbbf24"},
-            ticks:{stepSize:1,color:"#94a3b8"},
-            grid:{drawOnChartArea:false}
-          }
-        },
-        plugins:{
-          legend:{labels:{color:"#cbd5e1"}},
-          tooltip:{
-            callbacks:{
-              title:function(items){
-                var dArr = (__lastUsageData && __lastUsageData.days) || [];
-                return items.length && dArr[items[0].dataIndex] ? dArr[items[0].dataIndex].date : "";
-              },
-              afterBody:function(items){
-                if(!items.length)return"";
-                var di=items[0].dataIndex;
-                var dArr = (__lastUsageData && __lastUsageData.days) || [];
-                var x = dArr[di];
-                if (!x) return "";
-                var fh = getForensicHostFilterForCharts();
-                var lines=[];
-                if (fh) lines.push(tr("forensicTooltipHostHitScope",{host:fh}));
-                lines.push(t("tooltipVsPeak")+(x.forensic_vs_peak>0?x.forensic_vs_peak+"×":"—"));
-                lines.push(t("tooltipImpl90")+(x.forensic_implied_cap_90>0?fmt(x.forensic_implied_cap_90):"—"));
-                if(x.forensic_hint)lines.push(x.forensic_hint);
-                return lines;
-              }
-            }
-          }
-        }
-      }
-    });
-    }
+      }, true);
     }
     } finally {
       chartShellSetLoading("c-forensic", false);
     }
   }
 
-  // ─── Forensic: Session-Signale gestapelt (Ausfall oben im Stack) + Cache Read (Linie, rechts) ───
+  // ─── Forensic: Session Signals Stacked + Cache Read Line — ECharts ───
   var elSig = document.getElementById("c-forensic-signals");
   if (elSig) {
     try {
       if (!skipForensicPaint) {
         var sigStack = buildSessionSignalsStackedByDay(days, fhForensic);
-        var sigReuse =
-          _charts.cForensicSignals &&
-          _charts.cForensicSignals.data.datasets.length === 6 &&
-          _charts.cForensicSignals.data.datasets[0].type === "bar" &&
-          _charts.cForensicSignals.data.datasets[4].type === "bar" &&
-          _charts.cForensicSignals.data.datasets[5].type === "line" &&
-          (chartXLabelsMatch(_charts.cForensicSignals, labels) || chartLabelsPrefixMatch(_charts.cForensicSignals, labels));
-        if (sigReuse) {
-          freezeChartNoAnim(_charts.cForensicSignals);
-          _charts.cForensicSignals.data.labels = labels.slice();
-          _charts.cForensicSignals.data.datasets[0].data = sigStack.cont;
-          _charts.cForensicSignals.data.datasets[1].data = sigStack.res;
-          _charts.cForensicSignals.data.datasets[2].data = sigStack.retry;
-          _charts.cForensicSignals.data.datasets[3].data = sigStack.intr;
-          _charts.cForensicSignals.data.datasets[4].data = sigStack.outageBar;
-          _charts.cForensicSignals.data.datasets[4].outageHoursPerDay = sigStack.outageH;
-          _charts.cForensicSignals.data.datasets[5].data = sigStack.cacheRead;
-          _charts.cForensicSignals.update("none");
-        } else {
-          if (_charts.cForensicSignals) {
-            try {
-              _charts.cForensicSignals.destroy();
-            } catch (eFs) {}
-          }
-          _charts.cForensicSignals = new Chart(elSig, {
-            data: {
-              labels: labels.slice(),
-              datasets: [
-                {
-                  type: "bar",
-                  label: t("forensicDS_continueStack"),
-                  stack: "sig",
-                  yAxisID: "y",
-                  order: 2,
-                  data: sigStack.cont,
-                  backgroundColor: "rgba(59,130,246,0.75)",
-                  borderColor: "rgba(59,130,246,0.95)",
-                  borderWidth: 1
-                },
-                {
-                  type: "bar",
-                  label: t("forensicDS_resumeStack"),
-                  stack: "sig",
-                  yAxisID: "y",
-                  order: 2,
-                  data: sigStack.res,
-                  backgroundColor: "rgba(6,182,212,0.7)",
-                  borderColor: "rgba(6,182,212,0.95)",
-                  borderWidth: 1
-                },
-                {
-                  type: "bar",
-                  label: t("forensicDS_retryStack"),
-                  stack: "sig",
-                  yAxisID: "y",
-                  order: 2,
-                  data: sigStack.retry,
-                  backgroundColor: "rgba(239,68,68,0.65)",
-                  borderColor: "rgba(239,68,68,0.9)",
-                  borderWidth: 1
-                },
-                {
-                  type: "bar",
-                  label: t("forensicDS_interruptStack"),
-                  stack: "sig",
-                  yAxisID: "y",
-                  order: 2,
-                  data: sigStack.intr,
-                  backgroundColor: "rgba(251,191,36,0.55)",
-                  borderColor: "rgba(251,191,36,0.9)",
-                  borderWidth: 1
-                },
-                {
-                  type: "bar",
-                  label: t("forensicDS_outageHoursDay"),
-                  stack: "sig",
-                  yAxisID: "y",
-                  order: 2,
-                  data: sigStack.outageBar,
-                  outageHoursPerDay: sigStack.outageH,
-                  backgroundColor: "rgba(107,114,128,0.35)",
-                  borderColor: "rgba(107,114,128,0.5)",
-                  borderWidth: 1
-                },
-                {
-                  type: "line",
-                  label: t("chartDS_cacheRead"),
-                  yAxisID: "y2",
-                  order: 1,
-                  data: sigStack.cacheRead,
-                  borderColor: "rgba(139,92,246,0.95)",
-                  backgroundColor: "rgba(139,92,246,0.06)",
-                  pointBackgroundColor: "#8b5cf6",
-                  pointRadius: 3,
-                  tension: 0.2,
-                  borderWidth: 2,
-                  fill: false
-                }
-              ]
-            },
-            options: {
-              responsive: true,
-              resizeDelay: 280,
-              animation: false,
-              transitions: __chartTransitionsOff,
-              maintainAspectRatio: true,
-              aspectRatio: 2.4,
-              interaction: { mode: "index", intersect: false },
-              scales: {
-                x: {
-                  stacked: true,
-                  grid: { color: "rgba(51,65,85,0.45)" },
-                  ticks: { color: "#94a3b8", maxRotation: 45, autoSkip: true }
-                },
-                y: {
-                  stacked: true,
-                  position: "left",
-                  beginAtZero: true,
-                  title: { display: true, text: t("forensicSignalsAxisLines"), color: "#94a3b8" },
-                  ticks: { color: "#94a3b8", precision: 0 },
-                  grid: { color: "rgba(51,65,85,0.5)" }
-                },
-                y2: {
-                  type: "linear",
-                  position: "right",
-                  beginAtZero: true,
-                  title: { display: true, text: t("forensicSignalsAxisCacheRead"), color: "#a78bfa" },
-                  ticks: {
-                    color: "#a78bfa",
-                    callback: function (value) {
-                      return fmt(value);
-                    }
-                  },
-                  grid: { drawOnChartArea: false }
-                }
-              },
-              plugins: {
-                legend: { labels: { color: "#cbd5e1", boxWidth: 12 } },
-                tooltip: {
-                  callbacks: {
-                    title: function (items) {
-                      var dArr = (__lastUsageData && __lastUsageData.days) || [];
-                      var di = items.length ? items[0].dataIndex : -1;
-                      return di >= 0 && dArr[di] ? dArr[di].date : "";
-                    },
-                    label: function (ctx) {
-                      var v = ctx.parsed.y;
-                      if (ctx.dataset.outageHoursPerDay && ctx.dataIndex != null) {
-                        var oh = ctx.dataset.outageHoursPerDay[ctx.dataIndex];
-                        var h = oh != null ? Math.round(Number(oh) * 10) / 10 : 0;
-                        return ctx.dataset.label + ": " + h + " h";
-                      }
-                      if (ctx.dataset.yAxisID === "y2") {
-                        return ctx.dataset.label + ": " + fmt(v);
-                      }
-                      return ctx.dataset.label + ": " + v;
-                    },
-                    afterBody: function (items) {
-                      var lines = [t("forensicSignalsTooltipStackFooter")];
-                      if (items && items.length) {
-                        var di = items[0].dataIndex;
-                        var dArr = (__lastUsageData && __lastUsageData.days) || [];
-                        var row = di >= 0 ? dArr[di] : null;
-                        var fhx = getForensicHostFilterForCharts();
-                        if (fhx && row && row.hosts && row.hosts[fhx]) {
-                          var hrow = row.hosts[fhx];
-                          lines.push(
-                            tr("chartTooltipOutCacheDay", {
-                              out: fmt(hrow.output || 0),
-                              cache: fmt(hrow.cache_read || 0)
-                            })
-                          );
-                          lines.push(tr("chartTooltipCoDay", { ratio: hrow.cache_output_ratio || 0 }));
-                        } else if (row && row.cache_output_ratio != null) {
-                          lines.push(
-                            tr("chartTooltipOutCacheDay", {
-                              out: fmt(row.output || 0),
-                              cache: fmt(row.cache_read || 0)
-                            })
-                          );
-                          lines.push(tr("chartTooltipCoDay", { ratio: row.cache_output_ratio }));
-                        }
-                        if (fhx) lines.push(t("forensicSignalsTooltipOutageDayScope"));
-                      }
-                      return lines;
-                    }
-                  }
-                }
-              }
-            }
-          });
-        }
+        if (!_charts.cForensicSignals) _charts.cForensicSignals = echarts.init(elSig, null, { renderer: 'canvas' });
+        _charts.cForensicSignals.setOption({
+          animation: false,
+          grid: { left: 50, right: 60, top: 36, bottom: 30 },
+          legend: {
+            data: [t("forensicDS_continueStack"), t("forensicDS_resumeStack"), t("forensicDS_retryStack"), t("forensicDS_interruptStack"), t("forensicDS_outageHoursDay"), t("chartDS_cacheRead")],
+            textStyle: { color: '#cbd5e1' }, top: 4
+          },
+          tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' } },
+          xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', rotate: 45 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.45)' } } },
+          yAxis: [
+            { type: 'value', name: t("forensicSignalsAxisLines"), nameTextStyle: { color: '#94a3b8' }, min: 0, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+            { type: 'value', name: t("forensicSignalsAxisCacheRead"), nameTextStyle: { color: '#a78bfa' }, min: 0,
+              axisLabel: { color: '#a78bfa', formatter: function(v) { return fmt(v); } }, splitLine: { show: false } }
+          ],
+          series: [
+            { name: t("forensicDS_continueStack"), type: 'bar', stack: 'sig', data: sigStack.cont, itemStyle: { color: 'rgba(59,130,246,0.75)' } },
+            { name: t("forensicDS_resumeStack"), type: 'bar', stack: 'sig', data: sigStack.res, itemStyle: { color: 'rgba(6,182,212,0.7)' } },
+            { name: t("forensicDS_retryStack"), type: 'bar', stack: 'sig', data: sigStack.retry, itemStyle: { color: 'rgba(239,68,68,0.65)' } },
+            { name: t("forensicDS_interruptStack"), type: 'bar', stack: 'sig', data: sigStack.intr, itemStyle: { color: 'rgba(251,191,36,0.55)' } },
+            { name: t("forensicDS_outageHoursDay"), type: 'bar', stack: 'sig', data: sigStack.outageBar, itemStyle: { color: 'rgba(107,114,128,0.35)' } },
+            { name: t("chartDS_cacheRead"), type: 'line', yAxisIndex: 1, data: sigStack.cacheRead, smooth: 0.2, symbol: 'circle', symbolSize: 6,
+              lineStyle: { color: 'rgba(139,92,246,0.95)', width: 2 }, itemStyle: { color: '#8b5cf6' } }
+          ]
+        }, true);
       }
     } finally {
       chartShellSetLoading("c-forensic-signals", false);
     }
   }
 
-  // ─── Service Impact Chart (Arbeitszeit vs Ausfall + Cache-Read-Kosten) ───
+  // ─── Service Impact Chart (Work Hours vs Outage + Cache Read) — ECharts ───
   var elS=document.getElementById("c-service");
   if(elS){
     try {
     if (!skipServicePaint) {
-    // Berechne pro Tag: saubere Arbeitsstunden, betroffene Stunden, Ausfall ausserhalb Arbeit
     var sClean=[],sAffServer=[],sAffClient=[],sOutOnly=[],sCacheRead=[];
     for(var si=0;si<days.length;si++){
       var sd=days[si];
@@ -2925,135 +2669,42 @@ function renderDashboardCore(data) {
       sCacheRead.push(sd.cache_read||0);
     }
     window.__svcTip = { sClean: sClean, sAffServer: sAffServer, sAffClient: sAffClient, sOutOnly: sOutOnly, labels: labels };
-    var svcReuse =
-      _charts.cService &&
-      _charts.cService.data.datasets.length === 5 &&
-      _charts.cService.data.datasets[0].label === t("serviceDS_cleanWork") &&
-      (chartXLabelsMatch(_charts.cService, labels) || chartLabelsPrefixMatch(_charts.cService, labels));
-    if (svcReuse) {
-      freezeChartNoAnim(_charts.cService);
-      _charts.cService.options.resizeDelay = 280;
-      _charts.cService.data.labels = labels.slice();
-      var dss = _charts.cService.data.datasets;
-      dss[0].data = sClean;
-      dss[1].data = sAffServer;
-      dss[2].data = sAffClient;
-      dss[3].data = sOutOnly;
-      dss[4].data = sCacheRead;
-      _charts.cService.update("none");
-    } else {
-      if (_charts.cService) {
-        try {
-          _charts.cService.destroy();
-        } catch (e) {}
-      }
-      _charts.cService = new Chart(elS, {
-      data:{
-        labels:labels,
-        datasets:[
-          {
-            type:"bar",label:t("serviceDS_cleanWork"),
-            order:2,
-            data:sClean,
-            backgroundColor:"rgba(59,130,246,0.7)",borderColor:"rgba(59,130,246,0.9)",borderWidth:1,
-            stack:"hours",yAxisID:"y"
-          },
-          {
-            type:"bar",label:t("serviceDS_affectedServer"),
-            order:2,
-            data:sAffServer,
-            backgroundColor:"rgba(239,68,68,0.7)",borderColor:"rgba(239,68,68,0.9)",borderWidth:1,
-            stack:"hours",yAxisID:"y"
-          },
-          {
-            type:"bar",label:t("serviceDS_affectedClient"),
-            order:2,
-            data:sAffClient,
-            backgroundColor:"rgba(251,191,36,0.6)",borderColor:"rgba(251,191,36,0.9)",borderWidth:1,
-            stack:"hours",yAxisID:"y"
-          },
-          {
-            type:"bar",label:t("serviceDS_outageOnly"),
-            order:2,
-            data:sOutOnly,
-            backgroundColor:"rgba(107,114,128,0.35)",borderColor:"rgba(107,114,128,0.5)",borderWidth:1,
-            stack:"hours",yAxisID:"y"
-          },
-          {
-            type:"line",label:t("chartDS_cacheRead"),
-            order:1,
-            data:sCacheRead,
-            borderColor:"rgba(139,92,246,0.8)",backgroundColor:"rgba(139,92,246,0.08)",
-            pointBackgroundColor:"#8b5cf6",pointRadius:3,tension:0.25,borderWidth:2,
-            yAxisID:"yCR",fill:true
-          }
-        ]
+    if (!_charts.cService) _charts.cService = echarts.init(elS, null, { renderer: 'canvas' });
+    _charts.cService.setOption({
+      animation: false,
+      grid: { left: 50, right: 60, top: 36, bottom: 30 },
+      legend: {
+        data: [t("serviceDS_cleanWork"), t("serviceDS_affectedServer"), t("serviceDS_affectedClient"), t("serviceDS_outageOnly"), t("chartDS_cacheRead")],
+        textStyle: { color: '#cbd5e1' }, top: 4
       },
-      options:{
-        responsive:true,animation:false,transitions:__chartTransitionsOff,maintainAspectRatio:true,aspectRatio:2.4,
-        interaction:{mode:"index",intersect:false},
-        scales:{
-          x:{type:"category",stacked:true,grid:{color:"rgba(51,65,85,0.5)"}},
-          y:{stacked:true,position:"left",beginAtZero:true,
-            title:{display:true,text:t("serviceAxisHours"),color:"#94a3b8"},
-            ticks:{color:"#94a3b8",stepSize:4,callback:function(v){return v+"h";}},
-            grid:{color:"rgba(51,65,85,0.5)"}},
-          yCR:{position:"right",beginAtZero:true,
-            title:{display:true,text:t("chartDS_cacheRead"),color:"#8b5cf6"},
-            ticks:{color:"#8b5cf6",callback:function(v){return fmt(v);}},
-            grid:{drawOnChartArea:false}}
-        },
-        plugins:{
-          legend:{labels:{color:"#cbd5e1"}},
-          tooltip:{
-            callbacks:{
-              label:function(tooltipItem){
-                var ds=tooltipItem.dataset;
-                var di=tooltipItem.dataIndex;
-                if(ds.type==="line")return ds.label+": "+fmt(tooltipItem.raw);
-                return ds.label+": "+tooltipItem.parsed.y+"h";
-              },
-              title:function(items){
-                if(!items.length)return"";
-                var daysArr=(__lastUsageData&&__lastUsageData.days)||[];
-                var snap=window.__svcTip||{};
-                var lab=snap.labels;
-                var rawT=items[0].raw;
-                var diT=items[0].dataIndex;
-                if(rawT&&typeof rawT==="object"&&typeof rawT.x==="string"){var ixT=lab?lab.indexOf(rawT.x):-1;if(ixT>=0)diT=ixT;}
-                return daysArr[diT]?daysArr[diT].date:"";
-              },
-              afterBody:function(items){
-                if(!items.length)return"";
-                var daysArr=(__lastUsageData&&__lastUsageData.days)||[];
-                var snap=window.__svcTip||{};
-                var lab=snap.labels;
-                var rawB=items[0].raw;
-                var di=items[0].dataIndex;
-                if(rawB&&typeof rawB==="object"&&typeof rawB.x==="string"){var ixB=lab?lab.indexOf(rawB.x):-1;if(ixB>=0)di=ixB;}
-                var d=daysArr[di];
-                if(!d)return"";
-                var lines=[];
-                lines.push(t("serviceDS_cleanWork")+": "+(snap.sClean&&snap.sClean[di]!=null?snap.sClean[di]:0)+"h");
-                if((snap.sAffServer&&snap.sAffServer[di])>0)lines.push(t("serviceDS_affectedServer")+": "+snap.sAffServer[di]+"h");
-                if((snap.sAffClient&&snap.sAffClient[di])>0)lines.push(t("serviceDS_affectedClient")+": "+snap.sAffClient[di]+"h");
-                if((snap.sOutOnly&&snap.sOutOnly[di])>0)lines.push(t("serviceDS_outageOnly")+": "+snap.sOutOnly[di].toFixed(1)+"h");
-                var ssX=d.session_signals||{};
-                var sc=ssX.continue||0,sr=ssX.resume||0,sy=ssX.retry||0,si=ssX.interrupt||0;
-                if(sc+sr+sy+si>0){
-                  lines.push(t("serviceTooltipSessionSig")+": "+sc+" / "+sr+" / "+sy+" / "+si);
-                  lines.push(t("serviceTooltipSessionSigHourNote"));
-                }
-                lines.push("Cache Read: "+fmt(d.cache_read||0)+" (C:O "+(d.cache_output_ratio||0)+"x)");
-                lines.push(t("serviceTooltipSlideoutHint"));
-                return lines;
-              }
-            }
+      tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+        formatter: function(params) {
+          var lines = [params[0].axisValueLabel];
+          for (var pi = 0; pi < params.length; pi++) {
+            var p = params[pi];
+            var val = p.seriesType === 'line' ? fmt(p.value) : p.value + 'h';
+            lines.push(p.marker + ' ' + p.seriesName + ': ' + val);
           }
+          return lines.join('<br>');
         }
-      }
-    });
-    }
+      },
+      xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+      yAxis: [
+        { type: 'value', name: t("serviceAxisHours"), nameTextStyle: { color: '#94a3b8' }, min: 0,
+          axisLabel: { color: '#94a3b8', formatter: '{value}h' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+        { type: 'value', name: t("chartDS_cacheRead"), nameTextStyle: { color: '#8b5cf6' }, min: 0,
+          axisLabel: { color: '#8b5cf6', formatter: function(v) { return fmt(v); } }, splitLine: { show: false } }
+      ],
+      series: [
+        { name: t("serviceDS_cleanWork"), type: 'bar', stack: 'hours', data: sClean, itemStyle: { color: 'rgba(59,130,246,0.7)' } },
+        { name: t("serviceDS_affectedServer"), type: 'bar', stack: 'hours', data: sAffServer, itemStyle: { color: 'rgba(239,68,68,0.7)' } },
+        { name: t("serviceDS_affectedClient"), type: 'bar', stack: 'hours', data: sAffClient, itemStyle: { color: 'rgba(251,191,36,0.6)' } },
+        { name: t("serviceDS_outageOnly"), type: 'bar', stack: 'hours', data: sOutOnly, itemStyle: { color: 'rgba(107,114,128,0.35)' } },
+        { name: t("chartDS_cacheRead"), type: 'line', yAxisIndex: 1, data: sCacheRead, smooth: 0.25, symbol: 'circle', symbolSize: 6,
+          lineStyle: { color: 'rgba(139,92,246,0.8)', width: 2 }, itemStyle: { color: '#8b5cf6' },
+          areaStyle: { color: 'rgba(139,92,246,0.08)' } }
+      ]
+    }, true);
     }
     } finally {
       chartShellSetLoading("c-service", false);
@@ -5033,7 +4684,7 @@ function __budgetResizeAll() {
   }
 }
 function __mainChartsResizeAll() {
-  var keys = ['c1', 'c2', 'c3', 'c4', 'c1hosts'];
+  var keys = ['c1', 'c2', 'c3', 'c4', 'c1hosts', 'cForensic', 'cForensicSignals', 'cService'];
   for (var mi = 0; mi < keys.length; mi++) {
     if (_charts[keys[mi]] && typeof _charts[keys[mi]].resize === 'function') {
       try { _charts[keys[mi]].resize(); } catch (e) { /* detached */ }
