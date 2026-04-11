@@ -3738,6 +3738,15 @@ var server = http.createServer(function (req, res) {
     runScanAndBroadcast();
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({ ok: true, message: 'Day cache deleted, full rescan started' }));
+  } else if (pathname === '/api/debug/session-turns') {
+    var dstUrl = new URL(req.url, 'http://localhost');
+    var dstDate = dstUrl.searchParams.get('date') || new Date().toISOString().slice(0, 10);
+    var dstT0 = Date.now();
+    var dstResult = getSessionTurnsCached(dstDate);
+    var dstMs = Date.now() - dstT0;
+    serviceLog.info('session-turns', 'GET /api/debug/session-turns?date=' + dstDate + ' → ' + dstMs + 'ms');
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify(dstResult));
   } else if (pathname === '/api/proxy-usage') {
     if (!__proxyCache.data) refreshProxyCache();
     res.writeHead(200, {
@@ -3864,7 +3873,7 @@ var server = http.createServer(function (req, res) {
     var stUrl = new URL(req.url, 'http://localhost');
     var stDate = stUrl.searchParams.get('date') || new Date().toISOString().slice(0, 10);
     if (__devMode === 'full' && __devSource) {
-      var stRemoteUrl = __devSource.replace(/\/$/, '') + '/api/session-turns?date=' + encodeURIComponent(stDate);
+      var stRemoteUrl = __devSource.replace(/\/$/, '') + '/api/debug/session-turns?date=' + encodeURIComponent(stDate);
       var stT0r = Date.now();
       serviceLog.info('session-turns', 'REMOTE proxy → ' + stRemoteUrl);
       var stProto = stRemoteUrl.startsWith('https') ? require('https') : require('http');
