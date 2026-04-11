@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-134",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "a71dc4b",
+      "commit_full": "a71dc4bc439a6d7709a1552ff57f31212d48d118",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(economic): dual-grid Budget Drain + Q5 Overhead chart (#203)",
+      "detail": "Merged Budget Drain and Q5 Overhead into single dual-grid ECharts chart\nwith synchronized cursor (axisPointer link). Upper grid shows remaining\nquota drain with session brackets and Q5 penalty triangles. Lower grid\nshows cumulative Q5 actual vs ideal vs token-visible — the gap reveals\nhidden overpayment (58% Q5 overhead vs 3.5% visible token overhead).\n\n14 penalty events on a single heavy-use day consume 153% Q5 that should\nhave been available for productive work. 78% of penalties come from\nnormal large-cache-read turns, not from compaction or restarts.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-133",
       "timestamp": "2026-04-11",
       "session": "auto",
