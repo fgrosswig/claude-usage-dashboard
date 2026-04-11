@@ -2835,12 +2835,21 @@ function runScanAndBroadcast() {
     } finally {
       scanInProgress = false;
       broadcastSse();
-      setImmediate(function () {
-        var preloadDay = new Date().toISOString().slice(0, 10);
-        var pt0 = Date.now();
-        getSessionTurnsCached(preloadDay);
-        serviceLog.info('session-turns', 'background preload date=' + preloadDay + ' (' + (Date.now() - pt0) + 'ms)');
-      });
+      // Avoid stacking heavy work: refreshProxyCache already parsed all proxy NDJSON in try{}.
+      // Session-turns rebuild walks all JSONL again — defer once after first successful scan only.
+      if (scanOk && IDLE_SESSION_PRELOAD_MS > 0 && !__sessionTurnsIdlePreloadScheduled) {
+        __sessionTurnsIdlePreloadScheduled = true;
+        setTimeout(function () {
+          try {
+            var preloadDay = new Date().toISOString().slice(0, 10);
+            var pt0 = Date.now();
+            getSessionTurnsCached(preloadDay);
+            serviceLog.info('session-turns', 'idle preload date=' + preloadDay + ' (' + (Date.now() - pt0) + 'ms)');
+          } catch (pe) {
+            serviceLog.warn('session-turns', 'idle preload failed: ' + (pe.message || pe));
+          }
+        }, IDLE_SESSION_PRELOAD_MS);
+      }
       if (scanOk && cachedData && cachedData.days && cachedData.days.length) {
         backfillReleaseBodiesForDashboardDays(cachedData.days, function () {
           cachedData.generated = new Date().toISOString();
@@ -3460,6 +3469,14 @@ function devFetchProxyLogs(cb) {
 // ── /api/session-turns: per-session turn-level token data for a given date ──
 
 var _sessionTurnsCache = Object.create(null);
+/** After first successful JSONL scan, preload today's session-turns once after this delay (ms). 0 = disabled (env CLAUDE_USAGE_IDLE_SESSION_PRELOAD_MS). */
+var IDLE_SESSION_PRELOAD_MS = (function () {
+  var ev = String(process.env.CLAUDE_USAGE_IDLE_SESSION_PRELOAD_MS || '').trim();
+  if (ev === '0' || ev === 'off' || ev === 'false') return 0;
+  var n = parseInt(ev, 10);
+  return !isNaN(n) && n >= 0 ? n : 20000;
+})();
+var __sessionTurnsIdlePreloadScheduled = false;
 
 function getSessionTurnsCached(dateKey) {
   var noCache = process.env.CLAUDE_USAGE_NO_CACHE === '1' || process.env.CLAUDE_USAGE_NO_CACHE === 'true';
