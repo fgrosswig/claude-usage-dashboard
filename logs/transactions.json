@@ -2,6 +2,53 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-175",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "51bf767",
+      "commit_full": "51bf767d4cee62b52465ded262c4dc434ce6e7a9",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(econ): budget drain hides Q5 panel when no proxy logs",
+      "detail": "- API /api/quota-divisor: requested_date + no_proxy_logs when date filter has no pairs\n\n- Client: single-grid layout until Q5 data; localized message under chart\n\n- i18n: econDrainNoProxyLogs (de/en/ko)\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-174",
       "timestamp": "2026-04-12",
       "session": "auto",
