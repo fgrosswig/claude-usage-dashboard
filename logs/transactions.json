@@ -2,6 +2,33 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-152",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "50a66c9",
+      "commit_full": "50a66c97c79efd29ac5ee600d7a8bacb6c41a1f7",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(migration): migrate User Profile section to ECharts (CUD-14)",
+      "detail": "Migrate 3 horizontal bar charts (versions, entrypoints, release stability)\nfrom Chart.js to ECharts. Replace destroy() with dispose(). HTML canvas → div.\nStats: 11 Chart.js + 26 ECharts remaining.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-registry.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-151",
       "timestamp": "2026-04-12",
       "session": "auto",
