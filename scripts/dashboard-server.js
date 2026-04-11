@@ -3448,21 +3448,21 @@ function getSessionTurnsCached(dateKey) {
   var today = new Date().toISOString().slice(0, 10);
   var cached = noCache ? null : _sessionTurnsCache[dateKey];
   if (cached && dateKey < today) {
-    serviceLog.debug('session-turns', 'date=' + dateKey + ' historical HIT (0ms)');
+    serviceLog.info('session-turns', 'date=' + dateKey + ' historical HIT (0ms)');
     return cached.result;
   }
   var collected = collectTaggedJsonlFiles();
   var fp = buildTaggedJsonlFingerprintSync(collected.tagged);
   var fpMs = Date.now() - t0;
   if (cached && cached.fingerprint === fp) {
-    serviceLog.debug('session-turns', 'date=' + dateKey + ' fingerprint HIT (' + fpMs + 'ms stat)');
+    serviceLog.info('session-turns', 'date=' + dateKey + ' fingerprint HIT (' + fpMs + 'ms stat)');
     return cached.result;
   }
   var result = buildSessionTurnsForDate(dateKey);
   var totalMs = Date.now() - t0;
   var sessions = result && result.sessions ? result.sessions.length : 0;
   var turns = result && result.total_turns ? result.total_turns : 0;
-  serviceLog.debug('session-turns', 'date=' + dateKey + (noCache ? ' NO_CACHE REBUILD ' : ' REBUILD ') + collected.tagged.length + ' files → ' + sessions + ' sessions, ' + turns + ' turns (' + totalMs + 'ms, fp=' + fpMs + 'ms)');
+  serviceLog.info('session-turns', 'date=' + dateKey + (noCache ? ' NO_CACHE REBUILD ' : ' REBUILD ') + collected.tagged.length + ' files → ' + sessions + ' sessions, ' + turns + ' turns (' + totalMs + 'ms, fp=' + fpMs + 'ms)');
   if (!noCache) _sessionTurnsCache[dateKey] = { result: result, fingerprint: fp };
   return result;
 }
@@ -3866,7 +3866,7 @@ var server = http.createServer(function (req, res) {
     var stT0 = Date.now();
     var stResult = getSessionTurnsCached(stDate);
     var stMs = Date.now() - stT0;
-    serviceLog.debug('http', 'GET /api/session-turns?date=' + stDate + ' → ' + stMs + 'ms');
+    serviceLog.info('session-turns', 'GET /api/session-turns?date=' + stDate + ' → ' + stMs + 'ms');
     res.writeHead(200, {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
