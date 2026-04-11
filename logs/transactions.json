@@ -2,6 +2,33 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-145",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "56e3e68",
+      "commit_full": "56e3e68139b6c5d6c46ab3ab213810143bdb6c7a",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(migration): migrate budget section from Chart.js/Google to ECharts (CUD-15)",
+      "detail": "- Sankey: Google Charts visualization.Sankey → ECharts native sankey type\n- Budget Trend: Chart.js line → ECharts line (output%, overhead, cache miss)\n- Budget Quota: Chart.js line → ECharts line (5h/7d quota, fallback)\n- Remove Google Charts CDN script tag (gstatic.com/charts/loader.js)\n- HTML: canvas → div for trend + quota charts\n- Add ECharts resize handler for budget charts\n- Update widget registry: budget section now fully echarts (0 google remaining)\n- Stats: 26 Chart.js + 11 ECharts + 0 Google Charts\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-registry.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-144",
       "timestamp": "2026-04-11",
       "session": "auto",
