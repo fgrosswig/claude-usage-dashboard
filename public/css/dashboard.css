@@ -60,7 +60,7 @@ h1{font-size:1.5rem;margin-bottom:4px;color:#f8fafc}
 .user-filter-actions{display:flex;gap:4px;padding:4px 8px;border-top:1px solid #334155;margin-top:4px}
 .user-filter-actions button{flex:1;background:#334155;color:#94a3b8;border:none;border-radius:3px;padding:3px 0;font-size:.7rem;cursor:pointer}
 .user-filter-actions button:hover{background:#475569;color:#e2e8f0}
-#user-profile-charts{padding-top:12px}
+#user-profile-charts{padding-top:12px;align-items:start}
 /* User-Profile: Canvas nur im Host — Höhe in JS; sonst misst Chart.js die volle .chart-box inkl. h3+Blurb → Balken versetzt / abgeschnitten */
 #user-profile-charts .user-profile-chart-box{display:flex;flex-direction:column;min-height:0;overflow:hidden}
 #user-profile-charts .user-chart-canvas-host{flex:0 0 auto;width:100%;position:relative}
