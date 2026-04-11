@@ -225,6 +225,7 @@ steps:
     commands:
       - |
         apk add --no-cache git curl jq
+        git fetch --tags "https://oauth2:${GITEA_TOKEN}@gitea.grosswig-it.de/GRO/Claude-Usage-Dashboard.git" 2>/dev/null || true
         NOTES=$(node scripts/generate-release-notes.js "${CI_COMMIT_TAG}" --public 2>/dev/null || echo "")
         INTERNAL=$(node scripts/generate-release-notes.js "${CI_COMMIT_TAG}" 2>/dev/null || echo "")
         if [ -z "$NOTES" ] && [ -z "$INTERNAL" ]; then

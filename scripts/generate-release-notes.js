@@ -70,15 +70,29 @@ function componentSortKey(comp) {
 }
 
 // ── Tag bestimmen ────────────────────────────────────────
+// When called with a tag (e.g. from CI on tag event), find the PREVIOUS tag
+// so we get commits between previous and current tag, not current..HEAD (= 0).
+var allTags;
+try {
+  allTags = execSync('git tag --sort=-v:refname').toString().trim().split('\n').filter(Boolean);
+} catch (_) { allTags = []; }
+
 var sinceTag = sinceTagArg;
+var displayTag = null;
 if (!sinceTag) {
-  try {
-    sinceTag = execSync('git tag --sort=-v:refname').toString().trim().split('\n')[0];
-  } catch (_) { /* no tags */ }
+  sinceTag = allTags[0] || null;
 }
 if (!sinceTag) {
   console.error('Kein Git-Tag gefunden. Usage: node scripts/generate-release-notes.js [tag] [--public]');
   process.exit(1);
+}
+
+// If sinceTag is the latest tag, use the one before it as base
+var tagIdx = allTags.indexOf(sinceTag);
+if (tagIdx === 0 && allTags.length > 1) {
+  // sinceTag is the newest tag — use previous tag as base for diff
+  displayTag = sinceTag;
+  sinceTag = allTags[1];
 }
 
 var tagSha;
@@ -185,7 +199,8 @@ var labels = {
   other: 'Other'
 };
 
-var title = PUBLIC ? '## ' + sinceTag + '\n' : '## Changes since ' + sinceTag + '\n';
+var titleTag = displayTag || sinceTag;
+var title = PUBLIC ? '## ' + titleTag + '\n' : '## Changes since ' + sinceTag + '\n';
 console.log(title);
 var order = ['feat', 'fix', 'docs', 'chore', 'other'];
 for (var key of order) {
