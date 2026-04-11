@@ -543,6 +543,8 @@ module.exports = {
               cache_read_ratio: ratio,
               cache_health: cacheHealthLabel(ratio, usage),
               response_hints: respHints,
+              ephemeral_1h_input_tokens: usage ? (usage.ephemeral_1h_input_tokens || 0) : 0,
+              ephemeral_5m_input_tokens: usage ? (usage.ephemeral_5m_input_tokens || 0) : 0,
               source: 'proxy',
               peak_hour: (function() {
                 var d = new Date(endedIso);
