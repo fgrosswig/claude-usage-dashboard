@@ -3873,6 +3873,14 @@ var server = http.createServer(function (req, res) {
     var stUrl = new URL(req.url, 'http://localhost');
     var stDate = stUrl.searchParams.get('date') || new Date().toISOString().slice(0, 10);
     if (__devMode === 'full' && __devSource) {
+      var stCached = _sessionTurnsCache[stDate];
+      var stToday = new Date().toISOString().slice(0, 10);
+      if (stCached && stDate < stToday) {
+        serviceLog.info('session-turns', 'DEV local cache HIT date=' + stDate + ' (0ms)');
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
+        res.end(JSON.stringify(stCached.result));
+        return;
+      }
       var stRemoteUrl = __devSource.replace(/\/$/, '') + '/api/debug/session-turns?date=' + encodeURIComponent(stDate);
       var stT0r = Date.now();
       serviceLog.info('session-turns', 'REMOTE proxy → ' + stRemoteUrl);
@@ -3881,7 +3889,15 @@ var server = http.createServer(function (req, res) {
         var stBody = '';
         stResp.on('data', function (ch) { stBody += ch; });
         stResp.on('end', function () {
-          serviceLog.info('session-turns', 'REMOTE date=' + stDate + ' → ' + (Date.now() - stT0r) + 'ms (' + stResp.statusCode + ')');
+          var stMs = Date.now() - stT0r;
+          serviceLog.info('session-turns', 'REMOTE date=' + stDate + ' → ' + stMs + 'ms (' + stResp.statusCode + ')');
+          if (stResp.statusCode === 200) {
+            try {
+              var stParsed = JSON.parse(stBody);
+              _sessionTurnsCache[stDate] = { result: stParsed, fingerprint: 'remote' };
+              serviceLog.info('session-turns', 'DEV cached date=' + stDate + ' (' + (stParsed.sessions ? stParsed.sessions.length : 0) + ' sessions)');
+            } catch (e) {}
+          }
           res.writeHead(stResp.statusCode || 200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
           res.end(stBody);
         });
