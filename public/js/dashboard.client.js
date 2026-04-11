@@ -31,7 +31,7 @@ function hourHasTokenUsage(sd, wh) {
 function outageSpanHitsAtHour(spans, wh) {
   var hitSrv = false;
   var hitCli = false;
-  for (const span of spans) {
+  for (var span of spans) {
     if (wh >= Math.floor(span.from) && wh < Math.ceil(span.to)) {
       if (span.kind === "server") hitSrv = true;
       else hitCli = true;
@@ -62,14 +62,14 @@ function sumServiceImpactForDay(sd) {
   var affSrv = 0;
   var affCli = 0;
   var cleanCount = 0;
-  for (const wh of wHrs) {
+  for (var wh of wHrs) {
     var cls = classifyWorkHour(sd, spans, wh);
     if (cls === "srv") affSrv++;
     else if (cls === "cli") affCli++;
     else if (cls === "clean") cleanCount++;
   }
   var outTotal = 0;
-  for (const span of spans) outTotal += span.to - span.from;
+  for (var span of spans) outTotal += span.to - span.from;
   var outOnly = Math.max(0, Math.round((outTotal - affSrv - affCli) * 10) / 10);
   return { cleanWork: cleanCount, affSrv: affSrv, affCli: affCli, outOnly: outOnly };
 }
@@ -97,7 +97,7 @@ function buildSessionSignalsStackedByDay(days, hostLabel) {
   var intr = [];
   var outageH = [];
   var cacheRead = [];
-  for (const d of days) {
+  for (var d of days) {
     var oh = d?.outage_hours;
     outageH.push(oh != null && !Number.isNaN(Number(oh)) ? Number(oh) : 0);
     var sig = extractDaySignals(d, hostKey);
@@ -769,30 +769,11 @@ function chartLabelsPrefixMatch(ch, newLabels) {
   return true;
 }
 
-var __mainChartTransitions = {
-  active: { animation: { duration: 0 } },
-  resize: { animation: { duration: 0 } },
-  show: { animation: { duration: 0 } },
-  hide: { animation: { duration: 0 } }
-};
-/** Eine feste Referenz — nicht bei jedem renderDashboardCore neu erzeugen (sonst kann Chart.js bei options.transitions jedes Mal neu layouten / „zappeln“). */
-var __chartTransitionsOff = {
-  active: { animation: { duration: 0 } },
-  resize: { animation: { duration: 0 } },
-  show: { animation: { duration: 0 } },
-  hide: { animation: { duration: 0 } }
-};
-function freezeChartNoAnim(ch) {
-  if (!ch || !ch.options) return;
-  ch.options.animation = false;
-  ch.options.transitions = __chartTransitionsOff;
-}
-
-/** Chart.resize nur wenn Canvas noch im DOM — vermeidet ownerDocument-null nach Modal/DOM-Zug. */
+/** ECharts .resize() nur wenn DOM-Element noch angebunden. */
 function __safeChartResize(ch) {
   if (!ch || typeof ch.resize !== "function") return;
   try {
-    var dom = ch.getDom ? ch.getDom() : ch.canvas;
+    var dom = ch.getDom ? ch.getDom() : null;
     if (!dom?.isConnected) return;
     ch.resize();
   } catch(e) {
@@ -1187,152 +1168,7 @@ function initMetaDetailsPanel() {
     } catch (e2) {}
   });
 }
-var USAGE_EXT_VLINE_END_OFFSET = 22;
-// Global: disable ALL Chart.js animations to prevent flickering
-if (typeof Chart !== "undefined") {
-  Chart.defaults.animation = false;
-  Chart.defaults.transitions = {
-    active: { animation: { duration: 0 } },
-    resize: { animation: { duration: 0 } },
-    show: { animation: { duration: 0 } },
-    hide: { animation: { duration: 0 } }
-  };
-  Chart.defaults.responsive = true;
-  Chart.defaults.resizeDelay = 300;
-  // Native DPR only: forcing min 2 (old workaround) oversizes the backing store on 1x / zoomed
-  // views → browser downscales the bitmap and charts look blurry. Flicker is handled by
-  // animation:false and the stable __chartTransitionsOff object on updates.
-  Chart.defaults.devicePixelRatio = window.devicePixelRatio || 1;
-
-}
-var __usageUpdatePluginRegistered = false;
-function registerUsageUpdateVLinePlugin() {
-  if (__usageUpdatePluginRegistered || typeof Chart === "undefined") return;
-  __usageUpdatePluginRegistered = true;
-  Chart.register({
-    id: "usageUpdateVerticalLines",
-    beforeDatasetsDraw: function (chart) {
-      var cid = chart.canvas && chart.canvas.id;
-      if (cid !== "c-service") return;
-      var idxs = window.__usageVersionDayIndices;
-      if (!idxs || !idxs.length) return;
-      var xScale = chart.scales.x;
-      if (!xScale || typeof xScale.getPixelForTick !== "function") return;
-      var ca = chart.chartArea;
-      if (!ca) return;
-      var n = chart.data.labels ? chart.data.labels.length : 0;
-      if (!n) return;
-      var ctx = chart.ctx;
-      var yEnd = ca.top + USAGE_EXT_VLINE_END_OFFSET;
-      var bot = ca.bottom;
-      if (yEnd >= bot) return;
-      ctx.save();
-      ctx.setLineDash([3, 4]);
-      ctx.strokeStyle = "rgba(74, 222, 128, 0.38)";
-      ctx.lineWidth = 1;
-      for (var k = 0; k < idxs.length; k++) {
-        var di = idxs[k];
-        if (di < 0 || di >= n) continue;
-        var x = xScale.getPixelForTick(di);
-        if (x == null || isNaN(x)) continue;
-        ctx.beginPath();
-        ctx.moveTo(x, bot);
-        ctx.lineTo(x, yEnd);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-  });
-}
-registerUsageUpdateVLinePlugin();
-function chartTickXToParentLeft(chart, hostEl, tickIndex) {
-  if (!chart || !chart.scales || !chart.scales.x || !chart.canvas || !hostEl) return null;
-  var xScale = chart.scales.x;
-  if (typeof xScale.getPixelForTick !== "function") return null;
-  var x = xScale.getPixelForTick(tickIndex);
-  if (x == null || isNaN(x)) return null;
-  var cw = chart.width;
-  var ch = chart.height;
-  if (!cw || !ch) return null;
-  var canvas = chart.canvas;
-  var cr = canvas.getBoundingClientRect();
-  var hr = hostEl.getBoundingClientRect();
-  var xCss = (x / cw) * cr.width;
-  return cr.left - hr.left + xCss;
-}
-function chartAreaTopInParent(chart, hostEl) {
-  if (!chart || !chart.canvas || !hostEl) return 0;
-  var cr = chart.canvas.getBoundingClientRect();
-  var hr = hostEl.getBoundingClientRect();
-  var t = chart.chartArea ? chart.chartArea.top : 0;
-  return cr.top - hr.top + (t / chart.height) * cr.height;
-}
-function chartAreaBottomInParent(chart, hostEl) {
-  if (!chart || !chart.canvas || !hostEl) return 0;
-  var cr = chart.canvas.getBoundingClientRect();
-  var hr = hostEl.getBoundingClientRect();
-  var b = chart.chartArea ? chart.chartArea.bottom : chart.height;
-  return cr.top - hr.top + (b / chart.height) * cr.height;
-}
-/** Y-Koordinate (px von hostEl-Oberkante) für einen Canvas-Y-Wert (von Canvas-Oberkante). */
-function chartYInParent(chart, hostEl, yCanvas) {
-  if (!chart || !chart.canvas || !hostEl) return 0;
-  var cr = chart.canvas.getBoundingClientRect();
-  var hr = hostEl.getBoundingClientRect();
-  var ch = chart.height;
-  if (!ch || yCanvas == null || isNaN(yCanvas)) return cr.top - hr.top;
-  return cr.top - hr.top + (yCanvas / ch) * cr.height;
-}
-function layoutFsUpdateOverlay() {
-  var wrap = document.getElementById("service-chart-canvas-wrap");
-  var overlay = document.getElementById("fs-update-overlay");
-  if (!wrap || !overlay || !_charts.cService || !_charts.cService.chartArea) return;
-  overlay.innerHTML = "";
-  var ch = _charts.cService;
-  var n = ch.data.labels ? ch.data.labels.length : 0;
-  var daysArr = (__lastUsageData && __lastUsageData.days) || [];
-  var triTop = chartYInParent(ch, wrap, ch.chartArea.top + 4);
-  for (var di = 0; di < n; di++) {
-    var d = daysArr[di];
-    if (!d) continue;
-    var leftAbs = chartTickXToParentLeft(ch, wrap, di);
-    if (leftAbs == null) continue;
-    var hasV = !!d.version_change;
-    var hasM = !!d.model_change;
-    if (!hasV && !hasM) continue;
-    if (hasV) {
-      var mark = document.createElement("button");
-      mark.type = "button";
-      mark.className = "fs-update-mark";
-      mark.textContent = "\u25b2";
-      mark.style.left = (leftAbs + (hasM ? -10 : 0)) + "px";
-      mark.style.top = triTop + "px";
-      mark.setAttribute("aria-label", t("updateDotAria"));
-      mark.dataset.dayIndex = String(di);
-      overlay.appendChild(mark);
-    }
-    if (hasM) {
-      var mmark = document.createElement("button");
-      mmark.type = "button";
-      mmark.className = "fs-model-mark";
-      mmark.textContent = "\u25c7";
-      mmark.style.left = (leftAbs + (hasV ? 10 : 0)) + "px";
-      mmark.style.top = triTop + "px";
-      mmark.setAttribute("aria-label", t("modelDotAria"));
-      mmark.dataset.dayIndex = String(di);
-      overlay.appendChild(mmark);
-    }
-  }
-}
-/** Extension-Update-Marker nur im Service-Impact-Chart (c-service), nicht in den Haupt-Charts. */
-function layoutMainChartsUpdateOverlay() {
-  var overlay = document.getElementById("main-charts-update-overlay");
-  if (overlay) overlay.innerHTML = "";
-}
-function layoutUpdateGuideOverlays() {
-  layoutFsUpdateOverlay();
-  layoutMainChartsUpdateOverlay();
-}
+function layoutUpdateGuideOverlays() {}
 /** Stunden 0–24 als HH:MM (UTC-Tag wie serverseitige outage_spans). */
 function fmtUtcHmFromDayHour(h) {
   if (h == null || isNaN(h)) return "?";
@@ -2782,7 +2618,7 @@ function generateForensicReportMd(data) {
 
   // Detect peak + limit days
   var peakDay = null, peakVal = 0;
-  for (const dy of days) {
+  for (var dy of days) {
     var tt = __rptDayTotal(dy);
     if (tt > peakVal) {
       peakVal = tt;
@@ -2790,7 +2626,7 @@ function generateForensicReportMd(data) {
     }
   }
   var limitDays = [];
-  for (const dy of days) {
+  for (var dy of days) {
     var fl = [];
     if ((dy.hit_limit || 0) >= HIT_MIN) fl.push("HIT(" + dy.hit_limit + ")");
     if ((dy.cache_read || 0) >= CACHE_THRESH) fl.push("CACHE\u2265500M");
@@ -2810,7 +2646,7 @@ function generateForensicReportMd(data) {
     "|------------|----------|------------|--------|-------|-------|-------------|--------|"
   );
 
-  for (const dy of days) {
+  for (var dy of days) {
     var cr = dy.output > 0 ? Math.round(dy.cache_read / dy.output) : 0;
     var lim = "\u2014";
     if ((dy.hit_limit || 0) >= HIT_MIN) lim = "HIT(" + dy.hit_limit + ")";
@@ -2827,7 +2663,7 @@ function generateForensicReportMd(data) {
     "| " + (isDE ? "Datum" : "Date") + " | Overhead | Output/h | Total/h | Subagent% |",
     "|------------|----------|----------|---------|-----------|"
   );
-  for (const dy of days) {
+  for (var dy of days) {
     var tot2 = __rptDayTotal(dy);
     var ah = Math.max(1, dy.active_hours || 1);
     var oh = dy.output > 0 ? (tot2 / dy.output).toFixed(0) + "x" : "\u2014";
@@ -2843,7 +2679,7 @@ function generateForensicReportMd(data) {
     "| "+(isDE?"Datum":"Date")+" | "+(isDE?"Aufrufe":"Calls")+" | Sub | Sub-Cache | Sub-Cache% |",
     "|------------|--------|------|-----------|------------|"
   );
-  for(const dy of days){var sc=dy.sub_cache||0;var scp=(dy.sub_cache_pct||0)+"%";md.push("| "+dy.date+" | "+dy.calls+" | "+(dy.sub_calls||0)+" | "+fmt(sc)+" | "+scp+" |");}
+  for (var dy of days){var sc=dy.sub_cache||0;var scp=(dy.sub_cache_pct||0)+"%";md.push("| "+dy.date+" | "+dy.calls+" | "+(dy.sub_calls||0)+" | "+fmt(sc)+" | "+scp+" |");}
   md.push("");
 
   // 4. Budget estimate
@@ -2857,7 +2693,7 @@ function generateForensicReportMd(data) {
       "|------------|---------|----------|---------|-------|--------|"
     );
     var prevI = 0;
-    for (const ld of limitDays) {
+    for (var ld of limitDays) {
       var tot4 = __rptDayTotal(ld.d);
       var impl = Math.round(tot4 / 0.9);
       var vsp = peakVal > 0 ? (peakVal / impl).toFixed(1) + "x" : "\u2014";
@@ -2874,7 +2710,7 @@ function generateForensicReportMd(data) {
 
     // Median
     var ivs=[];
-    for(const ld of limitDays){if(ld.d.calls>=50&&(ld.d.active_hours||0)>=2)ivs.push(Math.round(__rptDayTotal(ld.d)/0.9));}
+    for (var ld of limitDays){if(ld.d.calls>=50&&(ld.d.active_hours||0)>=2)ivs.push(Math.round(__rptDayTotal(ld.d)/0.9));}
     if(ivs.length>=2){
       ivs.sort(function(a,b){return a-b;});
       var med=ivs[Math.floor(ivs.length/2)];
@@ -2923,7 +2759,7 @@ function generateForensicReportMd(data) {
 
   // ─── Service Impact: Work vs Outage mit ASCII-Bars ───
   var hasAnyOutage = false;
-  for (const dayOut of days) {
+  for (var dayOut of days) {
     if ((dayOut.outage_hours || 0) > 0) { hasAnyOutage = true; break; }
   }
   if (hasAnyOutage) {
@@ -2935,19 +2771,19 @@ function generateForensicReportMd(data) {
     );
     var maxH = 0;
     var svcRows = [];
-    for (const sd of days) {
+    for (var sd of days) {
       var wHrs = Object.keys(sd.hours || {}).map(function (h) { return Number.parseInt(h, 10); });
       var spans = sd.outage_spans || [];
       var affected = 0;
-      for (const hour of wHrs) {
+      for (var hour of wHrs) {
         var hitSpan = false;
-        for (const span of spans) {
+        for (var span of spans) {
           if (hour >= Math.floor(span.from) && hour < Math.ceil(span.to)) { hitSpan = true; break; }
         }
         if (hitSpan) affected++;
       }
       var outTotal = 0;
-      for (const span2 of spans) outTotal += span2.to - span2.from;
+      for (var span2 of spans) outTotal += span2.to - span2.from;
       var clean = wHrs.length - affected;
       var outOnly = Math.max(0, Math.round((outTotal - affected) * 10) / 10);
       var totalHRow = clean + affected + outOnly;
@@ -2956,7 +2792,7 @@ function generateForensicReportMd(data) {
     }
     var barW = 40;
     md.push("```");
-    for (const r of svcRows) {
+    for (var r of svcRows) {
       var totalH = r.clean + r.affected + r.outOnly;
       if (totalH === 0 && r.outageH === 0) continue;
       var scale = maxH > 0 ? barW / maxH : 1;
@@ -2977,7 +2813,7 @@ function generateForensicReportMd(data) {
     }
     md.push("```", "");
     var totClean = 0, totAff = 0, totOutOnly = 0;
-    for (const rowSum of svcRows) {
+    for (var rowSum of svcRows) {
       totClean += rowSum.clean;
       totAff += rowSum.affected;
       totOutOnly += rowSum.outOnly;
@@ -2992,7 +2828,7 @@ function generateForensicReportMd(data) {
 
   // ─── Extension-Versionen & Releases ───
   var hasVerChange = false;
-  for (const dvc of days) {
+  for (var dvc of days) {
     if (dvc.version_change) { hasVerChange = true; break; }
   }
   if (hasVerChange) {
@@ -3002,7 +2838,7 @@ function generateForensicReportMd(data) {
       "| " + (isDE ? "Datum" : "Date") + " | Version | Highlights |",
       "|------------|---------|------------|"
     );
-    for (const dVer of days) {
+    for (var dVer of days) {
       var vc = dVer.version_change;
       if (!vc) continue;
       var ver = vc.added.join(", ");
@@ -3068,7 +2904,7 @@ function generateForensicReportMd(data) {
     md.push("");
 
     var totOut = 0, totAll = 0, totCr = 0, totCc = 0, totRetries = 0, totInterrupts = 0, totTrunc = 0, totOutageH = 0;
-    for (const bd of days) {
+    for (var bd of days) {
       totOut += bd.output || 0;
       totAll += bd.total || 0;
       totCr += bd.cache_read || 0;
@@ -3325,13 +3161,13 @@ var __versionHealthMetrics = [
 function __stackedHBarXMax(datasets) {
   if (!datasets?.length) return undefined;
   var len = 0;
-  for (const ds of datasets) {
+  for (var ds of datasets) {
     var d = ds.data;
     if (d && d.length > len) len = d.length;
   }
   if (!len) return undefined;
   var sums = new Array(len).fill(0);
-  for (const ds of datasets) {
+  for (var ds of datasets) {
     var row = ds.data || [];
     for (var j = 0; j < len; j++) sums[j] += Number(row[j]) || 0;
   }
@@ -3346,7 +3182,7 @@ function __stackedHBarXMax(datasets) {
 function semverCmpDesc(a, b) {
   var pa = a.split(".").map(Number);
   var pb = b.split(".").map(Number);
-  for (const i of [0, 1, 2]) {
+  for (var i of [0, 1, 2]) {
     var da = pa[i] || 0, db = pb[i] || 0;
     if (da !== db) return db - da;
   }
@@ -3354,9 +3190,9 @@ function semverCmpDesc(a, b) {
 }
 
 function mergeVersionEntry(tgt, src) {
-  for (const fk of Object.keys(src)) {
+  for (var fk of Object.keys(src)) {
     if (fk === 'entrypoints') {
-      for (const ek of Object.keys(src.entrypoints || {})) {
+      for (var ek of Object.keys(src.entrypoints || {})) {
         tgt.entrypoints[ek] = (tgt.entrypoints[ek] || 0) + (src.entrypoints[ek] || 0);
       }
     } else {
@@ -3367,9 +3203,9 @@ function mergeVersionEntry(tgt, src) {
 
 function aggregateVersionStats(days) {
   var merged = {};
-  for (const day of days) {
+  for (var day of days) {
     var vs = day.version_stats || {};
-    for (const ver of Object.keys(vs)) {
+    for (var ver of Object.keys(vs)) {
       if (!merged[ver]) merged[ver] = { calls: 0, output: 0, cache_read: 0, hit_limit: 0, retry: 0, interrupt: 0, continue: 0, resume: 0, truncated: 0, api_error: 0, entrypoints: {} };
       mergeVersionEntry(merged[ver], vs[ver]);
     }
@@ -3404,7 +3240,7 @@ function initVersionSortDropdown(days) {
     { val: "newest", lbl: t("userSortNewest") },
     { val: "calls", lbl: t("userSortCalls") }
   ];
-  for (const opt of opts) {
+  for (var opt of opts) {
     var o = document.createElement("option");
     o.value = opt.val;
     o.textContent = opt.lbl;
@@ -3419,7 +3255,7 @@ function initVersionSortDropdown(days) {
 
 function buildFilterCheckboxHtml(allVers, stats) {
   var html = "";
-  for (const v of allVers) {
+  for (var v of allVers) {
     var checked = !__userVersionFilter || __userVersionFilter.includes(v);
     var anomalies = versionAnomalyTotal(stats[v]);
     var calls = stats[v]?.calls || 0;
@@ -3466,25 +3302,25 @@ function initUserVersionControls(stats, days) {
   var cbs = dd.querySelectorAll('input[type=checkbox]');
   function applyFilter() {
     var sel = [];
-    for (const cb of cbs) {
+    for (var cb of cbs) {
       if (cb.checked) sel.push(cb.value);
     }
     __userVersionFilter = sel.length === allVers.length ? null : sel;
     updateCount();
     renderUserProfileCharts(days);
   }
-  for (const cb of cbs) {
+  for (var cb of cbs) {
     cb.addEventListener("change", applyFilter);
   }
 
   var allBtn = document.getElementById("user-ver-all");
   var noneBtn = document.getElementById("user-ver-none");
   if (allBtn) allBtn.onclick = function() {
-    for (const cb of cbs) cb.checked = true;
+    for (var cb of cbs) cb.checked = true;
     applyFilter();
   };
   if (noneBtn) noneBtn.onclick = function() {
-    for (const cb of cbs) cb.checked = false;
+    for (var cb of cbs) cb.checked = false;
     applyFilter();
   };
 }
@@ -3497,15 +3333,15 @@ function collectAllVersionKeys(stats, days) {
 
 function collectFallbackVersionKeys(days) {
   var fallbackVers = {};
-  for (const day of days) {
-    for (const fk of Object.keys(day.versions || {})) fallbackVers[fk] = true;
+  for (var day of days) {
+    for (var fk of Object.keys(day.versions || {})) fallbackVers[fk] = true;
   }
   return Object.keys(fallbackVers);
 }
 
 function maxKeyByValue(obj) {
   var best = "", bestVal = 0;
-  for (const k of Object.keys(obj)) {
+  for (var k of Object.keys(obj)) {
     if (obj[k] > bestVal) { best = k; bestVal = obj[k]; }
   }
   return best;
@@ -3534,7 +3370,7 @@ function computeAnomalyStats(allVers, stats) {
   var totalAnomalies = 0;
   var worstVer = "";
   var worstAnomaly = 0;
-  for (const ver of allVers) {
+  for (var ver of allVers) {
     var sv = stats[ver];
     if (sv) {
       totalCalls += sv.calls || 0;
@@ -3585,11 +3421,11 @@ function renderUserProfileCharts(days) {
   var barPitch = 30;
   var chartCanvasH = Math.max(240, sortedVers.length * barPitch + 56);
   var hosts = document.querySelectorAll("#user-profile-charts .user-chart-canvas-host");
-  for (const hEl of hosts) {
+  for (var hEl of hosts) {
     hEl.style.height = chartCanvasH + "px";
     hEl.style.minHeight = chartCanvasH + "px";
   }
-  for (const bx of document.querySelectorAll("#user-profile-charts .chart-box")) {
+  for (var bx of document.querySelectorAll("#user-profile-charts .chart-box")) {
     bx.style.height = "";
   }
 
@@ -3614,7 +3450,7 @@ function renderVersionHealthChart(sortedVers, stats, allVers) {
   }
 
   var datasets = [];
-  for (const m of __versionHealthMetrics) {
+  for (var m of __versionHealthMetrics) {
     var mData = sortedVers.map(function(sv) { return stats[sv] ? (stats[sv][m.key] || 0) : 0; });
     datasets.push({ name: t(m.label), data: mData, color: m.color });
   }
@@ -3650,9 +3486,9 @@ function renderEntrypointsChart(sortedVers, stats) {
   }
 
   var allEp = {};
-  for (const sv of sortedVers) {
+  for (var sv of sortedVers) {
     if (stats[sv]?.entrypoints) {
-      for (const epk of Object.keys(stats[sv].entrypoints)) allEp[epk] = true;
+      for (var epk of Object.keys(stats[sv].entrypoints)) allEp[epk] = true;
     }
   }
   var epKeys = Object.keys(allEp).sort(function(a, b) { return a.localeCompare(b); });
@@ -3687,7 +3523,7 @@ function renderEntrypointsChart(sortedVers, stats) {
 // ── Release Stability Chart ──────────────────────────────────────────────
 function __countReleaseStabilityBlurb(sortedVers, lookup) {
   var matched = 0, stableN = 0, regN = 0, hotN = 0, unknownN = 0;
-  for (const ver of sortedVers) {
+  for (var ver of sortedVers) {
     var info = lookup[ver];
     if (info) {
       matched++;
@@ -3707,7 +3543,7 @@ function __buildReleaseStabilitySeries(sortedVers, lookup) {
   var hotfixData = [];
   var unknownData = [];
   var meta = [];
-  for (const ver of sortedVers) {
+  for (var ver of sortedVers) {
     var r = lookup[ver];
     if (!r) {
       stableData.push(0);
@@ -3748,7 +3584,7 @@ function __releaseStabilityTooltipAfterBody(meta, items, t) {
 function __buildReleaseLookup(releaseData) {
   var map = {};
   if (!releaseData?.releases) return map;
-  for (const r of releaseData.releases) {
+  for (var r of releaseData.releases) {
     var key = (r.tag || "").replace(/^v/, "");
     map[key] = r;
   }
@@ -3810,7 +3646,7 @@ function __aggregateBudgetDaysForEfficiency(days, filteredHost) {
   var tot = { input: 0, output: 0, cache_read: 0, cache_creation: 0, total: 0,
     retries: 0, interrupts: 0, api_errors: 0, hit_limits: 0, calls: 0, active_hours: 0 };
   var dailyTrend = [];
-  for (const d of days) {
+  for (var d of days) {
     var src_d = d;
     if (filteredHost && d.hosts?.[filteredHost]) src_d = d.hosts[filteredHost];
     tot.input += src_d.input || 0;
@@ -3846,9 +3682,9 @@ function __aggregateBudgetDaysForEfficiency(days, filteredHost) {
 
 function __budgetHostTotalsFromDays(days) {
   var hostTotals = {};
-  for (const dayRow of days) {
+  for (var dayRow of days) {
     var dh = dayRow.hosts || {};
-    for (const hl of Object.keys(dh)) {
+    for (var hl of Object.keys(dh)) {
       var hv = dh[hl];
       if (!hostTotals[hl]) hostTotals[hl] = { output: 0, input: 0, cache_read: 0, cache_creation: 0, total: 0 };
       hostTotals[hl].output += hv.output || 0;
@@ -3864,7 +3700,7 @@ function __budgetHostTotalsFromDays(days) {
 function __budgetSankeyWeights(src) {
   var allVals = [src.out, src.inp, src.cr, src.cc].filter(function(v) { return v > 0; });
   var maxLog = 0;
-  for (const av of allVals) {
+  for (var av of allVals) {
     var lx = Math.log10(1 + av);
     if (lx > maxLog) maxLog = lx;
   }
@@ -3879,9 +3715,9 @@ function __budgetSankeyWeights(src) {
 
 function __budgetKpiCardsHtml(days, tot, outputPct, overheadFactor, cacheMissRate, lostSignals) {
   var totalOutageH = 0;
-  for (const d of days) totalOutageH += d.outage_hours || 0;
+  for (var d of days) totalOutageH += d.outage_hours || 0;
   var totalTruncated = 0;
-  for (const d of days) totalTruncated += d.session_signals?.truncated || 0;
+  for (var d of days) totalTruncated += d.session_signals?.truncated || 0;
   var cards = [
     { label: t("budgetCardOutput"), value: outputPct + "%", sub: t("budgetCardOutputSub"), cls: outputPct < 25 ? "warn" : "" },
     { label: t("budgetCardOverhead"), value: overheadFactor + "x", sub: t("budgetCardOverheadSub"), cls: overheadFactor > 4 ? "warn" : "" },
@@ -3924,7 +3760,7 @@ function __budgetQuotaFromLatestProxy(proxy) {
 
 function __budgetQuotaByDateMap(proxyDays) {
   var quotaByDate = {};
-  for (const pd of proxyDays) {
+  for (var pd of proxyDays) {
     if (!pd.date || !pd.rate_limit) continue;
     var rl = pd.rate_limit;
     var pdQ5 = rl["anthropic-ratelimit-unified-5h-utilization"];
@@ -3941,7 +3777,7 @@ function __budgetQuotaByDateMap(proxyDays) {
 }
 
 function __budgetApplyQuotaToTrend(dailyTrend, quotaByDate) {
-  for (const dt of dailyTrend) {
+  for (var dt of dailyTrend) {
     var qd = quotaByDate[dt.date];
     dt.quota_5h = qd ? qd.pct_5h : null;
     dt.quota_7d = qd ? qd.pct_7d : null;
@@ -4126,7 +3962,7 @@ function __budgetSankeyDispose() {
 
 function __renderBudgetGroup(el, modes, current, setter) {
   el.innerHTML = "";
-  for (const mode of modes) {
+  for (var mode of modes) {
     var btn = document.createElement("button");
     btn.type = "button";
     btn.textContent = mode.label;
@@ -4168,12 +4004,12 @@ function __updateBudgetSwitchActive() {
   var flowGrp = document.getElementById("budget-flow-group");
   var weightGrp = document.getElementById("budget-weight-group");
   if (flowGrp) {
-    for (const btn of flowGrp.querySelectorAll("button")) {
+    for (var btn of flowGrp.querySelectorAll("button")) {
       btn.className = btn.dataset.key === __budgetFlowMode ? "active" : "";
     }
   }
   if (weightGrp) {
-    for (const b2 of weightGrp.querySelectorAll("button")) {
+    for (var b2 of weightGrp.querySelectorAll("button")) {
       b2.className = b2.dataset.key === __budgetViewMode ? "active" : "";
     }
   }
@@ -4202,7 +4038,7 @@ function __budgetPushLeafs(rows, from, s, x, w) {
 
 /** Expand parentNode into per-host sub-nodes and recurse into leafs. */
 function __budgetExpandHosts(rows, parentNode, x) {
-  for (const hk of x.hostKeys) {
+  for (var hk of x.hostKeys) {
     var hd = x.hostTotals[hk];
     var hLabel = hk + " (" + x.fmtTok(hd.total) + ")";
     var hsrc = __budgetHostSrc(hd, x.isCost);
@@ -4583,7 +4419,7 @@ var _proxyCharts = { tokens: null, latency: null };
 var _effCharts = { heatmap: null, ratio: null, vispct: null, cachemiss: null };
 var __effResizeT = null;
 function __effResizeAll() {
-  for (const key of Object.keys(_effCharts)) {
+  for (var key of Object.keys(_effCharts)) {
     var c = _effCharts[key];
     if (c && typeof c.resize === "function") {
       try {
@@ -4947,7 +4783,7 @@ function renderProxyInvisibleCost(pd) {
 // ── Phase 4: Hourly Request Heatmap ───────────────────────────────────────
 function aggregateHourlyTotals(proxyDays) {
   var totals = {};
-  for (const pd of proxyDays) {
+  for (var pd of proxyDays) {
     var dh = pd.hours || {};
     for (var hk in dh) {
       if (Object.hasOwn(dh, hk)) totals[hk] = (totals[hk] || 0) + (dh[hk] || 0);
@@ -5002,7 +4838,7 @@ function renderProxyModelChart(data) {
   if (!proxyDays.length) return;
   var colors = ["#8b5cf6", "#3b82f6", "#06b6d4", "#22c55e", "#f59e0b", "#ef4444", "#ec4899"];
   var allModels = {};
-  for (const pd of proxyDays) {
+  for (var pd of proxyDays) {
     var dm = pd.models || {};
     for (var mk in dm) { if (Object.hasOwn(dm, mk)) allModels[mk] = true; }
   }
@@ -5073,7 +4909,7 @@ function __proxyJsonlMatchAggregate(days, proxyByDate) {
   var matches = 0;
   var jsonlTotal = 0;
   var proxyTotal = 0;
-  for (const day of days) {
+  for (var day of days) {
     var pdx = proxyByDate[day.date];
     if (!pdx) continue;
     matches++;
@@ -5093,7 +4929,7 @@ function renderProxyJsonlComparison(data) {
     return;
   }
   var proxyByDate = {};
-  for (const pDay of proxyDays) {
+  for (var pDay of proxyDays) {
     proxyByDate[pDay.date] = pDay;
   }
   var agg = __proxyJsonlMatchAggregate(days, proxyByDate);
@@ -5122,7 +4958,7 @@ function __aggAddHourLatency(agg, hk, hl) {
 
 function aggregateHourlyLatency(proxyDays) {
   var agg = {};
-  for (const pd of proxyDays) {
+  for (var pd of proxyDays) {
     var phl = pd.per_hour_latency || {};
     for (var hk in phl) {
       if (!Object.hasOwn(phl, hk)) continue;
@@ -5269,7 +5105,7 @@ function buildEfficiencyData(proxyDays, mainDays) {
   var jsonlByDate = {};
   var jsonlVisibleByDate = {};
   var cacheMissByDate = {};
-  for (const md of mainDays) {
+  for (var md of mainDays) {
     if (!md.date) continue;
     jsonlByDate[md.date] = (md.input || 0) + (md.output || 0) + (md.cache_read || 0) + (md.cache_creation || 0);
     jsonlVisibleByDate[md.date] = (md.input || 0) + (md.output || 0);
@@ -5279,7 +5115,7 @@ function buildEfficiencyData(proxyDays, mainDays) {
   }
   var labels = [], ratioData = [], visPerPctData = [], cacheMissData = [];
   var visPerPctMeta = []; // per-day {method, q5Pct, coverage, samples, lowCoverage}
-  for (const pd of proxyDays) {
+  for (var pd of proxyDays) {
     var dk = pd.date || "";
     labels.push(dk ? dk.slice(5) : "?");
     var proxyTotal = pd.total_tokens || 0;
@@ -5321,7 +5157,7 @@ function buildEfficiencyData(proxyDays, mainDays) {
 
 function __effNormalizeRow(row) {
   var min = Infinity, max = -Infinity;
-  for (const v of row) {
+  for (var v of row) {
     if (v == null || Number.isNaN(v)) continue;
     if (v < min) min = v;
     if (v > max) max = v;
@@ -7096,7 +6932,7 @@ scheduleFetchExtensionTimeline(900);
 function miniMd(src) {
   var lines = (src || "").split("\n");
   var html = "", inList = false;
-  for (const ln of lines) {
+  for (var ln of lines) {
     // Headings
     var hm = ln.match(/^(#{1,4})\s+(.*)/);
     if (hm) {
@@ -7173,7 +7009,7 @@ function inlineMd(s) {
                 if (!releases.length) { relBody.innerHTML = '<p style="color:#64748b;font-size:.75rem">No releases found</p>'; return; }
                 var rh = "";
                 var isFirst = true;
-                for (const rel of releases) {
+                for (var rel of releases) {
                   var rDate = rel.published_at ? rel.published_at.slice(0, 10) : "";
                   var rBody2 = (rel.body || "").replace(/^## .+\n?/m, "");
                   rh += "<details class=\"release-modal-item\"" + (isFirst ? " open" : "") + ">";
@@ -9355,13 +9191,13 @@ function renderEconOverhead(qdData, stData) {
     });
     var nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
-    for (const n of nodes) wrapTextNode(n);
+    for (var n of nodes) wrapTextNode(n);
   }
 
   function removeAllTips() {
     hidePop();
     var tips = document.querySelectorAll(".tt");
-    for (const span of tips) {
+    for (var span of tips) {
       span.removeEventListener("mouseenter", showPop);
       span.removeEventListener("mousemove", movePop);
       span.removeEventListener("mouseleave", hidePop);
@@ -9384,7 +9220,7 @@ function renderEconOverhead(qdData, stData) {
   function startObserver() {
     if (observer) return;
     observer = new MutationObserver(function (mutations) {
-      for (const mut of mutations) {
+      for (var mut of mutations) {
         if (mut.addedNodes.length || mut.type === "characterData") {
           debouncedScan();
           break;
