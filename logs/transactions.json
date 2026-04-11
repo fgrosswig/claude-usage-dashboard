@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-155",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "2ac0728",
+      "commit_full": "2ac07281f9976f42a7cf1c7a4ef4975e63527f64",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(user-profile): remove legacy canvas min-height for ECharts containers",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-154",
       "timestamp": "2026-04-12",
       "session": "auto",
