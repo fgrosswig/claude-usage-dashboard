@@ -1,5 +1,6 @@
 # Dev-Build: Push auf feat/**/fix/** → Container bauen + Deploy, KEIN SonarQube
-# Prod-Build: Push auf main          → SonarQube + Container + Deploy (+ GitHub-Mirror bei Tag)
+# Prod-Build: Push auf main          → SonarQube + Container + Deploy + Auto-Tag (semver)
+# Tag-Event:  draft-release-notes    → Draft-Release auf Gitea erstellen
 when:
   - event: push
     branch: [main, develop, "feat/**", "fix/**"]
@@ -158,6 +159,49 @@ steps:
         done
     failure: ignore
 
+  - name: auto-tag
+    image: alpine
+    when:
+      branch: main
+      event: push
+    commands:
+      - |
+        apk add --no-cache git curl jq
+        LAST_TAG=$(git tag --sort=-v:refname | head -1)
+        if [ -z "$LAST_TAG" ]; then LAST_TAG="v0.0.0"; fi
+        COMMITS=$(git log ${LAST_TAG}..HEAD --format="%s" 2>/dev/null || echo "")
+        if [ -z "$COMMITS" ]; then
+          echo "No new commits since $LAST_TAG — skipping"
+          exit 0
+        fi
+        BUMP="patch"
+        if git log ${LAST_TAG}..HEAD --format="%s%n%b" | grep -qiE "BREAKING CHANGE|^[a-z]+(\([^)]*\))?!:"; then
+          BUMP="major"
+        elif echo "$COMMITS" | grep -qE "^feat(\([^)]*\))?:"; then
+          BUMP="minor"
+        fi
+        VER=$(echo "$LAST_TAG" | sed 's/^v//')
+        MAJOR=$(echo "$VER" | cut -d. -f1)
+        MINOR=$(echo "$VER" | cut -d. -f2)
+        PATCH=$(echo "$VER" | cut -d. -f3)
+        case "$BUMP" in
+          major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
+          minor) MINOR=$((MINOR+1)); PATCH=0 ;;
+          patch) PATCH=$((PATCH+1)) ;;
+        esac
+        NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+        echo "Last: $LAST_TAG → Bump: $BUMP → New: $NEW_TAG"
+        curl -sf -X POST \
+          -H "Authorization: token $GITEA_TOKEN" \
+          -H "Content-Type: application/json" \
+          "https://gitea.grosswig-it.de/api/v1/repos/GRO/Claude-Usage-Dashboard/tags" \
+          -d "$(jq -n --arg tag "$NEW_TAG" --arg sha "$CI_COMMIT_SHA" \
+            '{tag_name: $tag, target: $sha}')"
+        echo "Tag $NEW_TAG created — draft-release-notes will trigger on tag event"
+    environment:
+      GITEA_TOKEN:
+        from_secret: gitea_token
+
   - name: draft-release-notes
     image: node:20-alpine
     when:
@@ -165,8 +209,12 @@ steps:
     commands:
       - |
         apk add --no-cache git curl jq
-        NOTES=$(node scripts/generate-release-notes.js "${CI_COMMIT_TAG}" --public)
-        INTERNAL=$(node scripts/generate-release-notes.js "${CI_COMMIT_TAG}")
+        NOTES=$(node scripts/generate-release-notes.js "${CI_COMMIT_TAG}" --public 2>/dev/null || echo "")
+        INTERNAL=$(node scripts/generate-release-notes.js "${CI_COMMIT_TAG}" 2>/dev/null || echo "")
+        if [ -z "$NOTES" ] && [ -z "$INTERNAL" ]; then
+          echo "No release notes generated — creating minimal draft"
+          NOTES="Release ${CI_COMMIT_TAG}"
+        fi
         BODY=$(printf '%s\n\n<!--INTERNAL-->\n\n%s' "$NOTES" "$INTERNAL")
         curl -sf -X POST \
           -H "Authorization: token $GITEA_TOKEN" \
@@ -174,7 +222,8 @@ steps:
           "https://gitea.grosswig-it.de/api/v1/repos/GRO/Claude-Usage-Dashboard/releases" \
           -d "$(jq -n --arg tag "$CI_COMMIT_TAG" --arg body "$BODY" \
             --arg name "$CI_COMMIT_TAG" \
-            '{tag_name: $tag, name: $name, body: $body, draft: true}')"
+            '{tag_name: $tag, name: $name, body: $body, draft: true}')" \
+        || echo "WARNING: Draft release creation failed (may already exist)"
     environment:
       GITEA_TOKEN:
         from_secret: gitea_token
