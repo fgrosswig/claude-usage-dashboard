@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-136",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "c4549c3",
+      "commit_full": "c4549c38eded08ea7073c6a162db600fff80b0f0",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(budget): effective output 0% rounding + overhead blurb position (#206)",
+      "detail": "Show 2 decimal places for effective output below 1% instead of rounding\nto 0%. Reported by cnighswonger with overhead factor 1,172x.\nMove Q5 overhead blurb above chart with separator line.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-135",
       "timestamp": "2026-04-11",
       "session": "auto",
