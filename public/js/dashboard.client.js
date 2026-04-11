@@ -9608,6 +9608,10 @@ function renderBudgetDrain(stData, qdData) {
   var el = document.getElementById("chart-shell-econ-drain");
   if (!el || !stData || !stData.sessions || !stData.sessions.length) return;
   el.style.height = "650px";
+  var drainH3 = document.getElementById("econ-drain-h3");
+  if (drainH3) drainH3.textContent = t("econDrainTitle");
+  var drainBlurb = document.getElementById("econ-drain-blurb");
+  if (drainBlurb) drainBlurb.textContent = t("econDrainBlurb");
 
   var sessions = stData.sessions.slice().sort(function (a, b) { return a.first_ts < b.first_ts ? -1 : 1; });
   var dayTotal = sessions.reduce(function (s, x) { return s + x.total_all; }, 0);
@@ -10025,7 +10029,7 @@ function renderBudgetDrain(stData, qdData) {
         var nOh2 = ohPairs2.filter(function (p) { return p.delta >= 0.03; }).length;
         var tokOhPct = dayTokTotal > 0 ? Math.round((1 - cqi2 / cq2) * 3.5 * 10) / 10 : 0;
         var blurb2 = document.getElementById("econ-overhead-blurb");
-        if (blurb2) blurb2.textContent = "Q5: " + Math.round(cq2) + "% actual vs " + Math.round(cqi2) + "% ideal \u2014 " + ratio2 + "% Q5 overhead (" + gap2 + "% lost to " + nOh2 + " penalty events). Visible token overhead: ~3.5% \u2014 the gap is hidden costs.";
+        if (blurb2) blurb2.textContent = tr("econOverheadSummary", { actual: Math.round(cq2), ideal: Math.round(cqi2), ratio: ratio2, gap: gap2, events: nOh2 });
       }
       return allSeries;
     })(),

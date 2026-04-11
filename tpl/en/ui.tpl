@@ -506,5 +506,8 @@
   "econOverheadProductive": "Productive Output",
   "econOverheadWarmup": "Cache Warmup",
   "econOverheadCompaction": "Compaction Rebuild",
-  "econOverheadForced": "Forced Restart"
+  "econOverheadForced": "Forced Restart",
+  "econOverheadSummary": "Q5: {actual}% actual vs {ideal}% ideal — {ratio}% Q5 overhead ({gap}% lost to {events} penalty events). Visible token overhead: ~3.5% — the gap is hidden costs.",
+  "econDrainTitle": "Budget Drain — Daily Session Impact",
+  "econDrainBlurb": "Remaining quota over the day. Red blocks show rebuild cost from forced restarts — tokens wasted on context that was already built."
 }
