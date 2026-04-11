@@ -36,6 +36,7 @@ steps:
     image: sonarsource/sonar-scanner-cli
     when:
       branch: main
+      event: push
     commands:
       - sonar-scanner -Dsonar.host.url=$SONAR_URL -Dsonar.token=$SONAR_TOKEN
     environment:
@@ -48,6 +49,7 @@ steps:
     image: alpine
     when:
       branch: main
+      event: push
     commands:
       - |
         apk add --no-cache curl jq
@@ -89,6 +91,7 @@ steps:
     image: plugins/kaniko
     when:
       branch: main
+      event: push
     settings:
       repo: harbor.grosswig-it.de/claude/claude-usage-dashboard
       registry: harbor.grosswig-it.de
@@ -105,6 +108,8 @@ steps:
 
   - name: deploy
     image: bitnami/kubectl
+    when:
+      event: push
     commands:
       - |
         set -eux
@@ -131,6 +136,8 @@ steps:
 
   - name: cleanup
     image: alpine
+    when:
+      event: push
     environment:
       HARBOR_USER:
         from_secret: harbor_user
