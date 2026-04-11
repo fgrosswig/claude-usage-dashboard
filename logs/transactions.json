@@ -2,6 +2,33 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-153",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "b04e88c",
+      "commit_full": "b04e88c57acc55db5d2ac3f4d636cd622f29575f",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(migration): migrate Proxy Analytics section to ECharts (CUD-16)",
+      "detail": "7 charts migrated: tokens, latency, hourly-heatmap, models, hourly-latency,\nerror-trend, cache-trend. Canvas→div, destroy→dispose, resize handler,\nwidget-registry engine updated. Net -111 lines.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-registry.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-152",
       "timestamp": "2026-04-12",
       "session": "auto",
