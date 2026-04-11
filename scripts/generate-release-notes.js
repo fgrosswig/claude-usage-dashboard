@@ -76,7 +76,7 @@ function componentSortKey(comp) {
 var allTags;
 try {
   allTags = execSync('git tag --sort=-v:refname').toString().trim().split('\n').filter(Boolean);
-} catch (_) { allTags = []; }
+} catch (e) { console.error('[release-notes] git tag lookup failed:', e.message); allTags = []; }
 
 var sinceTag = sinceTagArg;
 var displayTag = null;
@@ -98,7 +98,7 @@ if (tagIdx === 0 && allTags.length > 1) {
 
 var tagSha;
 try {
-  tagSha = child_process.execFileSync('git', ['rev-list', '-1', sinceTag]).toString().trim();
+  tagSha = child_process.execFileSync('git', ['rev-list', '-1', sinceTag]).toString().trim(); // NOSONAR — CI-only script, PATH is controlled
 } catch (_) {
   console.error('Tag ' + sinceTag + ' nicht gefunden.');
   process.exit(1);
@@ -126,12 +126,12 @@ if (!txs.length) {
 // ── Einträge seit Tag filtern ────────────────────────────
 var sinceSet = Object.create(null);
 try {
-  var logOut = child_process.execFileSync('git', ['log', '--format=%H%n%h', sinceTag + '..HEAD'])
+  var logOut = child_process.execFileSync('git', ['log', '--format=%H%n%h', sinceTag + '..HEAD']) // NOSONAR — CI-only script, PATH is controlled
     .toString().trim();
   if (logOut) {
     for (var sha of logOut.split('\n')) sinceSet[sha] = true;
   }
-} catch (_) { /* empty range */ }
+} catch (e) { if (process.env.DEBUG) console.error('[release-notes] git log failed:', e.message); }
 
 var unreleased = [];
 for (var tx of txs) {
