@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-138",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "9205f56",
+      "commit_full": "9205f569e1705491934b0c7da3b7c6a4f196da1a",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(economic): filter edge-session turns to selected day in all charts (#205)",
+      "detail": "Budget Drain, Q5 Overhead, and Token Visible curves now filter turns\nto the selected dateKey. Edge sessions show arrow markers but only\ninclude turns from the viewed day. Session bracket labels use\nfiltered turn timestamps instead of original session bounds.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-137",
       "timestamp": "2026-04-11",
       "session": "auto",
