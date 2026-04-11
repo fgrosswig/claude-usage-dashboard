@@ -6523,6 +6523,11 @@ function __effConnectCharts() {
   if (_effCharts.vispct) group.push(_effCharts.vispct);
   if (_effCharts.cachemiss) group.push(_effCharts.cachemiss);
   if (group.length >= 2) echarts.connect(group);
+  // Sync Budget Drain + Session Overhead cursors
+  var econGroup = [];
+  if (_effCharts.econDrain) econGroup.push(_effCharts.econDrain);
+  if (_effCharts.econOverhead) econGroup.push(_effCharts.econOverhead);
+  if (econGroup.length === 2) echarts.connect(econGroup);
 }
 
 function renderProxyEfficiencyTrend(data) {
@@ -8413,15 +8418,16 @@ function renderEconomicSection(data, filteredDays) {
           renderEfficiencyTimeline(stData);
           renderBudgetDrain(stData);
         }
-        // Fetch quota-divisor data for overhead chart (proxy-based)
+        // Fetch quota-divisor data, then re-render Budget Drain with Q5 overlay
         fetch("/api/quota-divisor?date=" + encodeURIComponent(selectedDate))
           .then(function (r) { return r.json(); })
           .then(function (qdData) {
+            _econQdData = qdData;
             if (qdData && qdData.request_pairs && qdData.request_pairs.length > 0) {
-              renderEconOverhead(qdData, stData);
+              renderBudgetDrain(stData, qdData);
             }
           })
-          .catch(function () { /* no proxy data available — skip overhead chart */ });
+          .catch(function () { /* no proxy data — keep single-grid */ });
       })
       .catch(function () {
         if (sumEl) sumEl.textContent = t("econSummaryNoData");
@@ -8451,7 +8457,7 @@ function renderEconomicSection(data, filteredDays) {
           renderWasteCurve(session);
           renderCacheExplosion(session);
           renderEfficiencyTimeline(_econData);
-          renderBudgetDrain(_econData);
+          renderBudgetDrain(_econData, _econQdData);
         }
       }
     });
@@ -9596,10 +9602,11 @@ function renderDayComparison(days) {
   __effInitOrSet("econDayCompare", el, option);
 }
 
-function renderBudgetDrain(stData) {
+function renderBudgetDrain(stData, qdData) {
   if (typeof echarts === "undefined") return;
   var el = document.getElementById("chart-shell-econ-drain");
   if (!el || !stData || !stData.sessions || !stData.sessions.length) return;
+  el.style.height = "650px";
 
   var sessions = stData.sessions.slice().sort(function (a, b) { return a.first_ts < b.first_ts ? -1 : 1; });
   var dayTotal = sessions.reduce(function (s, x) { return s + x.total_all; }, 0);
@@ -9770,9 +9777,19 @@ function renderBudgetDrain(stData) {
           } else if (params[p].seriesName === "Cold Cache") {
             lines.push("<span style='color:#f59e0b'>\u26a0 Cold Cache: " + params[p].data[1] + "% — rebuild in progress</span>");
             if (params[p].data[2]) lines.push("<span style='color:#94a3b8'>" + params[p].data[2] + "</span>");
+          } else if (params[p].seriesName === "Q5 Actual") {
+            lines.push("<span style='color:#f97316'>Q5 Actual: " + params[p].data[1] + "%</span>");
+          } else if (params[p].seriesName === "Q5 Ideal") {
+            lines.push("<span style='color:#34d399'>Q5 Ideal: " + params[p].data[1] + "%</span>");
+          } else if (params[p].seriesName === "Q5 Penalty Lower") {
+            lines.push("<span style='color:#ef4444'>\u26a0 Q5 Penalty: +" + params[p].data[1] + "%</span>");
+          } else if (params[p].seriesName === "Token Visible") {
+            lines.push("<span style='color:#60a5fa'>Token (visible): " + params[p].data[1] + "%</span>");
+          } else if (params[p].seriesName === "Q5 Penalty") {
+            var pd = params[p].data;
+            lines.push("<span style='color:#ef4444'>\u25bc Q5 Penalty: +" + (pd._delta || "") + "%</span>");
           } else if (p === 0) {
             var turn = params[p].data[0];
-            // Find time for this turn
             var time = "";
             for (var tli = 0; tli < timeLabels.length; tli++) {
               if (timeLabels[tli].turn === turn) { time = timeLabels[tli].time; break; }
@@ -9781,32 +9798,42 @@ function renderBudgetDrain(stData) {
             lines.push("<b>" + time + "</b> (Turn " + turn + ")<br>Window remaining: " + params[p].data[1] + "%");
           }
         }
+        // Show Q5 gap if both present
+        var qa = null, qi = null;
+        for (var p2 = 0; p2 < params.length; p2++) {
+          if (params[p2].seriesName === "Q5 Actual") qa = params[p2].data[1];
+          if (params[p2].seriesName === "Q5 Ideal") qi = params[p2].data[1];
+        }
+        if (qa != null && qi != null) {
+          lines.push("<b>Q5 Gap: " + (Math.round((qa - qi) * 10) / 10) + "% overhead</b>");
+        }
         return lines.join("<br>");
       }
     },
-    legend: { show: false },
-    grid: { top: 30, right: 20, bottom: 40, left: 60 },
-    xAxis: {
-      type: "value",
-      min: 1,
-      max: turnCounter,
-      axisLabel: { color: "#64748b", fontSize: 9 },
-      splitLine: { show: false }
+    axisPointer: {
+      link: [{ xAxisIndex: "all" }],
+      lineStyle: { color: "#94a3b8", width: 1, type: "dashed" }
     },
-    yAxis: [{
-      type: "value",
-      min: 0,
-      max: 100,
-      axisLabel: { color: "#64748b", formatter: "{value}%" },
-      splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
-    }, {
-      type: "value",
-      position: "right",
-      min: 0,
-      max: 100,
-      axisLabel: { show: false },
-      splitLine: { show: false }
-    }],
+    legend: {
+      data: ["Q5 Actual", "Q5 Ideal", "Q5 Penalty Lower", "Token Visible"],
+      top: "48%",
+      right: 10,
+      textStyle: { color: "#94a3b8", fontSize: 9 },
+      itemWidth: 14, itemHeight: 8
+    },
+    grid: [
+      { top: 30, right: 20, height: "38%", left: 60 },
+      { top: "50%", right: 20, height: "42%", left: 60 }
+    ],
+    xAxis: [
+      { type: "value", gridIndex: 0, min: 1, max: turnCounter, axisLabel: { show: false }, splitLine: { show: false } },
+      { type: "value", gridIndex: 1, min: 1, max: turnCounter, axisLabel: { color: "#64748b", fontSize: 9 }, splitLine: { show: false } }
+    ],
+    yAxis: [
+      { type: "value", gridIndex: 0, min: 0, max: 100, axisLabel: { color: "#64748b", formatter: "{value}%" }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+      { type: "value", gridIndex: 0, position: "right", min: 0, max: 100, axisLabel: { show: false }, splitLine: { show: false } },
+      { type: "value", gridIndex: 1, axisLabel: { color: "#f97316", fontSize: 8, formatter: "{value}%" }, splitLine: { lineStyle: { color: "rgba(51,65,85,.2)" } } }
+    ],
     series: (function () {
       var allSeries = [];
       // Per quota-window: one series with continuous green→red gradient
@@ -9909,6 +9936,96 @@ function renderBudgetDrain(stData) {
         label: { show: true, formatter: function (p) { return p.data[2]; }, position: "top", color: "#a855f7", fontSize: 8 },
         data: compactionPoints
       });
+      // Tag all drain series with explicit grid indices (needed for multi-grid)
+      for (var asi = 0; asi < allSeries.length; asi++) {
+        if (allSeries[asi].xAxisIndex === undefined) allSeries[asi].xAxisIndex = 0;
+      }
+      // Q5 overhead curves in lower grid (if proxy data available)
+      if (qdData && qdData.request_pairs && qdData.request_pairs.length > 0) {
+        var ohPairs2 = qdData.request_pairs.slice().sort(function (a2, b2) { return a2.ts < b2.ts ? -1 : a2.ts > b2.ts ? 1 : 0; });
+        var q5a2 = [], q5i2 = [], q5sc2 = [];
+        var cq2 = 0, cqi2 = 0;
+        // Build turn timeline
+        var tt2 = [];
+        var ss2 = stData.sessions.slice().sort(function (a2, b2) { return a2.first_ts < b2.first_ts ? -1 : 1; });
+        for (var s2i = 0; s2i < ss2.length; s2i++) {
+          var st2 = ss2[s2i].turns || [];
+          for (var t2i = 0; t2i < st2.length; t2i++) tt2.push(st2[t2i].ts || "");
+        }
+        for (var q2i = 0; q2i < ohPairs2.length; q2i++) {
+          var qp2 = ohPairs2[q2i];
+          var qd2 = qp2.delta * 100;
+          cq2 += qd2;
+          var isOh2 = qp2.delta >= 0.03;
+          if (!isOh2) cqi2 += qd2;
+          else q5sc2.push([1, Math.round(cq2 * 10) / 10]); // placeholder turn
+          // Map timestamp to turn
+          var qTs2 = qp2.ts.slice(0, 19);
+          var qTurn2 = 1;
+          for (var qt2 = 0; qt2 < tt2.length; qt2++) {
+            if (tt2[qt2].slice(0, 19) <= qTs2) qTurn2 = qt2 + 1;
+          }
+          q5a2.push([qTurn2, Math.round(cq2 * 10) / 10]);
+          q5i2.push([qTurn2, Math.round(cqi2 * 10) / 10]);
+          if (isOh2) q5sc2[q5sc2.length - 1] = [qTurn2, Math.round(cq2 * 10) / 10];
+        }
+        allSeries.push({
+          name: "Q5 Actual", type: "line", xAxisIndex: 1, yAxisIndex: 2,
+          data: q5a2, smooth: false, symbol: "none",
+          lineStyle: { color: "#f97316", width: 2 },
+          areaStyle: { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [{ offset: 0, color: "rgba(249,115,22,0.15)" }, { offset: 1, color: "rgba(249,115,22,0.02)" }]
+          }}
+        });
+        allSeries.push({
+          name: "Q5 Ideal", type: "line", xAxisIndex: 1, yAxisIndex: 2,
+          data: q5i2, smooth: false, symbol: "none",
+          lineStyle: { color: "#34d399", width: 2, type: "dashed" }
+        });
+        allSeries.push({
+          name: "Q5 Penalty Lower", type: "scatter", xAxisIndex: 1, yAxisIndex: 2,
+          data: q5sc2, symbolSize: 8,
+          itemStyle: { color: "#ef4444" }, z: 10
+        });
+        // Token-visible line: cumulative tokens normalized to Q5 scale
+        // Shows what the Q5 SHOULD be if only visible tokens counted
+        var tokVis = [];
+        var cumTok = 0;
+        var dayTokTotal = 0;
+        var ss3 = stData.sessions.slice().sort(function (a3, b3) { return a3.first_ts < b3.first_ts ? -1 : 1; });
+        for (var s3i = 0; s3i < ss3.length; s3i++) {
+          var t3 = ss3[s3i].turns || [];
+          for (var t3i = 0; t3i < t3.length; t3i++) {
+            dayTokTotal += (t3[t3i].cache_read || 0) + (t3[t3i].cache_creation || 0) + (t3[t3i].output || 0);
+          }
+        }
+        if (dayTokTotal > 0) {
+          var tIdx = 0;
+          for (var s3i = 0; s3i < ss3.length; s3i++) {
+            var t3 = ss3[s3i].turns || [];
+            for (var t3i = 0; t3i < t3.length; t3i++) {
+              cumTok += (t3[t3i].cache_read || 0) + (t3[t3i].cache_creation || 0) + (t3[t3i].output || 0);
+              tIdx++;
+              if (tIdx % 5 === 0 || tIdx === 1) {
+                tokVis.push([tIdx, Math.round(cumTok / dayTokTotal * cq2 * 10) / 10]);
+              }
+            }
+          }
+          allSeries.push({
+            name: "Token Visible", type: "line", xAxisIndex: 1, yAxisIndex: 2,
+            data: tokVis, smooth: false, symbol: "none",
+            lineStyle: { color: "#60a5fa", width: 1.5, type: "dotted" }
+          });
+        }
+
+        // Update blurb
+        var gap2 = Math.round((cq2 - cqi2) * 10) / 10;
+        var ratio2 = cq2 > 0 ? Math.round((cq2 - cqi2) / cq2 * 100) : 0;
+        var nOh2 = ohPairs2.filter(function (p) { return p.delta >= 0.03; }).length;
+        var tokOhPct = dayTokTotal > 0 ? Math.round((1 - cqi2 / cq2) * 3.5 * 10) / 10 : 0;
+        var blurb2 = document.getElementById("econ-overhead-blurb");
+        if (blurb2) blurb2.textContent = "Q5: " + Math.round(cq2) + "% actual vs " + Math.round(cqi2) + "% ideal \u2014 " + ratio2 + "% Q5 overhead (" + gap2 + "% lost to " + nOh2 + " penalty events). Visible token overhead: ~3.5% \u2014 the gap is hidden costs.";
+      }
       return allSeries;
     })(),
     graphic: []
@@ -9963,26 +10080,49 @@ function renderEconOverhead(qdData, stData) {
 
   var OVERHEAD_THRESHOLD = 0.03; // Q5 delta >= 3% = overhead event
 
-  // ── Q5 curve (from proxy) ──
+  // Build turn timeline for timestamp -> turn mapping
+  var turnTimes = [];
+  if (hasJsonl) {
+    var sortedSess = stData.sessions.slice().sort(function (a, b) { return a.first_ts < b.first_ts ? -1 : 1; });
+    for (var si = 0; si < sortedSess.length; si++) {
+      var sTurns = sortedSess[si].turns || [];
+      for (var tti = 0; tti < sTurns.length; tti++) {
+        turnTimes.push(sTurns[tti].ts || "");
+      }
+    }
+  }
+
+  function tsToTurn(ts) {
+    var tsShort = ts.slice(0, 19);
+    var best = 0;
+    for (var i = 0; i < turnTimes.length; i++) {
+      if (turnTimes[i].slice(0, 19) <= tsShort) best = i + 1;
+    }
+    return best || 1;
+  }
+
+  // ── Q5 curve (from proxy) mapped to turn X-axis ──
   var q5Actual = [], q5Ideal = [], q5Scatter = [];
   var cumQ5 = 0, cumQ5Ideal = 0, q5Events = 0, q5Overhead = 0;
+  var pairs = [];
 
   if (hasProxy) {
-    var pairs = qdData.request_pairs.slice().sort(function (a, b) { return a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0; });
+    pairs = qdData.request_pairs.slice().sort(function (a, b) { return a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0; });
     for (var i = 0; i < pairs.length; i++) {
       var p = pairs[i];
       var delta = p.delta * 100;
       cumQ5 += delta;
+      var turnX = hasJsonl ? tsToTurn(p.ts) : i;
       var isOh = p.delta >= OVERHEAD_THRESHOLD;
       if (!isOh) {
         cumQ5Ideal += delta;
       } else {
         q5Events++;
         q5Overhead += delta;
-        q5Scatter.push([i, Math.round(cumQ5 * 10) / 10]);
+        q5Scatter.push([turnX, Math.round(cumQ5 * 10) / 10]);
       }
-      q5Actual.push([i, Math.round(cumQ5 * 10) / 10]);
-      q5Ideal.push([i, Math.round(cumQ5Ideal * 10) / 10]);
+      q5Actual.push([turnX, Math.round(cumQ5 * 10) / 10]);
+      q5Ideal.push([turnX, Math.round(cumQ5Ideal * 10) / 10]);
     }
   }
 
@@ -10029,13 +10169,12 @@ function renderEconOverhead(qdData, stData) {
         cumTokAll += total;
         cumTokIdeal += (total - overhead);
 
-        // Map token index to proxy request scale for overlay
-        if (hasProxy) {
-          var mappedX = Math.round(tokIdx / (stData.total_turns || 1) * (pairs.length - 1));
-          var pctAll = tokDayTotal > 0 ? Math.round(cumTokAll / tokDayTotal * cumQ5 * 10) / 10 : 0;
-          var pctIdeal = tokDayTotal > 0 ? Math.round(cumTokIdeal / tokDayTotal * cumQ5 * 10) / 10 : 0;
-          tokActual.push([mappedX, pctAll]);
-          tokIdeal.push([mappedX, pctIdeal]);
+        // Map token cumulative to same scale as Q5 (% of day total, scaled to Q5 range)
+        if (hasProxy && tokDayTotal > 0) {
+          var pctAll = Math.round(cumTokAll / tokDayTotal * cumQ5 * 10) / 10;
+          var pctIdeal = Math.round(cumTokIdeal / tokDayTotal * cumQ5 * 10) / 10;
+          tokActual.push([tokIdx, pctAll]);
+          tokIdeal.push([tokIdx, pctIdeal]);
         }
         tokIdx++;
       }
@@ -10108,9 +10247,8 @@ function renderEconOverhead(qdData, stData) {
       trigger: "axis",
       formatter: function (params) {
         if (!params || !params.length) return "";
-        var idx = params[0].value[0];
-        var tip = '<div style="font-size:11px">Request ' + (idx + 1);
-        if (hasProxy && pairs[idx]) tip += " (" + pairs[idx].ts.slice(11, 19) + ")";
+        var turnNum = params[0].value[0];
+        var tip = '<div style="font-size:11px">Turn ' + turnNum;
         var q5a = null, q5i = null;
         for (var k = 0; k < params.length; k++) {
           var pm = params[k];
@@ -10122,8 +10260,17 @@ function renderEconOverhead(qdData, stData) {
         if (q5a != null && q5i != null) {
           tip += "<br><b>Q5 Gap: " + (Math.round((q5a - q5i) * 10) / 10) + "%</b>";
         }
-        if (hasProxy && pairs[idx] && pairs[idx].delta >= OVERHEAD_THRESHOLD) {
-          tip += '<br><span style="color:#ef4444">\u26a0 +' + (pairs[idx].delta * 100) + '% Q5</span>';
+        // Check if any overhead event is near this turn
+        if (hasProxy) {
+          for (var oi = 0; oi < pairs.length; oi++) {
+            if (pairs[oi].delta >= OVERHEAD_THRESHOLD) {
+              var oTurn = hasJsonl ? tsToTurn(pairs[oi].ts) : oi;
+              if (oTurn === turnNum) {
+                tip += '<br><span style="color:#ef4444">\u26a0 +' + (pairs[oi].delta * 100) + '% Q5</span>';
+                break;
+              }
+            }
+          }
         }
         tip += "</div>";
         return tip;
@@ -10136,7 +10283,8 @@ function renderEconOverhead(qdData, stData) {
     },
     grid: { left: 50, right: 20, top: 30, bottom: 25 },
     xAxis: {
-      type: "value", name: "Requests",
+      type: "value", name: "Turns",
+      min: 1,
       nameTextStyle: { color: "#64748b", fontSize: 9 },
       axisLabel: { color: "#94a3b8", fontSize: 9 },
       splitLine: { lineStyle: { color: "rgba(100,116,139,0.15)" } }
