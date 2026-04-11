@@ -2598,8 +2598,8 @@ function renderDashboardCore(data) {
         tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 12 } },
         xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
         yAxis: [
-          { type: 'value', name: t("forensicAxisCounts"), nameTextStyle: { color: '#94a3b8', fontSize: 11 }, min: 0, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
-          { type: 'value', name: fhForensic ? '' : t("forensicAxisForensic"), nameTextStyle: { color: '#fbbf24', fontSize: 11 }, min: 0, max: 3.5, show: !fhForensic,
+          { type: 'value', name: t("forensicAxisCounts"), nameLocation: 'center', nameGap: 35, nameTextStyle: { color: '#94a3b8', fontSize: 11 }, min: 0, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+          { type: 'value', name: fhForensic ? '' : t("forensicAxisForensic"), nameLocation: 'center', nameGap: 40, nameTextStyle: { color: '#fbbf24', fontSize: 11 }, min: 0, max: 3.5, show: !fhForensic,
             axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { show: false } }
         ],
         series: [
@@ -2635,7 +2635,7 @@ function renderDashboardCore(data) {
         if (!_charts.cForensicSignals) _charts.cForensicSignals = echarts.init(elSig, null, { renderer: 'canvas' });
         _charts.cForensicSignals.setOption({
           animation: false,
-          grid: { left: 50, right: 65, top: 40, bottom: 36 },
+          grid: { left: 60, right: 65, top: 40, bottom: 36 },
           legend: {
             data: [t("forensicDS_continueStack"), t("forensicDS_resumeStack"), t("forensicDS_retryStack"), t("forensicDS_interruptStack"), t("forensicDS_outageHoursDay"), t("chartDS_cacheRead")],
             textStyle: { color: '#cbd5e1', fontSize: 10 }, top: 4, itemWidth: 12, itemHeight: 10
@@ -2643,8 +2643,8 @@ function renderDashboardCore(data) {
           tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 12 } },
           xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 11, rotate: 45 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.45)' } } },
           yAxis: [
-            { type: 'value', name: t("forensicSignalsAxisLines"), nameTextStyle: { color: '#94a3b8', fontSize: 11 }, min: 0, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
-            { type: 'value', name: t("forensicSignalsAxisCacheRead"), nameTextStyle: { color: '#a78bfa', fontSize: 11 }, min: 0,
+            { type: 'value', name: t("forensicSignalsAxisLines"), nameLocation: 'center', nameGap: 42, nameTextStyle: { color: '#94a3b8', fontSize: 11 }, min: 0, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+            { type: 'value', name: t("forensicSignalsAxisCacheRead"), nameLocation: 'center', nameGap: 48, nameTextStyle: { color: '#a78bfa', fontSize: 11 }, min: 0,
               axisLabel: { color: '#a78bfa', fontSize: 11, formatter: function(v) { return fmt(v); } }, splitLine: { show: false } }
           ],
           series: [
@@ -2700,9 +2700,9 @@ function renderDashboardCore(data) {
       },
       xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
       yAxis: [
-        { type: 'value', name: t("serviceAxisHours"), nameTextStyle: { color: '#94a3b8', fontSize: 11 }, min: 0,
+        { type: 'value', name: t("serviceAxisHours"), nameLocation: 'center', nameGap: 35, nameTextStyle: { color: '#94a3b8', fontSize: 11 }, min: 0,
           axisLabel: { color: '#94a3b8', fontSize: 11, formatter: '{value}h' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
-        { type: 'value', name: t("chartDS_cacheRead"), nameTextStyle: { color: '#8b5cf6', fontSize: 11 }, min: 0,
+        { type: 'value', name: t("chartDS_cacheRead"), nameLocation: 'center', nameGap: 48, nameTextStyle: { color: '#8b5cf6', fontSize: 11 }, min: 0,
           axisLabel: { color: '#8b5cf6', fontSize: 11, formatter: function(v) { return fmt(v); } }, splitLine: { show: false } }
       ],
       series: [
