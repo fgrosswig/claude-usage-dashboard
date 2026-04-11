@@ -494,5 +494,11 @@
   "econExplosionWarmup": "워밍업",
   "econExplosionLinear": "선형",
   "econExplosionDrain": "드레인",
-  "econExplosionSplitAt": "턴 {turn}에서 분할 권장"
+  "econExplosionSplitAt": "턴 {turn}에서 분할 권장",
+  "econBurnZoneTitle": "\u26d4 번 존",
+  "econBurnZoneLine1": "여기서 모든 턴이 할당량을 소모합니다",
+  "econBurnZoneLine2": "비례적 가치 없이.",
+  "econBurnZoneLine3": "세션 분할로 60\u201375% 절약.",
+  "econCompactionLabel": "\u26a1 압축 리빌드",
+  "econCompactionDetail": "캐시 무효화 + 재구축"
 }

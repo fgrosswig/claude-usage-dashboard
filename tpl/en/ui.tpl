@@ -494,5 +494,11 @@
   "econExplosionWarmup": "Warmup",
   "econExplosionLinear": "Linear",
   "econExplosionDrain": "Drain",
-  "econExplosionSplitAt": "Split recommended at turn {turn}"
+  "econExplosionSplitAt": "Split recommended at turn {turn}",
+  "econBurnZoneTitle": "\u26d4 Burn Zone",
+  "econBurnZoneLine1": "Every turn here burns quota",
+  "econBurnZoneLine2": "without proportional value.",
+  "econBurnZoneLine3": "Splitting the session saves 60\u201375%.",
+  "econCompactionLabel": "\u26a1 Compaction Rebuild",
+  "econCompactionDetail": "Cache invalidated + rebuilt"
 }

@@ -8597,10 +8597,10 @@ function renderWasteCurve(session) {
         if (wallTurn > 0 && turnNum >= wallTurn) {
           lines.push(
             "",
-            "<span style='color:#ef4444'>\u26d4 <b>Burn Zone</b></span>",
-            "<span style='color:#ef4444'>Jeder Turn hier verbrennt Quota</span>",
-            "<span style='color:#ef4444'>ohne proportionalen Mehrwert.</span>",
-            "<span style='color:#ef4444'>Session splitten spart 60\u201375%.</span>"
+            "<span style='color:#ef4444'><b>" + t("econBurnZoneTitle") + "</b></span>",
+            "<span style='color:#ef4444'>" + t("econBurnZoneLine1") + "</span>",
+            "<span style='color:#ef4444'>" + t("econBurnZoneLine2") + "</span>",
+            "<span style='color:#ef4444'>" + t("econBurnZoneLine3") + "</span>"
           );
         }
         return lines.join("<br>");
@@ -8915,8 +8915,8 @@ function renderCacheExplosion(session) {
         }
         if (isCompaction[idx]) {
           lines.push(
-            "<span style='color:#a855f7'>\u26a1 Compaction Rebuild</span>",
-            "<span style='color:#a855f7'>Cache invalidiert + neu geschrieben</span>"
+            "<span style='color:#a855f7'>" + t("econCompactionLabel") + "</span>",
+            "<span style='color:#a855f7'>" + t("econCompactionDetail") + "</span>"
           );
         } else {
           lines.push("Zone: " + zone);
