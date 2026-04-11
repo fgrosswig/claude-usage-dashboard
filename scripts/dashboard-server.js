@@ -3738,7 +3738,7 @@ var server = http.createServer(function (req, res) {
     runScanAndBroadcast();
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({ ok: true, message: 'Day cache deleted, full rescan started' }));
-  } else if (pathname === '/api/debug/session-turns') {
+  } else if (pathname === '/api/debug/session-turns' && process.env.DEBUG_API === '1') {
     var dstUrl = new URL(req.url, 'http://localhost');
     var dstDate = dstUrl.searchParams.get('date') || new Date().toISOString().slice(0, 10);
     var dstT0 = Date.now();
