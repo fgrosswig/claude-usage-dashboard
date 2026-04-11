@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-159",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "d44dc5d",
+      "commit_full": "d44dc5d9ffafb0510a3b088abf76559c7a846ff1",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(charts): convert all ECharts min-height to fixed height",
+      "detail": "ECharts needs fixed height containers. min-height causes uncontrolled\nexpansion and empty space below charts in grid layouts.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-158",
       "timestamp": "2026-04-12",
       "session": "auto",
