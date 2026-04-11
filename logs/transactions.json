@@ -2,6 +2,209 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-138",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "9205f56",
+      "commit_full": "9205f569e1705491934b0c7da3b7c6a4f196da1a",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(economic): filter edge-session turns to selected day in all charts (#205)",
+      "detail": "Budget Drain, Q5 Overhead, and Token Visible curves now filter turns\nto the selected dateKey. Edge sessions show arrow markers but only\ninclude turns from the viewed day. Session bracket labels use\nfiltered turn timestamps instead of original session bounds.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-137",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "c40a89d",
+      "commit_full": "c40a89d503b6b86441183d9f0a7ce91441012e4e",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(i18n): translate overhead blurb + drain title/blurb DE/EN/KO (#204)",
+      "detail": "Replace hardcoded English strings with i18n keys:\n- econOverheadSummary (Q5 overhead stats)\n- econDrainTitle, econDrainBlurb (Budget Drain section)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-136",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "c4549c3",
+      "commit_full": "c4549c38eded08ea7073c6a162db600fff80b0f0",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(budget): effective output 0% rounding + overhead blurb position (#206)",
+      "detail": "Show 2 decimal places for effective output below 1% instead of rounding\nto 0%. Reported by cnighswonger with overhead factor 1,172x.\nMove Q5 overhead blurb above chart with separator line.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-135",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "d0eb7e1",
+      "commit_full": "d0eb7e1e889ffaead145a69ba8ad8901bdf0dfca",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(economic): edge-session support for cross-midnight sessions (#205)",
+      "detail": "Sessions spanning midnight now include turns from adjacent days.\nEdge flags (edge_start, edge_end) mark sessions that started on the\nprevious day or continue into the next. Session labels show arrows\nfor edge sessions (e.g. \"S5 23:19-01:33 →\").\n\nFixes session-turns API cutting sessions at day boundaries.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-134",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "a71dc4b",
+      "commit_full": "a71dc4bc439a6d7709a1552ff57f31212d48d118",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(economic): dual-grid Budget Drain + Q5 Overhead chart (#203)",
+      "detail": "Merged Budget Drain and Q5 Overhead into single dual-grid ECharts chart\nwith synchronized cursor (axisPointer link). Upper grid shows remaining\nquota drain with session brackets and Q5 penalty triangles. Lower grid\nshows cumulative Q5 actual vs ideal vs token-visible — the gap reveals\nhidden overpayment (58% Q5 overhead vs 3.5% visible token overhead).\n\n14 penalty events on a single heavy-use day consume 153% Q5 that should\nhave been available for productive work. 78% of penalties come from\nnormal large-cache-read turns, not from compaction or restarts.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-133",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "b295f89",
+      "commit_full": "b295f89935bb6e092371bd87a90e04ab198d8645",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(economic): Session Overhead chart with Q5 + Token dual view (#203)",
+      "detail": "Shows actual Q5 consumption vs ideal (without overhead events) from\nproxy data, overlaid with visible token overhead from JSONL. The gap\nbetween Q5 and token curves reveals hidden phantom costs (58% vs 3.5%).\nFalls back gracefully when no proxy data is available.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-132",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "2510b2d",
+      "commit_full": "2510b2da87a7233d44ac83b9280f9798dac73555",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(economic): add Session Overhead chart — Heavy User Tax (#203)",
+      "detail": "Stacked horizontal bar chart below Budget Drain showing per-session\nbreakdown: productive output vs cache warmup, compaction rebuild,\nand forced restart overhead. Includes collapsible info overlay\nwith overhead percentage summary. i18n for DE/EN/KO.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-131",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "70314ae",
+      "commit_full": "70314ae95793b3bb025af1045b7e3d5b84ab8631",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(api): add /api/quota-divisor endpoint, enrich q5_samples (#203)",
+      "detail": "- Extend q5_samples with cache_read + cache_creation tokens\n- New /api/quota-divisor endpoint: per-request Q5 cost correlation\n- Persist proxy NDJSON files in DEV_MODE=full for local analysis\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-130",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "e281e97",
+      "commit_full": "e281e97aa3b5da365a9dc117cc0d94c4e9417bd6",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(api): add /api/quota-divisor endpoint for per-request quota analysis",
+      "detail": "Correlates Anthropic rate-limit q5 deltas with full token costs\n(including cache_read/cache_creation) to compute implied quota divisors.\nAlso enriches q5_samples with cache token data for future analysis.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-129",
       "timestamp": "2026-04-11",
       "session": "auto",
