@@ -3192,7 +3192,9 @@ function parseProxyNdjsonFiles() {
                 dd.q5_samples.push({
                   ts: tsEnd,
                   q5: q5Num,
-                  tokens: (u?.input_tokens || 0) + (u?.output_tokens || 0)
+                  tokens: (u?.input_tokens || 0) + (u?.output_tokens || 0),
+                  cache_read: u?.cache_read_input_tokens || 0,
+                  cache_creation: u?.cache_creation_input_tokens || 0
                 });
               }
             }
@@ -3650,6 +3652,117 @@ var server = http.createServer(function (req, res) {
     res.end(JSON.stringify(__proxyCache.data));
   } else if (pathname === '/api/claude-data-sync') {
     handleClaudeDataSyncRequest(req, res);
+  } else if (pathname === '/api/quota-divisor') {
+    // Per-request quota divisor analysis: correlates token costs with q5 deltas
+    var qdUrl = new URL(req.url, 'http://localhost');
+    var qdDate = qdUrl.searchParams.get('date'); // optional: single day
+    var proxyData = __proxyCache.data || parseProxyNdjsonFiles();
+    var pdays = proxyData.proxy_days || [];
+
+    // Opus 4.6 published pricing ($/MTok)
+    var PRICE = { cache_read: 1.50, cache_creation: 18.75, input: 15.0, output: 75.0 };
+
+    var allSamples = [];
+    var dailySummaries = [];
+
+    for (var qi = 0; qi < pdays.length; qi++) {
+      var qd = pdays[qi];
+      if (qdDate && qd.date !== qdDate) continue;
+      var qs = qd._q5_samples_raw || qd.q5_samples_raw;
+      // Rebuild from cached proxy data — q5_samples are in-memory during parse
+      // We need the raw samples; fall back to re-parsing if not available
+    }
+
+    // Re-parse proxy logs to get per-request q5 + full token data
+    var proxyFiles = collectProxyNdjsonFiles();
+    var requestPairs = []; // { date, ts, q5, q5_prev, delta, cost, tokens }
+
+    for (var qfi = 0; qfi < proxyFiles.length; qfi++) {
+      var qfDate = path.basename(proxyFiles[qfi]).replace('proxy-', '').replace('.ndjson', '');
+      if (qdDate && qfDate !== qdDate) continue;
+      var prevQ5 = null;
+      try {
+        forEachJsonlLineSync(proxyFiles[qfi], function(line) {
+          if (!line.trim()) return;
+          var rec;
+          try { rec = JSON.parse(line); } catch (_e) { return; }
+          if (!rec.usage) return;
+          var rah = rec.response_anthropic_headers || {};
+          var q5Str = rah['anthropic-ratelimit-unified-5h-utilization'];
+          if (q5Str == null) return;
+          var q5 = parseFloat(q5Str);
+          if (isNaN(q5) || q5 < 0) return;
+
+          var u = rec.usage;
+          var cr = u.cache_read_input_tokens || 0;
+          var cc = u.cache_creation_input_tokens || 0;
+          var inp = u.input_tokens || 0;
+          var out = u.output_tokens || 0;
+          var cost = cr * PRICE.cache_read / 1e6 + cc * PRICE.cache_creation / 1e6 +
+                     inp * PRICE.input / 1e6 + out * PRICE.output / 1e6;
+
+          var delta = (prevQ5 !== null) ? q5 - prevQ5 : null;
+          if (delta !== null && delta > 0 && cost > 0) {
+            var impliedDivisor = cost / delta;
+            requestPairs.push({
+              date: qfDate,
+              ts: rec.ts_end || rec.ts_start || '',
+              q5_prev: prevQ5,
+              q5: q5,
+              delta: delta,
+              cost: Math.round(cost * 100) / 100,
+              implied_divisor: Math.round(impliedDivisor * 100) / 100,
+              cache_read: cr,
+              cache_creation: cc,
+              input: inp,
+              output: out,
+              cache_pct: cr > 0 ? Math.round(cr / (cr + cc + inp + out) * 100) : 0
+            });
+          }
+          prevQ5 = q5;
+        });
+      } catch (_e) { /* skip */ }
+    }
+
+    // Aggregate by date
+    var byDate = {};
+    for (var rp = 0; rp < requestPairs.length; rp++) {
+      var pair = requestPairs[rp];
+      if (!byDate[pair.date]) byDate[pair.date] = { pairs: [], divisors: [], costs: [], deltas: [] };
+      byDate[pair.date].pairs.push(pair);
+      byDate[pair.date].divisors.push(pair.implied_divisor);
+      byDate[pair.date].costs.push(pair.cost);
+      byDate[pair.date].deltas.push(pair.delta);
+    }
+
+    var dateSummaries = [];
+    var dateKeys = Object.keys(byDate).sort();
+    for (var dk = 0; dk < dateKeys.length; dk++) {
+      var bd = byDate[dateKeys[dk]];
+      var divs = bd.divisors.slice().sort(function(a, b) { return a - b; });
+      var totalCost = bd.costs.reduce(function(s, c) { return s + c; }, 0);
+      var totalDelta = bd.deltas.reduce(function(s, d) { return s + d; }, 0);
+      dateSummaries.push({
+        date: dateKeys[dk],
+        request_pairs: bd.pairs.length,
+        weighted_divisor: totalDelta > 0 ? Math.round(totalCost / totalDelta * 100) / 100 : null,
+        median_divisor: divs.length > 0 ? divs[Math.floor(divs.length / 2)] : null,
+        p10_divisor: divs.length >= 10 ? divs[Math.floor(divs.length * 0.1)] : divs[0] || null,
+        p90_divisor: divs.length >= 10 ? divs[Math.floor(divs.length * 0.9)] : divs[divs.length - 1] || null,
+        total_cost: Math.round(totalCost * 100) / 100,
+        total_q5_delta: Math.round(totalDelta * 10000) / 10000
+      });
+    }
+
+    var qdResult = {
+      pricing: PRICE,
+      note: 'implied_divisor = API_cost / q5_delta. If constant, quota is a simple linear mapping of cost.',
+      date_summaries: dateSummaries,
+      request_pairs: requestPairs.length > 2000 ? requestPairs.slice(0, 2000) : requestPairs,
+      truncated: requestPairs.length > 2000
+    };
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify(qdResult));
   } else if (pathname === '/api/session-turns') {
     var stUrl = new URL(req.url, 'http://localhost');
     var stDate = stUrl.searchParams.get('date') || new Date().toISOString().slice(0, 10);
