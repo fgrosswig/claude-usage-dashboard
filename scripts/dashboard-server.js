@@ -3863,17 +3863,37 @@ var server = http.createServer(function (req, res) {
   } else if (pathname === '/api/session-turns') {
     var stUrl = new URL(req.url, 'http://localhost');
     var stDate = stUrl.searchParams.get('date') || new Date().toISOString().slice(0, 10);
-    var stT0 = Date.now();
-    var stResult = getSessionTurnsCached(stDate);
-    var stMs = Date.now() - stT0;
-    serviceLog.info('session-turns', 'GET /api/session-turns?date=' + stDate + ' → ' + stMs + 'ms');
-    res.writeHead(200, {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-      'Cache-Control': 'no-store, no-cache, must-revalidate',
-      Pragma: 'no-cache'
-    });
-    res.end(JSON.stringify(stResult));
+    if (__devMode === 'full' && __devSource) {
+      var stRemoteUrl = __devSource.replace(/\/$/, '') + '/api/session-turns?date=' + encodeURIComponent(stDate);
+      var stT0r = Date.now();
+      serviceLog.info('session-turns', 'REMOTE proxy → ' + stRemoteUrl);
+      var stProto = stRemoteUrl.startsWith('https') ? require('https') : require('http');
+      stProto.get(stRemoteUrl, function (stResp) {
+        var stBody = '';
+        stResp.on('data', function (ch) { stBody += ch; });
+        stResp.on('end', function () {
+          serviceLog.info('session-turns', 'REMOTE date=' + stDate + ' → ' + (Date.now() - stT0r) + 'ms (' + stResp.statusCode + ')');
+          res.writeHead(stResp.statusCode || 200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
+          res.end(stBody);
+        });
+      }).on('error', function (stErr) {
+        serviceLog.warn('session-turns', 'REMOTE error: ' + (stErr.message || stErr));
+        res.writeHead(502, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'remote_fetch_failed', message: stErr.message }));
+      });
+    } else {
+      var stT0 = Date.now();
+      var stResult = getSessionTurnsCached(stDate);
+      var stMs = Date.now() - stT0;
+      serviceLog.info('session-turns', 'GET /api/session-turns?date=' + stDate + ' → ' + stMs + 'ms');
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        Pragma: 'no-cache'
+      });
+      res.end(JSON.stringify(stResult));
+    }
   } else {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(getDashboardHtml());
