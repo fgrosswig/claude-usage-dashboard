@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-144",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "5d3b4a9",
+      "commit_full": "5d3b4a90fc0e37c64f34b3c51481a552874ddf9b",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(widgets): add chart/section registry for widget system foundation",
+      "detail": "Central manifest of all 9 sections and 37 charts with metadata (engine,\ndata source, size, render function). Tracks migration state (chartjs/echarts/\ngoogle) and serves as foundation for future drag & drop widget builder.\nStats: 28 Chart.js + 8 ECharts + 1 Google Charts to migrate.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/widget-registry.js",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-143",
       "timestamp": "2026-04-11",
       "session": "auto",
