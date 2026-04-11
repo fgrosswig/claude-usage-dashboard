@@ -3604,63 +3604,33 @@ function renderVersionHealthChart(sortedVers, stats, allVers) {
   var blurbV = document.getElementById("user-version-blurb");
   if (blurbV) blurbV.textContent = t("userVersionHealthBlurb");
   if (!elV || !allVers.length || !sortedVers.length) {
-    if (_userCharts.versions) { _userCharts.versions.destroy(); _userCharts.versions = null; }
+    if (_userCharts.versions) { if (typeof _userCharts.versions.dispose === 'function') _userCharts.versions.dispose(); _userCharts.versions = null; }
     return;
   }
-  if (_userCharts.versions) { _userCharts.versions.destroy(); _userCharts.versions = null; }
+  if (_userCharts.versions) {
+    if (typeof _userCharts.versions.dispose === 'function') _userCharts.versions.dispose();
+    _userCharts.versions = null;
+  }
 
   var datasets = [];
   for (const m of __versionHealthMetrics) {
     var mData = sortedVers.map(function(sv) { return stats[sv] ? (stats[sv][m.key] || 0) : 0; });
-    datasets.push({ label: t(m.label), data: mData, backgroundColor: m.color, stack: "vh" });
+    datasets.push({ name: t(m.label), data: mData, color: m.color });
   }
 
-  var vhXMax = __stackedHBarXMax(datasets);
-  _userCharts.versions = new Chart(elV, {
-    type: "bar",
-    data: { labels: sortedVers, datasets: datasets },
-    options: {
-      indexAxis: "y",
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      layout: { padding: { left: 2, right: 10, top: 4, bottom: 10 } },
-      interaction: { mode: "index", intersect: false },
-      datasets: {
-        bar: { categoryPercentage: 0.88, barPercentage: 0.92 }
-      },
-      scales: {
-        x: {
-          stacked: true,
-          min: 0,
-          max: vhXMax,
-          grid: { color: "rgba(51,65,85,0.5)" },
-          ticks: { color: "#94a3b8", precision: 0 }
-        },
-        y: {
-          stacked: false,
-          offset: true,
-          grid: { color: "rgba(51,65,85,0.3)" },
-          ticks: { color: "#e2e8f0", font: { family: "monospace" }, autoSkip: false }
-        }
-      },
-      plugins: {
-        legend: { labels: { color: "#cbd5e1" } },
-        tooltip: {
-          callbacks: {
-            afterBody: function(items) {
-              if (!items.length) return "";
-              var ver = sortedVers[items[0].dataIndex];
-              var s = stats[ver];
-              if (!s) return "";
-              return t("userProfileCardVersion") + ": " + ver + " | Calls: " + (s.calls || 0) + " | Output: " + (s.output || 0);
-            }
-          }
-        }
-      }
-    }
+  _userCharts.versions = echarts.init(elV, null, { renderer: 'canvas' });
+  var vSeries = datasets.map(function(ds) {
+    return { name: ds.name, type: 'bar', stack: 'vh', data: ds.data, itemStyle: { color: ds.color }, barCategoryGap: '12%' };
   });
+  _userCharts.versions.setOption({
+    animation: false,
+    grid: { left: 120, right: 20, top: 36, bottom: 20 },
+    legend: { data: datasets.map(function(ds) { return ds.name; }), textStyle: { color: '#cbd5e1', fontSize: 11 }, top: 4 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 12 } },
+    xAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: { type: 'category', data: sortedVers, inverse: true, axisLabel: { color: '#e2e8f0', fontSize: 11, fontFamily: 'monospace' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
+    series: vSeries
+  }, true);
 }
 
 function renderEntrypointsChart(sortedVers, stats) {
@@ -3670,10 +3640,13 @@ function renderEntrypointsChart(sortedVers, stats) {
   var blurbE = document.getElementById("user-entrypoint-blurb");
   if (blurbE) blurbE.textContent = t("userEntrypointBlurb");
   if (!elE || !sortedVers.length) {
-    if (_userCharts.entrypoints) { _userCharts.entrypoints.destroy(); _userCharts.entrypoints = null; }
+    if (_userCharts.entrypoints) { if (typeof _userCharts.entrypoints.dispose === 'function') _userCharts.entrypoints.dispose(); _userCharts.entrypoints = null; }
     return;
   }
-  if (_userCharts.entrypoints) { _userCharts.entrypoints.destroy(); _userCharts.entrypoints = null; }
+  if (_userCharts.entrypoints) {
+    if (typeof _userCharts.entrypoints.dispose === 'function') _userCharts.entrypoints.dispose();
+    _userCharts.entrypoints = null;
+  }
 
   var allEp = {};
   for (const sv of sortedVers) {
@@ -3688,53 +3661,26 @@ function renderEntrypointsChart(sortedVers, stats) {
     "cli": "rgba(34,197,94,0.8)",
     "claude-jetbrains": "rgba(245,158,11,0.8)"
   };
-  var epDatasets = [];
+  var epSeries = [];
   for (var edi = 0; edi < epKeys.length; edi++) {
     var eKey = epKeys[edi];
     var eData = sortedVers.map(function(sv) { return stats[sv]?.entrypoints ? (stats[sv].entrypoints[eKey] || 0) : 0; });
-    epDatasets.push({
-      label: eKey,
-      data: eData,
-      backgroundColor: epColors[eKey] || __userProfileColors[edi % __userProfileColors.length],
-      stack: "ep"
+    epSeries.push({
+      name: eKey, type: 'bar', stack: 'ep', data: eData, barCategoryGap: '12%',
+      itemStyle: { color: epColors[eKey] || __userProfileColors[edi % __userProfileColors.length] }
     });
   }
-  var epXMax = __stackedHBarXMax(epDatasets);
-  _userCharts.entrypoints = new Chart(elE, {
-    type: "bar",
-    data: { labels: sortedVers, datasets: epDatasets },
-    options: {
-      indexAxis: "y",
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      layout: { padding: { left: 2, right: 10, top: 4, bottom: 10 } },
-      interaction: { mode: "index", intersect: false },
-      datasets: {
-        bar: { categoryPercentage: 0.88, barPercentage: 0.92 }
-      },
-      scales: {
-        x: {
-          stacked: true,
-          min: 0,
-          max: epXMax,
-          grid: { color: "rgba(51,65,85,0.5)" },
-          ticks: { color: "#94a3b8", precision: 0 }
-        },
-        y: {
-          stacked: false,
-          offset: true,
-          grid: { color: "rgba(51,65,85,0.3)" },
-          ticks: { color: "#e2e8f0", font: { family: "monospace" }, autoSkip: false }
-        }
-      },
-      plugins: {
-        legend: { labels: { color: "#cbd5e1" } },
-        tooltip: { callbacks: { label: function(c) { return c.dataset.label + ": " + c.raw; } } }
-      }
-    }
-  });
+
+  _userCharts.entrypoints = echarts.init(elE, null, { renderer: 'canvas' });
+  _userCharts.entrypoints.setOption({
+    animation: false,
+    grid: { left: 120, right: 20, top: 36, bottom: 20 },
+    legend: { data: epKeys, textStyle: { color: '#cbd5e1', fontSize: 11 }, top: 4 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 12 } },
+    xAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: { type: 'category', data: sortedVers, inverse: true, axisLabel: { color: '#e2e8f0', fontSize: 11, fontFamily: 'monospace' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
+    series: epSeries
+  }, true);
 }
 
 // ── Release Stability Chart ──────────────────────────────────────────────
@@ -3814,7 +3760,10 @@ function renderReleaseStabilityChart(sortedVers, releaseData) {
   if (h3) h3.textContent = t("releaseStabilityTitle");
   var blurb = document.getElementById("user-release-stability-blurb");
   if (!el) return;
-  if (_userCharts.releaseStability) { _userCharts.releaseStability.destroy(); _userCharts.releaseStability = null; }
+  if (_userCharts.releaseStability) {
+    if (typeof _userCharts.releaseStability.dispose === 'function') _userCharts.releaseStability.dispose();
+    _userCharts.releaseStability = null;
+  }
   if (!sortedVers?.length || !releaseData) {
     if (blurb) blurb.textContent = t("releaseStabilityNoData");
     return;
@@ -3831,68 +3780,26 @@ function renderReleaseStabilityChart(sortedVers, releaseData) {
     .replace("{regressions}", String(counts.regN));
 
   var series = __buildReleaseStabilitySeries(sortedVers, lookup);
-  var stableData = series.stableData;
-  var regressionData = series.regressionData;
-  var hotfixData = series.hotfixData;
-  var unknownData = series.unknownData;
-  var meta = series.meta;
 
-  var datasets = [
-    { label: t("releaseStabilityStable"), data: stableData, backgroundColor: "rgba(34,197,94,0.8)", stack: "s" },
-    { label: t("releaseStabilityRegression"), data: regressionData, backgroundColor: "rgba(250,204,21,0.85)", stack: "s" },
-    { label: t("releaseStabilityHotfix"), data: hotfixData, backgroundColor: "rgba(248,113,113,0.85)", stack: "s" },
-    { label: t("releaseStabilityUnknown"), data: unknownData, backgroundColor: "rgba(100,116,139,0.4)", stack: "s" }
-  ];
-
-  var rsXMax = __stackedHBarXMax(datasets);
-  _userCharts.releaseStability = new Chart(el, {
-    type: "bar",
-    data: { labels: sortedVers, datasets: datasets },
-    options: {
-      indexAxis: "y",
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      layout: { padding: { left: 2, right: 10, top: 4, bottom: 32 } },
-      interaction: { mode: "index", intersect: false },
-      datasets: {
-        bar: { categoryPercentage: 0.88, barPercentage: 0.92 }
-      },
-      scales: {
-        x: {
-          stacked: true,
-          min: 0,
-          max: rsXMax,
-          grid: { color: "rgba(51,65,85,0.5)" },
-          ticks: { color: "#94a3b8" },
-          title: {
-            display: true,
-            text: t("releaseStabilityXAxis"),
-            color: "#64748b",
-            font: { size: 11 },
-            padding: { top: 10 }
-          }
-        },
-        y: {
-          stacked: false,
-          offset: true,
-          grid: { color: "rgba(51,65,85,0.18)" },
-          ticks: { color: "#e2e8f0", font: { family: "monospace" }, autoSkip: false }
-        }
-      },
-      plugins: {
-        legend: { labels: { color: "#cbd5e1" } },
-        tooltip: {
-          callbacks: {
-            afterBody: function(items) {
-              return __releaseStabilityTooltipAfterBody(meta, items, t);
-            }
-          }
-        }
-      }
-    }
-  });
+  _userCharts.releaseStability = echarts.init(el, null, { renderer: 'canvas' });
+  _userCharts.releaseStability.setOption({
+    animation: false,
+    grid: { left: 120, right: 20, top: 36, bottom: 36 },
+    legend: {
+      data: [t("releaseStabilityStable"), t("releaseStabilityRegression"), t("releaseStabilityHotfix"), t("releaseStabilityUnknown")],
+      textStyle: { color: '#cbd5e1', fontSize: 11 }, top: 4
+    },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 12 } },
+    xAxis: { type: 'value', min: 0, name: t("releaseStabilityXAxis"), nameLocation: 'center', nameGap: 24, nameTextStyle: { color: '#64748b', fontSize: 11 },
+      axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: { type: 'category', data: sortedVers, inverse: true, axisLabel: { color: '#e2e8f0', fontSize: 11, fontFamily: 'monospace' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.18)' } } },
+    series: [
+      { name: t("releaseStabilityStable"), type: 'bar', stack: 's', data: series.stableData, itemStyle: { color: 'rgba(34,197,94,0.8)' }, barCategoryGap: '12%' },
+      { name: t("releaseStabilityRegression"), type: 'bar', stack: 's', data: series.regressionData, itemStyle: { color: 'rgba(250,204,21,0.85)' } },
+      { name: t("releaseStabilityHotfix"), type: 'bar', stack: 's', data: series.hotfixData, itemStyle: { color: 'rgba(248,113,113,0.85)' } },
+      { name: t("releaseStabilityUnknown"), type: 'bar', stack: 's', data: series.unknownData, itemStyle: { color: 'rgba(100,116,139,0.4)' } }
+    ]
+  }, true);
 }
 
 // ── Budget Efficiency Section ─────────────────────────────────────────────

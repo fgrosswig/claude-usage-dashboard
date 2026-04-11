@@ -171,7 +171,7 @@
             id: 'user-versions',
             titleKey: 'chartUserVersions',
             type: 'bar-horizontal',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c-user-versions',
             size: { cols: 1, minHeight: 300 },
             renderFn: 'renderUserProfile_versions'
@@ -180,7 +180,7 @@
             id: 'user-entrypoints',
             titleKey: 'chartUserEntrypoints',
             type: 'bar-horizontal',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c-user-entrypoints',
             size: { cols: 1, minHeight: 300 },
             renderFn: 'renderUserProfile_entrypoints'
@@ -189,7 +189,7 @@
             id: 'user-release-stability',
             titleKey: 'chartUserReleaseStability',
             type: 'bar-horizontal',
-            engine: 'chartjs',
+            engine: 'echarts',
             canvasId: 'c-user-release-stability',
             size: { cols: 1, minHeight: 300 },
             renderFn: 'renderUserProfile_releaseStability'
