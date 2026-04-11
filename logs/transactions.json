@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-129",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "3b1bbd1",
+      "commit_full": "3b1bbd122c3078dfe9a18c0732007ae2b3319ffe",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(sonar): resolve code quality findings in economic charts",
+      "detail": "- Replace typeof checks with globalThis access\n- Extract nested ternaries into IIFE blocks\n- Use optional chaining (?.) for property access\n- Use Array.find() instead of manual for loops\n- Use for-of where applicable\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-128",
       "timestamp": "2026-04-11",
       "session": "auto",
