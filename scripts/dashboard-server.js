@@ -3034,7 +3034,14 @@ function emptyProxyDayBucket() {
     per_hour_latency: {},
     false_429s: 0,
     context_resets: 0,
-    _prev_cache_read_high: false
+    _prev_cache_read_high: false,
+    // claude-code-cache-fix interop fields
+    ttl_tiers: { '1h': 0, '5m': 0, unknown: 0 },
+    peak_hour_requests: 0,
+    off_peak_requests: 0,
+    ephemeral_1h_tokens: 0,
+    ephemeral_5m_tokens: 0,
+    data_sources: {}
   };
 }
 
@@ -3200,6 +3207,33 @@ function parseProxyNdjsonFiles() {
             }
           }
         }
+
+        // ── claude-code-cache-fix interop fields ──────────────────────
+        // TTL tier (from cache-fix interceptor, absent in native proxy)
+        var ttl = rec.ttl_tier || 'unknown';
+        if (dd.ttl_tiers[ttl] !== undefined) dd.ttl_tiers[ttl]++;
+        else dd.ttl_tiers.unknown++;
+
+        // Ephemeral token breakdown by TTL tier
+        dd.ephemeral_1h_tokens += (rec.ephemeral_1h_input_tokens || 0);
+        dd.ephemeral_5m_tokens += (rec.ephemeral_5m_input_tokens || 0);
+
+        // Peak hour (prefer flag from cache-fix, fallback: compute from ts)
+        if (rec.peak_hour === true) {
+          dd.peak_hour_requests++;
+        } else if (rec.peak_hour === false) {
+          dd.off_peak_requests++;
+        } else if (tsEnd.length >= 13) {
+          var phDate = new Date(tsEnd);
+          var phUtcH = phDate.getUTCHours();
+          var phUtcD = phDate.getUTCDay();
+          if (phUtcD >= 1 && phUtcD <= 5 && phUtcH >= 13 && phUtcH < 19) dd.peak_hour_requests++;
+          else dd.off_peak_requests++;
+        }
+
+        // Data source tracking
+        var src = rec.source || 'proxy';
+        dd.data_sources[src] = (dd.data_sources[src] || 0) + 1;
       });
     } catch (e) {
       serviceLog.warn('proxy-parse', 'ndjson read failed ' + files[fi] + ': ' + (e.message || e));
@@ -3248,7 +3282,14 @@ function parseProxyNdjsonFiles() {
       visible_tokens_per_pct_method: null,
       q5_consumed_pct: 0,
       q5_samples: 0,
-      proxy_active_visible_tokens: 0
+      proxy_active_visible_tokens: 0,
+      // claude-code-cache-fix interop
+      ttl_tiers: d.ttl_tiers,
+      peak_hour_requests: d.peak_hour_requests,
+      off_peak_requests: d.off_peak_requests,
+      ephemeral_1h_tokens: d.ephemeral_1h_tokens,
+      ephemeral_5m_tokens: d.ephemeral_5m_tokens,
+      data_sources: d.data_sources
     });
     // Quota benchmark: visible tokens per 1% of 5h window consumption.
     // Cumulative over positive Δq5 between consecutive chronological requests —

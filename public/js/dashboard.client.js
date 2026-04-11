@@ -5635,12 +5635,19 @@ function renderProxyAnalysis(data) {
   var q7pct = "?";
   if (q5h !== undefined && q5h !== null) q5pct = (Number.parseFloat(q5h) * 100).toFixed(1);
   if (q7d !== undefined && q7d !== null) q7pct = (Number.parseFloat(q7d) * 100).toFixed(1);
-  sumEl.textContent = tr("proxySummaryLine", {
+  var summaryText = tr("proxySummaryLine", {
     reqs: pd.requests || 0,
     errs: pd.errors || 0,
     q5h: q5pct,
     q7d: q7pct
   });
+  // Data source badge (proxy / interceptor / both)
+  var ds = pd.data_sources || {};
+  var hasProxy = (ds.proxy || 0) > 0;
+  var hasInterceptor = (ds["claude-code-cache-fix"] || 0) > 0;
+  if (hasProxy && hasInterceptor) summaryText += " · " + t("proxySourceBoth");
+  else if (hasInterceptor) summaryText += " · " + t("proxySourceInterceptor");
+  sumEl.textContent = summaryText;
   if (noteEl) noteEl.textContent = t("proxyNote");
 
   // Cards
@@ -5721,6 +5728,32 @@ function renderProxyAnalysis(data) {
       valueColor: gaugeColor(q7pctVal)
     }
   ];
+
+  // TTL tier card (only if interceptor data present, not all unknown)
+  var ttl = pd.ttl_tiers || {};
+  var ttlTotal = (ttl["1h"] || 0) + (ttl["5m"] || 0);
+  if (ttlTotal > 0) {
+    var ttl1hPct = Math.round((ttl["1h"] || 0) / ttlTotal * 100);
+    var ttl5mPct = 100 - ttl1hPct;
+    pcards.push({
+      label: t("proxyTtlTier"),
+      value: tr("proxyTtl1h", { pct: ttl1hPct }),
+      sub: tr("proxyTtl5m", { pct: ttl5mPct }),
+      cls: ttl5mPct > 20 ? "warn" : "ok"
+    });
+  }
+
+  // Peak / Off-Peak card
+  var peakReqs = pd.peak_hour_requests || 0;
+  var offPeakReqs = pd.off_peak_requests || 0;
+  if (peakReqs + offPeakReqs > 0) {
+    pcards.push({
+      label: t("proxyDataSource"),
+      value: tr("proxyPeakHours", { peak: peakReqs, offpeak: offPeakReqs }),
+      sub: hasInterceptor ? t("proxySourceInterceptor") : t("proxySourceProxy"),
+      cls: ""
+    });
+  }
   if (cardsEl) {
     var ch2 = "";
     pcards.forEach(function (c) {
