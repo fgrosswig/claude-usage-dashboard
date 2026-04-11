@@ -2,6 +2,43 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-132",
+      "timestamp": "2026-04-11",
+      "session": "auto",
+      "commit": "2510b2d",
+      "commit_full": "2510b2da87a7233d44ac83b9280f9798dac73555",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(economic): add Session Overhead chart — Heavy User Tax (#203)",
+      "detail": "Stacked horizontal bar chart below Budget Drain showing per-session\nbreakdown: productive output vs cache warmup, compaction rebuild,\nand forced restart overhead. Includes collapsible info overlay\nwith overhead percentage summary. i18n for DE/EN/KO.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-131",
       "timestamp": "2026-04-11",
       "session": "auto",
