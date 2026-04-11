@@ -17,7 +17,9 @@
 - **측정된 백그라운드 작업(프록시 아이디어):** **ArkNill**의 **[Claude Code Hidden Problem Analysis](https://github.com/ArkNill/claude-code-hidden-problem-analysis)** — 캐시 버그, **5h/7d-Quota** 및 프록시 캡처 헤더(**cc-relay** 유사 측정 등)에 대한 문서화된 분석. **이 프로젝트는 프록시/NDJSON 아이디어를** 대시보드와 파이프라인에 적용하며, **분석 깊이**는 **해당** 리포지토리에 있습니다.
 - **GitHub 이슈 토론(Claude Code):** **[anthropics/claude-code#38335](https://github.com/anthropics/claude-code/issues/38335)** — 특히 **비정상적으로 빠르게** 소진되는 Max/Session 윈도우 관련(토론 기준: 2026년 3월경). **fgrosswig**가 **포렌식/측정**으로 참여했으며, **해당 토론에 링크된 모든 댓글, 이슈 및 하위 토론**은 **동일한 주제 범위**(사용량, 회귀, 커뮤니티 측정값)에 속하며 **참고 자료**입니다 — 여기에 전체 URL 목록을 나열하면 범위를 초과합니다.
 
-**직접 링크:** [https://github.com/anthropics/claude-code/issues/38335](https://github.com/anthropics/claude-code/issues/38335) · [https://github.com/ArkNill/claude-code-hidden-problem-analysis](https://github.com/ArkNill/claude-code-hidden-problem-analysis)
+- **Q5 할당량 검증 및 인터셉터 연동:** **cnighswonger**(Veritas Super AI Solutions)의 **[claude-code-cache-fix](https://github.com/cnighswonger/claude-code-cache-fix)** — 강제 재시작 발견의 독립적 재현, **cache_read 90% 할인이 여전히 활성** 증명(8.8x 비율), **할당량 제수 가설**(API 비용 대 Q5% 매핑이 고정되지 않음). v1.7.0부터 **NDJSON 어댑터**(`usage-to-dashboard-ndjson.mjs`)로 대시보드 프록시 형식에 직접 기록 — 설정 없는 연동. 공동 분석으로 **대용량 캐시 읽기 패널티** 발견: 큰 Q5 점프의 93%가 압축이 아닌 대용량 캐시의 일반 턴에서 발생.
+
+**직접 링크:** [https://github.com/anthropics/claude-code/issues/38335](https://github.com/anthropics/claude-code/issues/38335) · [https://github.com/ArkNill/claude-code-hidden-problem-analysis](https://github.com/ArkNill/claude-code-hidden-problem-analysis) · [https://github.com/cnighswonger/claude-code-cache-fix](https://github.com/cnighswonger/claude-code-cache-fix)
 
 기술, UI, 환경 변수 및 API: **[문서](docs/README.md)**.
 
