@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-169",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "0d5d9cf",
+      "commit_full": "0d5d9cf0328547635bd71cc31334a11b7944312c",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(session-turns): log cache hits/misses at info level instead of debug",
+      "detail": "Visible at default log level without --log-level=debug\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-168",
       "timestamp": "2026-04-12",
       "session": "auto",
