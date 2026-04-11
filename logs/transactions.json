@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-148",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "b468c44",
+      "commit_full": "b468c44fe9b911a782f5840c6d9c7bef4b23f1f9",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(forensic): remove per-chart disclosures, increase chart height, normalize axis labels",
+      "detail": "- Remove individual <details> collapse from forensic charts (section-level\n  collapse is sufficient)\n- Increase min-height: 260px → 340px (hit-limit), 320px (signals, service)\n- Normalize axis label fontSize to 11px across all forensic charts\n- Legend fontSize 10px with compact itemWidth for multi-series charts\n- Tooltip fontSize 12px consistent\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-147",
       "timestamp": "2026-04-12",
       "session": "auto",
