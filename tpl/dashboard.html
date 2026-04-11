@@ -158,42 +158,36 @@
 <div class="forensic-charts-stack" id="forensic-charts-stack">
 <div class="forensic-charts-host-scope">
 <!-- Row 1: Forensic & Hit Limit (full width) -->
-<details class="forensic-chart-disclosure" open>
-<summary class="forensic-chart-summary"><span id="forensic-chart-h3">Forensic &amp; Hit Limit pro Tag</span></summary>
-<div class="forensic-chart-panel">
-<p id="forensic-chart-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"><strong style="color:#ef4444">Rot (Balken)</strong> = Zähler Hit-Limit-Zeilen in JSONL. <strong style="color:#f59e0b">Linie</strong> = Score 3=? · 2=HIT · 1=&lt;&lt;P (Peak-Vergleich, nicht Claude-UI 90%/100%).</p>
+<div class="chart-box">
+<h3 id="forensic-chart-h3">Forensic &amp; Hit Limit pro Tag</h3>
+<p id="forensic-chart-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"><strong style="color:#ef4444">Rot (Balken)</strong> = Hit-Limit-Zeilen in JSONL. <strong style="color:#f59e0b">Linie</strong> = Score 3=? · 2=HIT · 1=&lt;&lt;P.</p>
 <div class="chart-shell chart-shell--forensic is-loading" id="chart-shell-forensic">
 <div class="chart-shell-ph" aria-hidden="true"></div>
-<div id="c-forensic" style="width:100%;min-height:260px"></div>
+<div id="c-forensic" style="width:100%;min-height:340px"></div>
 </div>
 </div>
-</details>
 </div>
 <!-- Row 2: Session-Signale + Service Impact (side by side) -->
 <div class="forensic-charts-pair">
-<details class="forensic-chart-disclosure" open>
-<summary class="forensic-chart-summary"><span id="forensic-signals-chart-h3"></span></summary>
-<div class="forensic-chart-panel">
+<div class="chart-box">
+<h3 id="forensic-signals-chart-h3"></h3>
 <p id="forensic-signals-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"></p>
 <div class="chart-shell chart-shell--forensic is-loading" id="chart-shell-forensic-signals">
 <div class="chart-shell-ph" aria-hidden="true"></div>
-<div id="c-forensic-signals" style="width:100%;min-height:260px"></div>
+<div id="c-forensic-signals" style="width:100%;min-height:320px"></div>
 </div>
 </div>
-</details>
-<details class="forensic-chart-disclosure" open>
-<summary class="forensic-chart-summary"><span id="service-chart-h3">Service Impact</span></summary>
-<div class="forensic-chart-panel">
+<div class="chart-box">
+<h3 id="service-chart-h3">Service Impact</h3>
 <p id="service-chart-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"></p>
 <div class="service-chart-canvas-wrap" id="service-chart-canvas-wrap">
 <div class="chart-shell chart-shell--service is-loading" id="chart-shell-service">
 <div class="chart-shell-ph" aria-hidden="true"></div>
 <div class="fs-update-overlay" id="fs-update-overlay" aria-hidden="true"></div>
-<div id="c-service" style="width:100%;min-height:260px"></div>
+<div id="c-service" style="width:100%;min-height:320px"></div>
 </div>
 </div>
 </div>
-</details>
 </div>
 </div>
 <p id="thinking-note" style="font-size:.75rem;color:#f59e0b;margin:12px 0 4px;line-height:1.45"></p>

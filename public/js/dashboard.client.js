@@ -2593,14 +2593,14 @@ function renderDashboardCore(data) {
       var fHitColors = fHitData.map(function(v) { return v > 0 ? 'rgba(248,113,113,0.55)' : 'rgba(71,85,105,0.35)'; });
       _charts.cForensic.setOption({
         animation: false,
-        grid: { left: 50, right: fhForensic ? 16 : 60, top: 36, bottom: 30 },
-        legend: { data: [t("forensicDS_hitLimit"), t("forensicDS_score")], textStyle: { color: '#cbd5e1' }, top: 4 },
-        tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' } },
-        xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+        grid: { left: 50, right: fhForensic ? 20 : 65, top: 40, bottom: 36 },
+        legend: { data: [t("forensicDS_hitLimit"), t("forensicDS_score")], textStyle: { color: '#cbd5e1', fontSize: 11 }, top: 4 },
+        tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 12 } },
+        xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
         yAxis: [
-          { type: 'value', name: t("forensicAxisCounts"), nameTextStyle: { color: '#94a3b8' }, min: 0, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
-          { type: 'value', name: fhForensic ? '' : t("forensicAxisForensic"), nameTextStyle: { color: '#fbbf24' }, min: 0, max: 3.5, show: !fhForensic,
-            axisLabel: { color: '#94a3b8' }, splitLine: { show: false } }
+          { type: 'value', name: t("forensicAxisCounts"), nameTextStyle: { color: '#94a3b8', fontSize: 11 }, min: 0, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+          { type: 'value', name: fhForensic ? '' : t("forensicAxisForensic"), nameTextStyle: { color: '#fbbf24', fontSize: 11 }, min: 0, max: 3.5, show: !fhForensic,
+            axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { show: false } }
         ],
         series: [
           { name: t("forensicDS_hitLimit"), type: 'bar', data: fHitData, yAxisIndex: 0,
@@ -2625,17 +2625,17 @@ function renderDashboardCore(data) {
         if (!_charts.cForensicSignals) _charts.cForensicSignals = echarts.init(elSig, null, { renderer: 'canvas' });
         _charts.cForensicSignals.setOption({
           animation: false,
-          grid: { left: 50, right: 60, top: 36, bottom: 30 },
+          grid: { left: 50, right: 65, top: 40, bottom: 36 },
           legend: {
             data: [t("forensicDS_continueStack"), t("forensicDS_resumeStack"), t("forensicDS_retryStack"), t("forensicDS_interruptStack"), t("forensicDS_outageHoursDay"), t("chartDS_cacheRead")],
-            textStyle: { color: '#cbd5e1' }, top: 4
+            textStyle: { color: '#cbd5e1', fontSize: 10 }, top: 4, itemWidth: 12, itemHeight: 10
           },
-          tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' } },
-          xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', rotate: 45 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.45)' } } },
+          tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 12 } },
+          xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 11, rotate: 45 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.45)' } } },
           yAxis: [
-            { type: 'value', name: t("forensicSignalsAxisLines"), nameTextStyle: { color: '#94a3b8' }, min: 0, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
-            { type: 'value', name: t("forensicSignalsAxisCacheRead"), nameTextStyle: { color: '#a78bfa' }, min: 0,
-              axisLabel: { color: '#a78bfa', formatter: function(v) { return fmt(v); } }, splitLine: { show: false } }
+            { type: 'value', name: t("forensicSignalsAxisLines"), nameTextStyle: { color: '#94a3b8', fontSize: 11 }, min: 0, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+            { type: 'value', name: t("forensicSignalsAxisCacheRead"), nameTextStyle: { color: '#a78bfa', fontSize: 11 }, min: 0,
+              axisLabel: { color: '#a78bfa', fontSize: 11, formatter: function(v) { return fmt(v); } }, splitLine: { show: false } }
           ],
           series: [
             { name: t("forensicDS_continueStack"), type: 'bar', stack: 'sig', data: sigStack.cont, itemStyle: { color: 'rgba(59,130,246,0.75)' } },
@@ -2672,12 +2672,12 @@ function renderDashboardCore(data) {
     if (!_charts.cService) _charts.cService = echarts.init(elS, null, { renderer: 'canvas' });
     _charts.cService.setOption({
       animation: false,
-      grid: { left: 50, right: 60, top: 36, bottom: 30 },
+      grid: { left: 50, right: 65, top: 40, bottom: 36 },
       legend: {
         data: [t("serviceDS_cleanWork"), t("serviceDS_affectedServer"), t("serviceDS_affectedClient"), t("serviceDS_outageOnly"), t("chartDS_cacheRead")],
-        textStyle: { color: '#cbd5e1' }, top: 4
+        textStyle: { color: '#cbd5e1', fontSize: 10 }, top: 4, itemWidth: 12, itemHeight: 10
       },
-      tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 12 },
         formatter: function(params) {
           var lines = [params[0].axisValueLabel];
           for (var pi = 0; pi < params.length; pi++) {
@@ -2688,12 +2688,12 @@ function renderDashboardCore(data) {
           return lines.join('<br>');
         }
       },
-      xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+      xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
       yAxis: [
-        { type: 'value', name: t("serviceAxisHours"), nameTextStyle: { color: '#94a3b8' }, min: 0,
-          axisLabel: { color: '#94a3b8', formatter: '{value}h' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
-        { type: 'value', name: t("chartDS_cacheRead"), nameTextStyle: { color: '#8b5cf6' }, min: 0,
-          axisLabel: { color: '#8b5cf6', formatter: function(v) { return fmt(v); } }, splitLine: { show: false } }
+        { type: 'value', name: t("serviceAxisHours"), nameTextStyle: { color: '#94a3b8', fontSize: 11 }, min: 0,
+          axisLabel: { color: '#94a3b8', fontSize: 11, formatter: '{value}h' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+        { type: 'value', name: t("chartDS_cacheRead"), nameTextStyle: { color: '#8b5cf6', fontSize: 11 }, min: 0,
+          axisLabel: { color: '#8b5cf6', fontSize: 11, formatter: function(v) { return fmt(v); } }, splitLine: { show: false } }
       ],
       series: [
         { name: t("serviceDS_cleanWork"), type: 'bar', stack: 'hours', data: sClean, itemStyle: { color: 'rgba(59,130,246,0.7)' } },
