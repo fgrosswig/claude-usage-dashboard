@@ -8412,8 +8412,16 @@ function renderEconomicSection(data, filteredDays) {
           renderCacheExplosion(session);
           renderEfficiencyTimeline(stData);
           renderBudgetDrain(stData);
-          renderEconOverhead(stData);
         }
+        // Fetch quota-divisor data for overhead chart (proxy-based)
+        fetch("/api/quota-divisor?date=" + encodeURIComponent(selectedDate))
+          .then(function (r) { return r.json(); })
+          .then(function (qdData) {
+            if (qdData && qdData.request_pairs && qdData.request_pairs.length > 0) {
+              renderEconOverhead(qdData, stData);
+            }
+          })
+          .catch(function () { /* no proxy data available — skip overhead chart */ });
       })
       .catch(function () {
         if (sumEl) sumEl.textContent = t("econSummaryNoData");
@@ -8444,7 +8452,6 @@ function renderEconomicSection(data, filteredDays) {
           renderCacheExplosion(session);
           renderEfficiencyTimeline(_econData);
           renderBudgetDrain(_econData);
-          renderEconOverhead(_econData);
         }
       }
     });
@@ -9941,171 +9948,206 @@ function renderBudgetDrain(stData) {
 
 // ── Session Overhead — Heavy User Tax ────────────────────────────────
 
-function renderEconOverhead(stData) {
+function renderEconOverhead(qdData, stData) {
   if (typeof echarts === "undefined") return;
   var el = document.getElementById("chart-shell-econ-overhead");
-  if (!el || !stData || !stData.sessions || !stData.sessions.length) return;
+  if (!el) return;
 
-  var sessions = stData.sessions.slice().sort(function (a, b) { return a.first_ts < b.first_ts ? -1 : 1; });
+  var hasProxy = qdData && qdData.request_pairs && qdData.request_pairs.length > 0;
+  var hasJsonl = stData && stData.sessions && stData.sessions.length > 0;
 
-  var labels = [];      // y-axis: "S1 14:23–14:44"
-  var productive = [];  // green: output tokens
-  var warmup = [];      // yellow: initial cache_creation
-  var compaction = [];   // orange: cache_creation after compaction drops
-  var forcedRestart = [];// red: warmup cost of forced-restart sessions
-
-  var totalProductive = 0, totalWarmup = 0, totalCompaction = 0, totalForced = 0;
-
-  for (var si = 0; si < sessions.length; si++) {
-    var sess = sessions[si];
-    var turns = sess.turns || [];
-    if (!turns.length) continue;
-
-    // Session label
-    var t0 = sess.first_ts || "";
-    var t1 = sess.last_ts || "";
-    var hh0 = t0.length >= 16 ? t0.slice(11, 16) : "?";
-    var hh1 = t1.length >= 16 ? t1.slice(11, 16) : "?";
-    labels.push("S" + (si + 1) + " " + hh0 + "–" + hh1);
-
-    // Detect forced restart (gap < 5min to previous session)
-    var forced = false;
-    if (si > 0) {
-      var prevEnd = new Date(sessions[si - 1].last_ts).getTime();
-      var thisStart = new Date(sess.first_ts).getTime();
-      forced = (thisStart - prevEnd) <= 5 * 60000 && (thisStart - prevEnd) >= 0;
-    }
-
-    // Classify each turn
-    var sessOutput = 0, sessWarmup = 0, sessCompaction = 0;
-    var warmupDone = false;
-    var prevCacheRead = 0;
-
-    for (var ti = 0; ti < turns.length; ti++) {
-      var T = turns[ti];
-      var cc = T.cache_creation || 0;
-      var cr = T.cache_read || 0;
-      var out = T.output || 0;
-
-      sessOutput += out;
-
-      // Phase 1: Warmup — cache_creation dominates until cache_read > cache_creation
-      if (!warmupDone) {
-        if (cr > cc && ti > 0) {
-          warmupDone = true;
-        } else {
-          sessWarmup += cc;
-          continue;
-        }
-      }
-
-      // Phase 2: Compaction detection — cache_read drops >60% from previous turn
-      if (prevCacheRead > 10000 && cr < prevCacheRead * 0.4) {
-        // Compaction detected — count this and next few turns as rebuild
-        sessCompaction += cc;
-      } else if (sessCompaction > 0 && cc > cr) {
-        // Still rebuilding after compaction
-        sessCompaction += cc;
-      }
-
-      prevCacheRead = cr > 0 ? cr : prevCacheRead;
-    }
-
-    // For forced restarts: warmup cost goes to forced category instead
-    if (forced) {
-      productive.push(sessOutput);
-      warmup.push(0);
-      compaction.push(sessCompaction);
-      forcedRestart.push(sessWarmup);
-      totalForced += sessWarmup;
-    } else {
-      productive.push(sessOutput);
-      warmup.push(sessWarmup);
-      compaction.push(sessCompaction);
-      forcedRestart.push(0);
-      totalWarmup += sessWarmup;
-    }
-    totalProductive += sessOutput;
-    totalCompaction += sessCompaction;
+  if (!hasProxy && !hasJsonl) {
+    el.innerHTML = '<div style="color:#64748b;font-size:11px;padding:40px;text-align:center">No data available.</div>';
+    return;
   }
 
-  var grandTotal = totalProductive + totalWarmup + totalCompaction + totalForced;
-  var overheadPct = grandTotal > 0 ? Math.round((totalWarmup + totalCompaction + totalForced) / grandTotal * 100) : 0;
+  var OVERHEAD_THRESHOLD = 0.03; // Q5 delta >= 3% = overhead event
 
-  // Update header with overhead percentage
+  // ── Q5 curve (from proxy) ──
+  var q5Actual = [], q5Ideal = [], q5Scatter = [];
+  var cumQ5 = 0, cumQ5Ideal = 0, q5Events = 0, q5Overhead = 0;
+
+  if (hasProxy) {
+    var pairs = qdData.request_pairs.slice().sort(function (a, b) { return a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0; });
+    for (var i = 0; i < pairs.length; i++) {
+      var p = pairs[i];
+      var delta = p.delta * 100;
+      cumQ5 += delta;
+      var isOh = p.delta >= OVERHEAD_THRESHOLD;
+      if (!isOh) {
+        cumQ5Ideal += delta;
+      } else {
+        q5Events++;
+        q5Overhead += delta;
+        q5Scatter.push([i, Math.round(cumQ5 * 10) / 10]);
+      }
+      q5Actual.push([i, Math.round(cumQ5 * 10) / 10]);
+      q5Ideal.push([i, Math.round(cumQ5Ideal * 10) / 10]);
+    }
+  }
+
+  // ── Token curve (from JSONL session-turns) ──
+  // Normalized to same scale: 0-100% of day total
+  var tokActual = [], tokIdeal = [];
+  var cumTokAll = 0, cumTokIdeal = 0, tokDayTotal = 0;
+
+  if (hasJsonl) {
+    var sessions = stData.sessions.slice().sort(function (a, b) { return a.first_ts < b.first_ts ? -1 : 1; });
+    // Day total for normalization
+    for (var si = 0; si < sessions.length; si++) {
+      var turns = sessions[si].turns || [];
+      for (var ti = 0; ti < turns.length; ti++) {
+        tokDayTotal += (turns[ti].cache_read || 0) + (turns[ti].cache_creation || 0) + (turns[ti].output || 0);
+      }
+    }
+
+    var tokIdx = 0;
+    for (var si = 0; si < sessions.length; si++) {
+      var turns = sessions[si].turns || [];
+      var warmupDone = false, prevCR = 0, maxCR = 0, inRebuild = false, rebuildN = 0;
+      var forced = false;
+      if (si > 0) {
+        var gapMs = new Date(sessions[si].first_ts).getTime() - new Date(sessions[si - 1].last_ts).getTime();
+        forced = gapMs >= 0 && gapMs <= 300000;
+      }
+      for (var ti = 0; ti < turns.length; ti++) {
+        var T = turns[ti];
+        var cc = T.cache_creation || 0, cr = T.cache_read || 0, out = T.output || 0;
+        var total = cc + cr + out;
+        var overhead = 0;
+
+        if (!warmupDone) {
+          if (cr > cc && ti > 0) { warmupDone = true; }
+          else { overhead = cc; }
+        } else {
+          if (prevCR > 10000 && cr < prevCR * 0.4 && cc > prevCR * 0.3) { inRebuild = true; rebuildN = 0; }
+          if (inRebuild) { overhead = cc; rebuildN++; if (cr > maxCR * 0.5 && rebuildN > 1) inRebuild = false; }
+        }
+        prevCR = cr > 0 ? cr : prevCR;
+        maxCR = Math.max(maxCR, cr);
+
+        cumTokAll += total;
+        cumTokIdeal += (total - overhead);
+
+        // Map token index to proxy request scale for overlay
+        if (hasProxy) {
+          var mappedX = Math.round(tokIdx / (stData.total_turns || 1) * (pairs.length - 1));
+          var pctAll = tokDayTotal > 0 ? Math.round(cumTokAll / tokDayTotal * cumQ5 * 10) / 10 : 0;
+          var pctIdeal = tokDayTotal > 0 ? Math.round(cumTokIdeal / tokDayTotal * cumQ5 * 10) / 10 : 0;
+          tokActual.push([mappedX, pctAll]);
+          tokIdeal.push([mappedX, pctIdeal]);
+        }
+        tokIdx++;
+      }
+    }
+  }
+
+  var gapQ5 = Math.round((cumQ5 - cumQ5Ideal) * 10) / 10;
+  var q5Ratio = cumQ5 > 0 ? Math.round(q5Overhead / cumQ5 * 100) : 0;
+  var tokOverheadPct = tokDayTotal > 0 ? Math.round((cumTokAll - cumTokIdeal) / cumTokAll * 1000) / 10 : 0;
+
+  // Header
   var h3 = document.getElementById("econ-overhead-h3");
-  if (h3) h3.textContent = t("econOverheadTitle") + " — " + overheadPct + "% Overhead";
+  if (h3) {
+    if (hasProxy) {
+      h3.textContent = t("econOverheadTitle") + " \u2014 Q5: " + q5Ratio + "% Overhead | Tokens: " + tokOverheadPct + "% Overhead";
+    } else {
+      h3.textContent = t("econOverheadTitle") + " \u2014 " + tokOverheadPct + "% Token Overhead (no proxy data)";
+    }
+  }
+
+  // Blurb
+  var blurb = document.getElementById("econ-overhead-blurb");
+  if (blurb && hasProxy) {
+    blurb.textContent = q5Events + " overhead events consumed " + gapQ5 + "% Q5 (" + q5Ratio + "% of budget). Visible token overhead is only " + tokOverheadPct + "% \u2014 the gap reveals hidden costs (thinking tokens, internal overhead).";
+  }
+
+  // ── Build chart ──
+  var series = [];
+
+  if (hasProxy) {
+    series.push({
+      name: "Q5 Actual",
+      type: "line", data: q5Actual, smooth: false, symbol: "none",
+      lineStyle: { color: "#f97316", width: 2 },
+      areaStyle: {
+        color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [{ offset: 0, color: "rgba(249,115,22,0.15)" }, { offset: 1, color: "rgba(249,115,22,0.02)" }]
+        }
+      }
+    });
+    series.push({
+      name: "Q5 Ideal",
+      type: "line", data: q5Ideal, smooth: false, symbol: "none",
+      lineStyle: { color: "#34d399", width: 2, type: "dashed" }
+    });
+    series.push({
+      name: "Overhead Event",
+      type: "scatter", data: q5Scatter, symbolSize: 8,
+      itemStyle: { color: "#ef4444" }, z: 10
+    });
+  }
+
+  if (hasJsonl && hasProxy) {
+    series.push({
+      name: "Token Actual",
+      type: "line", data: tokActual, smooth: false, symbol: "none",
+      lineStyle: { color: "#60a5fa", width: 1.5, type: "dotted" }
+    });
+    series.push({
+      name: "Token Ideal",
+      type: "line", data: tokIdeal, smooth: false, symbol: "none",
+      lineStyle: { color: "#a78bfa", width: 1.5, type: "dotted" }
+    });
+  }
+
+  var legendData = series.map(function (s) { return s.name; });
 
   var option = {
     tooltip: {
       trigger: "axis",
-      axisPointer: { type: "shadow" },
       formatter: function (params) {
         if (!params || !params.length) return "";
-        var tip = '<div style="font-size:11px">' + params[0].name;
-        var total = 0;
-        for (var k = 0; k < params.length; k++) total += (params[k].value || 0);
+        var idx = params[0].value[0];
+        var tip = '<div style="font-size:11px">Request ' + (idx + 1);
+        if (hasProxy && pairs[idx]) tip += " (" + pairs[idx].ts.slice(11, 19) + ")";
+        var q5a = null, q5i = null;
         for (var k = 0; k < params.length; k++) {
-          var p = params[k];
-          if (!p.value) continue;
-          var pct = total > 0 ? Math.round(p.value / total * 100) : 0;
-          tip += "<br>" + p.marker + " " + p.seriesName + ": " + fmt(p.value) + " (" + pct + "%)";
+          var pm = params[k];
+          if (!pm.value) continue;
+          tip += "<br>" + pm.marker + " " + pm.seriesName + ": " + pm.value[1] + "%";
+          if (pm.seriesName === "Q5 Actual") q5a = pm.value[1];
+          if (pm.seriesName === "Q5 Ideal") q5i = pm.value[1];
         }
-        tip += "<br><b>Total: " + fmt(total) + "</b></div>";
+        if (q5a != null && q5i != null) {
+          tip += "<br><b>Q5 Gap: " + (Math.round((q5a - q5i) * 10) / 10) + "%</b>";
+        }
+        if (hasProxy && pairs[idx] && pairs[idx].delta >= OVERHEAD_THRESHOLD) {
+          tip += '<br><span style="color:#ef4444">\u26a0 +' + (pairs[idx].delta * 100) + '% Q5</span>';
+        }
+        tip += "</div>";
         return tip;
       }
     },
     legend: {
-      data: [t("econOverheadProductive"), t("econOverheadWarmup"), t("econOverheadCompaction"), t("econOverheadForced")],
-      top: 0, right: 10,
+      data: legendData, top: 0, right: 10,
       textStyle: { color: "#94a3b8", fontSize: 10 },
-      itemWidth: 12, itemHeight: 8
+      itemWidth: 14, itemHeight: 8
     },
-    grid: { left: 90, right: 20, top: 30, bottom: 20, containLabel: false },
+    grid: { left: 50, right: 20, top: 30, bottom: 25 },
     xAxis: {
-      type: "value",
-      axisLabel: {
-        color: "#94a3b8", fontSize: 9,
-        formatter: function (v) { return v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : v >= 1e3 ? Math.round(v / 1e3) + "K" : v; }
-      },
+      type: "value", name: "Requests",
+      nameTextStyle: { color: "#64748b", fontSize: 9 },
+      axisLabel: { color: "#94a3b8", fontSize: 9 },
       splitLine: { lineStyle: { color: "rgba(100,116,139,0.15)" } }
     },
     yAxis: {
-      type: "category",
-      data: labels,
-      inverse: true,
-      axisLabel: { color: "#cbd5e1", fontSize: 9 }
+      type: "value", name: "% consumed",
+      nameTextStyle: { color: "#64748b", fontSize: 9 },
+      axisLabel: { color: "#94a3b8", fontSize: 9, formatter: function (v) { return v + "%"; } },
+      splitLine: { lineStyle: { color: "rgba(100,116,139,0.15)" } }
     },
-    series: [
-      {
-        name: t("econOverheadProductive"),
-        type: "bar", stack: "total",
-        data: productive,
-        itemStyle: { color: "#34d399" },
-        emphasis: { itemStyle: { color: "#6ee7b7" } }
-      },
-      {
-        name: t("econOverheadWarmup"),
-        type: "bar", stack: "total",
-        data: warmup,
-        itemStyle: { color: "#facc15" },
-        emphasis: { itemStyle: { color: "#fde047" } }
-      },
-      {
-        name: t("econOverheadCompaction"),
-        type: "bar", stack: "total",
-        data: compaction,
-        itemStyle: { color: "#f97316" },
-        emphasis: { itemStyle: { color: "#fb923c" } }
-      },
-      {
-        name: t("econOverheadForced"),
-        type: "bar", stack: "total",
-        data: forcedRestart,
-        itemStyle: { color: "#ef4444" },
-        emphasis: { itemStyle: { color: "#f87171" } }
-      }
-    ]
+    series: series
   };
 
   __effInitOrSet("econOverhead", el, option, true);
@@ -10114,14 +10156,21 @@ function renderEconOverhead(stData) {
   var existingOverlay = el.querySelector(".overhead-info-overlay");
   if (existingOverlay) existingOverlay.remove();
 
-  var infoLines = [
-    "Productive: " + fmt(totalProductive) + " (" + (grandTotal > 0 ? Math.round(totalProductive / grandTotal * 100) : 0) + "%)",
-    "Warmup: " + fmt(totalWarmup) + " (" + (grandTotal > 0 ? Math.round(totalWarmup / grandTotal * 100) : 0) + "%)",
-    "Compaction: " + fmt(totalCompaction) + " (" + (grandTotal > 0 ? Math.round(totalCompaction / grandTotal * 100) : 0) + "%)",
-    "Forced Restart: " + fmt(totalForced) + " (" + (grandTotal > 0 ? Math.round(totalForced / grandTotal * 100) : 0) + "%)",
-    "─────────────────",
-    "Total Overhead: " + overheadPct + "%"
-  ];
+  var infoLines = [];
+  if (hasProxy) {
+    infoLines.push("Q5 Actual:   " + Math.round(cumQ5) + "% consumed");
+    infoLines.push("Q5 Ideal:    " + Math.round(cumQ5Ideal) + "%");
+    infoLines.push("Q5 Overhead: " + gapQ5 + "% (" + q5Ratio + "%)");
+  }
+  if (hasJsonl) {
+    infoLines.push("Tok Overhead:" + tokOverheadPct + "%");
+  }
+  if (hasProxy && hasJsonl) {
+    var phantom = q5Ratio - tokOverheadPct;
+    infoLines.push("\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500");
+    infoLines.push("Phantom:     " + Math.round(phantom) + "% (hidden)");
+    infoLines.push("Events:      " + q5Events);
+  }
 
   var overlay = document.createElement("div");
   overlay.className = "overhead-info-overlay";
