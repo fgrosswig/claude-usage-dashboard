@@ -169,13 +169,13 @@ steps:
         apk add --no-cache curl jq
         API="https://gitea.grosswig-it.de/api/v1/repos/GRO/Claude-Usage-Dashboard"
         # 1. Last tag via API (no local git tags needed)
-        TAG_RAW=$(curl -s -w "\n%{http_code}" -H "Authorization: token $GITEA_TOKEN" "$API/tags?limit=1")
-        TAG_HTTP=$(echo "$TAG_RAW" | tail -1)
-        TAG_BODY=$(echo "$TAG_RAW" | sed '$d')
+        TAG_HTTP=$(curl -s -o /tmp/tags.json -w "%{http_code}" \
+          -H "Authorization: token $GITEA_TOKEN" "$API/tags?limit=1")
         echo "Tags API: HTTP $TAG_HTTP"
-        LAST_TAG=$(echo "$TAG_BODY" | jq -r '.[0].name // empty' 2>/dev/null)
+        cat /tmp/tags.json | head -1
+        LAST_TAG=$(jq -r '.[0].name // empty' /tmp/tags.json 2>/dev/null)
         if [ -z "$LAST_TAG" ]; then LAST_TAG="v0.0.0"; fi
-        TAG_SHA=$(echo "$TAG_BODY" | jq -r '.[0].commit.sha // empty' 2>/dev/null)
+        TAG_SHA=$(jq -r '.[0].commit.sha // empty' /tmp/tags.json 2>/dev/null)
         echo "Last tag: $LAST_TAG ($TAG_SHA)"
         # 2. Commits since tag via API
         if [ "$TAG_SHA" = "$CI_COMMIT_SHA" ]; then
@@ -201,10 +201,12 @@ steps:
           BUMP="minor"
         fi
         # 4. Parse + bump version
-        VER=$(echo "$LAST_TAG" | sed 's/^v//')
+        VER=$(echo "$LAST_TAG" | sed 's/^v//' | tr -d '\r\n ')
+        echo "Parsing version: [$VER]"
         MAJOR=$(echo "$VER" | cut -d. -f1)
         MINOR=$(echo "$VER" | cut -d. -f2)
         PATCH=$(echo "$VER" | cut -d. -f3)
+        echo "Parsed: MAJOR=$MAJOR MINOR=$MINOR PATCH=$PATCH"
         case "$BUMP" in
           major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
           minor) MINOR=$((MINOR+1)); PATCH=0 ;;
