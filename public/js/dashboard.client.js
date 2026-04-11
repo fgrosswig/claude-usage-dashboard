@@ -5164,8 +5164,8 @@ function renderProxyHourlyLatency(data) {
     xAxis: { type: 'category', data: ld.labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
     yAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8', formatter: function(v) { return fmtMs(v); } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
     series: [
-      { name: t("proxyDSAvgLatency"), type: 'bar', data: ld.avgData, itemStyle: { color: 'rgba(59,130,246,0.6)', borderRadius: [2, 2, 0, 0] } },
-      { name: t("proxyDSMaxLatency"), type: 'bar', data: ld.maxData, itemStyle: { color: 'rgba(239,68,68,0.35)', borderRadius: [2, 2, 0, 0] } }
+      { name: t("proxyDSMaxLatency"), type: 'bar', data: ld.maxData, barGap: '-100%', z: 1, itemStyle: { color: 'rgba(239,68,68,0.25)', borderRadius: [2, 2, 0, 0] } },
+      { name: t("proxyDSAvgLatency"), type: 'bar', data: ld.avgData, z: 2, itemStyle: { color: 'rgba(59,130,246,0.7)', borderRadius: [2, 2, 0, 0] } }
     ]
   }, true);
 }
