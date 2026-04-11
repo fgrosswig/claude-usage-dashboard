@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-163",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "877c00d",
+      "commit_full": "877c00d03221c5894cd165ee400ef7ba9c482c53",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(charts): clean up Chart.js remnants after full ECharts migration",
+      "detail": "- c1hosts.destroy() -> dispose/destroy fallback (same pattern as destroyMainChartIfScopeMismatch)\n\n- Remove global canvas{} CSS rule (no canvas elements remain)\n\n- Remove stale Chart.js comment from user-profile CSS\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-162",
       "timestamp": "2026-04-12",
       "session": "auto",
