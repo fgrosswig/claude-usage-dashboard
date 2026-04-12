@@ -1037,4 +1037,13 @@
     renderWidgetTree: renderWidgetTree,
     applyAllChartVisibility: applyAllChartVisibility
   };
+
+  // Bind sidebar toggle immediately (don't wait for data/init)
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () { bindSidebarEvents(); });
+    } else {
+      bindSidebarEvents();
+    }
+  }
 })(typeof window !== 'undefined' ? window : this);

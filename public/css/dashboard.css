@@ -627,7 +627,7 @@ tr:hover td{background:#334155}
 #tt-pop{position:fixed;pointer-events:none;opacity:0;transition:opacity .12s;z-index:99999;background:rgba(15,23,42,.96);color:#e2e8f0;font-size:.72rem;line-height:1.4;padding:5px 10px;border-radius:6px;border:1px solid rgba(71,85,105,.6);width:max-content;max-width:90vw}
 
 /* ── Settings Sidebar (slide-out left) ──────────────────────────── */
-.settings-nav-btn{background:none;border:1px solid #475569;color:#94a3b8;font-size:1.1rem;padding:4px 10px;border-radius:6px;cursor:pointer;line-height:1;transition:background .15s,color .15s}
+.settings-nav-btn{background:none;border:1px solid #475569;color:#94a3b8;font-size:1.1rem;padding:4px 10px;border-radius:6px;cursor:pointer;line-height:1;transition:background .15s,color .15s;position:relative;z-index:10000}
 .settings-nav-btn:hover{background:#334155;color:#e2e8f0}
 .settings-nav-btn.is-active{background:#475569;color:#f8fafc}
 
