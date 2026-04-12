@@ -4,7 +4,7 @@
 // CLAUDE_USAGE_WALK_SLICE=N (5–500): größer = schnellere Projektbaum-Ermittlung, kleiner = responsiver direkt nach Start (Default 40 readdir/Tick).
 // Tages-Cache: ~/.claude/usage-dashboard-days.json (Vortage). Bei passender jsonl-Anzahl nur noch „heute“ aus JSONL.
 // Vollscan erzwingen: CLAUDE_USAGE_NO_CACHE=1  oder  Cache-Datei löschen / neue .jsonl-Datei ändert die Anzahl.
-// full_jsonl-Grund im Log: siehe scan-Zeile "day_cache_miss …". Identischen Scan überspringen (nur wenn JSONL mtimes unverändert): CLAUDE_USAGE_SKIP_IDENTICAL_SCAN=1
+// full_jsonl-Grund im Log: siehe scan-Zeile "day_cache_miss …". Identischen JSONL-Scan (Fingerprint mtime+size) standardmaessig ueberspringen wenn unveraendert — sonst bei vielen .jsonl Dauer-„Loading …/N“ + hohe Last. Abschalten: CLAUDE_USAGE_SKIP_IDENTICAL_SCAN=0
 // Marketplace POST-Timeout ms: CLAUDE_USAGE_MARKETPLACE_TIMEOUT_MS (3000-120000, Default 12000).
 // Backfill-Pause zwischen GitHub-Release-Tags ms: CLAUDE_USAGE_GITHUB_BACKFILL_DELAY_MS (0-5000, Default 0).
 // Push JSONL ins Container-/PVC-Volume: POST /api/claude-data-sync (Body = gzip-Tar), Header Authorization: Bearer <CLAUDE_USAGE_SYNC_TOKEN>.
@@ -2326,9 +2326,10 @@ function parseAllUsageIncremental(done, onProgress) {
   var tagged = coll.tagged;
   var roots = coll.roots;
   var scanFpForPersist = buildTaggedJsonlFingerprintSync(tagged);
-  var skipIdentScan =
-    process.env.CLAUDE_USAGE_SKIP_IDENTICAL_SCAN === '1' ||
-    process.env.CLAUDE_USAGE_SKIP_IDENTICAL_SCAN === 'true';
+  var skipIdentRaw = String(process.env.CLAUDE_USAGE_SKIP_IDENTICAL_SCAN || '').trim().toLowerCase();
+  // Default: skip full re-parse when JSONL set unchanged (avoids re-reading hundreds of files every refresh interval).
+  // Opt-out with CLAUDE_USAGE_SKIP_IDENTICAL_SCAN=0 or false (always run full incremental scan each tick).
+  var skipIdentScan = skipIdentRaw !== '0' && skipIdentRaw !== 'false' && skipIdentRaw !== 'off' && skipIdentRaw !== 'no';
   if (
     skipIdentScan &&
     scanFpForPersist === __lastScanJsonlFingerprint &&
