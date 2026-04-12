@@ -118,6 +118,9 @@ h1{font-size:1.5rem;margin-bottom:4px;color:#f8fafc}
 #user-profile-charts{padding-top:12px;align-items:start}
 /* User-Profile: Canvas nur im Host — Höhe in JS; sonst misst Chart.js die volle .chart-box inkl. h3+Blurb → Balken versetzt / abgeschnitten */
 #user-profile-charts .user-profile-chart-box{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+/* Gleiche Kopf-/Blurb-Höhe in allen drei Spalten → ECharts-Hosts starten auf einer Linie */
+#user-profile-charts .user-profile-chart-box h3{min-height:2.35em;line-height:1.25;box-sizing:border-box}
+#user-profile-charts .user-profile-chart-box .user-chart-blurb{min-height:3.75em;box-sizing:border-box}
 #user-profile-charts .user-chart-canvas-host{flex:0 0 auto;width:100%;position:relative}
 #user-profile-charts .user-chart-canvas-host>div{display:block;max-width:100%}
 table{width:100%;border-collapse:collapse;font-size:.8rem}

@@ -2247,9 +2247,9 @@ function renderDashboardCore(data) {
       axisLabel: { color: '#94a3b8', formatter: function(v) { return fmt(v); } },
       splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
     series: [
-      { name: t("chartDS_cacheRead"), type: 'bar', stack: 'tok', data: c1CacheRead, itemStyle: { color: 'rgba(139,92,246,0.7)' } },
-      { name: t("chartDS_output"), type: 'bar', stack: 'tok', data: c1Output, itemStyle: { color: 'rgba(59,130,246,0.9)' } },
-      { name: t("chartDS_cacheCreate"), type: 'bar', stack: 'tok', data: c1CacheCreate, itemStyle: { color: 'rgba(6,182,212,0.5)' } }
+      { name: t("chartDS_cacheRead"), type: 'bar', stack: 'tok', barCategoryGap: '8%', data: c1CacheRead, itemStyle: { color: 'rgba(139,92,246,0.7)' } },
+      { name: t("chartDS_output"), type: 'bar', stack: 'tok', barCategoryGap: '8%', data: c1Output, itemStyle: { color: 'rgba(59,130,246,0.9)' } },
+      { name: t("chartDS_cacheCreate"), type: 'bar', stack: 'tok', barCategoryGap: '8%', data: c1CacheCreate, itemStyle: { color: 'rgba(6,182,212,0.5)' } }
     ]
   }, true);
   _charts.c1._dashScope = mainScope;
@@ -2261,7 +2261,7 @@ function renderDashboardCore(data) {
       var ch1h = document.createElement("div");
       ch1h.className = "chart-box";
       ch1h.id = "chart-host-wrap";
-      ch1h.innerHTML = "<h3></h3><p style=\"font-size:.72rem;color:#94a3b8;margin:4px 0 10px;line-height:1.4\"></p><div id=\"c1-hosts\" style=\"width:100%;min-height:260px\"></div>";
+      ch1h.innerHTML = "<h3></h3><p style=\"font-size:.72rem;color:#94a3b8;margin:4px 0 10px;line-height:1.4\"></p><div id=\"c1-hosts\" style=\"width:100%;min-height:320px\"></div>";
       var pairIns = document.getElementById("charts-host-sub");
       if (pairIns) {
         if (pairIns.firstChild) pairIns.insertBefore(ch1h, pairIns.firstChild);
@@ -2285,7 +2285,7 @@ function renderDashboardCore(data) {
       for (var hli = 0; hli < hLabs.length; hli++) {
         var lb0 = hLabs[hli];
         hostSeries.push({
-          name: lb0, type: 'bar', stack: 'h',
+          name: lb0, type: 'bar', stack: 'h', barCategoryGap: '8%',
           data: days.map(function(d) { var x = d.hosts && d.hosts[lb0]; return x ? (x.total || 0) : 0; }),
           itemStyle: { color: hostBarColors[hli % hostBarColors.length] }
         });
@@ -2391,7 +2391,7 @@ function renderDashboardCore(data) {
     },
     xAxis: { type: 'category', data: c3Labels, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
     yAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8', formatter: function(v) { return fmt(v); } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
-    series: [{ name: c3Name, type: 'bar', data: c3Data, itemStyle: { color: 'rgba(34,197,94,0.7)' } }]
+    series: [{ name: c3Name, type: 'bar', barCategoryGap: '8%', data: c3Data, itemStyle: { color: 'rgba(34,197,94,0.7)' } }]
   }, true);
   _charts.c3._dashScope = mainScope;
 
@@ -2404,7 +2404,7 @@ function renderDashboardCore(data) {
     var sigColors = ['rgba(59,130,246,0.75)', 'rgba(6,182,212,0.7)', 'rgba(239,68,68,0.65)', 'rgba(251,191,36,0.55)'];
     var sigKeys = ['continue', 'resume', 'retry', 'interrupt'];
     for (var si4 = 0; si4 < 4; si4++) {
-      c4Series.push({ name: c4Leg[si4], type: 'bar', stack: 'sig', data: hourSignalsArrayForHost(dayForHourly, mainHostKey, sigKeys[si4]), itemStyle: { color: sigColors[si4] } });
+      c4Series.push({ name: c4Leg[si4], type: 'bar', stack: 'sig', barCategoryGap: '8%', data: hourSignalsArrayForHost(dayForHourly, mainHostKey, sigKeys[si4]), itemStyle: { color: sigColors[si4] } });
     }
     _charts.c4.setOption({
       animation: false,
@@ -2420,7 +2420,7 @@ function renderDashboardCore(data) {
       var lb4 = hLabs[c4i];
       c4Leg.push(lb4);
       c4Series.push({
-        name: lb4, type: 'bar', stack: 'subcache',
+        name: lb4, type: 'bar', stack: 'subcache', barCategoryGap: '8%',
         data: days.map(function (d) { var cr = d.cache_read || 0; var x = d.hosts && d.hosts[lb4]; if (!x || cr <= 0) return 0; return Math.round(((x.sub_cache || 0) / cr) * 100); }),
         itemStyle: { color: hostBarColors[c4i % hostBarColors.length] }
       });
@@ -2451,7 +2451,7 @@ function renderDashboardCore(data) {
       },
       xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
       yAxis: { type: 'value', max: 100, axisLabel: { color: '#94a3b8', formatter: '{value}%' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
-      series: [{ name: t("chartSubCachePct"), type: 'bar', data: c4Vals,
+      series: [{ name: t("chartSubCachePct"), type: 'bar', barCategoryGap: '8%', data: c4Vals,
         itemStyle: { color: function(params) { return c4Colors[params.dataIndex]; } } }]
     }, true);
   }
@@ -3305,6 +3305,41 @@ function copyReport(){
 
 // ── User Profile Charts ──────────────────────────────────────────────────
 var _userCharts = { versions: null, entrypoints: null, releaseStability: null };
+/** Identical grid for all User-Profile horizontal bar charts (aligns Y rows + bar thickness across columns). */
+var __USER_PROFILE_BAR_GRID = { left: 6, right: 6, top: 54, bottom: 56, containLabel: true };
+var __USER_PROFILE_BAR_Y_LABEL = {
+  color: "#e2e8f0",
+  fontSize: 11,
+  fontFamily: "monospace",
+  width: 64,
+  overflow: "truncate",
+  margin: 2,
+  align: "right"
+};
+/** Scroll legend with fixed vertical footprint so Version / Entry / Release reserve the same top band. */
+function __userProfileLegendOpts(legendData) {
+  return {
+    type: "scroll",
+    orient: "horizontal",
+    top: 6,
+    left: 6,
+    right: 6,
+    height: 30,
+    itemGap: 6,
+    itemWidth: 10,
+    itemHeight: 10,
+    textStyle: { fontSize: 10, color: "#cbd5e1" },
+    data: legendData
+  };
+}
+
+/** Display names for entrypoint keys — aligned with userEntrypointBlurb (VS Code, CLI, JetBrains). */
+function __userEntrypointLegendName(key) {
+  if (key === "claude-vscode") return t("userEntrypointLegendVscode");
+  if (key === "cli") return t("userEntrypointLegendCli");
+  if (key === "claude-jetbrains") return t("userEntrypointLegendJetbrains");
+  return key;
+}
 function __disposeUserEchartsChart(which) {
   var ch = _userCharts[which];
   if (!ch) return;
@@ -3613,6 +3648,18 @@ function renderUserProfileCharts(days) {
   renderVersionHealthChart(sortedVers, stats, allVers);
   renderEntrypointsChart(sortedVers, stats);
   renderReleaseStabilityChart(sortedVers, __releaseStabilityData);
+  function __resizeUserProfileChartsAfterLayout() {
+    try {
+      if (_userCharts.versions && typeof _userCharts.versions.resize === "function") _userCharts.versions.resize();
+      if (_userCharts.entrypoints && typeof _userCharts.entrypoints.resize === "function") _userCharts.entrypoints.resize();
+      if (_userCharts.releaseStability && typeof _userCharts.releaseStability.resize === "function") _userCharts.releaseStability.resize();
+    } catch (eRz) {}
+  }
+  if (typeof requestAnimationFrame !== "undefined") {
+    requestAnimationFrame(__resizeUserProfileChartsAfterLayout);
+  } else {
+    setTimeout(__resizeUserProfileChartsAfterLayout, 0);
+  }
 }
 
 function renderVersionHealthChart(sortedVers, stats, allVers) {
@@ -3639,11 +3686,18 @@ function renderVersionHealthChart(sortedVers, stats, allVers) {
   });
   _userCharts.versions.setOption({
     animation: false,
-    grid: { left: 120, right: 20, top: 36, bottom: 20 },
-    legend: { data: datasets.map(function(ds) { return ds.name; }), textStyle: { color: '#cbd5e1', fontSize: 11 }, top: 4 },
+    grid: __USER_PROFILE_BAR_GRID,
+    legend: __userProfileLegendOpts(datasets.map(function(ds) { return ds.name; })),
     tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 12 } },
     xAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
-    yAxis: { type: 'category', data: sortedVers, inverse: true, axisLabel: { color: '#e2e8f0', fontSize: 11, fontFamily: 'monospace' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
+    yAxis: {
+      type: "category",
+      data: sortedVers,
+      inverse: true,
+      boundaryGap: true,
+      axisLabel: __USER_PROFILE_BAR_Y_LABEL,
+      splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } }
+    },
     series: vSeries
   }, true);
 }
@@ -3674,11 +3728,14 @@ function renderEntrypointsChart(sortedVers, stats) {
     "claude-jetbrains": "rgba(245,158,11,0.8)"
   };
   var epSeries = [];
+  var epLegendNames = [];
   for (var edi = 0; edi < epKeys.length; edi++) {
     var eKey = epKeys[edi];
+    var legName = __userEntrypointLegendName(eKey);
+    epLegendNames.push(legName);
     var eData = sortedVers.map(function(sv) { return stats[sv]?.entrypoints ? (stats[sv].entrypoints[eKey] || 0) : 0; });
     epSeries.push({
-      name: eKey, type: 'bar', stack: 'ep', data: eData, barCategoryGap: '12%',
+      name: legName, type: 'bar', stack: 'ep', data: eData, barCategoryGap: '12%',
       itemStyle: { color: epColors[eKey] || __userProfileColors[edi % __userProfileColors.length] }
     });
   }
@@ -3686,11 +3743,18 @@ function renderEntrypointsChart(sortedVers, stats) {
   _userCharts.entrypoints = echarts.init(elE, null, { renderer: 'canvas' });
   _userCharts.entrypoints.setOption({
     animation: false,
-    grid: { left: 120, right: 20, top: 36, bottom: 20 },
-    legend: { data: epKeys, textStyle: { color: '#cbd5e1', fontSize: 11 }, top: 4 },
+    grid: __USER_PROFILE_BAR_GRID,
+    legend: __userProfileLegendOpts(epLegendNames),
     tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 12 } },
     xAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
-    yAxis: { type: 'category', data: sortedVers, inverse: true, axisLabel: { color: '#e2e8f0', fontSize: 11, fontFamily: 'monospace' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
+    yAxis: {
+      type: "category",
+      data: sortedVers,
+      inverse: true,
+      boundaryGap: true,
+      axisLabel: __USER_PROFILE_BAR_Y_LABEL,
+      splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } }
+    },
     series: epSeries
   }, true);
 }
@@ -3796,20 +3860,29 @@ function renderReleaseStabilityChart(sortedVers, releaseData) {
   _userCharts.releaseStability = echarts.init(el, null, { renderer: 'canvas' });
   _userCharts.releaseStability.setOption({
     animation: false,
-    grid: { left: 120, right: 20, top: 36, bottom: 36 },
-    legend: {
-      data: [t("releaseStabilityStable"), t("releaseStabilityRegression"), t("releaseStabilityHotfix"), t("releaseStabilityUnknown")],
-      textStyle: { color: '#cbd5e1', fontSize: 11 }, top: 4
-    },
+    grid: __USER_PROFILE_BAR_GRID,
+    legend: __userProfileLegendOpts([
+      t("releaseStabilityStable"),
+      t("releaseStabilityRegression"),
+      t("releaseStabilityHotfix"),
+      t("releaseStabilityUnknown")
+    ]),
     tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 12 } },
-    xAxis: { type: 'value', min: 0, name: t("releaseStabilityXAxis"), nameLocation: 'center', nameGap: 24, nameTextStyle: { color: '#64748b', fontSize: 11 },
+    xAxis: { type: 'value', min: 0, name: t("releaseStabilityXAxis"), nameLocation: 'center', nameGap: 22, nameTextStyle: { color: '#64748b', fontSize: 11 },
       axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
-    yAxis: { type: 'category', data: sortedVers, inverse: true, axisLabel: { color: '#e2e8f0', fontSize: 11, fontFamily: 'monospace' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.18)' } } },
+    yAxis: {
+      type: "category",
+      data: sortedVers,
+      inverse: true,
+      boundaryGap: true,
+      axisLabel: __USER_PROFILE_BAR_Y_LABEL,
+      splitLine: { lineStyle: { color: 'rgba(51,65,85,0.18)' } }
+    },
     series: [
       { name: t("releaseStabilityStable"), type: 'bar', stack: 's', data: series.stableData, itemStyle: { color: 'rgba(34,197,94,0.8)' }, barCategoryGap: '12%' },
-      { name: t("releaseStabilityRegression"), type: 'bar', stack: 's', data: series.regressionData, itemStyle: { color: 'rgba(250,204,21,0.85)' } },
-      { name: t("releaseStabilityHotfix"), type: 'bar', stack: 's', data: series.hotfixData, itemStyle: { color: 'rgba(248,113,113,0.85)' } },
-      { name: t("releaseStabilityUnknown"), type: 'bar', stack: 's', data: series.unknownData, itemStyle: { color: 'rgba(100,116,139,0.4)' } }
+      { name: t("releaseStabilityRegression"), type: 'bar', stack: 's', data: series.regressionData, itemStyle: { color: 'rgba(250,204,21,0.85)' }, barCategoryGap: '12%' },
+      { name: t("releaseStabilityHotfix"), type: 'bar', stack: 's', data: series.hotfixData, itemStyle: { color: 'rgba(248,113,113,0.85)' }, barCategoryGap: '12%' },
+      { name: t("releaseStabilityUnknown"), type: 'bar', stack: 's', data: series.unknownData, itemStyle: { color: 'rgba(100,116,139,0.4)' }, barCategoryGap: '12%' }
     ]
   }, true);
 }
@@ -4629,11 +4702,22 @@ function __proxyChartsResizeAll() {
     }
   }
 }
+function __userProfileChartsResizeAll() {
+  if (_userCharts.versions && typeof _userCharts.versions.resize === "function") {
+    try { _userCharts.versions.resize(); } catch (eU0) { /* detached */ }
+  }
+  if (_userCharts.entrypoints && typeof _userCharts.entrypoints.resize === "function") {
+    try { _userCharts.entrypoints.resize(); } catch (eU1) { /* detached */ }
+  }
+  if (_userCharts.releaseStability && typeof _userCharts.releaseStability.resize === "function") {
+    try { _userCharts.releaseStability.resize(); } catch (eU2) { /* detached */ }
+  }
+}
 var __effWin = globalThis.window;
 if (__effWin) {
   __effWin.addEventListener("resize", function () {
     if (__effResizeT) clearTimeout(__effResizeT);
-    __effResizeT = setTimeout(function() { __effResizeAll(); __budgetResizeAll(); __mainChartsResizeAll(); __proxyChartsResizeAll(); }, 120);
+    __effResizeT = setTimeout(function() { __effResizeAll(); __budgetResizeAll(); __mainChartsResizeAll(); __proxyChartsResizeAll(); __userProfileChartsResizeAll(); }, 120);
   });
 }
 
@@ -5054,8 +5138,8 @@ function renderProxyModelChart(data) {
     },
     xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
     yAxis: [
-      { type: 'value', min: 0, position: 'left', name: 'Requests', nameTextStyle: { color: '#94a3b8', fontSize: 10 }, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
-      { type: 'value', min: 0, position: 'right', name: 'Latency', nameTextStyle: { color: '#f59e0b', fontSize: 10 }, axisLabel: { color: '#f59e0b', formatter: function(v) { return __fmtMsShort(v); } }, splitLine: { show: false } }
+      { type: 'value', min: 0, position: 'left', name: t("proxyAxisRequests"), nameTextStyle: { color: '#94a3b8', fontSize: 10 }, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+      { type: 'value', min: 0, position: 'right', name: t("proxyAxisLatency"), nameTextStyle: { color: '#f59e0b', fontSize: 10 }, axisLabel: { color: '#f59e0b', formatter: function(v) { return __fmtMsShort(v); } }, splitLine: { show: false } }
     ],
     series: series
   }, true);
@@ -5161,6 +5245,15 @@ function aggregateHourlyLatency(proxyDays) {
   return { labels: labels, avgData: avgData, maxData: maxData, yCap: yCap };
 }
 
+/** Y-axis for hourly latency: outlier cap only applies while Max series is visible (legend). */
+function __proxyHourlyLatencyYAxis(ld, legendSelected) {
+  var nameMax = t("proxyDSMaxLatency");
+  var yBase = { type: 'value', min: 0, axisLabel: { color: '#94a3b8', formatter: function(v) { return __fmtMsShort(v); } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } };
+  var maxOn = !legendSelected || legendSelected[nameMax] !== false;
+  if (ld.yCap && maxOn) yBase.max = ld.yCap;
+  return yBase;
+}
+
 function renderProxyHourlyLatency(data) {
   if (typeof echarts === "undefined") return;
   var el = document.getElementById("c-proxy-hourly-latency");
@@ -5170,13 +5263,13 @@ function renderProxyHourlyLatency(data) {
 
   chartShellSetLoading("c-proxy-hourly-latency", false);
   if (!_proxyCharts.hourlyLatency) _proxyCharts.hourlyLatency = echarts.init(el, null, { renderer: 'canvas' });
-  var yOpts = { type: 'value', min: 0, axisLabel: { color: '#94a3b8', formatter: function(v) { return __fmtMsShort(v); } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } };
-  if (ld.yCap) yOpts.max = ld.yCap;
+  var chart = _proxyCharts.hourlyLatency;
+  var yOpts = __proxyHourlyLatencyYAxis(ld, null);
   var maxSeries = { name: t("proxyDSMaxLatency"), type: 'bar', data: ld.maxData, barGap: '-100%', z: 1, itemStyle: { color: 'rgba(239,68,68,0.25)', borderRadius: [2, 2, 0, 0] } };
   if (ld.yCap) {
     maxSeries.markLine = { silent: true, symbol: 'none', data: [{ yAxis: ld.yCap, lineStyle: { color: '#ef4444', type: 'dashed', width: 1 }, label: { show: true, position: 'insideEndTop', color: '#ef4444', fontSize: 9, formatter: 'outlier cap ' + __fmtMsShort(ld.yCap) } }] };
   }
-  _proxyCharts.hourlyLatency.setOption({
+  chart.setOption({
     animation: false,
     grid: { left: 60, right: 16, top: 36, bottom: 38 },
     legend: { data: [t("proxyDSAvgLatency"), t("proxyDSMaxLatency")], textStyle: { color: '#cbd5e1' }, top: 4 },
@@ -5194,6 +5287,11 @@ function renderProxyHourlyLatency(data) {
       { name: t("proxyDSAvgLatency"), type: 'bar', data: ld.avgData, z: 2, itemStyle: { color: 'rgba(59,130,246,0.7)', borderRadius: [2, 2, 0, 0] } }
     ]
   }, true);
+  chart.off("legendselectchanged");
+  chart.on("legendselectchanged", function(ev) {
+    var sel = ev.selected || {};
+    chart.setOption({ yAxis: __proxyHourlyLatencyYAxis(ld, sel) }, { replaceMerge: ["yAxis"] });
+  });
 }
 
 // ── Error/429 Rate Trend ─────────────────────────────────────────────────
@@ -6352,11 +6450,14 @@ function renderIncidentHistory(data) {
     _proxyCharts.incidentHistory = null;
   }
 
+  var legCrit = t("incidentLegendCritical");
+  var legMajor = t("incidentLegendMajor");
+  var legMinor = t("incidentLegendMinor");
   _proxyCharts.incidentHistory = echarts.init(el, null, { renderer: 'canvas' });
   _proxyCharts.incidentHistory.setOption({
     animation: false,
     grid: { left: 50, right: 50, top: 30, bottom: 24 },
-    legend: { data: ['critical', 'major', 'minor', t("incidentDSHitLimits")], textStyle: { color: '#f8fafc', fontSize: _cf().legend }, top: 2, itemWidth: 12, itemHeight: 10 },
+    legend: { data: [legCrit, legMajor, legMinor, t("incidentDSHitLimits")], textStyle: { color: '#f8fafc', fontSize: _cf().legend }, top: 2, itemWidth: 12, itemHeight: 10 },
     tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: _cf().tooltip },
       formatter: function(params) {
         var lines = [params[0].axisValueLabel];
@@ -6375,9 +6476,9 @@ function renderIncidentHistory(data) {
       { type: 'value', min: 0, position: 'right', name: t("incidentAxisHitLimits"), nameTextStyle: { color: '#f59e0b', fontSize: _cf().title }, axisLabel: { color: '#f59e0b', fontSize: _cf().tick }, splitLine: { show: false } }
     ],
     series: [
-      { name: 'critical', type: 'bar', stack: 'inc', yAxisIndex: 0, data: critH, itemStyle: { color: 'rgba(239,68,68,0.4)', borderColor: 'rgba(239,68,68,0.7)', borderWidth: 1 } },
-      { name: 'major', type: 'bar', stack: 'inc', yAxisIndex: 0, data: majorH, itemStyle: { color: 'rgba(249,115,22,0.35)', borderColor: 'rgba(249,115,22,0.6)', borderWidth: 1 } },
-      { name: 'minor', type: 'bar', stack: 'inc', yAxisIndex: 0, data: minorH, itemStyle: { color: 'rgba(245,158,11,0.3)', borderColor: 'rgba(245,158,11,0.6)', borderWidth: 1 } },
+      { name: legCrit, type: 'bar', stack: 'inc', yAxisIndex: 0, data: critH, itemStyle: { color: 'rgba(239,68,68,0.4)', borderColor: 'rgba(239,68,68,0.7)', borderWidth: 1 } },
+      { name: legMajor, type: 'bar', stack: 'inc', yAxisIndex: 0, data: majorH, itemStyle: { color: 'rgba(249,115,22,0.35)', borderColor: 'rgba(249,115,22,0.6)', borderWidth: 1 } },
+      { name: legMinor, type: 'bar', stack: 'inc', yAxisIndex: 0, data: minorH, itemStyle: { color: 'rgba(245,158,11,0.3)', borderColor: 'rgba(245,158,11,0.6)', borderWidth: 1 } },
       { name: '', type: 'bar', stack: 'inc', yAxisIndex: 0, data: greyH, itemStyle: { color: 'rgba(51,65,85,0.45)', borderColor: 'rgba(51,65,85,0.55)', borderWidth: 1 } },
       { name: t("incidentDSHitLimits"), type: 'line', yAxisIndex: 1, data: hitLimits, smooth: 0.3, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#f59e0b' }, itemStyle: { color: '#f59e0b' }, areaStyle: { color: 'rgba(245,158,11,0.1)' } }
     ]
@@ -6416,19 +6517,20 @@ function updateAnthropicPopup(data) {
   if (!_proxyCharts.anthropicIncidents) {
     _proxyCharts.anthropicIncidents = echarts.init(el, null, { renderer: 'canvas' });
   }
+  var legAnthInc = t("anthropicLegendIncidents");
   _proxyCharts.anthropicIncidents.setOption({
     animation: false,
     grid: { left: 50, right: 50, top: 16, bottom: 24 },
-    legend: { data: [t("incidentDSOutageHours"), 'Incidents'], textStyle: { color: '#e2e8f0', fontSize: 10 }, top: 0, itemWidth: 10, itemHeight: 8 },
+    legend: { data: [t("incidentDSOutageHours"), legAnthInc], textStyle: { color: '#e2e8f0', fontSize: 10 }, top: 0, itemWidth: 10, itemHeight: 8 },
     tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 11 } },
     xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 9 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.4)' } } },
     yAxis: [
-      { type: 'value', min: 0, position: 'left', name: 'Outage (h)', nameTextStyle: { color: '#94a3b8', fontSize: 9 }, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.4)' } } },
-      { type: 'value', min: 0, position: 'right', name: 'Incidents', nameTextStyle: { color: '#ef4444', fontSize: 9 }, axisLabel: { color: '#ef4444' }, splitLine: { show: false } }
+      { type: 'value', min: 0, position: 'left', name: t("incidentAxisOutage"), nameTextStyle: { color: '#94a3b8', fontSize: 9 }, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.4)' } } },
+      { type: 'value', min: 0, position: 'right', name: t("availKpiIncidents"), nameTextStyle: { color: '#ef4444', fontSize: 9 }, axisLabel: { color: '#ef4444' }, splitLine: { show: false } }
     ],
     series: [
       { name: t("incidentDSOutageHours"), type: 'bar', yAxisIndex: 0, data: outageH, barWidth: '35%', itemStyle: { color: function(p) { return outageColors[p.dataIndex]; }, borderColor: function(p) { return outageColors[p.dataIndex].replace(/[\d.]+\)$/, '0.8)'); }, borderWidth: 1, borderRadius: 2 } },
-      { name: 'Incidents', type: 'scatter', yAxisIndex: 1, data: scatterData, symbolSize: 8, itemStyle: { color: 'rgba(239,68,68,0.15)', borderColor: 'rgba(239,68,68,0.8)', borderWidth: 2 } }
+      { name: legAnthInc, type: 'scatter', yAxisIndex: 1, data: scatterData, symbolSize: 8, itemStyle: { color: 'rgba(239,68,68,0.15)', borderColor: 'rgba(239,68,68,0.8)', borderWidth: 2 } }
     ]
   }, true);
 }
@@ -6530,11 +6632,15 @@ function renderOutageTimeline(data, monthFilter) {
     ? { color: '#cbd5e1', fontSize: Math.max(9, _cf().tick - 2), rotate: 45, interval: 0 }
     : { color: '#cbd5e1', fontSize: _cf().tick };
 
+  var legNone = t("outageTimelineOk");
+  var legOCrit = t("incidentLegendCritical");
+  var legOMajor = t("incidentLegendMajor");
+  var legOMinor = t("incidentLegendMinor");
   _proxyCharts.outageTimeline = echarts.init(el, null, { renderer: 'canvas' });
   _proxyCharts.outageTimeline.setOption({
     animation: false,
     grid: { left: 40, right: 8, top: 30, bottom: paddedDays.length > 31 ? 40 : 24 },
-    legend: { data: ['none', 'critical', 'major', 'minor'], textStyle: { color: '#f8fafc', fontSize: _cf().legend }, top: 2, itemWidth: 12, itemHeight: 10 },
+    legend: { data: [legNone, legOCrit, legOMajor, legOMinor], textStyle: { color: '#f8fafc', fontSize: _cf().legend }, top: 2, itemWidth: 12, itemHeight: 10 },
     tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: _cf().tooltip },
       formatter: function(params) {
         var lines = [params[0].axisValueLabel];
@@ -6545,10 +6651,10 @@ function renderOutageTimeline(data, monthFilter) {
     xAxis: { type: 'category', data: labels, axisLabel: xLabelOpts, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
     yAxis: { type: 'value', max: 24, min: 0, interval: 6, axisLabel: { color: '#cbd5e1', fontSize: _cf().tick, formatter: function(v) { return v + 'h'; } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
     series: [
-      { name: 'none', type: 'bar', stack: 's', data: noneData, itemStyle: { color: 'rgba(34,197,94,0.25)', borderColor: 'rgba(34,197,94,0.5)', borderWidth: 1 } },
-      { name: 'critical', type: 'bar', stack: 's', data: critData, itemStyle: { color: 'rgba(239,68,68,0.35)', borderColor: 'rgba(239,68,68,0.7)', borderWidth: 1 } },
-      { name: 'major', type: 'bar', stack: 's', data: majorData, itemStyle: { color: 'rgba(249,115,22,0.3)', borderColor: 'rgba(249,115,22,0.6)', borderWidth: 1 } },
-      { name: 'minor', type: 'bar', stack: 's', data: minorData, itemStyle: { color: 'rgba(245,158,11,0.25)', borderColor: 'rgba(245,158,11,0.6)', borderWidth: 1 } },
+      { name: legNone, type: 'bar', stack: 's', data: noneData, itemStyle: { color: 'rgba(34,197,94,0.25)', borderColor: 'rgba(34,197,94,0.5)', borderWidth: 1 } },
+      { name: legOCrit, type: 'bar', stack: 's', data: critData, itemStyle: { color: 'rgba(239,68,68,0.35)', borderColor: 'rgba(239,68,68,0.7)', borderWidth: 1 } },
+      { name: legOMajor, type: 'bar', stack: 's', data: majorData, itemStyle: { color: 'rgba(249,115,22,0.3)', borderColor: 'rgba(249,115,22,0.6)', borderWidth: 1 } },
+      { name: legOMinor, type: 'bar', stack: 's', data: minorData, itemStyle: { color: 'rgba(245,158,11,0.25)', borderColor: 'rgba(245,158,11,0.6)', borderWidth: 1 } },
       { name: '', type: 'bar', stack: 's', data: greyData, itemStyle: { color: 'rgba(51,65,85,0.45)', borderColor: 'rgba(51,65,85,0.55)', borderWidth: 1 } }
     ]
   }, true);
@@ -7560,6 +7666,10 @@ function renderWasteCurve(session) {
   var el = document.getElementById("chart-shell-econ-waste");
   if (!el || !session || !session.turns || !session.turns.length) return;
 
+  var econLegFit = t("econLegendQuadraticFit");
+  var econLegAct = t("econLegendTotalActual");
+  var econLegProj = t("econLegendTotalProjected");
+
   var turns = session.turns;
   var n = turns.length;
   var cumTotal = [];
@@ -7692,7 +7802,7 @@ function renderWasteCurve(session) {
         return lines.join("<br>");
       }
     },
-    legend: { top: 4, textStyle: { color: "#94a3b8", fontSize: 11 } },
+    legend: { top: 4, textStyle: { color: "#94a3b8", fontSize: 11 }, data: [econLegFit, econLegAct, econLegProj] },
     grid: { top: 50, right: 20, bottom: 40, left: 60 },
     xAxis: {
       type: "value",
@@ -7711,7 +7821,7 @@ function renderWasteCurve(session) {
     },
     series: [
       {
-        name: "Quadratic fit",
+        name: econLegFit,
         type: "line",
         showSymbol: false,
         lineStyle: { color: "#ef4444", width: 2, type: "dotted" },
@@ -7780,7 +7890,7 @@ function renderWasteCurve(session) {
         })()
       },
       {
-        name: "Total (actual)",
+        name: econLegAct,
         type: "line",
         showSymbol: false,
         areaStyle: { color: "rgba(134,239,172,0.25)", origin: 0 },
@@ -7789,7 +7899,7 @@ function renderWasteCurve(session) {
         data: actualPairs
       },
       {
-        name: "Total (projected)",
+        name: econLegProj,
         type: "line",
         showSymbol: false,
         areaStyle: { color: "rgba(239,68,68,0.15)", origin: 0 },
@@ -8049,6 +8159,16 @@ function renderCacheExplosion(session) {
     }
   );
 
+  var legCostPerTurn = t("econLegendCostPerTurn");
+  var legQuadFitLine = t("econLegendQuadraticFitLine");
+  var legCtxSize = t("econLegendContextSize");
+  var legCostFactor = t("econLegendCostFactor");
+  var legTipMap = {};
+  legTipMap[legCostPerTurn] = t("econLegendTipCostPerTurn");
+  legTipMap[legQuadFitLine] = t("econLegendTipQuadraticFit");
+  legTipMap[legCtxSize] = t("econLegendTipContextSize");
+  legTipMap[legCostFactor] = t("econLegendTipCostFactor");
+
   var option = {
     tooltip: {
       trigger: "axis",
@@ -8086,17 +8206,11 @@ function renderCacheExplosion(session) {
     legend: {
       top: 4,
       textStyle: { color: "#94a3b8", fontSize: 11 },
-      data: ["Cost / Turn", "Quadratic Fit", "Context Size", "Cost Factor"],
+      data: [legCostPerTurn, legQuadFitLine, legCtxSize, legCostFactor],
       tooltip: {
         show: true,
         formatter: function (p) {
-          var tips = {
-            "Cost / Turn": "Token cost per turn. Background zones: Green = cheap (< 1.5\u00d7 baseline), Yellow = linear growth (1.5\u20133\u00d7), Red = quadratic drain (> 3\u00d7)",
-            "Quadratic Fit": "Least-squares quadratic curve fitted to per-turn costs. Shows the acceleration trend.",
-            "Context Size": "Cache read size relative to peak. Drops = compaction events where 78\u201391% of context is lost and must be rebuilt.",
-            "Cost Factor": "Current turn cost divided by first turn cost. Shows how much more expensive each turn has become."
-          };
-          return tips[p.name] || "";
+          return legTipMap[p.name] || "";
         }
       }
     },
@@ -8127,7 +8241,7 @@ function renderCacheExplosion(session) {
     ],
     series: [
       {
-        name: "Cost / Turn",
+        name: legCostPerTurn,
         type: "scatter",
         yAxisIndex: 0,
         symbolSize: 4,
@@ -8140,7 +8254,7 @@ function renderCacheExplosion(session) {
         }
       },
       {
-        name: "Quadratic Fit",
+        name: legQuadFitLine,
         type: "line",
         yAxisIndex: 0,
         lineStyle: { color: "rgba(251,191,36,0.7)", width: 2, type: "dashed" },
@@ -8149,7 +8263,7 @@ function renderCacheExplosion(session) {
         z: 5
       },
       {
-        name: "Context Size",
+        name: legCtxSize,
         type: "line",
         yAxisIndex: 1,
         lineStyle: { color: "rgba(56,189,248,0.5)", width: 1, type: "dotted" },
@@ -8166,7 +8280,7 @@ function renderCacheExplosion(session) {
         z: 2
       },
       {
-        name: "Cost Factor",
+        name: legCostFactor,
         type: "line",
         yAxisIndex: 1,
         lineStyle: { color: "rgba(236,72,153,0.6)", width: 1.5 },
@@ -8644,6 +8758,15 @@ function renderBudgetDrain(stData, qdData) {
   var dayTotal = sessions.reduce(function (s, x) { return s + x.total_all; }, 0);
   if (dayTotal === 0) return;
 
+  var econLQ5A = t("econLegendQ5Actual");
+  var econLQ5I = t("econLegendQ5Ideal");
+  var econLQ5PL = t("econLegendQ5PenaltyLower");
+  var econLTokVis = t("econLegendTokenVisible");
+  var econLCacheHealth = t("econLegendCacheHealth");
+  var econLCompaction = t("econLegendCompaction");
+  var econLColdCache = t("econLegendColdCache");
+  var econLQ5Pen = t("econLegendQ5Penalty");
+
   // 1. Group into quota windows (gap > 30 min)
   var windows = [];
   var curWin = [];
@@ -8798,12 +8921,12 @@ function renderBudgetDrain(stData, qdData) {
   if (blurbOhEarly && !hasQ5Overlay) blurbOhEarly.textContent = "";
 
   if (useDualGrid) el.style.height = "650px";
-  else el.style.height = "440px";
+  else el.style.height = "460px";
 
   var gridCfg = useDualGrid
     ? [
-      { top: 30, right: 20, height: "38%", left: 60 },
-      { top: "50%", right: 20, height: "42%", left: 60 }
+      { top: 36, right: 52, bottom: "50%", left: 60 },
+      { top: "50%", right: 52, bottom: 18, left: 60 }
     ]
     : [{ top: 30, right: 20, bottom: 50, left: 60 }];
   var xAxisCfg = useDualGrid
@@ -8814,9 +8937,23 @@ function renderBudgetDrain(stData, qdData) {
     : [{ type: "value", gridIndex: 0, min: 1, max: turnCounter, axisLabel: { color: "#64748b", fontSize: 9 }, splitLine: { show: false } }];
   var yAxisCfg = useDualGrid
     ? [
-      { type: "value", gridIndex: 0, min: 0, max: 100, axisLabel: { color: "#64748b", formatter: "{value}%" }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+      {
+        type: "value",
+        gridIndex: 0,
+        min: 0,
+        max: 100,
+        axisLabel: { color: "#64748b", formatter: "{value}%" },
+        splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
+      },
       { type: "value", gridIndex: 0, position: "right", min: 0, max: 100, axisLabel: { show: false }, splitLine: { show: false } },
-      { type: "value", gridIndex: 1, axisLabel: { color: "#f97316", fontSize: 8, formatter: "{value}%" }, splitLine: { lineStyle: { color: "rgba(51,65,85,.2)" } } }
+      {
+        type: "value",
+        gridIndex: 1,
+        position: "right",
+        axisLabel: { color: "#f97316", fontSize: 8, formatter: "{value}%", margin: 8 },
+        axisLine: { show: true, lineStyle: { color: "rgba(249,115,22,0.35)" } },
+        splitLine: { lineStyle: { color: "rgba(51,65,85,.2)" } }
+      }
     ]
     : [
       { type: "value", gridIndex: 0, min: 0, max: 100, axisLabel: { color: "#64748b", formatter: "{value}%" }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
@@ -8824,9 +8961,10 @@ function renderBudgetDrain(stData, qdData) {
     ];
   var legendCfg = useDualGrid
     ? {
-      data: ["Q5 Actual", "Q5 Ideal", "Q5 Penalty Lower", "Token Visible"],
-      top: "48%",
-      right: 10,
+      data: [econLQ5A, econLQ5I, econLQ5PL, econLTokVis],
+      top: 4,
+      left: "center",
+      itemGap: 10,
       textStyle: { color: "#94a3b8", fontSize: 9 },
       itemWidth: 14, itemHeight: 8
     }
@@ -8839,24 +8977,24 @@ function renderBudgetDrain(stData, qdData) {
         if (!params || !params.length) return "";
         var lines = [];
         for (var p = 0; p < params.length; p++) {
-          if (params[p].seriesName === "Compaction") {
+          if (params[p].seriesName === econLCompaction) {
             lines.push("<span style='color:#a855f7'>\u25c6 " + params[p].data[2] + "</span>");
-          } else if (params[p].seriesName === "Cache Health") {
+          } else if (params[p].seriesName === econLCacheHealth) {
             var chVal = params[p].data[1];
             var chLabel = chVal > 80 ? "Warm" : chVal > 40 ? "Cooling" : chVal > 10 ? "Cold" : "Frozen";
             lines.push("<span style='color:#f59e0b'>Cache: " + chVal + "% (" + chLabel + ")</span>");
-          } else if (params[p].seriesName === "Cold Cache") {
+          } else if (params[p].seriesName === econLColdCache) {
             lines.push("<span style='color:#f59e0b'>\u26a0 Cold Cache: " + params[p].data[1] + "% — rebuild in progress</span>");
             if (params[p].data[2]) lines.push("<span style='color:#94a3b8'>" + params[p].data[2] + "</span>");
-          } else if (params[p].seriesName === "Q5 Actual") {
+          } else if (params[p].seriesName === econLQ5A) {
             lines.push("<span style='color:#f97316'>Q5 Actual: " + params[p].data[1] + "%</span>");
-          } else if (params[p].seriesName === "Q5 Ideal") {
+          } else if (params[p].seriesName === econLQ5I) {
             lines.push("<span style='color:#34d399'>Q5 Ideal: " + params[p].data[1] + "%</span>");
-          } else if (params[p].seriesName === "Q5 Penalty Lower") {
+          } else if (params[p].seriesName === econLQ5PL) {
             lines.push("<span style='color:#ef4444'>\u26a0 Q5 Penalty: +" + params[p].data[1] + "%</span>");
-          } else if (params[p].seriesName === "Token Visible") {
+          } else if (params[p].seriesName === econLTokVis) {
             lines.push("<span style='color:#60a5fa'>Token (visible): " + params[p].data[1] + "%</span>");
-          } else if (params[p].seriesName === "Q5 Penalty") {
+          } else if (params[p].seriesName === econLQ5Pen) {
             var pd = params[p].data;
             lines.push("<span style='color:#ef4444'>\u25bc Q5 Penalty: +" + (pd._delta || "") + "%</span>");
           } else if (p === 0) {
@@ -8872,8 +9010,8 @@ function renderBudgetDrain(stData, qdData) {
         // Show Q5 gap if both present
         var qa = null, qi = null;
         for (var p2 = 0; p2 < params.length; p2++) {
-          if (params[p2].seriesName === "Q5 Actual") qa = params[p2].data[1];
-          if (params[p2].seriesName === "Q5 Ideal") qi = params[p2].data[1];
+          if (params[p2].seriesName === econLQ5A) qa = params[p2].data[1];
+          if (params[p2].seriesName === econLQ5I) qi = params[p2].data[1];
         }
         if (qa != null && qi != null) {
           lines.push("<b>Q5 Gap: " + (Math.round((qa - qi) * 10) / 10) + "% overhead</b>");
@@ -8914,6 +9052,7 @@ function renderBudgetDrain(stData, qdData) {
           name: "W" + (parseInt(winKeys[wki]) + 1),
           type: "line",
           showSymbol: false,
+          clip: false,
           areaStyle: {
             color: {
               type: "linear", x: 0, y: 0, x2: 1, y2: 0,
@@ -8930,10 +9069,22 @@ function renderBudgetDrain(stData, qdData) {
           markLine: isFirst ? { silent: true, symbol: "none", data: sessionBoundaries } : undefined,
           markArea: isFirst ? {
             silent: false,
-            label: { show: true, fontSize: 9, position: "insideTop" },
+            label: { show: true, fontSize: 8, position: "top", distance: 2 },
             data: rebuildAreas.concat(sessionSpans.map(function (sp2) {
               return [
-                { xAxis: sp2.firstTurn, yAxis: 100, name: sp2.label, itemStyle: { color: sp2.forced ? "rgba(239,68,68,0.06)" : "rgba(59,130,246,0.04)" }, label: { color: sp2.color, fontSize: 9, position: "insideTop", fontWeight: sp2.forced ? "bold" : "normal" } },
+                {
+                  xAxis: sp2.firstTurn,
+                  yAxis: 100,
+                  name: sp2.label,
+                  itemStyle: { color: sp2.forced ? "rgba(239,68,68,0.06)" : "rgba(59,130,246,0.04)" },
+                  label: {
+                    color: sp2.color,
+                    fontSize: 8,
+                    position: "top",
+                    distance: 2,
+                    fontWeight: sp2.forced ? "bold" : "normal"
+                  }
+                },
                 { xAxis: sp2.lastTurn, yAxis: 92 }
               ];
             }))
@@ -8959,7 +9110,7 @@ function renderBudgetDrain(stData, qdData) {
         }
       }
       allSeries.push({
-        name: "Cache Health",
+        name: econLCacheHealth,
         type: "line",
         yAxisIndex: 1,
         showSymbol: false,
@@ -8970,7 +9121,7 @@ function renderBudgetDrain(stData, qdData) {
       });
       // Cold cache spikes as hoverable points
       allSeries.push({
-        name: "Cold Cache",
+        name: econLColdCache,
         type: "scatter",
         yAxisIndex: 1,
         symbol: "circle",
@@ -8982,7 +9133,7 @@ function renderBudgetDrain(stData, qdData) {
 
       // Compaction scatter
       allSeries.push({
-        name: "Compaction",
+        name: econLCompaction,
         type: "scatter",
         symbol: "diamond",
         symbolSize: 10,
@@ -9029,7 +9180,7 @@ function renderBudgetDrain(stData, qdData) {
           if (isOh2) q5sc2[q5sc2.length - 1] = [qTurn2, Math.round(cq2 * 10) / 10];
         }
         allSeries.push({
-          name: "Q5 Actual", type: "line", xAxisIndex: 1, yAxisIndex: 2,
+          name: econLQ5A, type: "line", xAxisIndex: 1, yAxisIndex: 2,
           data: q5a2, smooth: false, symbol: "none",
           lineStyle: { color: "#f97316", width: 2 },
           areaStyle: { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1,
@@ -9037,12 +9188,12 @@ function renderBudgetDrain(stData, qdData) {
           }}
         });
         allSeries.push({
-          name: "Q5 Ideal", type: "line", xAxisIndex: 1, yAxisIndex: 2,
+          name: econLQ5I, type: "line", xAxisIndex: 1, yAxisIndex: 2,
           data: q5i2, smooth: false, symbol: "none",
           lineStyle: { color: "#34d399", width: 2, type: "dashed" }
         });
         allSeries.push({
-          name: "Q5 Penalty Lower", type: "scatter", xAxisIndex: 1, yAxisIndex: 2,
+          name: econLQ5PL, type: "scatter", xAxisIndex: 1, yAxisIndex: 2,
           data: q5sc2, symbolSize: 8,
           itemStyle: { color: "#ef4444" }, z: 10
         });
@@ -9073,7 +9224,7 @@ function renderBudgetDrain(stData, qdData) {
             }
           }
           allSeries.push({
-            name: "Token Visible", type: "line", xAxisIndex: 1, yAxisIndex: 2,
+            name: econLTokVis, type: "line", xAxisIndex: 1, yAxisIndex: 2,
             data: tokVis, smooth: false, symbol: "none",
             lineStyle: { color: "#60a5fa", width: 1.5, type: "dotted" }
           });
@@ -9092,6 +9243,13 @@ function renderBudgetDrain(stData, qdData) {
   };
 
   __effInitOrSet("econDrain", el, option, true);
+  if (_effCharts.econDrain && typeof _effCharts.econDrain.resize === "function") {
+    try {
+      requestAnimationFrame(function () {
+        if (_effCharts.econDrain && typeof _effCharts.econDrain.resize === "function") _effCharts.econDrain.resize();
+      });
+    } catch (eRzDrain) {}
+  }
 
   // HTML overlay for collapsible info box
   var existingOverlay = el.querySelector(".drain-info-overlay");
@@ -9268,12 +9426,20 @@ function renderEconOverhead(qdData, stData) {
     blurb.textContent = q5Events + " overhead events consumed " + gapQ5 + "% Q5 (" + q5Ratio + "% of budget). Visible token overhead is only " + tokOverheadPct + "% \u2014 the gap reveals hidden costs (thinking tokens, internal overhead).";
   }
 
+  var ohQ5A = t("econLegendQ5Actual");
+  var ohQ5I = t("econLegendQ5Ideal");
+  var ohOverheadEv = t("econLegendOverheadEvent");
+  var ohTokA = t("econLegendTokenActual");
+  var ohTokI = t("econLegendTokenIdeal");
+  var ohAxisTurns = t("econAxisTurns");
+  var ohAxisPct = t("econAxisPctConsumed");
+
   // ── Build chart ──
   var series = [];
 
   if (hasProxy) {
     series.push({
-      name: "Q5 Actual",
+      name: ohQ5A,
       type: "line", data: q5Actual, smooth: false, symbol: "none",
       lineStyle: { color: "#f97316", width: 2 },
       areaStyle: {
@@ -9283,12 +9449,12 @@ function renderEconOverhead(qdData, stData) {
       }
     });
     series.push({
-      name: "Q5 Ideal",
+      name: ohQ5I,
       type: "line", data: q5Ideal, smooth: false, symbol: "none",
       lineStyle: { color: "#34d399", width: 2, type: "dashed" }
     });
     series.push({
-      name: "Overhead Event",
+      name: ohOverheadEv,
       type: "scatter", data: q5Scatter, symbolSize: 8,
       itemStyle: { color: "#ef4444" }, z: 10
     });
@@ -9296,12 +9462,12 @@ function renderEconOverhead(qdData, stData) {
 
   if (hasJsonl && hasProxy) {
     series.push({
-      name: "Token Actual",
+      name: ohTokA,
       type: "line", data: tokActual, smooth: false, symbol: "none",
       lineStyle: { color: "#60a5fa", width: 1.5, type: "dotted" }
     });
     series.push({
-      name: "Token Ideal",
+      name: ohTokI,
       type: "line", data: tokIdeal, smooth: false, symbol: "none",
       lineStyle: { color: "#a78bfa", width: 1.5, type: "dotted" }
     });
@@ -9321,8 +9487,8 @@ function renderEconOverhead(qdData, stData) {
           var pm = params[k];
           if (!pm.value) continue;
           tip += "<br>" + pm.marker + " " + pm.seriesName + ": " + pm.value[1] + "%";
-          if (pm.seriesName === "Q5 Actual") q5a = pm.value[1];
-          if (pm.seriesName === "Q5 Ideal") q5i = pm.value[1];
+          if (pm.seriesName === ohQ5A) q5a = pm.value[1];
+          if (pm.seriesName === ohQ5I) q5i = pm.value[1];
         }
         if (q5a != null && q5i != null) {
           tip += "<br><b>Q5 Gap: " + (Math.round((q5a - q5i) * 10) / 10) + "%</b>";
@@ -9350,14 +9516,14 @@ function renderEconOverhead(qdData, stData) {
     },
     grid: { left: 50, right: 20, top: 30, bottom: 25 },
     xAxis: {
-      type: "value", name: "Turns",
+      type: "value", name: ohAxisTurns,
       min: 1,
       nameTextStyle: { color: "#64748b", fontSize: 9 },
       axisLabel: { color: "#94a3b8", fontSize: 9 },
       splitLine: { lineStyle: { color: "rgba(100,116,139,0.15)" } }
     },
     yAxis: {
-      type: "value", name: "% consumed",
+      type: "value", name: ohAxisPct,
       nameTextStyle: { color: "#64748b", fontSize: 9 },
       axisLabel: { color: "#94a3b8", fontSize: 9, formatter: function (v) { return v + "%"; } },
       splitLine: { lineStyle: { color: "rgba(100,116,139,0.15)" } }
