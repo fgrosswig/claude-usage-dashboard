@@ -6614,7 +6614,7 @@ function renderAvailabilityKpis(data) {
   var badge = document.getElementById("anthropic-badge");
   if (!expandBtn || !overlay || !modalBody || !popup) return;
 
-  var chartDetailIds = ["uptime-chart-details", "incident-history-details", "anthropic-incidents-details", "outage-timeline-details"];
+  var chartDetailIds = ["uptime-chart-details", "outage-timeline-details", "incident-history-details", "anthropic-incidents-details"];
 
   function forceChartsOpen() {
     for (var i = 0; i < chartDetailIds.length; i++) {
@@ -6719,7 +6719,7 @@ function renderAvailabilityKpis(data) {
   var winH = globalThis.window;
   if (!winH) return;
   winH.addEventListener("resize", __scheduleAnthropicHealthChartsResize);
-  ["uptime-chart-details", "incident-history-details", "anthropic-incidents-details", "outage-timeline-details"].forEach(function (id) {
+  ["uptime-chart-details", "outage-timeline-details", "incident-history-details", "anthropic-incidents-details"].forEach(function (id) {
     var d = document.getElementById(id);
     if (d) d.addEventListener("toggle", __scheduleAnthropicHealthChartsResize);
   });
