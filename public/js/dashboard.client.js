@@ -5272,7 +5272,7 @@ function renderHealthScore(data) {
   }
 
   var indicators = computeHealthIndicators(data);
-  var dispH = global.__widgetDispatcher;
+  var dispH = window.__widgetDispatcher;
   var visInd = [];
   for (var vj = 0; vj < indicators.length; vj++) {
     var kpiId = "health-kpi-" + indicators[vj].id;
@@ -5338,7 +5338,7 @@ function renderHealthScore(data) {
   var hintAll = document.getElementById("health-kpi-all-hidden-hint");
   if (hintAll) {
     var anyK = false;
-    var wd = global.__widgetDispatcher;
+    var wd = window.__widgetDispatcher;
     for (var hk = 0; hk < indicators.length; hk++) {
       var kpid = "health-kpi-" + indicators[hk].id;
       if (!wd || typeof wd.isChartVisible !== "function" || wd.isChartVisible(kpid)) {
@@ -5550,13 +5550,15 @@ function renderKeyFindings(data) {
   if (!days.length && !pdays.length) {
     if (headerEl) headerEl.textContent = t("findingsNoData");
     el.innerHTML = "";
+    var kfClear = document.getElementById("key-findings");
+    if (kfClear) kfClear.classList.remove("is-layout-empty");
     return;
   }
 
   var findings = computeKeyFindings(data);
   function findingShown(f) {
     var w = f.widgetId || "";
-    var disp = global.__widgetDispatcher;
+    var disp = window.__widgetDispatcher;
     if (!w || !disp || typeof disp.isChartVisible !== "function") return true;
     return disp.isChartVisible(w);
   }
@@ -5586,8 +5588,11 @@ function renderKeyFindings(data) {
     html += "<div class=\"finding-detail\">" + escHtml(f.detail) + "</div>";
     html += "</div></div>";
   }
+  var kfWrap = document.getElementById("key-findings");
   if (!html && findings.length) {
-    html = "<p class=\"key-findings-all-hidden-hint\">" + escHtml(t("findingsAllHiddenHint")) + "</p>";
+    if (kfWrap) kfWrap.classList.add("is-layout-empty");
+  } else {
+    if (kfWrap) kfWrap.classList.remove("is-layout-empty");
   }
   if (el.innerHTML !== html) el.innerHTML = html;
 }
