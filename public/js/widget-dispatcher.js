@@ -1252,6 +1252,22 @@
     return getBuiltinSectionWidgetsMap();
   }
 
+  /** Kernbefunde-Gruppe immer vor Health-KPIs (auch bei alter sectionWidgets-Reihenfolge in Templates). */
+  function stableHealthWidgetGroupOrder(arr) {
+    if (!arr || !arr.length) return arr;
+    var kern = [];
+    var kpis = [];
+    var rest = [];
+    for (var hi = 0; hi < arr.length; hi++) {
+      var ch = arr[hi];
+      var wg = ch.widgetGroup;
+      if (wg === 'kernbefunde') kern.push(ch);
+      else if (wg === 'health-kpis') kpis.push(ch);
+      else rest.push(ch);
+    }
+    return kern.concat(kpis).concat(rest);
+  }
+
   function getOrderedChartsForSection(sec) {
     if (!sec || !sec.charts || !sec.charts.length) return [];
     var charts = sec.charts.slice();
@@ -1261,7 +1277,7 @@
       charts.sort(function (a, b) {
         return (a.order || 0) - (b.order || 0);
       });
-      return charts;
+      return sec.id === 'health' ? stableHealthWidgetGroupOrder(charts) : charts;
     }
     var byId = {};
     for (var ci = 0; ci < charts.length; ci++) {
@@ -1282,7 +1298,7 @@
       }
       if (!found) out.push(charts[cj]);
     }
-    return out;
+    return sec.id === 'health' ? stableHealthWidgetGroupOrder(out) : out;
   }
 
   function wtreeGroupDomId(sectionId, widgetGroup) {
