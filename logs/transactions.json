@@ -2,6 +2,58 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-209",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "33eb87c",
+      "commit_full": "33eb87c594cc5e2e50c7a8a1b6e625dc8836a90b",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(ui): User Settings modal, top-nav cleanup, warmup splash, filter toggle",
+      "detail": "- Top-Nav: hide Lang/Plan (sidebar is master), Settings gear far right, Filter toggle button\n- User Settings modal: 5 sections (Language, Plan, User Profile, GitHub PAT, VS Marketplace)\n- Warmup splash: animated token rings on first load, status updates during scan\n- Recompute overlay: semi-transparent blur during filter/day-picker re-render\n- Filter bar: collapsed by default, slide-toggle via top-nav button\n- DEV section moved to bottom of sidebar\n- Registry fix: align efficiency-range charts with actual HTML canvas IDs\n- Explorer modal: docks to sidebar edge + top-bar instead of floating centered\n- Rename heading to \"Claude Usage Dashboard\", i18n 20+ new keys (DE/EN/KO)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-registry.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-208",
       "timestamp": "2026-04-12",
       "session": "auto",
