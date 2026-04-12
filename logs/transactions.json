@@ -2,6 +2,38 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-188",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "45d33e8",
+      "commit_full": "45d33e8d650312b8ffb33df3ea7aeb66f0e0edc7",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(dev): session-turns benchmark API, server log, dev bar button",
+      "detail": "POST /api/debug/benchmark-session-turns (DEV_MODE) runs benchmark-session-turns and logs full report as session-turns-bench lines; refactor CLI module exports; Benchmark + Tage input in dev overlay.\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/benchmark-session-turns.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-187",
       "timestamp": "2026-04-12",
       "session": "auto",
