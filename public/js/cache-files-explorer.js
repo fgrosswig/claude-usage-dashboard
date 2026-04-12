@@ -460,13 +460,48 @@
             }
             if (title) title.textContent = (o.path_ui || "") + (o.truncated ? " (gekuerzt)" : "");
             var raw = o.content != null ? String(o.content) : "";
-            // Try JSON tree view with collapse
-            try {
-              var parsed = JSON.parse(raw);
-              pre.innerHTML = "";
-              pre.appendChild(buildJsonTree(parsed, 0, true));
-            } catch (_ej) {
-              pre.textContent = raw;
+            // Try JSON tree view with collapse (skip if truncated — incomplete JSON)
+            var didTree = false;
+            if (!o.truncated) {
+              try {
+                var parsed = JSON.parse(raw);
+                pre.innerHTML = "";
+                pre.appendChild(buildJsonTree(parsed, 0, true));
+                didTree = true;
+              } catch (_ej) {}
+            }
+            if (!didTree) {
+              // Truncated or non-JSON: try to pretty-print what we can
+              try {
+                // Attempt partial JSON: find last complete top-level entry
+                var lastBrace = raw.lastIndexOf('}');
+                if (lastBrace > 0 && raw.trimStart()[0] === '{') {
+                  // Try to close the JSON structure
+                  var attempt = raw.slice(0, lastBrace + 1);
+                  // Count open braces/brackets to close
+                  var openB = 0, openA = 0;
+                  for (var ci = 0; ci < attempt.length; ci++) {
+                    if (attempt[ci] === '{') openB++;
+                    else if (attempt[ci] === '}') openB--;
+                    else if (attempt[ci] === '[') openA++;
+                    else if (attempt[ci] === ']') openA--;
+                  }
+                  var closer = '';
+                  while (openA > 0) { closer += ']'; openA--; }
+                  while (openB > 0) { closer += '}'; openB--; }
+                  var partial = JSON.parse(attempt + closer);
+                  pre.innerHTML = "";
+                  pre.appendChild(buildJsonTree(partial, 0, true));
+                  if (o.truncated) {
+                    var trNote = document.createElement('div');
+                    trNote.className = 'jt-more';
+                    trNote.textContent = '… truncated (' + (o.size / 1024 / 1024).toFixed(1) + ' MB total, showing partial)';
+                    pre.appendChild(trNote);
+                  }
+                  didTree = true;
+                }
+              } catch (_ep) {}
+              if (!didTree) pre.textContent = raw;
             }
           } catch (eZ) {
             pre.textContent = "parse error: " + String(eZ && eZ.message ? eZ.message : eZ);
