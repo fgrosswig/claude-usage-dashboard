@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-231",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "a8d4f6f",
+      "commit_full": "a8d4f6fddac95a58c7488bf6a6a0966435e106c6",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(layout): health sidebar kernbefunde before KPIs, flush group row refs #216",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-230",
       "timestamp": "2026-04-12",
       "session": "auto",
