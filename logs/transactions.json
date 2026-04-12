@@ -2,6 +2,38 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-207",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "ad9b20f",
+      "commit_full": "ad9b20fc6023969e45a66aaf2b6c0d51f07e4361",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(ui): DEV section in sidebar + app version from git describe",
+      "detail": "DEV section (yellow accent border, only visible in DEV_MODE):\n- Source URL display\n- Sync Now button (triggers /api/debug/sync-proxy-logs)\n- Benchmark runner (configurable days, /api/debug/benchmark-session-turns)\n- JSONL + PROXY cache rebuild buttons with last-cache timestamps\n- Auto-polls /api/debug/status for cache timestamps\n\nApp version:\n- Server runs git describe --tags --abbrev=7, injects into HTML template\n- Sidebar footer shows version immediately (no API wait)\n- Release Notes button opens existing release modal\n- GitHub link to public repo\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-206",
       "timestamp": "2026-04-12",
       "session": "auto",
