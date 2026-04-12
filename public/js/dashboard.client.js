@@ -7225,17 +7225,33 @@ function applyDevCacheFromStatus(info) {
             var pr = document.getElementById("dev-cache-file-preview");
             if (pr) pr.style.display = "none";
           });
-          cacheModalEl.addEventListener("click", function (ev) {
-            var t = ev.target;
-            if (!t || t.nodeName !== "BUTTON") return;
-            if ((" " + t.className + " ").indexOf(" dev-cache-view-btn ") < 0) return;
-            var enc = t.getAttribute("data-path-enc");
+          // Document delegation: DataTables 2 moves/wraps the table outside the modal root, so clicks
+          // on "Ansehen" no longer bubble to cacheModalEl (see https://datatables.net/ layout).
+          document.addEventListener("click", function (ev) {
+            var modal = document.getElementById("dev-cache-files-modal");
+            if (!modal) return;
+            var dsp = modal.style.display;
+            if (dsp === "none" || dsp === "") return;
+            var el = ev.target;
+            var btn = null;
+            if (el && el.closest) {
+              btn = el.closest("button.dev-cache-view-btn");
+            } else {
+              var n = el;
+              while (n && n.nodeName !== "BUTTON") n = n.parentElement;
+              if (n && n.className && (" " + n.className + " ").indexOf(" dev-cache-view-btn ") >= 0) btn = n;
+            }
+            if (!btn) return;
+            var enc = btn.getAttribute("data-path-enc");
             if (!enc) return;
             var pAbs = decodeURIComponent(enc);
             var pre = document.getElementById("dev-cache-preview-body");
             var title = document.getElementById("dev-cache-preview-title");
             var pr = document.getElementById("dev-cache-file-preview");
             if (!pre || !pr) return;
+            try {
+              ev.preventDefault();
+            } catch (ePe) {}
             pre.textContent = "Lade …";
             pr.style.display = "block";
             if (title) title.textContent = pAbs;
@@ -7254,9 +7270,9 @@ function applyDevCacheFromStatus(info) {
                   return;
                 }
                 if (title) title.textContent = (o.path_ui || "") + (o.truncated ? " (gekuerzt)" : "");
-                pre.textContent = o.content || "";
+                pre.textContent = o.content != null ? String(o.content) : "";
               } catch (eZ) {
-                pre.textContent = "parse error";
+                pre.textContent = "parse error: " + String(eZ && eZ.message ? eZ.message : eZ);
               }
             };
             rq.onerror = function () {
