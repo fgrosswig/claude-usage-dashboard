@@ -6575,14 +6575,18 @@ function renderAvailabilityKpis(data) {
       }
     }
   });
-  // Re-open charts when Kennzahlen closes
+  // Re-open default service charts when Kennzahlen closes (incident charts stay collapsed)
   kpiDet.addEventListener("toggle", function() {
     if (isInModal()) return;
     if (!kpiDet.open) {
-      for (var i = 0; i < chartIds.length; i++) {
-        var el = document.getElementById(chartIds[i]);
-        if (el) el.setAttribute("open", "");
-      }
+      var u = document.getElementById("uptime-chart-details");
+      var o = document.getElementById("outage-timeline-details");
+      var ih = document.getElementById("incident-history-details");
+      var ai = document.getElementById("anthropic-incidents-details");
+      if (u) u.setAttribute("open", "");
+      if (o) o.setAttribute("open", "");
+      if (ih) ih.removeAttribute("open");
+      if (ai) ai.removeAttribute("open");
     }
   });
 })();
@@ -6616,11 +6620,16 @@ function renderAvailabilityKpis(data) {
 
   var chartDetailIds = ["uptime-chart-details", "outage-timeline-details", "incident-history-details", "anthropic-incidents-details"];
 
-  function forceChartsOpen() {
-    for (var i = 0; i < chartDetailIds.length; i++) {
-      var el = document.getElementById(chartDetailIds[i]);
-      if (el) { el.setAttribute("open", ""); el.classList.add("no-collapse"); }
-    }
+  /** Service row open, incident row closed — same as initial popup / refresh. */
+  function setDefaultAnthropicHealthDetailsState() {
+    var u = document.getElementById("uptime-chart-details");
+    var o = document.getElementById("outage-timeline-details");
+    var ih = document.getElementById("incident-history-details");
+    var ai = document.getElementById("anthropic-incidents-details");
+    if (u) u.setAttribute("open", "");
+    if (o) o.setAttribute("open", "");
+    if (ih) ih.removeAttribute("open");
+    if (ai) ai.removeAttribute("open");
   }
 
   function restoreChartsCollapse() {
@@ -6636,14 +6645,13 @@ function renderAvailabilityKpis(data) {
     // Hide expand button inside modal (not needed)
     var expInModal = modalBody.querySelector(".anthropic-popup-expand");
     if (expInModal) expInModal.style.display = "none";
-    // Force all charts open and disable collapsing
-    forceChartsOpen();
-    // Move Kennzahlen above charts in modal + force open
+    setDefaultAnthropicHealthDetailsState();
+    // Move Kennzahlen above charts in modal (collapsed by default)
     var kpiEl = modalBody.querySelector("#avail-kpi-details");
     var chartsRow = modalBody.querySelector(".health-charts-row");
     if (kpiEl && chartsRow && chartsRow.parentNode) {
       chartsRow.parentNode.insertBefore(kpiEl, chartsRow);
-      kpiEl.setAttribute("open", "");
+      kpiEl.removeAttribute("open");
     }
     // Close the dropdown popup
     if (badge) badge.classList.remove("popup-open");
