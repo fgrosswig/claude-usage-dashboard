@@ -3598,11 +3598,9 @@ function readJsonBodyMax(req, maxBytes, cb) {
   });
 }
 
-function logBenchmarkReportLines(reportText) {
-  var lines = reportText.split('\n');
-  for (var li = 0; li < lines.length; li++) {
-    if (lines[li].length) serviceLog.info('session-turns-bench', lines[li]);
-  }
+/** One log record (one timestamp); body lines follow on newlines without repeated prefixes. */
+function logBenchmarkReportBlock(reportText) {
+  serviceLog.info('session-turns-bench', reportText);
 }
 
 /**
@@ -3853,7 +3851,7 @@ var server = http.createServer(function (req, res) {
       var last = benchmarkSessionTurns.runOnce(dateKeys);
       var modeLine = '  mode:          POST /api/debug/benchmark-session-turns days_back=' + n + '\n';
       var report = benchmarkSessionTurns.formatBenchmarkReport(process.cwd(), last, dateKeys, modeLine, 1, []);
-      logBenchmarkReportLines(report);
+      logBenchmarkReportBlock(report);
       var byDay = [];
       for (var bi = 0; bi < dateKeys.length; bi++) {
         var dk0 = dateKeys[bi];
