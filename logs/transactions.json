@@ -2,6 +2,38 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-203",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "93d52f4",
+      "commit_full": "93d52f4d0cb17f3018ceef93f7b52fcc9050a5cf",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(ui): template system + hide original filters when sidebar open",
+      "detail": "Template system with 4 built-in presets:\n- Full (all sections visible)\n- Performance (Token Stats + Forensic + Economic)\n- Cost (Budget + Economic + Proxy)\n- Minimal (Health + Token Stats + Budget)\n\nTemplate CRUD: save current layout as named template,\napply/delete user templates, stored in localStorage.\n\nOriginal top-bar filters (language, plan, day-picker) are\nhidden when sidebar is open to avoid duplicate controls.\n\ni18n: 5 new keys in DE/EN/KO for template UI.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-202",
       "timestamp": "2026-04-12",
       "session": "auto",
