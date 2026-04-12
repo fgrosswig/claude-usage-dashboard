@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-178",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "a29febd",
+      "commit_full": "a29febd13471074c296a5498f6ec98f09a8ba5b9",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(server): DEV session-turns remote uses /api/debug only",
+      "detail": "Public /api/session-turns may return 401 behind Authelia; debug route is bypassed. Remove public-first and 404 fallback.\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-177",
       "timestamp": "2026-04-12",
       "session": "auto",
