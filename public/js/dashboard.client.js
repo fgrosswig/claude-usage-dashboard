@@ -1918,6 +1918,7 @@ function renderDashboardCore(data) {
   __releaseStabilityData = data.release_stability || null;
   var disp = window.__widgetDispatcher;
   if (disp && disp.init) disp.init();
+  if (disp && disp.applyGridLayout) disp.applyGridLayout();
   // Section renders — dispatcher controls order + visibility
   renderProxyAnalysis(data);
   renderBudgetEfficiency(data);

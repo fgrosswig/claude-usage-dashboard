@@ -116,6 +116,21 @@
     return p;
   }
 
+  /** Manual JSON often omits v — sonst loadPrefs -> defaultPrefs bei jedem Refresh. */
+  function tryAcceptPrefsPayload(p) {
+    if (!p || typeof p !== 'object') return null;
+    if (p.v !== PREFS_VERSION) {
+      if (
+        p.v == null &&
+        ((Array.isArray(p.widgets) && p.widgets.length) || (Array.isArray(p.order) && p.order.length))
+      ) {
+        p.v = PREFS_VERSION;
+      }
+    }
+    if (p.v !== PREFS_VERSION) return null;
+    return normalizePrefsShape(p);
+  }
+
   /** Re-read hiddenSections / hiddenCharts from localStorage so the sidebar matches saved prefs. */
   function syncVisibilityPrefsFromLocalStorage() {
     if (!_prefs) return;
@@ -136,7 +151,8 @@
       var raw = localStorage.getItem(PREFS_KEY);
       if (raw) {
         var p = JSON.parse(raw);
-        if (p && p.v === PREFS_VERSION) return normalizePrefsShape(p);
+        var ok = tryAcceptPrefsPayload(p);
+        if (ok) return ok;
       }
     } catch (e) {}
     // Fallback: server (sync XHR, only when localStorage empty)
@@ -146,9 +162,10 @@
       xhr.send();
       if (xhr.status === 200 && xhr.responseText && xhr.responseText !== 'null') {
         var sp = JSON.parse(xhr.responseText);
-        if (sp && sp.v === PREFS_VERSION) {
+        var ok2 = tryAcceptPrefsPayload(sp);
+        if (ok2) {
           try { localStorage.setItem(PREFS_KEY, JSON.stringify(sp)); } catch (e2) {}
-          return normalizePrefsShape(sp);
+          return ok2;
         }
       }
     } catch (e) { /* server unreachable */ }
@@ -2371,12 +2388,21 @@
           reader.onload = function (ev) {
             try {
               var imported = JSON.parse(ev.target.result);
-              if (imported && imported.v === PREFS_VERSION) {
-                _prefs = normalizePrefsShape(imported);
+              var okImp = tryAcceptPrefsPayload(imported);
+              if (okImp) {
+                _prefs = okImp;
                 migrateHiddenChartsLegacy();
+                if (!_prefs.widgets && _prefs.order) {
+                  var mig = migrateTemplateV1toV2({ order: _prefs.order, hiddenSections: _prefs.hiddenSections });
+                  _prefs.widgets = mig.widgets;
+                }
+                if (_prefs.widgets && _prefs.widgets.length) {
+                  syncPrefsOrderFromWidgets();
+                }
                 savePrefs();
+                applyGridLayout();
                 applyVisibility();
-                applyOrder();
+                applyAllChartVisibility();
                 renderWidgetTree();
               }
             } catch (e) { /* invalid JSON */ }
@@ -2505,6 +2531,7 @@
     isSectionVisible: isSectionVisible,
     isChartVisible: isChartVisible,
     renderWidgetTree: renderWidgetTree,
+    applyGridLayout: applyGridLayout,
     applyAllChartVisibility: applyAllChartVisibility,
     getOrderedChartsForSection: getOrderedChartsForSection
   };
