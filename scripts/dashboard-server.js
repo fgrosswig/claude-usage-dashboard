@@ -3857,6 +3857,7 @@ function collectDebugCacheFilesPayload() {
   }
   tryPushDebugCacheKnownPath(out, 'day_cache', USAGE_DAY_CACHE_FILE);
   tryPushDebugCacheKnownPath(out, 'jsonl_today_index', JSONL_TODAY_INDEX_FILE);
+  tryPushDebugCacheKnownPath(out, 'extract_cache', extractCache.CACHE_FILE);
   tryPushDebugCacheKnownPath(out, 'releases_disk', RELEASES_CACHE);
   tryPushDebugCacheKnownPath(out, 'outages_disk', OUTAGE_DISK_CACHE);
   tryPushDebugCacheKnownPath(out, 'marketplace_disk', MARKETPLACE_CACHE);

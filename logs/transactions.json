@@ -5,12 +5,27 @@
       "id": "TX-241",
       "timestamp": "2026-04-12",
       "session": "auto",
+<<<<<<< HEAD
       "commit": "cf3b4d1",
       "commit_full": "cf3b4d195c13ad16e43191e0066e58edc514c89d",
       "status": "ABGESCHLOSSEN",
       "description": "Merge branch 'feat/widget-dispatcher' into develop",
       "detail": "# Conflicts:\n#\tlogs/transactions.json",
       "changes": []
+=======
+      "commit": "a4fc9b5",
+      "commit_full": "a4fc9b5a61ef15fdfabbf59d336f514656b0c066",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(explorer): add extract_cache to debug cache-files endpoint",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+>>>>>>> feat/widget-dispatcher
     },
     {
       "id": "TX-240",
