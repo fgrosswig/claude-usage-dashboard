@@ -83,6 +83,16 @@ body.sidebar-open .dev-cache-files-modal{left:320px}
 .dev-cache-preview-pre{display:none;margin:0;flex:1;min-height:120px;overflow:auto;font-size:.64rem;line-height:1.35;background:#334155;color:#e2e8f0;padding:8px;border-radius:6px;border:1px solid #475569;white-space:pre-wrap;word-break:break-word}
 .dev-cache-file-preview.has-file .dev-cache-preview-empty{display:none}
 .dev-cache-file-preview.has-file .dev-cache-preview-pre{display:block}
+/* JSON Tree Viewer */
+.jt-toggle{cursor:pointer;user-select:none;color:#3b82f6;margin-right:4px;font-size:.6rem;display:inline-block;width:10px}
+.jt-summary{color:#94a3b8;font-size:.62rem}
+.jt-children{margin-left:14px;border-left:1px solid #334155;padding-left:6px}
+.jt-row{padding:1px 0}
+.jt-key{color:#8b5cf6;font-weight:600}
+.jt-sep{color:#475569}
+.jt-str{color:#22c55e}.jt-num{color:#3b82f6}.jt-bool{color:#f59e0b}.jt-null{color:#64748b;font-style:italic}
+.jt-more{color:#64748b;font-style:italic;font-size:.6rem}
+.jt-node{display:inline}
 @media (max-width:900px){
   .dev-cache-files-main-row{flex-direction:column;max-height:none}
   .dev-cache-file-preview{width:100%;min-width:0;flex:0 0 auto;align-self:stretch;border-left:none;border-top:1px solid #475569;padding:12px 0 0 0;margin-top:8px;min-height:min(36vh,320px);max-height:min(44vh,420px)}
