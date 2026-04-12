@@ -635,11 +635,15 @@ function updateWarmupOverlay(data) {
   var sub = document.getElementById('warmup-sub');
   if (!data) return;
   var sp = data.scan_progress;
+  var progressFill = document.getElementById('warmup-progress-fill');
   if (data.scanning && sp && sp.total > 0) {
+    var pct = Math.round(sp.done / sp.total * 100);
     if (status) status.textContent = t('warmupScanning').replace('{done}', sp.done).replace('{total}', sp.total);
-    if (sub) sub.textContent = Math.round(sp.done / sp.total * 100) + '%';
+    if (sub) sub.textContent = pct + '%';
+    if (progressFill) progressFill.style.width = pct + '%';
   } else if (data.scanning) {
     if (status) status.textContent = t('warmupInit');
+    if (progressFill) progressFill.style.width = '0%';
   }
 }
 function dismissWarmupOverlay() {

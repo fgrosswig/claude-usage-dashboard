@@ -13,6 +13,8 @@
 @keyframes warmup-pulse{0%,100%{opacity:.6;transform:scale(.9)}50%{opacity:1;transform:scale(1.05)}}
 .warmup-title{font-size:1.1rem;font-weight:600;color:#e2e8f0;margin:0 0 10px}
 .warmup-status{font-size:.8rem;color:#94a3b8;margin:0 0 4px;transition:opacity .2s}
+.warmup-progress{width:200px;height:6px;background:#1e293b;border-radius:3px;margin:8px auto 6px;overflow:hidden;border:1px solid #334155}
+.warmup-progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);border-radius:3px;transition:width .3s ease-out}
 .warmup-sub{font-size:.72rem;color:#3b82f6;margin:0;font-weight:600;letter-spacing:.02em}
 .warmup-tokens{display:flex;justify-content:center;gap:4px;margin-top:14px}
 .warmup-token-dot{width:6px;height:6px;border-radius:50%;background:#334155;animation:warmup-dot 1.4s ease-in-out infinite}
