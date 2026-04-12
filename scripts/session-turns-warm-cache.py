@@ -13,6 +13,10 @@ Cron example (repo root, Linux):
     CLAUDE_USAGE_SESSION_TURNS_CACHE_DIR=~/.cache/cud-session-turns \\
     python3 scripts/session-turns-warm-cache.py --days-back 8
 
+Benchmark (no writes):
+  python3 scripts/session-turns-warm-cache.py --benchmark --days-back 8
+  python3 scripts/session-turns-warm-cache.py --benchmark --iterations 3 --days-back 3
+
 See getSessionTurnsCached / pass1CollectSessionsForDayWindowFromFiles in dashboard-server.js.
 """
 from __future__ import annotations
@@ -26,6 +30,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from typing import Any, Dict, List, Mapping, MutableMapping, Optional, Set, Tuple
 
 MODEL_SUFFIX = re.compile(r"-\d{8}$")
@@ -210,6 +215,40 @@ def _atomic_write_json(path: str, obj: Any) -> None:
         raise
 
 
+def _resolve_date_keys(days_back: int, dates_csv: str) -> List[str]:
+    if dates_csv.strip():
+        return [x.strip() for x in dates_csv.split(",") if x.strip()]
+    n = max(1, int(days_back))
+    today = _dt.datetime.now(_dt.timezone.utc).date()
+    return [(today - _dt.timedelta(days=i)).isoformat() for i in range(n)]
+
+
+def _run_timed_pipeline(repo: str, date_keys: List[str]) -> Dict[str, Any]:
+    """One full scan; returns timings (seconds) and counts."""
+    t0 = time.perf_counter()
+    paths, fp = _load_paths_and_fingerprint(repo)
+    t1 = time.perf_counter()
+    allowed = _allowed_turn_days(date_keys)
+    all_sessions = _pass1(paths, allowed)
+    t2 = time.perf_counter()
+    results: Dict[str, Dict[str, Any]] = {}
+    for dk in date_keys:
+        results[dk] = _finalize(dk, all_sessions)
+    t3 = time.perf_counter()
+    return {
+        "paths_s": t1 - t0,
+        "pass1_s": t2 - t1,
+        "finalize_s": t3 - t2,
+        "total_s": t3 - t0,
+        "jsonl_files": len(paths),
+        "fingerprint_chars": len(fp),
+        "raw_session_ids": len(all_sessions),
+        "date_keys": date_keys,
+        "results": results,
+        "fingerprint": fp,
+    }
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Warm CLAUDE_USAGE_SESSION_TURNS_CACHE_DIR JSON files.")
     ap.add_argument("--repo-root", default=_repo_root(), help="Repository root (default: parent of scripts/)")
@@ -224,30 +263,83 @@ def main() -> None:
         default="",
         help="Comma-separated YYYY-MM-DD instead of --days-back",
     )
+    ap.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Measure phases (node paths+fingerprint, pass1, finalize); no disk writes",
+    )
+    ap.add_argument(
+        "--iterations",
+        type=int,
+        default=1,
+        help="With --benchmark: repeat full pipeline and report min/avg/max total (default 1)",
+    )
     args = ap.parse_args()
+    repo = os.path.abspath(args.repo_root)
+    date_keys = _resolve_date_keys(args.days_back, args.dates)
+
+    if args.benchmark:
+        iters = max(1, int(args.iterations))
+        totals: List[float] = []
+        last_stats: Optional[Dict[str, Any]] = None
+        for _ in range(iters):
+            last_stats = _run_timed_pipeline(repo, date_keys)
+            totals.append(float(last_stats["total_s"]))
+        assert last_stats is not None
+        sys.stdout.write(
+            "session-turns-warm-cache benchmark\n"
+            "  repo:          %s\n"
+            "  dates:         %d (%s .. %s)\n"
+            "  jsonl files:   %d\n"
+            "  last run:\n"
+            "    node paths+fp:  %8.3f s\n"
+            "    pass1 (read):   %8.3f s\n"
+            "    finalize:       %8.3f s\n"
+            "    total:          %8.3f s\n"
+            "  raw sid keys:  %d\n"
+            % (
+                repo,
+                len(date_keys),
+                date_keys[0],
+                date_keys[-1],
+                last_stats["jsonl_files"],
+                last_stats["paths_s"],
+                last_stats["pass1_s"],
+                last_stats["finalize_s"],
+                last_stats["total_s"],
+                last_stats["raw_session_ids"],
+            )
+        )
+        if iters > 1:
+            avg = sum(totals) / len(totals)
+            sys.stdout.write(
+                "  iterations=%d total_s: min=%.3f avg=%.3f max=%.3f\n"
+                % (iters, min(totals), avg, max(totals))
+            )
+        for dk in date_keys:
+            r = last_stats["results"][dk]
+            sys.stdout.write("  %s  sessions=%d total_turns=%d\n" % (dk, r["session_count"], r["total_turns"]))
+        return
+
     out_dir = (args.out_dir or "").strip()
     if not out_dir:
-        ap.error("set --out-dir or CLAUDE_USAGE_SESSION_TURNS_CACHE_DIR")
-    repo = os.path.abspath(args.repo_root)
+        ap.error("set --out-dir or CLAUDE_USAGE_SESSION_TURNS_CACHE_DIR (or use --benchmark)")
 
-    if args.dates.strip():
-        date_keys = [x.strip() for x in args.dates.split(",") if x.strip()]
-    else:
-        n = max(1, int(args.days_back))
-        today = _dt.datetime.now(_dt.timezone.utc).date()
-        date_keys = [(today - _dt.timedelta(days=i)).isoformat() for i in range(n)]
-
-    paths, fp = _load_paths_and_fingerprint(repo)
-    allowed = _allowed_turn_days(date_keys)
-    all_sessions = _pass1(paths, allowed)
+    stats = _run_timed_pipeline(repo, date_keys)
+    fp = str(stats["fingerprint"])
     gen = _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
+    # Re-use finalized results from stats (avoid double pass1)
     for dk in date_keys:
-        result = _finalize(dk, all_sessions)
+        result = stats["results"][dk]
         payload = {"fingerprint": fp, "generated": gen, "result": result}
         target = os.path.join(out_dir, dk + ".json")
         _atomic_write_json(target, payload)
         sys.stdout.write("wrote %s (%d sessions)\n" % (target, result["session_count"]))
+    sys.stdout.write(
+        "(timing: paths+fp %.3fs pass1 %.3fs finalize %.3fs total %.3fs)\n"
+        % (stats["paths_s"], stats["pass1_s"], stats["finalize_s"], stats["total_s"])
+    )
 
 
 if __name__ == "__main__":
