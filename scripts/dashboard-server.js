@@ -4222,7 +4222,7 @@ var server = http.createServer(function (req, res) {
     return;
   } else if (pathname === '/api/debug/cache-files' && req.method === 'GET') {
     var corsCf = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
-    if (!__devMode) {
+    if (!__devMode && process.env.DEBUG_API !== '1') {
       res.writeHead(403, corsCf);
       res.end(JSON.stringify({ ok: false, error: 'dev_only' }));
       return;
