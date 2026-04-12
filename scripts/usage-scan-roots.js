@@ -169,6 +169,24 @@ function collectTaggedJsonlFiles() {
   return { tagged: tagged, roots: roots };
 }
 
+/** mtimeMs + size aller JSONL (sortiert); gleicher String wie dashboard-server früher — für Disk-Cache / session-turns-warm-cache.py. */
+function buildTaggedJsonlFingerprintSync(tagged) {
+  var parts = [];
+  for (var fi = 0; fi < tagged.length; fi++) {
+    var ref = tagged[fi];
+    var p = typeof ref === 'string' ? ref : ref.path;
+    var abs = path.resolve(p);
+    try {
+      var st = fs.statSync(abs);
+      parts.push(abs + ':' + st.mtimeMs + ':' + st.size);
+    } catch (eSt) {
+      parts.push(abs + ':err');
+    }
+  }
+  parts.sort();
+  return parts.join('\n');
+}
+
 /** Wie collectTaggedJsonlFiles, aber zwischen Wurzeln und readdir-Slices mit setImmediate — Server bleibt beim Start bedienbar. */
 function collectTaggedJsonlFilesAsync(cb) {
   var roots = getScanRoots();
@@ -237,6 +255,7 @@ module.exports = {
   walkJsonl: walkJsonl,
   walkJsonlYielding: walkJsonlYielding,
   collectTaggedJsonlFiles: collectTaggedJsonlFiles,
+  buildTaggedJsonlFingerprintSync: buildTaggedJsonlFingerprintSync,
   collectTaggedJsonlFilesAsync: collectTaggedJsonlFilesAsync,
   forEachJsonlLineSync: forEachJsonlLineSync,
   getProxyLogDir: getProxyLogDir,

@@ -9,6 +9,8 @@
 // Backfill-Pause zwischen GitHub-Release-Tags ms: CLAUDE_USAGE_GITHUB_BACKFILL_DELAY_MS (0-5000, Default 0).
 // Push JSONL ins Container-/PVC-Volume: POST /api/claude-data-sync (Body = gzip-Tar), Header Authorization: Bearer <CLAUDE_USAGE_SYNC_TOKEN>.
 // Größe: CLAUDE_USAGE_SYNC_MAX_MB (Default 512). Client: scripts/claude-data-sync-client.js
+// Session-turns Disk-Cache (optional): CLAUDE_USAGE_SESSION_TURNS_CACHE_DIR=~/.cache/…  — JSON {fingerprint,result} pro Tag;
+//   vorab füllen: python3 scripts/session-turns-warm-cache.py --out-dir … (siehe Skript-Docstring).
 
 var http = require('http');
 var https = require('https');
@@ -35,6 +37,7 @@ var getScanRoots = usageScanRoots.getScanRoots;
 var scanRootsCacheKey = usageScanRoots.scanRootsCacheKey;
 var walkJsonl = usageScanRoots.walkJsonl;
 var collectTaggedJsonlFiles = usageScanRoots.collectTaggedJsonlFiles;
+var buildTaggedJsonlFingerprintSync = usageScanRoots.buildTaggedJsonlFingerprintSync;
 var collectTaggedJsonlFilesAsync = usageScanRoots.collectTaggedJsonlFilesAsync;
 var forEachJsonlLineSync = usageScanRoots.forEachJsonlLineSync;
 var getProxyLogDir = usageScanRoots.getProxyLogDir;
@@ -44,23 +47,6 @@ var claudeDataIngest = require('./claude-data-ingest');
 
 /** Nach erfolgreichem Scan: Fingerprint aller JSONL (mtime+size); für optionalen Skip bei unveränderten Dateien. */
 var __lastScanJsonlFingerprint = '';
-
-function buildTaggedJsonlFingerprintSync(tagged) {
-  var parts = [];
-  for (var fi = 0; fi < tagged.length; fi++) {
-    var ref = tagged[fi];
-    var p = typeof ref === 'string' ? ref : ref.path;
-    var abs = path.resolve(p);
-    try {
-      var st = fs.statSync(abs);
-      parts.push(abs + ':' + st.mtimeMs + ':' + st.size);
-    } catch (eSt) {
-      parts.push(abs + ':err');
-    }
-  }
-  parts.sort();
-  return parts.join('\n');
-}
 
 var PORT = 3333;
 var REFRESH_SEC = 180;
@@ -3474,6 +3460,38 @@ function devFetchProxyLogs(cb) {
 
 // ── /api/session-turns: per-session turn-level token data for a given date ──
 
+/** Optional disk cache (e.g. warmed by scripts/session-turns-warm-cache.py). Same fingerprint as buildTaggedJsonlFingerprintSync. */
+function resolveSessionTurnsCacheDir() {
+  var raw = String(process.env.CLAUDE_USAGE_SESSION_TURNS_CACHE_DIR || '').trim();
+  if (!raw) return '';
+  try {
+    var ex = usageScanRoots.expandUserPath(raw);
+    if (ex) return ex;
+  } catch (e0) {}
+  try {
+    return path.resolve(raw);
+  } catch (e1) {
+    return '';
+  }
+}
+
+function tryLoadSessionTurnsDiskCache(dateKey, fp) {
+  var dir = resolveSessionTurnsCacheDir();
+  if (!dir) return null;
+  var f = path.join(dir, dateKey + '.json');
+  try {
+    var raw = fs.readFileSync(f, 'utf8');
+    var o = JSON.parse(raw);
+    if (!o || typeof o !== 'object') return null;
+    if (o.fingerprint !== fp) return null;
+    var r = o.result;
+    if (!r || r.date !== dateKey || !Array.isArray(r.sessions)) return null;
+    return r;
+  } catch (e) {
+    return null;
+  }
+}
+
 var _sessionTurnsCache = Object.create(null);
 /** After first successful JSONL scan, preload today's session-turns once after this delay (ms). 0 = disabled (env CLAUDE_USAGE_IDLE_SESSION_PRELOAD_MS). */
 var IDLE_SESSION_PRELOAD_MS = (function () {
@@ -3496,6 +3514,12 @@ function getSessionTurnsCached(dateKey) {
   var collected = collectTaggedJsonlFiles();
   var fp = buildTaggedJsonlFingerprintSync(collected.tagged);
   var fpMs = Date.now() - t0;
+  var fromDisk = tryLoadSessionTurnsDiskCache(dateKey, fp);
+  if (fromDisk) {
+    serviceLog.info('session-turns', 'date=' + dateKey + ' DISK cache HIT (' + (Date.now() - t0) + 'ms)');
+    if (!noCache) _sessionTurnsCache[dateKey] = { result: fromDisk, fingerprint: fp };
+    return fromDisk;
+  }
   if (cached && cached.fingerprint === fp) {
     serviceLog.info('session-turns', 'date=' + dateKey + ' fingerprint HIT (' + fpMs + 'ms stat)');
     return cached.result;
