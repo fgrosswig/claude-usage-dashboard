@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-185",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "e22871a",
+      "commit_full": "e22871a64d369f4073c67fb1a6014e8c911fcc54",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(scripts): clarify session-turns benchmark output for day count",
+      "detail": "Show chronological UTC span, newest-first key list, pass1 allowed-day count, and that full JSONL scans dominate; add --help. Avoid misleading first..last date pair.\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "scripts/benchmark-session-turns.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-184",
       "timestamp": "2026-04-12",
       "session": "auto",
