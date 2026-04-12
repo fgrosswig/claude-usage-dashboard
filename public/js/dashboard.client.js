@@ -3358,17 +3358,29 @@ function __budgetKpiCardsHtml(days, tot, outputPct, overheadFactor, cacheMissRat
     totalTruncated += d.session_signals?.truncated || 0;
   }
   var cards = [
-    { label: t("budgetCardOutput"), value: outputPct + "%", sub: t("budgetCardOutputSub"), cls: outputPct < 25 ? "warn" : "" },
-    { label: t("budgetCardOverhead"), value: overheadFactor + "x", sub: t("budgetCardOverheadSub"), cls: overheadFactor > 4 ? "warn" : "" },
-    { label: t("budgetCardCacheMiss"), value: cacheMissRate + "%", sub: t("budgetCardCacheMissSub"), cls: cacheMissRate > 40 ? "warn" : "" },
-    { label: t("budgetCardLost"), value: String(lostSignals), sub: t("budgetCardLostSub").replace("{r}", String(tot.retries)).replace("{i}", String(tot.interrupts)).replace("{e}", String(tot.api_errors)), cls: lostSignals > 5 ? "warn" : "" },
-    { label: t("budgetCardOutage"), value: totalOutageH.toFixed(1) + "h", sub: t("budgetCardOutageSub"), cls: totalOutageH > 2 ? "warn" : "" },
-    { label: t("budgetCardTruncated"), value: String(totalTruncated), sub: t("budgetCardTruncatedSub"), cls: totalTruncated > 50 ? "warn" : "" }
+    { wid: "budget-kpi-output", label: t("budgetCardOutput"), value: outputPct + "%", sub: t("budgetCardOutputSub"), cls: outputPct < 25 ? "warn" : "" },
+    { wid: "budget-kpi-overhead", label: t("budgetCardOverhead"), value: overheadFactor + "x", sub: t("budgetCardOverheadSub"), cls: overheadFactor > 4 ? "warn" : "" },
+    { wid: "budget-kpi-cache-miss", label: t("budgetCardCacheMiss"), value: cacheMissRate + "%", sub: t("budgetCardCacheMissSub"), cls: cacheMissRate > 40 ? "warn" : "" },
+    { wid: "budget-kpi-lost", label: t("budgetCardLost"), value: String(lostSignals), sub: t("budgetCardLostSub").replace("{r}", String(tot.retries)).replace("{i}", String(tot.interrupts)).replace("{e}", String(tot.api_errors)), cls: lostSignals > 5 ? "warn" : "" },
+    { wid: "budget-kpi-outage", label: t("budgetCardOutage"), value: totalOutageH.toFixed(1) + "h", sub: t("budgetCardOutageSub"), cls: totalOutageH > 2 ? "warn" : "" },
+    { wid: "budget-kpi-truncated", label: t("budgetCardTruncated"), value: String(totalTruncated), sub: t("budgetCardTruncatedSub"), cls: totalTruncated > 50 ? "warn" : "" }
   ];
   var ch = "";
-  cards.forEach(function(c) {
-    ch += "<div class=\"card " + c.cls + "\"><div class=\"label\">" + escHtml(c.label) + "</div><div class=\"value\">" + escHtml(c.value) + "</div><div class=\"sub\">" + escHtml(c.sub) + "</div></div>";
-  });
+  for (var bci = 0; bci < cards.length; bci++) {
+    var c = cards[bci];
+    ch +=
+      '<div class="chart-box chart-box--kpi" id="' +
+      c.wid +
+      '"><div class="card ' +
+      c.cls +
+      '"><div class="label">' +
+      escHtml(c.label) +
+      '</div><div class="value">' +
+      escHtml(c.value) +
+      '</div><div class="sub">' +
+      escHtml(c.sub) +
+      "</div></div></div>";
+  }
   return ch;
 }
 
@@ -4216,30 +4228,35 @@ function renderProxyAnalysis(data) {
 
   var pcards = [
     {
+      wid: "proxy-kpi-requests",
       label: t("proxyCardRequests"),
       value: String(pd.requests || 0),
       sub: reqSub,
       cls: (pd.error_rate || 0) > 5 ? "warn" : ""
     },
     {
+      wid: "proxy-kpi-latency",
       label: t("proxyCardLatency"),
       value: (pd.avg_duration_ms >= 1000 ? (pd.avg_duration_ms/1000).toFixed(1) + "s" : Math.round(pd.avg_duration_ms || 0) + "ms"),
       sub: tr("proxyCardLatencySub", { min: pd.min_duration_ms || 0, max: pd.max_duration_ms || 0 }),
       cls: (pd.avg_duration_ms || 0) > 15000 ? "warn" : ""
     },
     {
+      wid: "proxy-kpi-cache-ratio",
       label: t("proxyCardCacheRatio"),
       value: ((pd.cache_read_ratio || 0) * 100).toFixed(1) + "%",
       sub: tr("proxyCardCacheRatioSub", { healthy: ch.healthy || 0, affected: ch.affected || 0 }),
       cls: (pd.cache_read_ratio || 0) < 0.8 ? "warn" : "ok"
     },
     {
+      wid: "proxy-kpi-models",
       label: t("proxyCardModels"),
       value: String(pd.requests || 0),
       sub: tr("proxyCardModelsSub", { opus: opusReqs, sonnet: sonnetReqs, other: otherReqs }),
       cls: ""
     },
     {
+      wid: "proxy-kpi-quota-5h",
       label: t("proxyCardQuota5h"),
       value: q5pctVal.toFixed(1) + "%",
       sub: quotaResetStr(rl["anthropic-ratelimit-unified-5h-reset"]),
@@ -4247,6 +4264,7 @@ function renderProxyAnalysis(data) {
       valueColor: gaugeColor(q5pctVal)
     },
     {
+      wid: "proxy-kpi-quota-7d",
       label: t("proxyCardQuota7d"),
       value: q7pctVal.toFixed(1) + "%",
       sub: quotaResetStr(rl["anthropic-ratelimit-unified-7d-reset"]),
@@ -4262,6 +4280,7 @@ function renderProxyAnalysis(data) {
     var ttl1hPct = Math.round((ttl["1h"] || 0) / ttlTotal * 100);
     var ttl5mPct = 100 - ttl1hPct;
     pcards.push({
+      wid: "proxy-kpi-ttl-tier",
       label: t("proxyTtlTier"),
       value: tr("proxyTtl1h", { pct: ttl1hPct }),
       sub: tr("proxyTtl5m", { pct: ttl5mPct }),
@@ -4274,6 +4293,7 @@ function renderProxyAnalysis(data) {
   var offPeakReqs = pd.off_peak_requests || 0;
   if (peakReqs + offPeakReqs > 0) {
     pcards.push({
+      wid: "proxy-kpi-peak-hours",
       label: t("proxyDataSource"),
       value: tr("proxyPeakHours", { peak: peakReqs, offpeak: offPeakReqs }),
       sub: hasInterceptor ? t("proxySourceInterceptor") : t("proxySourceProxy"),
@@ -4282,10 +4302,25 @@ function renderProxyAnalysis(data) {
   }
   if (cardsEl) {
     var ch2 = "";
-    pcards.forEach(function (c) {
+    for (var pci = 0; pci < pcards.length; pci++) {
+      var c = pcards[pci];
       var valStyle = c.valueColor ? " style=\"color:" + c.valueColor + "\"" : "";
-      ch2 += "<div class=\"card " + c.cls + "\"><div class=\"label\">" + escHtml(c.label) + "</div><div class=\"value\"" + valStyle + ">" + escHtml(c.value) + "</div><div class=\"sub\">" + escHtml(c.sub) + "</div></div>";
-    });
+      var w = c.wid || "proxy-kpi";
+      ch2 +=
+        '<div class="chart-box chart-box--kpi" id="' +
+        w +
+        '"><div class="card ' +
+        c.cls +
+        '"><div class="label">' +
+        escHtml(c.label) +
+        '</div><div class="value"' +
+        valStyle +
+        ">" +
+        escHtml(c.value) +
+        '</div><div class="sub">' +
+        escHtml(c.sub) +
+        "</div></div></div>";
+    }
     cardsEl.innerHTML = ch2;
   }
 
@@ -5096,6 +5131,13 @@ function renderProxyEfficiencyTrend(data) {
 
 // ── Health Score Ampel ────────────────────────────────────────────────────
 var __lastHealthFingerprint = "";
+var __lastFindingsFingerprint = "";
+
+function invalidateHealthAndFindingsRender() {
+  __lastHealthFingerprint = "";
+  __lastFindingsFingerprint = "";
+}
+window.invalidateHealthAndFindingsRender = invalidateHealthAndFindingsRender;
 
 function healthColor(value, greenMax, yellowMax) {
   // greenMax = upper bound for green, yellowMax = upper bound for yellow
@@ -5223,14 +5265,26 @@ function renderHealthScore(data) {
   }
 
   var indicators = computeHealthIndicators(data);
-  var totalPts = 0, warns = 0, crits = 0;
-  for (var i = 0; i < indicators.length; i++) {
-    totalPts += healthPoints(indicators[i].color);
-    if (indicators[i].color === "yellow") warns++;
-    if (indicators[i].color === "red") crits++;
+  var dispH = global.__widgetDispatcher;
+  var visInd = [];
+  for (var vj = 0; vj < indicators.length; vj++) {
+    var kpiId = "health-kpi-" + indicators[vj].id;
+    if (dispH && typeof dispH.isChartVisible === "function" && !dispH.isChartVisible(kpiId)) continue;
+    visInd.push(indicators[vj]);
   }
-  var score = Math.round(totalPts / (indicators.length * 2) * 10);
-  var scoreColor = score > 7 ? "#22c55e" : score >= 4 ? "#f59e0b" : "#ef4444";
+  var totalPts = 0, warns = 0, crits = 0;
+  var score = 0;
+  var scoreColor = "#64748b";
+  if (visInd.length) {
+    for (var i = 0; i < visInd.length; i++) {
+      totalPts += healthPoints(visInd[i].color);
+      if (visInd[i].color === "yellow") warns++;
+      if (visInd[i].color === "red") crits++;
+    }
+    var denom = visInd.length * 2;
+    score = denom > 0 ? Math.round(totalPts / denom * 10) : 0;
+    scoreColor = score > 7 ? "#22c55e" : score >= 4 ? "#f59e0b" : "#ef4444";
+  }
 
   // Header
   var hh = "<div class=\"health-total-circle\" style=\"background:" + scoreColor + "\">" + score + "</div>";
@@ -5247,8 +5301,8 @@ function renderHealthScore(data) {
   if (smCircle) { smCircle.style.background = scoreColor; smCircle.textContent = score; }
   if (smText) {
     var sh = "";
-    for (var si = 0; si < indicators.length; si++) {
-      var ind = indicators[si];
+    for (var si = 0; si < visInd.length; si++) {
+      var ind = visInd[si];
       var dc = ind.color === "red" ? "#ef4444" : ind.color === "yellow" ? "#f59e0b" : "#22c55e";
       sh += '<span class="hs-inline-badge"><span class="hs-inline-dot" style="background:' + dc + '"></span>' + escHtml(ind.label) + ' <strong>' + escHtml(ind.display) + '</strong></span>';
     }
@@ -5260,21 +5314,22 @@ function renderHealthScore(data) {
   renderOutageTimeline(data);
   renderAvailabilityKpis(data);
 
-  // Grid
+  // Grid (one host per KPI for visibility sync)
   var gh = "";
   for (var gi = 0; gi < indicators.length; gi++) {
     var ind = indicators[gi];
+    var hostId = "health-kpi-" + ind.id;
+    gh += "<div class=\"chart-box chart-box--kpi\" id=\"" + hostId + "\">";
     gh += "<div class=\"health-badge health-badge--" + ind.color + "\">";
     gh += "<div class=\"health-badge-label\">" + escHtml(ind.label) + "</div>";
     gh += "<div class=\"health-badge-value\">" + escHtml(ind.display) + "</div>";
     gh += "<div class=\"health-badge-bar\"><div class=\"health-badge-bar-fill health-badge-bar-fill--" + ind.color + "\" style=\"width:" + Math.round(ind.barPct) + "%\"></div></div>";
-    gh += "</div>";
+    gh += "</div></div>";
   }
   if (gridEl.innerHTML !== gh) gridEl.innerHTML = gh;
 }
 
 // ── Key Findings Panel ────────────────────────────────────────────────────
-var __lastFindingsFingerprint = "";
 
 function computeKeyFindings(data) {
   var days = data.days || [];
@@ -5309,6 +5364,7 @@ function computeKeyFindings(data) {
     if (todayJ && pd.total_tokens > 0) {
       var gap = (todayJ.total || 0) / pd.total_tokens;
       findings.push({
+        widgetId: "health-finding-jsonlProxyGap",
         icon: gap > 5 ? "red" : gap > 2 ? "yellow" : "green",
         title: t("findingThinkingGap"),
         value: gap.toFixed(1) + "x",
@@ -5321,6 +5377,7 @@ function computeKeyFindings(data) {
   if (totalOut > 0) {
     var overhead = Math.round(totalAll / totalOut);
     findings.push({
+      widgetId: "health-finding-overhead",
       icon: overhead > 1000 ? "red" : overhead > 500 ? "yellow" : "green",
       title: t("findingOverhead"),
       value: overhead + "x",
@@ -5332,6 +5389,7 @@ function computeKeyFindings(data) {
   if (totalHits > 0) {
     var hpd = Math.round(totalHits / numDays);
     findings.push({
+      widgetId: "health-finding-hitLimits",
       icon: hpd > 500 ? "red" : hpd > 50 ? "yellow" : "green",
       title: t("findingHitLimits"),
       value: fmt(totalHits),
@@ -5342,6 +5400,7 @@ function computeKeyFindings(data) {
   // 4. Interrupts vs Hit Limits
   if (totalInterrupts > 0) {
     findings.push({
+      widgetId: "health-finding-interrupts",
       icon: totalInterrupts > totalHits ? "red" : "yellow",
       title: t("findingInterrupts"),
       value: fmt(totalInterrupts),
@@ -5356,6 +5415,7 @@ function computeKeyFindings(data) {
     var q7 = Number.parseFloat(rl["anthropic-ratelimit-unified-7d-utilization"] || 0) * 100;
     if (q5 > 0) {
       findings.push({
+        widgetId: "health-finding-quota",
         icon: q5 > 80 ? "red" : q5 > 50 ? "yellow" : "green",
         title: t("findingQuota"),
         value: q5.toFixed(0) + "% / " + q7.toFixed(0) + "%",
@@ -5371,6 +5431,7 @@ function computeKeyFindings(data) {
     if (fb !== undefined && fb !== null) {
       var fbPct = Math.round(Number.parseFloat(fb) * 100);
       findings.push({
+        widgetId: "health-finding-fallback",
         icon: fbPct < 100 ? "red" : "green",
         title: t("findingFallback"),
         value: fbPct + "%",
@@ -5386,6 +5447,7 @@ function computeKeyFindings(data) {
     var ovReason = rl7["anthropic-ratelimit-unified-overage-disabled-reason"];
     if (ovStatus) {
       findings.push({
+        widgetId: "health-finding-overage",
         icon: ovStatus === "rejected" ? "red" : "green",
         title: t("findingOveragePolicy"),
         value: ovStatus,
@@ -5400,6 +5462,7 @@ function computeKeyFindings(data) {
     var claim = rl8["anthropic-ratelimit-unified-representative-claim"];
     if (claim) {
       findings.push({
+        widgetId: "health-finding-claim",
         icon: claim === "five_hour" ? "yellow" : "green",
         title: t("findingClaim"),
         value: claim.replaceAll("_", " "),
@@ -5411,6 +5474,7 @@ function computeKeyFindings(data) {
   // 9. Peak Day
   if (peakDay) {
     findings.push({
+      widgetId: "health-finding-peakDay",
       icon: peakTotal > 2e9 ? "red" : peakTotal > 500e6 ? "yellow" : "green",
       title: t("findingPeakDay"),
       value: peakDay.date,
@@ -5422,6 +5486,7 @@ function computeKeyFindings(data) {
   if (totalRetries > 0) {
     var rpd = Math.round(totalRetries / numDays);
     findings.push({
+      widgetId: "health-finding-retries",
       icon: rpd > 200 ? "red" : rpd > 50 ? "yellow" : "green",
       title: t("findingRetries"),
       value: fmt(totalRetries),
@@ -5432,6 +5497,7 @@ function computeKeyFindings(data) {
   // 11. Cache paradox
   if (pd && pd.cache_read_ratio > 0.9 && totalHits > 100) {
     findings.push({
+      widgetId: "health-finding-cacheParadox",
       icon: "yellow",
       title: t("findingCacheParadox"),
       value: (pd.cache_read_ratio * 100).toFixed(1) + "%",
@@ -5460,26 +5526,37 @@ function renderKeyFindings(data) {
   }
 
   var findings = computeKeyFindings(data);
+  function findingShown(f) {
+    var w = f.widgetId || "";
+    var disp = global.__widgetDispatcher;
+    if (!w || !disp || typeof disp.isChartVisible !== "function") return true;
+    return disp.isChartVisible(w);
+  }
   if (headerEl) {
-    var reds = 0, yellows = 0;
+    var reds = 0, yellows = 0, visTotal = 0;
     for (var c = 0; c < findings.length; c++) {
+      if (!findingShown(findings[c])) continue;
+      visTotal++;
       if (findings[c].icon === "red") reds++;
       if (findings[c].icon === "yellow") yellows++;
     }
     headerEl.innerHTML = "<strong>" + escHtml(t("findingsTitle")) + "</strong> <span style=\"font-size:.78rem;color:#94a3b8\">" +
-      escHtml(tr("findingsSummary", { total: findings.length, reds: reds, yellows: yellows })) + "</span>";
+      escHtml(tr("findingsSummary", { total: visTotal, reds: reds, yellows: yellows })) + "</span>";
   }
 
   var html = "";
   for (var fi = 0; fi < findings.length; fi++) {
     var f = findings[fi];
+    if (!findingShown(f)) continue;
+    var wid = f.widgetId || "";
     var dot = f.icon === "red" ? "#ef4444" : f.icon === "yellow" ? "#f59e0b" : "#22c55e";
+    html += '<div class="finding-card-host" id="' + wid + '">';
     html += "<div class=\"finding-card\">";
     html += "<div class=\"finding-head\"><span class=\"finding-dot\" style=\"background:" + dot + "\"></span>";
     html += "<span class=\"finding-title\">" + escHtml(f.title) + "</span>";
     html += "<span class=\"finding-value\">" + escHtml(f.value) + "</span></div>";
     html += "<div class=\"finding-detail\">" + escHtml(f.detail) + "</div>";
-    html += "</div>";
+    html += "</div></div>";
   }
   if (el.innerHTML !== html) el.innerHTML = html;
 }

@@ -18,6 +18,10 @@
  *   companionIds (string[])  — sibling DOM elements that move with the section
  *   reorderable (boolean)    — false for popup/nested sections
  *
+ * Layer 4 (modular widgets): optional per-chart/chip:
+ *   kind (string)            — "chart" | "chip" (default chart for ECharts)
+ *   widgetGroup (string)     — sidebar: cluster under one expandable group (e.g. "kernbefunde")
+ *
  * Usage:
  *   window.__widgetRegistry.sections  — all section definitions
  *   window.__widgetRegistry.findChart("ts-c1")  — lookup by chart ID (token stats main chart)
@@ -105,7 +109,33 @@
         defaultOpen: false,
         dataSource: '/api/usage',
         requires: ['usage'],
-        charts: []
+        charts: [
+          { id: 'health-finding-jsonlProxyGap', titleKey: 'findingThinkingGap', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-finding-jsonlProxyGap', widgetGroup: 'kernbefunde', renderFn: 'renderHealthScore' },
+          { id: 'health-finding-overhead', titleKey: 'findingOverhead', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-finding-overhead', widgetGroup: 'kernbefunde', renderFn: 'renderHealthScore' },
+          { id: 'health-finding-hitLimits', titleKey: 'findingHitLimits', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-finding-hitLimits', widgetGroup: 'kernbefunde', renderFn: 'renderHealthScore' },
+          { id: 'health-finding-interrupts', titleKey: 'findingInterrupts', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-finding-interrupts', widgetGroup: 'kernbefunde', renderFn: 'renderHealthScore' },
+          { id: 'health-finding-quota', titleKey: 'findingQuota', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-finding-quota', widgetGroup: 'kernbefunde', renderFn: 'renderHealthScore' },
+          { id: 'health-finding-fallback', titleKey: 'findingFallback', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-finding-fallback', widgetGroup: 'kernbefunde', renderFn: 'renderHealthScore' },
+          { id: 'health-finding-overage', titleKey: 'findingOveragePolicy', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-finding-overage', widgetGroup: 'kernbefunde', renderFn: 'renderHealthScore' },
+          { id: 'health-finding-claim', titleKey: 'findingClaim', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-finding-claim', widgetGroup: 'kernbefunde', renderFn: 'renderHealthScore' },
+          { id: 'health-finding-peakDay', titleKey: 'findingPeakDay', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-finding-peakDay', widgetGroup: 'kernbefunde', renderFn: 'renderHealthScore' },
+          { id: 'health-finding-retries', titleKey: 'findingRetries', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-finding-retries', widgetGroup: 'kernbefunde', renderFn: 'renderHealthScore' },
+          { id: 'health-finding-cacheParadox', titleKey: 'findingCacheParadox', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-finding-cacheParadox', widgetGroup: 'kernbefunde', renderFn: 'renderHealthScore' },
+          { id: 'health-kpi-quota5h', titleKey: 'healthQuota5h', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-kpi-quota5h', widgetGroup: 'health-kpis', renderFn: 'renderHealthScore' },
+          { id: 'health-kpi-thinkingGap', titleKey: 'healthThinkingGap', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-kpi-thinkingGap', widgetGroup: 'health-kpis', renderFn: 'renderHealthScore' },
+          { id: 'health-kpi-cacheHealth', titleKey: 'healthCacheHealth', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-kpi-cacheHealth', widgetGroup: 'health-kpis', renderFn: 'renderHealthScore' },
+          { id: 'health-kpi-errorRate', titleKey: 'healthErrorRate', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-kpi-errorRate', widgetGroup: 'health-kpis', renderFn: 'renderHealthScore' },
+          { id: 'health-kpi-hitLimits', titleKey: 'healthHitLimits', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-kpi-hitLimits', widgetGroup: 'health-kpis', renderFn: 'renderHealthScore' },
+          { id: 'health-kpi-latency', titleKey: 'healthLatency', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-kpi-latency', widgetGroup: 'health-kpis', renderFn: 'renderHealthScore' },
+          { id: 'health-kpi-interrupts', titleKey: 'healthInterrupts', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-kpi-interrupts', widgetGroup: 'health-kpis', renderFn: 'renderHealthScore' },
+          { id: 'health-kpi-coldStarts', titleKey: 'healthColdStarts', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-kpi-coldStarts', widgetGroup: 'health-kpis', renderFn: 'renderHealthScore' },
+          { id: 'health-kpi-retries', titleKey: 'healthRetries', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-kpi-retries', widgetGroup: 'health-kpis', renderFn: 'renderHealthScore' },
+          { id: 'health-kpi-false429', titleKey: 'healthFalse429', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-kpi-false429', widgetGroup: 'health-kpis', renderFn: 'renderHealthScore' },
+          { id: 'health-kpi-truncations', titleKey: 'healthTruncations', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-kpi-truncations', widgetGroup: 'health-kpis', renderFn: 'renderHealthScore' },
+          { id: 'health-kpi-contextResets', titleKey: 'healthContextResets', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-kpi-contextResets', widgetGroup: 'health-kpis', renderFn: 'renderHealthScore' },
+          { id: 'health-kpi-quotaBench', titleKey: 'healthQuotaBench', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-kpi-quotaBench', widgetGroup: 'health-kpis', renderFn: 'renderHealthScore' },
+          { id: 'health-kpi-anomalStops', titleKey: 'healthAnomalStops', kind: 'chip', engine: 'html', type: 'cards', canvasId: 'health-kpi-anomalStops', widgetGroup: 'health-kpis', renderFn: 'renderHealthScore' }
+        ]
       },
 
       // ── Token Stats ────────────────────────────────────────────
@@ -120,15 +150,17 @@
         dataSource: '/api/usage',
         requires: ['usage'],
         charts: [
-          {
-            id: 'ts-kpis',
-            titleKey: 'tokenStatsKpiCards',
-            type: 'cards',
-            engine: 'html',
-            canvasId: 'cards',
-            size: { cols: 1, minHeight: 0 },
-            renderFn: 'renderTokenStatsSection'
-          },
+          { id: 'token-stats-kpi-day-output', titleKey: 'cardDayOutput', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'token-stats-kpi-day-output', widgetGroup: 'token-stats-kpis', renderFn: 'renderTokenStatsSection' },
+          { id: 'token-stats-kpi-day-cache-read', titleKey: 'cardDayCacheRead', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'token-stats-kpi-day-cache-read', widgetGroup: 'token-stats-kpis', renderFn: 'renderTokenStatsSection' },
+          { id: 'token-stats-kpi-day-total', titleKey: 'cardDayTotal', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'token-stats-kpi-day-total', widgetGroup: 'token-stats-kpis', renderFn: 'renderTokenStatsSection' },
+          { id: 'token-stats-kpi-hit-day', titleKey: 'cardHitDay', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'token-stats-kpi-hit-day', widgetGroup: 'token-stats-kpis', renderFn: 'renderTokenStatsSection' },
+          { id: 'token-stats-kpi-hit-all', titleKey: 'cardHitAll', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'token-stats-kpi-hit-all', widgetGroup: 'token-stats-kpis', renderFn: 'renderTokenStatsSection' },
+          { id: 'token-stats-kpi-overhead', titleKey: 'cardOverhead', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'token-stats-kpi-overhead', widgetGroup: 'token-stats-kpis', renderFn: 'renderTokenStatsSection' },
+          { id: 'token-stats-kpi-peak', titleKey: 'cardPeak', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'token-stats-kpi-peak', widgetGroup: 'token-stats-kpis', renderFn: 'renderTokenStatsSection' },
+          { id: 'token-stats-kpi-all-out', titleKey: 'cardAllOut', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'token-stats-kpi-all-out', widgetGroup: 'token-stats-kpis', renderFn: 'renderTokenStatsSection' },
+          { id: 'token-stats-kpi-all-cache', titleKey: 'cardAllCache', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'token-stats-kpi-all-cache', widgetGroup: 'token-stats-kpis', renderFn: 'renderTokenStatsSection' },
+          { id: 'token-stats-kpi-session-signals', titleKey: 'cardSessionSignals', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'token-stats-kpi-session-signals', widgetGroup: 'token-stats-kpis', renderFn: 'renderTokenStatsSection' },
+          { id: 'token-stats-kpi-hosts', titleKey: 'tokenStatsHostKpiGroup', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'token-stats-kpi-hosts', widgetGroup: 'token-stats-kpis', renderFn: 'renderTokenStatsSection' },
           {
             id: 'ts-c1',
             titleKey: 'tokenStatsChartC1',
@@ -188,6 +220,9 @@
         dataSource: '/api/usage',
         requires: ['usage'],
         charts: [
+          { id: 'forensic-card-code', titleKey: 'fcForensicDay', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'forensic-card-code', widgetGroup: 'forensic-cards', renderFn: 'renderForensicSection' },
+          { id: 'forensic-card-impl', titleKey: 'fcImpl', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'forensic-card-impl', widgetGroup: 'forensic-cards', renderFn: 'renderForensicSection' },
+          { id: 'forensic-card-budget', titleKey: 'fcBudget', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'forensic-card-budget', widgetGroup: 'forensic-cards', renderFn: 'renderForensicSection' },
           {
             id: 'forensic-hitlimit',
             titleKey: 'chartForensicHitLimit',
@@ -270,6 +305,12 @@
         dataSource: '/api/usage',
         requires: ['usage'],
         charts: [
+          { id: 'budget-kpi-output', titleKey: 'budgetCardOutput', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'budget-kpi-output', widgetGroup: 'budget-kpis', renderFn: 'renderBudgetEfficiency' },
+          { id: 'budget-kpi-overhead', titleKey: 'budgetCardOverhead', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'budget-kpi-overhead', widgetGroup: 'budget-kpis', renderFn: 'renderBudgetEfficiency' },
+          { id: 'budget-kpi-cache-miss', titleKey: 'budgetCardCacheMiss', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'budget-kpi-cache-miss', widgetGroup: 'budget-kpis', renderFn: 'renderBudgetEfficiency' },
+          { id: 'budget-kpi-lost', titleKey: 'budgetCardLost', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'budget-kpi-lost', widgetGroup: 'budget-kpis', renderFn: 'renderBudgetEfficiency' },
+          { id: 'budget-kpi-outage', titleKey: 'budgetCardOutage', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'budget-kpi-outage', widgetGroup: 'budget-kpis', renderFn: 'renderBudgetEfficiency' },
+          { id: 'budget-kpi-truncated', titleKey: 'budgetCardTruncated', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'budget-kpi-truncated', widgetGroup: 'budget-kpis', renderFn: 'renderBudgetEfficiency' },
           {
             id: 'budget-sankey',
             titleKey: 'chartBudgetSankey',
@@ -311,6 +352,14 @@
         dataSource: '/api/usage',
         requires: ['usage'],
         charts: [
+          { id: 'proxy-kpi-requests', titleKey: 'proxyCardRequests', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'proxy-kpi-requests', widgetGroup: 'proxy-kpis', renderFn: 'renderProxyAnalysis' },
+          { id: 'proxy-kpi-latency', titleKey: 'proxyCardLatency', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'proxy-kpi-latency', widgetGroup: 'proxy-kpis', renderFn: 'renderProxyAnalysis' },
+          { id: 'proxy-kpi-cache-ratio', titleKey: 'proxyCardCacheRatio', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'proxy-kpi-cache-ratio', widgetGroup: 'proxy-kpis', renderFn: 'renderProxyAnalysis' },
+          { id: 'proxy-kpi-models', titleKey: 'proxyCardModels', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'proxy-kpi-models', widgetGroup: 'proxy-kpis', renderFn: 'renderProxyAnalysis' },
+          { id: 'proxy-kpi-quota-5h', titleKey: 'proxyCardQuota5h', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'proxy-kpi-quota-5h', widgetGroup: 'proxy-kpis', renderFn: 'renderProxyAnalysis' },
+          { id: 'proxy-kpi-quota-7d', titleKey: 'proxyCardQuota7d', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'proxy-kpi-quota-7d', widgetGroup: 'proxy-kpis', renderFn: 'renderProxyAnalysis' },
+          { id: 'proxy-kpi-ttl-tier', titleKey: 'proxyTtlTier', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'proxy-kpi-ttl-tier', widgetGroup: 'proxy-kpis', renderFn: 'renderProxyAnalysis' },
+          { id: 'proxy-kpi-peak-hours', titleKey: 'proxyDataSource', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'proxy-kpi-peak-hours', widgetGroup: 'proxy-kpis', renderFn: 'renderProxyAnalysis' },
           {
             id: 'proxy-tokens',
             titleKey: 'proxyTokenChartTitle',

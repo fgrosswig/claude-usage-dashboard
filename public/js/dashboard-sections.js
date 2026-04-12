@@ -84,30 +84,33 @@
       impl90 = selDay.forensic_implied_cap_90 || 0;
     }
     var cards = [
-      { label: t("cardDayOutput"), value: fmt(cardBase.output || 0), sub: selDay.date, cls: "" },
+      { wid: "token-stats-kpi-day-output", label: t("cardDayOutput"), value: fmt(cardBase.output || 0), sub: selDay.date, cls: "" },
       {
+        wid: "token-stats-kpi-day-cache-read",
         label: t("cardDayCacheRead"),
         value: fmt(cardBase.cache_read || 0),
         sub: tr("cardCacheOutSub", { ratio: cardBase.cache_output_ratio || 0 }),
         cls: (cardBase.cache_output_ratio || 0) > 500 ? "warn" : ""
       },
       {
+        wid: "token-stats-kpi-day-total",
         label: t("cardDayTotal"),
         value: fmt(cardBase.total || 0),
         sub: tr("cardCallsActiveSub", { calls: cardBase.calls || 0, hours: cardBase.active_hours || 0 }),
         cls: ""
       },
-      { label: t("cardHitDay"), value: String(hitSel), sub: t("cardHitDaySub"), cls: hitSel > 0 ? "warn" : "ok" },
-      { label: t("cardHitAll"), value: String(hitAll), sub: t("cardHitAllSub"), cls: hitAll > 0 ? "warn" : "" },
+      { wid: "token-stats-kpi-hit-day", label: t("cardHitDay"), value: String(hitSel), sub: t("cardHitDaySub"), cls: hitSel > 0 ? "warn" : "ok" },
+      { wid: "token-stats-kpi-hit-all", label: t("cardHitAll"), value: String(hitAll), sub: t("cardHitAllSub"), cls: hitAll > 0 ? "warn" : "" },
       {
+        wid: "token-stats-kpi-overhead",
         label: t("cardOverhead"),
         value: (cardBase.overhead || 0) + "x",
         sub: t("cardOverheadSub"),
         cls: (cardBase.overhead || 0) > 1000 ? "danger" : ""
       },
-      { label: t("cardPeak"), value: fmt(peak.total || 0), sub: tr("cardPeakSub", { date: peak.date || "\u2014" }), cls: "ok" },
-      { label: t("cardAllOut"), value: fmt(totalOut), sub: tr("cardAllOutSub", { days: days.length }), cls: "" },
-      { label: t("cardAllCache"), value: fmt(totalCache), sub: tr("cardAllCacheSub", { pct: pct(totalCache, totalAll) }), cls: "" }
+      { wid: "token-stats-kpi-peak", label: t("cardPeak"), value: fmt(peak.total || 0), sub: tr("cardPeakSub", { date: peak.date || "\u2014" }), cls: "ok" },
+      { wid: "token-stats-kpi-all-out", label: t("cardAllOut"), value: fmt(totalOut), sub: tr("cardAllOutSub", { days: days.length }), cls: "" },
+      { wid: "token-stats-kpi-all-cache", label: t("cardAllCache"), value: fmt(totalCache), sub: tr("cardAllCacheSub", { pct: pct(totalCache, totalAll) }), cls: "" }
     ];
     var ssSel = cardBase.session_signals || {};
     var ssc = ssSel.continue || 0;
@@ -115,28 +118,58 @@
     var ssy = ssSel.retry || 0;
     var ssi = ssSel.interrupt || 0;
     cards.push({
+      wid: "token-stats-kpi-session-signals",
       label: t("cardSessionSignals"),
       value: String(ssc + ssr + ssy + ssi),
       sub: tr("cardSessionSignalsSub", { c: String(ssc), r: String(ssr), y: String(ssy), i: String(ssi) }),
       cls: ssy + ssi > 0 ? "warn" : ""
     });
+    var chtml = "";
+    for (var cix = 0; cix < cards.length; cix++) {
+      var c = cards[cix];
+      var wid = c.wid;
+      if (!wid) continue;
+      chtml +=
+        '<div class="chart-box chart-box--kpi" id="' +
+        wid +
+        '"><div class="card ' +
+        c.cls +
+        '"><div class="label">' +
+        escHtml(c.label) +
+        '</div><div class="value">' +
+        escHtml(c.value) +
+        '</div><div class="sub">' +
+        escHtml(c.sub) +
+        "</div></div></div>";
+    }
     if (multiHost && selDay.hosts) {
+      chtml += '<div class="chart-box chart-box--kpi" id="token-stats-kpi-hosts">';
       for (var hci = 0; hci < hLabs.length; hci++) {
         var hlbl = hLabs[hci];
         var hday = selDay.hosts[hlbl];
         if (!hday) continue;
         var hhit = hday.hit_limit || 0;
-        cards.push({
+        var hc = {
           label: hlbl + t("cardHostParen"),
           value: fmt(hday.total),
           sub: tr("cardHostSub", { out: fmt(hday.output), calls: hday.calls, hit: String(hhit) }),
           cls: hhit > 0 ? "warn" : ""
-        });
+        };
+        chtml +=
+          '<div class="card ' +
+          hc.cls +
+          '"><div class="label">' +
+          escHtml(hc.label) +
+          '</div><div class="value">' +
+          escHtml(hc.value) +
+          '</div><div class="sub">' +
+          escHtml(hc.sub) +
+          "</div></div>";
       }
+      chtml += "</div>";
     }
-    var chtml="";
-    cards.forEach(function(c){chtml+="<div class=\"card "+c.cls+"\"><div class=\"label\">"+escHtml(c.label)+"</div><div class=\"value\">"+escHtml(c.value)+"</div><div class=\"sub\">"+escHtml(c.sub)+"</div></div>";});
-    var _ce=document.getElementById("cards");if(_ce&&_ce.innerHTML!==chtml)_ce.innerHTML=chtml;
+    var _ce = document.getElementById("cards");
+    if (_ce && _ce.innerHTML !== chtml) _ce.innerHTML = chtml;
     var tsSum=document.getElementById("token-stats-summary-line");
     if(tsSum) tsSum.textContent=tr("tokenStatsSummary",{date:selDay.date||"",out:fmt(cardBase.output||0),cache:fmt(cardBase.cache_read||0),overhead:(cardBase.overhead||0)+"x"});
 
@@ -607,13 +640,28 @@
 
     // --- Forensic cards ---
     var fcards = [
-      { label: t("fcForensicDay"), value: fc, sub: forensicHintF, cls: fwarn ? "warn" : "" },
-      { label: t("fcImpl"), value: impl90 > 0 ? fmt(impl90) : "\u2014", sub: t("fcImplSub"), cls: "" },
-      { label: t("fcBudget"), value: "~" + budgetRatio + "x", sub: t("fcBudgetSub"), cls: budgetRatio > 10 ? "danger" : "warn" }
+      { wid: "forensic-card-code", label: t("fcForensicDay"), value: fc, sub: forensicHintF, cls: fwarn ? "warn" : "" },
+      { wid: "forensic-card-impl", label: t("fcImpl"), value: impl90 > 0 ? fmt(impl90) : "\u2014", sub: t("fcImplSub"), cls: "" },
+      { wid: "forensic-card-budget", label: t("fcBudget"), value: "~" + budgetRatio + "x", sub: t("fcBudgetSub"), cls: budgetRatio > 10 ? "danger" : "warn" }
     ];
-    var fch="";
-    fcards.forEach(function(c){fch+="<div class=\"card "+c.cls+"\"><div class=\"label\">"+escHtml(c.label)+"</div><div class=\"value\">"+escHtml(c.value)+"</div><div class=\"sub\">"+escHtml(c.sub)+"</div></div>";});
-    var fcg=document.getElementById("forensic-cards");if(fcg&&fcg.innerHTML!==fch)fcg.innerHTML=fch;
+    var fch = "";
+    for (var fci = 0; fci < fcards.length; fci++) {
+      var fcrd = fcards[fci];
+      fch +=
+        '<div class="chart-box chart-box--kpi" id="' +
+        fcrd.wid +
+        '"><div class="card ' +
+        fcrd.cls +
+        '"><div class="label">' +
+        escHtml(fcrd.label) +
+        '</div><div class="value">' +
+        escHtml(fcrd.value) +
+        '</div><div class="sub">' +
+        escHtml(fcrd.sub) +
+        "</div></div></div>";
+    }
+    var fcg = document.getElementById("forensic-cards");
+    if (fcg && fcg.innerHTML !== fch) fcg.innerHTML = fch;
 
     // --- Forensic chart throttle ---
     var spForensic = data.scan_progress;

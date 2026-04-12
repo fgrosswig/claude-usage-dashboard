@@ -535,6 +535,19 @@
     }
     savePrefs();
     applyChartVisibility(chartId, visible);
+    if (
+      chartId.indexOf('health-kpi-') === 0 ||
+      chartId.indexOf('health-finding-') === 0
+    ) {
+      if (typeof global.invalidateHealthAndFindingsRender === 'function') {
+        global.invalidateHealthAndFindingsRender();
+      }
+      var dd = global.__lastUsageData;
+      if (dd) {
+        if (typeof global.renderHealthScore === 'function') global.renderHealthScore(dd);
+        if (typeof global.renderKeyFindings === 'function') global.renderKeyFindings(dd);
+      }
+    }
   }
 
   /** One DOM host (canvas / KPI grid) may map to several registry charts — OR visibility. */
@@ -556,10 +569,6 @@
     }
     var el = document.getElementById(canvasId);
     if (!el) return;
-    if (el.classList.contains('grid') && el.id === 'cards') {
-      el.style.display = show ? '' : 'none';
-      return;
-    }
     var box = el.closest('.chart-box');
     if (box) {
       box.style.display = show ? '' : 'none';
@@ -568,18 +577,56 @@
     el.style.display = show ? '' : 'none';
   }
 
+  /** ECharts mis-measures after host display:none -> visible; defer resize until layout settles. */
+  function scheduleResizeAfterChartVisibility() {
+    setTimeout(function () {
+      resizeAll();
+    }, 50);
+    setTimeout(function () {
+      resizeAll();
+    }, 200);
+  }
+
   function applyChartVisibility(chartId, visible) {
     var reg = getRegistry();
     if (!reg) return;
     var chartDef = reg.findChart(chartId);
     if (!chartDef) return;
     syncCanvasGroupVisibility(chartDef.canvasId);
+    scheduleResizeAfterChartVisibility();
   }
 
   function migrateHiddenChartsLegacy() {
     if (!_prefs) return false;
     if (!Array.isArray(_prefs.hiddenCharts)) _prefs.hiddenCharts = [];
-    if (!_prefs.hiddenCharts.length) return false;
+    var tsKpisAll = [
+      'token-stats-kpi-day-output',
+      'token-stats-kpi-day-cache-read',
+      'token-stats-kpi-day-total',
+      'token-stats-kpi-hit-day',
+      'token-stats-kpi-hit-all',
+      'token-stats-kpi-overhead',
+      'token-stats-kpi-peak',
+      'token-stats-kpi-all-out',
+      'token-stats-kpi-all-cache',
+      'token-stats-kpi-session-signals',
+      'token-stats-kpi-hosts'
+    ];
+    var changedTs = false;
+    if (_prefs.hiddenCharts.indexOf('ts-kpis') !== -1) {
+      var merged = [];
+      for (var tsi = 0; tsi < _prefs.hiddenCharts.length; tsi++) {
+        var tid = _prefs.hiddenCharts[tsi];
+        if (tid === 'ts-kpis') {
+          for (var tsj = 0; tsj < tsKpisAll.length; tsj++) {
+            if (merged.indexOf(tsKpisAll[tsj]) === -1) merged.push(tsKpisAll[tsj]);
+          }
+          changedTs = true;
+        } else if (merged.indexOf(tid) === -1) merged.push(tid);
+      }
+      _prefs.hiddenCharts = merged;
+    }
+    if (!_prefs.hiddenCharts.length) return changedTs;
     var mapLegacyToCanon = {
       'token-hourly': 'ts-c1',
       'token-daily': 'ts-c1',
@@ -603,7 +650,7 @@
         set[id] = true;
       }
     }
-    if (!changed) return false;
+    if (!changed && !changedTs) return false;
     var out = [];
     for (var k in set) {
       if (set[k]) out.push(k);
@@ -625,6 +672,7 @@
         syncCanvasGroupVisibility(cid);
       }
     }
+    scheduleResizeAfterChartVisibility();
   }
 
   function setOrder(orderedIds) {
@@ -743,16 +791,7 @@
       html += '<button type="button" class="widget-tree-expand" data-expand="' + sec.id + '"' + (hasCharts ? '' : ' style="visibility:hidden"') + '>&#x25B6;</button>';
       html += '</li>';
       if (hasCharts) {
-        html += '<ul class="widget-tree-charts" data-charts-for="' + sec.id + '" style="display:none">';
-        for (var ci = 0; ci < sec.charts.length; ci++) {
-          var ch = sec.charts[ci];
-          var chVis = isChartVisible(ch.id);
-          html += '<li class="widget-tree-item">';
-          html += '<input type="checkbox" class="widget-tree-check" data-type="chart" data-id="' + ch.id + '"' + (chVis ? ' checked' : '') + '>';
-          html += '<span class="widget-tree-label">' + _t(ch.titleKey) + '</span>';
-          html += '</li>';
-        }
-        html += '</ul>';
+        html += buildSectionChartsTreeHtml(sec);
       }
     }
     html += '</ul>';
@@ -772,6 +811,14 @@
       body.addEventListener('click', function (e) {
         var btn = e.target.closest('.widget-tree-expand');
         if (!btn) return;
+        if (btn.dataset.wtreeGroupId) {
+          var nest = body.querySelector('[data-wtree-group-ul="' + btn.dataset.wtreeGroupId + '"]');
+          if (!nest) return;
+          var openG = nest.style.display !== 'none';
+          nest.style.display = openG ? 'none' : '';
+          btn.style.transform = openG ? '' : 'rotate(90deg)';
+          return;
+        }
         var secId = btn.dataset.expand;
         var charts = body.querySelector('[data-charts-for="' + secId + '"]');
         if (!charts) return;
@@ -1046,11 +1093,136 @@
   // Only top-level sections (efficiency-range is nested inside economic)
   var ALL_SECTION_IDS = ['health', 'token-stats', 'forensic', 'user-profile', 'budget', 'proxy', 'anthropic-status', 'economic'];
 
+  /** Default chart/chip order per section (sidebar + getOrderedChartsForSection). */
+  var DEFAULT_SECTION_WIDGETS = {
+    health: [
+      'health-finding-jsonlProxyGap', 'health-finding-overhead', 'health-finding-hitLimits', 'health-finding-interrupts', 'health-finding-quota', 'health-finding-fallback', 'health-finding-overage', 'health-finding-claim', 'health-finding-peakDay', 'health-finding-retries', 'health-finding-cacheParadox',
+      'health-kpi-quota5h', 'health-kpi-thinkingGap', 'health-kpi-cacheHealth', 'health-kpi-errorRate', 'health-kpi-hitLimits', 'health-kpi-latency', 'health-kpi-interrupts', 'health-kpi-coldStarts', 'health-kpi-retries', 'health-kpi-false429', 'health-kpi-truncations', 'health-kpi-contextResets', 'health-kpi-quotaBench', 'health-kpi-anomalStops'
+    ],
+    'token-stats': [
+      'token-stats-kpi-day-output', 'token-stats-kpi-day-cache-read', 'token-stats-kpi-day-total', 'token-stats-kpi-hit-day', 'token-stats-kpi-hit-all', 'token-stats-kpi-overhead', 'token-stats-kpi-peak', 'token-stats-kpi-all-out', 'token-stats-kpi-all-cache', 'token-stats-kpi-session-signals', 'token-stats-kpi-hosts',
+      'ts-c1', 'ts-c2', 'ts-c3', 'ts-c4', 'ts-hosts'
+    ],
+    forensic: ['forensic-card-code', 'forensic-card-impl', 'forensic-card-budget', 'forensic-hitlimit', 'forensic-signals', 'forensic-service'],
+    'user-profile': ['user-versions', 'user-entrypoints', 'user-release-stability'],
+    budget: ['budget-kpi-output', 'budget-kpi-overhead', 'budget-kpi-cache-miss', 'budget-kpi-lost', 'budget-kpi-outage', 'budget-kpi-truncated', 'budget-sankey', 'budget-trend', 'budget-quota'],
+    proxy: [
+      'proxy-kpi-requests', 'proxy-kpi-latency', 'proxy-kpi-cache-ratio', 'proxy-kpi-models', 'proxy-kpi-quota-5h', 'proxy-kpi-quota-7d', 'proxy-kpi-ttl-tier', 'proxy-kpi-peak-hours',
+      'proxy-tokens', 'proxy-latency', 'proxy-hourly', 'proxy-models', 'proxy-hourly-latency', 'proxy-error-trend', 'proxy-cache-trend'
+    ],
+    'anthropic-status': ['status-uptime', 'status-incidents', 'status-outage-scatter', 'status-outage-timeline'],
+    economic: ['econ-cumulative', 'econ-explosion', 'econ-budget-drain'],
+    'efficiency-range': ['eff-efficiency-timeline', 'eff-monthly-butterfly', 'eff-day-comparison']
+  };
+
+  function getBuiltinSectionWidgetsMap() {
+    return DEFAULT_SECTION_WIDGETS;
+  }
+
+  function getActiveTemplateSectionWidgets() {
+    var name = getActiveTemplateName();
+    var all = getAllTemplates();
+    for (var ti = 0; ti < all.length; ti++) {
+      if (all[ti].name !== name) continue;
+      if (all[ti].sectionWidgets && typeof all[ti].sectionWidgets === 'object') return all[ti].sectionWidgets;
+      return getBuiltinSectionWidgetsMap();
+    }
+    return getBuiltinSectionWidgetsMap();
+  }
+
+  function getOrderedChartsForSection(sec) {
+    if (!sec || !sec.charts || !sec.charts.length) return [];
+    var charts = sec.charts.slice();
+    var sw = getActiveTemplateSectionWidgets();
+    var orderIds = sw && sw[sec.id] ? sw[sec.id] : null;
+    if (!orderIds || !orderIds.length) {
+      charts.sort(function (a, b) {
+        return (a.order || 0) - (b.order || 0);
+      });
+      return charts;
+    }
+    var byId = {};
+    for (var ci = 0; ci < charts.length; ci++) {
+      byId[charts[ci].id] = charts[ci];
+    }
+    var out = [];
+    for (var oi = 0; oi < orderIds.length; oi++) {
+      if (byId[orderIds[oi]]) out.push(byId[orderIds[oi]]);
+    }
+    for (var cj = 0; cj < charts.length; cj++) {
+      var cid = charts[cj].id;
+      var found = false;
+      for (var ok = 0; ok < orderIds.length; ok++) {
+        if (orderIds[ok] === cid) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) out.push(charts[cj]);
+    }
+    return out;
+  }
+
+  function wtreeGroupDomId(sectionId, widgetGroup) {
+    return 'wtg-' + sectionId + '-' + String(widgetGroup).replace(/[^a-z0-9-]/gi, '-');
+  }
+
+  function widgetGroupTitleKey(sectionId, widgetGroup) {
+    if (sectionId === 'health' && widgetGroup === 'kernbefunde') return 'findingsTitle';
+    if (sectionId === 'health' && widgetGroup === 'health-kpis') return 'widgetGroupHealthKpis';
+    if (sectionId === 'token-stats' && widgetGroup === 'token-stats-kpis') return 'widgetGroupTokenStatsKpis';
+    if (sectionId === 'forensic' && widgetGroup === 'forensic-cards') return 'widgetGroupForensicCards';
+    if (sectionId === 'budget' && widgetGroup === 'budget-kpis') return 'widgetGroupBudgetKpis';
+    if (sectionId === 'proxy' && widgetGroup === 'proxy-kpis') return 'widgetGroupProxyKpis';
+    return 'widgetGroupGeneric';
+  }
+
+  function buildSectionChartsTreeHtml(sec) {
+    var ordered = getOrderedChartsForSection(sec);
+    var html = '<ul class="widget-tree-charts" data-charts-for="' + escT(sec.id) + '" style="display:none">';
+    var gi = 0;
+    while (gi < ordered.length) {
+      var ch0 = ordered[gi];
+      var wg = ch0.widgetGroup;
+      if (!wg) {
+        var chVis0 = isChartVisible(ch0.id);
+        html += '<li class="widget-tree-item">';
+        html += '<input type="checkbox" class="widget-tree-check" data-type="chart" data-id="' + escT(ch0.id) + '"' + (chVis0 ? ' checked' : '') + '>';
+        html += '<span class="widget-tree-label">' + _t(ch0.titleKey) + '</span>';
+        html += '</li>';
+        gi++;
+        continue;
+      }
+      var gj = gi + 1;
+      while (gj < ordered.length && ordered[gj].widgetGroup === wg) gj++;
+      var gdom = wtreeGroupDomId(sec.id, wg);
+      html += '<li class="widget-tree-item widget-tree-item--grouphead">';
+      html += '<span class="widget-tree-group-spacer"></span>';
+      html += '<button type="button" class="widget-tree-expand widget-tree-expand--group" data-wtree-group-id="' + escT(gdom) + '">&#x25B6;</button>';
+      html += '<span class="widget-tree-label">' + _t(widgetGroupTitleKey(sec.id, wg)) + '</span>';
+      html += '</li>';
+      html += '<ul class="widget-tree-group-charts" data-wtree-group-ul="' + escT(gdom) + '" style="display:none">';
+      for (var k = gi; k < gj; k++) {
+        var ch = ordered[k];
+        var chVis = isChartVisible(ch.id);
+        html += '<li class="widget-tree-item">';
+        html += '<input type="checkbox" class="widget-tree-check" data-type="chart" data-id="' + escT(ch.id) + '"' + (chVis ? ' checked' : '') + '>';
+        html += '<span class="widget-tree-label">' + _t(ch.titleKey) + '</span>';
+        html += '</li>';
+      }
+      html += '</ul>';
+      gi = gj;
+    }
+    html += '</ul>';
+    return html;
+  }
+
   var BUILTIN_TEMPLATES = [
     {
       name: 'Full',
       builtin: true,
       version: 2,
+      sectionWidgets: DEFAULT_SECTION_WIDGETS,
       widgets: [
         { id: 'health', span: 12 },
         { id: 'token-stats', span: 12 },
@@ -1066,6 +1238,7 @@
       name: 'Performance',
       builtin: true,
       version: 2,
+      sectionWidgets: DEFAULT_SECTION_WIDGETS,
       widgets: [
         { id: 'token-stats', span: 12 },
         { id: 'forensic', span: 12 },
@@ -1076,6 +1249,7 @@
       name: 'Cost',
       builtin: true,
       version: 2,
+      sectionWidgets: DEFAULT_SECTION_WIDGETS,
       widgets: [
         { id: 'budget', span: 6 },
         { id: 'proxy', span: 6 },
@@ -1086,6 +1260,7 @@
       name: 'Compact',
       builtin: true,
       version: 2,
+      sectionWidgets: DEFAULT_SECTION_WIDGETS,
       widgets: [
         { id: 'health', span: 4 },
         { id: 'token-stats', span: 4 },
@@ -1114,7 +1289,9 @@
         widgets.push({ id: sid, span: 12 });
       }
     }
-    return { name: tpl.name, builtin: tpl.builtin || false, version: 2, widgets: widgets };
+    var outTpl = { name: tpl.name, builtin: tpl.builtin || false, version: 2, widgets: widgets };
+    if (tpl.sectionWidgets && typeof tpl.sectionWidgets === 'object') outTpl.sectionWidgets = tpl.sectionWidgets;
+    return outTpl;
   }
 
   function loadTemplates() {
@@ -2017,6 +2194,7 @@
               var imported = JSON.parse(ev.target.result);
               if (imported && imported.v === PREFS_VERSION) {
                 _prefs = normalizePrefsShape(imported);
+                migrateHiddenChartsLegacy();
                 savePrefs();
                 applyVisibility();
                 applyOrder();
@@ -2148,7 +2326,8 @@
     isSectionVisible: isSectionVisible,
     isChartVisible: isChartVisible,
     renderWidgetTree: renderWidgetTree,
-    applyAllChartVisibility: applyAllChartVisibility
+    applyAllChartVisibility: applyAllChartVisibility,
+    getOrderedChartsForSection: getOrderedChartsForSection
   };
 
   // Bind sidebar toggle immediately (don't wait for data/init)
