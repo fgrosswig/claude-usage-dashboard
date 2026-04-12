@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-243",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "2fa2e78",
+      "commit_full": "2fa2e78eb65156f3cab7d9ec500274910daf0e1a",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(explorer): merge remote cache-files in DEV_MODE",
+      "detail": "In DEV_MODE the cache-files endpoint only showed local files.\nNow fetches remote list from DEV_PROXY_SOURCE and merges\nnon-duplicate entries (e.g. extract_cache from prod pod).\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-242",
       "timestamp": "2026-04-12",
       "session": "auto",
