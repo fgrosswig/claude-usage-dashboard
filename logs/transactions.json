@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-212",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "a93f534",
+      "commit_full": "a93f53447990604433de163eae56e1c9ee6ff0e9",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(grid): skip nested sections in grid layout, preserve non-section elements order",
+      "detail": "- efficiency-range (parentSection: economic) stays inside economic-collapse, not moved as separate grid item\n- Non-section elements (table, day-picker) appended at end of grid, not left at top\n- Removed efficiency-range from ALL_SECTION_IDS and built-in templates (nested, not top-level)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-211",
       "timestamp": "2026-04-12",
       "session": "auto",
