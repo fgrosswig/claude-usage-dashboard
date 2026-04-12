@@ -5,12 +5,18 @@
       "id": "TX-245",
       "timestamp": "2026-04-12",
       "session": "auto",
-      "commit": "39a550d",
-      "commit_full": "39a550daaa31eac239b94c295de4a96f59c544b5",
+      "commit": "31675d7",
+      "commit_full": "31675d7132750f74c708ab2dbaa9ab4b43391e03",
       "status": "ABGESCHLOSSEN",
-      "description": "Merge branch 'feat/widget-dispatcher' into develop",
-      "detail": "# Conflicts:\n#\tlogs/transactions.json",
-      "changes": []
+      "description": "fix(explorer): whitelist extract_cache path for debug file view",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
     },
     {
       "id": "TX-244",
