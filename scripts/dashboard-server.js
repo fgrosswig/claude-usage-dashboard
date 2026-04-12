@@ -4228,6 +4228,36 @@ var server = http.createServer(function (req, res) {
       return;
     }
     var listCf = collectDebugCacheFilesPayload();
+    // DEV_MODE: merge remote cache-files list (prod pod has files we don't have locally)
+    if (__devSource && __devMode) {
+      try {
+        var remProto = __devSource.startsWith('https') ? require('https') : require('http');
+        var remUrl = __devSource.replace(/\/$/, '') + '/api/debug/cache-files';
+        var remReq = remProto.get(remUrl, { timeout: 5000 }, function (remResp) {
+          var remBody = '';
+          remResp.on('data', function (ch) { remBody += ch; });
+          remResp.on('end', function () {
+            try {
+              var remJson = JSON.parse(remBody);
+              if (remJson.files && Array.isArray(remJson.files)) {
+                var localKinds = {};
+                listCf.forEach(function (f) { localKinds[f.kind + ':' + f.path_abs] = true; });
+                remJson.files.forEach(function (rf) {
+                  if (!localKinds[rf.kind + ':' + rf.path_abs]) listCf.push(rf);
+                });
+              }
+            } catch (eR) {}
+            res.writeHead(200, corsCf);
+            res.end(JSON.stringify({ ok: true, files: listCf }));
+          });
+        });
+        remReq.on('error', function () {
+          res.writeHead(200, corsCf);
+          res.end(JSON.stringify({ ok: true, files: listCf }));
+        });
+        return;
+      } catch (eRem) {}
+    }
     res.writeHead(200, corsCf);
     res.end(JSON.stringify({ ok: true, files: listCf }));
   } else if (pathname === '/api/debug/cache-file-view') {
