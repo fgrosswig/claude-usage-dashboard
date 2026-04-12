@@ -2,6 +2,73 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-236",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "e35e73f",
+      "commit_full": "e35e73fba10931f33dcd54070c7bf99dfa363103",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(widgets): chart-level DnD, metrics engine, intelligence section",
+      "detail": "Chart-Level DnD:\n- Extract 21 standalone chart render functions (all 5 sections)\n- Template format v3 with type: \"section\"|\"chart\" + migration\n- applyGridLayout() creates standalone chart wrappers\n- Builder UI with expand/extract/absorb for individual charts\n\nMetrics Engine (CUD-28/29):\n- metrics-engine.js: 7 modules (saturation, quota ETA, EWMA,\n  health score, root cause, narrative, seasonality)\n- Intelligence section with KPI cards + narrative + seasonality chart\n- i18n DE/EN/KO\n\nExtract-Cache (performance):\n- Sync extract-cache after scan for session-turns acceleration\n- Asset route for metrics-engine.js\n\nrefs #218\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard-sections.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-registry.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-http.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-235",
       "timestamp": "2026-04-12",
       "session": "auto",
