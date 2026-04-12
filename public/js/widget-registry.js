@@ -205,6 +205,16 @@
             canvasId: 'c1-hosts',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderTokenStats_c1hosts'
+          },
+          {
+            id: 'token-stats-daily-detail',
+            titleKey: 'tokenStatsDailyDetailTable',
+            kind: 'chip',
+            type: 'table',
+            engine: 'html',
+            canvasId: 'token-stats-daily-detail',
+            size: { cols: 1, minHeight: 0 },
+            renderFn: 'renderTokenStatsSection'
           }
         ]
       },

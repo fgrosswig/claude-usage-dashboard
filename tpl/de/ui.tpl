@@ -410,6 +410,7 @@
   "tokenStatsChartC2": "Cache:Output-Verhaeltnis",
   "tokenStatsChartC3": "API-Ereignisse",
   "tokenStatsChartC4": "Session-Signale",
+  "tokenStatsDailyDetailTable": "Tagesdetail-Tabelle",
   "sectionForensic": "Forensische Analyse",
   "sectionUserProfile": "Benutzerprofil",
   "sectionBudget": "Budget-Effizienz",

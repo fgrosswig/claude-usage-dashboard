@@ -610,7 +610,8 @@
       'token-stats-kpi-all-out',
       'token-stats-kpi-all-cache',
       'token-stats-kpi-session-signals',
-      'token-stats-kpi-hosts'
+      'token-stats-kpi-hosts',
+      'token-stats-daily-detail'
     ];
     var changedTs = false;
     if (_prefs.hiddenCharts.indexOf('ts-kpis') !== -1) {
@@ -1101,7 +1102,7 @@
     ],
     'token-stats': [
       'token-stats-kpi-day-output', 'token-stats-kpi-day-cache-read', 'token-stats-kpi-day-total', 'token-stats-kpi-hit-day', 'token-stats-kpi-hit-all', 'token-stats-kpi-overhead', 'token-stats-kpi-peak', 'token-stats-kpi-all-out', 'token-stats-kpi-all-cache', 'token-stats-kpi-session-signals', 'token-stats-kpi-hosts',
-      'ts-c1', 'ts-c2', 'ts-c3', 'ts-c4', 'ts-hosts'
+      'ts-c1', 'ts-c2', 'ts-c3', 'ts-c4', 'ts-hosts', 'token-stats-daily-detail'
     ],
     forensic: ['forensic-card-code', 'forensic-card-impl', 'forensic-card-budget', 'forensic-hitlimit', 'forensic-signals', 'forensic-service'],
     'user-profile': ['user-versions', 'user-entrypoints', 'user-release-stability'],

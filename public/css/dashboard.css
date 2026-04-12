@@ -114,6 +114,7 @@ h1{font-size:1.5rem;margin-bottom:4px;color:#f8fafc}
 .github-token-status{margin-top:4px!important;color:#4ade80}
 .github-token-status.is-warn{color:#fbbf24}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:24px}
+.daily-detail-scroll{overflow-x:auto}
 .card{background:#1e293b;border-radius:10px;padding:16px;border:1px solid #334155}
 .card .label{font-size:.75rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px}
 .card .value{font-size:1.8rem;font-weight:700;margin-top:4px;color:#f8fafc}

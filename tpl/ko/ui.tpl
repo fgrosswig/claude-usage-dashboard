@@ -321,6 +321,7 @@
   "tokenStatsChartC2": "캐시:출력 비율",
   "tokenStatsChartC3": "API 이벤트",
   "tokenStatsChartC4": "세션 신호",
+  "tokenStatsDailyDetailTable": "일일 상세 표",
   "sectionForensic": "포렌식 분석",
   "sectionUserProfile": "사용자 프로필",
   "sectionBudget": "예산 효율성",
