@@ -8,6 +8,10 @@
  *   node scripts/benchmark-session-turns.js --days-back=8
  *   node scripts/benchmark-session-turns.js --dates=2026-04-01,2026-04-02
  *   node scripts/benchmark-session-turns.js --iterations=3
+ *
+ * Hinweis: pass1 iteriert immer alle .jsonl-Dateien; --days-back vergroessert nur
+ * die Menge erlaubter Kalendertage (je Tag prev+self+next). Deshalb aehnliche
+ * pass1-Zeit bei 3 vs 8 Tagen, wenn die Logs gross sind — das ist erwartbar.
  */
 var perf = require('node:perf_hooks').performance;
 var usageScanRoots = require('./usage-scan-roots');
@@ -78,6 +82,47 @@ function msToS(ms) {
   return ms / 1000;
 }
 
+/** Gleiche Regel wie pass1: Vereinigung (Vortag, Tag, Folgetag) pro dateKey. */
+function countAllowedTurnDays(dateKeys) {
+  var allowedDays = Object.create(null);
+  for (var di = 0; di < dateKeys.length; di++) {
+    var dk = dateKeys[di];
+    var d = new Date(dk + 'T00:00:00Z');
+    var prevDay = new Date(d.getTime() - 86400000).toISOString().slice(0, 10);
+    var nextDay = new Date(d.getTime() + 86400000).toISOString().slice(0, 10);
+    allowedDays[dk] = true;
+    allowedDays[prevDay] = true;
+    allowedDays[nextDay] = true;
+  }
+  return Object.keys(allowedDays).length;
+}
+
+function chronologicalMinMax(dateKeys) {
+  if (!dateKeys.length) {
+    return { min: '', max: '' };
+  }
+  var sorted = dateKeys.slice().sort();
+  return { min: sorted[0], max: sorted[sorted.length - 1] };
+}
+
+function formatDateKeyList(dateKeys) {
+  var maxShow = 12;
+  if (dateKeys.length <= maxShow) {
+    return dateKeys.join(', ');
+  }
+  var head = [];
+  for (var i = 0; i < 6; i++) head.push(dateKeys[i]);
+  return head.join(', ') + ', … +' + (dateKeys.length - 6) + ' more';
+}
+
+function padNum8(s) {
+  var n = 8 - s.length;
+  if (n <= 0) return s;
+  var sp = '';
+  for (var i = 0; i < n; i++) sp += ' ';
+  return sp + s;
+}
+
 function runOnce(dateKeys) {
   var t0 = perf.now();
   var collected = collectTaggedJsonlFiles();
@@ -102,13 +147,28 @@ function runOnce(dateKeys) {
     total_s: msToS(t3 - t0),
     jsonl_files: collected.tagged.length,
     raw_session_ids: Object.keys(allSessions).length,
-    results: results
+    results: results,
+    allowed_turn_days: countAllowedTurnDays(dateKeys)
   };
 }
 
 function main() {
-  var opts = parseArgs(process.argv.slice(2));
+  var argv = process.argv.slice(2);
+  if (argv.indexOf('--help') >= 0 || argv.indexOf('-h') >= 0) {
+    process.stdout.write(
+      'benchmark-session-turns.js — gleiche Pipeline wie dashboard (collect, fp, pass1, finalize).\n' +
+        '\n' +
+        '  node scripts/benchmark-session-turns.js [--days-back=N] [--dates=a,b] [--iterations=N]\n' +
+        '\n' +
+        'Default --days-back=8 (wie Python warm-cache). Datumsreihenfolge: heute zuerst, dann zurueck.\n' +
+        'pass1 liest immer alle JSONL-Zeilen; weniger Tage = engerer Tag-Filter, aber kaum schneller\n' +
+        'wenn die Dateien gross sind — zum Vergleich Python vs Node trotzdem gleiches N verwenden.\n'
+    );
+    return;
+  }
+  var opts = parseArgs(argv);
   var dateKeys = resolveDateKeys(opts.daysBack, opts.datesCsv);
+  var span = chronologicalMinMax(dateKeys);
   var iters = Math.max(1, parseInt(opts.iterations, 10) || 1);
   var totals = [];
   var last = null;
@@ -116,37 +176,49 @@ function main() {
     last = runOnce(dateKeys);
     totals.push(last.total_s);
   }
+  var modeLine =
+    opts.datesCsv && String(opts.datesCsv).trim()
+      ? '  mode:          --dates (explicit keys)\n'
+      : '  mode:          --days-back=' + opts.daysBack + ' (UTC calendar days, today first)\n';
   process.stdout.write(
     'benchmark-session-turns.js\n' +
       '  repo:          ' +
       process.cwd() +
       '\n' +
-      '  dates:         ' +
+      modeLine +
+      '  date keys:     ' +
       dateKeys.length +
-      ' (' +
-      dateKeys[0] +
+      '  [newest-first: ' +
+      formatDateKeyList(dateKeys) +
+      ']\n' +
+      '  UTC span:      ' +
+      span.min +
       ' .. ' +
-      dateKeys[dateKeys.length - 1] +
-      ')\n' +
+      span.max +
+      ' (chronological)\n' +
+      '  pass1 filter:  ' +
+      last.allowed_turn_days +
+      ' distinct turn-days (prev+day+next per key)\n' +
       '  jsonl files:   ' +
       last.jsonl_files +
       '\n' +
       '  last run:\n' +
       '    collect+fp:     ' +
-      last.paths_s.toFixed(3).padStart(8, ' ') +
+      padNum8(last.paths_s.toFixed(3)) +
       ' s\n' +
       '    pass1 (read):   ' +
-      last.pass1_s.toFixed(3).padStart(8, ' ') +
+      padNum8(last.pass1_s.toFixed(3)) +
       ' s\n' +
       '    finalize:       ' +
-      last.finalize_s.toFixed(3).padStart(8, ' ') +
+      padNum8(last.finalize_s.toFixed(3)) +
       ' s\n' +
       '    total:          ' +
-      last.total_s.toFixed(3).padStart(8, ' ') +
+      padNum8(last.total_s.toFixed(3)) +
       ' s\n' +
       '  raw sid keys:  ' +
       last.raw_session_ids +
-      '\n'
+      '\n' +
+      '  note: pass1 always walks every .jsonl line; days-back widens which turn-days are kept.\n'
   );
   if (iters > 1) {
     var sum = 0;
