@@ -1403,6 +1403,7 @@ function buildDashboardStatePaths() {
   return {
     day_cache: displayPathForUi(USAGE_DAY_CACHE_FILE),
     jsonl_today_index: displayPathForUi(JSONL_TODAY_INDEX_FILE),
+    extract_cache: displayPathForUi(extractCache.CACHE_FILE),
     releases: displayPathForUi(RELEASES_CACHE),
     marketplace: displayPathForUi(MARKETPLACE_CACHE),
     outage: displayPathForUi(OUTAGE_DISK_CACHE)
