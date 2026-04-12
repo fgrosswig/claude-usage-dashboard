@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-242",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "be9d1f4",
+      "commit_full": "be9d1f457cdb5aef23628248a611990eea8e4413",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(api): allow cache-files endpoint when DEBUG_API=1 (not only devMode)",
+      "detail": "Production pod has DEBUG_API=1 but no DEV_MODE, so cache-files\nreturned 403. DEV_MODE local fetches remote cache-files list via\nthis endpoint.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-241",
       "timestamp": "2026-04-12",
       "session": "auto",
