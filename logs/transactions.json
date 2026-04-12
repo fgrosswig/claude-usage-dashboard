@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-240",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "b458da0",
+      "commit_full": "b458da01049e59c700aa29f999a0b1d3adde40a6",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(explorer): register extract_cache in state_paths for file explorer",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-239",
       "timestamp": "2026-04-12",
       "session": "auto",
