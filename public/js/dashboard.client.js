@@ -8798,6 +8798,8 @@ function renderBudgetDrain(stData, qdData) {
   for (var wi = 0; wi < windows.length; wi++) {
     var win = windows[wi];
     var winTotal = win.reduce(function (s, x) { return s + x.total_all; }, 0);
+    if (winTotal <= 0) continue;
+
     var winConsumed = 0;
 
     for (var si = 0; si < win.length; si++) {
@@ -8911,11 +8913,13 @@ function renderBudgetDrain(stData, qdData) {
 
   // Resolve _rawTurn to xAxis value (direct turn number for value axis)
   for (var ri = 0; ri < sessionBoundaries.length; ri++) {
-    if (sessionBoundaries[ri]._rawTurn) {
+    if (typeof sessionBoundaries[ri]._rawTurn === "number") {
       sessionBoundaries[ri].xAxis = sessionBoundaries[ri]._rawTurn;
       delete sessionBoundaries[ri]._rawTurn;
     }
   }
+
+  if (turnCounter < 1) return;
 
   var blurbOhEarly = document.getElementById("econ-overhead-blurb");
   if (blurbOhEarly && !hasQ5Overlay) blurbOhEarly.textContent = "";
@@ -8929,10 +8933,11 @@ function renderBudgetDrain(stData, qdData) {
       { top: "50%", right: 52, bottom: 18, left: 60 }
     ]
     : [{ top: 30, right: 20, bottom: 50, left: 60 }];
+  var drainMutedAxisLine = { color: "rgba(100,116,139,0.38)", width: 1 };
   var xAxisCfg = useDualGrid
     ? [
-      { type: "value", gridIndex: 0, min: 1, max: turnCounter, axisLabel: { show: false }, splitLine: { show: false } },
-      { type: "value", gridIndex: 1, min: 1, max: turnCounter, axisLabel: { color: "#64748b", fontSize: 9 }, splitLine: { show: false } }
+      { type: "value", gridIndex: 0, min: 1, max: turnCounter, axisLabel: { show: false }, splitLine: { show: false }, axisLine: { show: true, lineStyle: drainMutedAxisLine } },
+      { type: "value", gridIndex: 1, min: 1, max: turnCounter, axisLabel: { color: "#64748b", fontSize: 9 }, splitLine: { show: false }, axisLine: { show: true, lineStyle: drainMutedAxisLine } }
     ]
     : [{ type: "value", gridIndex: 0, min: 1, max: turnCounter, axisLabel: { color: "#64748b", fontSize: 9 }, splitLine: { show: false } }];
   var yAxisCfg = useDualGrid
@@ -8942,6 +8947,7 @@ function renderBudgetDrain(stData, qdData) {
         gridIndex: 0,
         min: 0,
         max: 100,
+        axisLine: { show: true, lineStyle: drainMutedAxisLine },
         axisLabel: { color: "#64748b", formatter: "{value}%" },
         splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
       },
@@ -8953,6 +8959,19 @@ function renderBudgetDrain(stData, qdData) {
         axisLabel: { color: "#f97316", fontSize: 8, formatter: "{value}%", margin: 8 },
         axisLine: { show: true, lineStyle: { color: "rgba(249,115,22,0.35)" } },
         splitLine: { lineStyle: { color: "rgba(51,65,85,.2)" } }
+      },
+      {
+        type: "value",
+        gridIndex: 1,
+        position: "left",
+        min: 0,
+        max: 100,
+        axisLabel: { show: false },
+        axisTick: { show: false },
+        splitLine: { show: false },
+        minorSplitLine: { show: false },
+        axisLine: { show: true, lineStyle: drainMutedAxisLine },
+        axisPointer: { show: false }
       }
     ]
     : [
@@ -9149,8 +9168,12 @@ function renderBudgetDrain(stData, qdData) {
       // Q5 overhead curves in lower grid (if proxy data available)
       if (qdData && qdData.request_pairs && qdData.request_pairs.length > 0) {
         var ohPairs2 = qdData.request_pairs.slice().sort(function (a2, b2) { return a2.ts < b2.ts ? -1 : a2.ts > b2.ts ? 1 : 0; });
+        var co5 = qdData.carryover_q5;
+        var seedA = (co5 && typeof co5.actual === "number") ? co5.actual : 0;
+        var seedI = (co5 && typeof co5.ideal === "number") ? co5.ideal : 0;
         var q5a2 = [], q5i2 = [], q5sc2 = [];
-        var cq2 = 0, cqi2 = 0;
+        var cq2 = seedA;
+        var cqi2 = seedI;
         // Build turn timeline
         var tt2 = [];
         var ss2 = stData.sessions.slice().sort(function (a2, b2) { return a2.first_ts < b2.first_ts ? -1 : 1; });
@@ -9164,17 +9187,24 @@ function renderBudgetDrain(stData, qdData) {
         }
         for (var q2i = 0; q2i < ohPairs2.length; q2i++) {
           var qp2 = ohPairs2[q2i];
-          var qd2 = qp2.delta * 100;
-          cq2 += qd2;
-          var isOh2 = qp2.delta >= 0.03;
-          if (!isOh2) cqi2 += qd2;
-          else q5sc2.push([1, Math.round(cq2 * 10) / 10]); // placeholder turn
-          // Map timestamp to turn
           var qTs2 = qp2.ts.slice(0, 19);
           var qTurn2 = 1;
           for (var qt2 = 0; qt2 < tt2.length; qt2++) {
             if (tt2[qt2].slice(0, 19) <= qTs2) qTurn2 = qt2 + 1;
           }
+          if (q2i === 0 && tt2.length && (seedA !== 0 || seedI !== 0 || qTurn2 > 1)) {
+            q5a2.push([1, Math.round(cq2 * 10) / 10]);
+            q5i2.push([1, Math.round(cqi2 * 10) / 10]);
+            if (qTurn2 > 1) {
+              q5a2.push([qTurn2, Math.round(cq2 * 10) / 10]);
+              q5i2.push([qTurn2, Math.round(cqi2 * 10) / 10]);
+            }
+          }
+          var qd2 = qp2.delta * 100;
+          cq2 += qd2;
+          var isOh2 = qp2.delta >= 0.03;
+          if (!isOh2) cqi2 += qd2;
+          else q5sc2.push([1, Math.round(cq2 * 10) / 10]); // placeholder turn
           q5a2.push([qTurn2, Math.round(cq2 * 10) / 10]);
           q5i2.push([qTurn2, Math.round(cqi2 * 10) / 10]);
           if (isOh2) q5sc2[q5sc2.length - 1] = [qTurn2, Math.round(cq2 * 10) / 10];
@@ -9230,12 +9260,14 @@ function renderBudgetDrain(stData, qdData) {
           });
         }
 
-        // Update blurb
-        var gap2 = Math.round((cq2 - cqi2) * 10) / 10;
-        var ratio2 = cq2 > 0 ? Math.round((cq2 - cqi2) / cq2 * 100) : 0;
+        // Update blurb (today-only deltas; chart line includes prior-day carryover)
+        var cq2Day = cq2 - seedA;
+        var cqi2Day = cqi2 - seedI;
+        var gap2 = Math.round((cq2Day - cqi2Day) * 10) / 10;
+        var ratio2 = cq2Day > 0 ? Math.round((cq2Day - cqi2Day) / cq2Day * 100) : 0;
         var nOh2 = ohPairs2.filter(function (p) { return p.delta >= 0.03; }).length;
         var blurb2 = document.getElementById("econ-overhead-blurb");
-        if (blurb2) blurb2.textContent = tr("econOverheadSummary", { actual: Math.round(cq2), ideal: Math.round(cqi2), ratio: ratio2, gap: gap2, events: nOh2 });
+        if (blurb2) blurb2.textContent = tr("econOverheadSummary", { actual: Math.round(cq2Day), ideal: Math.round(cqi2Day), ratio: ratio2, gap: gap2, events: nOh2 });
       }
       return allSeries;
     })(),

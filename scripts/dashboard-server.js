@@ -3868,6 +3868,31 @@ function createQuotaDivisorLineProcessor(PRICE, qfDate, requestPairs) {
   };
 }
 
+/** YYYY-MM-DD minus one calendar day (UTC). */
+function calendarPrevDateYmd(ymd) {
+  var parts = String(ymd).split('-');
+  if (parts.length !== 3) return null;
+  var y = parseInt(parts[0], 10);
+  var m = parseInt(parts[1], 10) - 1;
+  var d = parseInt(parts[2], 10);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
+  var dt = new Date(Date.UTC(y, m, d));
+  dt.setUTCDate(dt.getUTCDate() - 1);
+  return dt.toISOString().slice(0, 10);
+}
+
+/** Same cumulative rules as Budget Drain lower chart (client). */
+function q5CarryoverTotalsFromPairs(pairs) {
+  var csum = 0;
+  var cisum = 0;
+  for (var pi = 0; pi < pairs.length; pi++) {
+    var dltPct = pairs[pi].delta * 100;
+    csum += dltPct;
+    if (!(pairs[pi].delta >= 0.03)) cisum += dltPct;
+  }
+  return { actual: Math.round(csum * 10) / 10, ideal: Math.round(cisum * 10) / 10 };
+}
+
 var server = http.createServer(function (req, res) {
   var pathname = dashboardHttp.requestPathname(req.url);
   if (
@@ -4265,6 +4290,26 @@ var server = http.createServer(function (req, res) {
       } catch (_e) { /* skip */ }
     }
 
+    var carryoverQ5 = null;
+    if (qdDate) {
+      var prevYmd = calendarPrevDateYmd(qdDate);
+      if (prevYmd) {
+        for (var qfCar = 0; qfCar < proxyFiles.length; qfCar++) {
+          var qfDateCar = path.basename(proxyFiles[qfCar]).replace('proxy-', '').replace('.ndjson', '');
+          if (qfDateCar !== prevYmd) continue;
+          var prevPairsCar = [];
+          try {
+            forEachJsonlLineSync(proxyFiles[qfCar], createQuotaDivisorLineProcessor(PRICE, qfDateCar, prevPairsCar));
+          } catch (_eCar) { /* skip */ }
+          if (prevPairsCar.length) {
+            var carSums = q5CarryoverTotalsFromPairs(prevPairsCar);
+            carryoverQ5 = { actual: carSums.actual, ideal: carSums.ideal, from_date: prevYmd };
+          }
+          break;
+        }
+      }
+    }
+
     // Aggregate by date
     var byDate = {};
     for (var rp = 0; rp < requestPairs.length; rp++) {
@@ -4304,7 +4349,8 @@ var server = http.createServer(function (req, res) {
       no_proxy_logs: !!(qdDate && requestPairs.length === 0),
       date_summaries: dateSummaries,
       request_pairs: requestPairs.length > 2000 ? requestPairs.slice(0, 2000) : requestPairs,
-      truncated: requestPairs.length > 2000
+      truncated: requestPairs.length > 2000,
+      carryover_q5: carryoverQ5
     };
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify(qdResult));
