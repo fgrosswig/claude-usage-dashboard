@@ -437,6 +437,8 @@
   "findingsTitle": "Kernbefunde",
   "findingsSummary": "{total} Befunde — {reds} kritisch, {yellows} Warnungen",
   "findingsNoData": "Kernbefunde — warte auf Daten",
+  "findingsAllHiddenHint": "Alle Kernbefund-Karten sind im Layout ausgeschaltet. Unter LAYOUT → Gesundheits-Score → Kernbefunde wieder aktivieren.",
+  "healthKpiAllHiddenHint": "Alle Health-KPI-Kacheln sind im Layout ausgeschaltet. Unter LAYOUT → Gesundheits-Score → Health-KPIs wieder aktivieren.",
   "findingThinkingGap": "Thinking Token Gap",
   "findingThinkingGapDetail": "JSONL meldet {jsonl}, Proxy sieht {proxy}. PRELIM-Duplikation bläht JSONL-Zahlen auf.",
   "findingOverhead": "Token-Overhead",

@@ -85,12 +85,12 @@
 <div class="top-bar-badge" id="anthropic-badge" style="margin-left:auto"><span id="anthropic-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#475569;margin-right:6px"></span><span id="anthropic-label">Anthropic</span><div class="anthropic-popup" id="anthropic-popup">
 <button type="button" class="anthropic-popup-expand" id="anthropic-popup-expand" title="Maximize">&#x26F6;</button>
 <div class="health-charts-row">
-<details class="health-chart-sm" id="uptime-chart-details" open><summary class="health-chart-summary"><span id="uptime-chart-title"></span></summary><div class="health-chart-canvas-host"><div id="c-uptime-chart" style="width:100%;height:100%"></div></div></details>
-<details class="health-chart-sm" id="incident-history-details" open><summary class="health-chart-summary"><span id="incident-history-title"></span></summary><div class="health-chart-canvas-host"><div id="c-incident-history" style="width:100%;height:100%"></div></div></details>
-<details class="health-chart-sm" id="anthropic-incidents-details" open><summary class="health-chart-summary"><span id="anthropic-scatter-chart-title"></span></summary><div class="health-chart-canvas-host"><div id="c-anthropic-incidents" style="width:100%;height:100%"></div></div></details>
-<details class="health-chart-sm" id="outage-timeline-details" open><summary class="health-chart-summary"><span id="outage-timeline-title"></span></summary><div class="health-chart-canvas-host"><div id="c-outage-timeline" style="width:100%;height:100%"></div></div></details></div>
+<details class="health-chart-sm" id="uptime-chart-details" open><summary class="health-chart-summary"><span id="uptime-chart-title">Service Uptime (24h per day)</span></summary><div class="health-chart-canvas-host"><div id="c-uptime-chart" style="width:100%;height:100%"></div></div></details>
+<details class="health-chart-sm" id="incident-history-details" open><summary class="health-chart-summary"><span id="incident-history-title">Incidents &amp; Hit Limits (per day)</span></summary><div class="health-chart-canvas-host"><div id="c-incident-history" style="width:100%;height:100%"></div></div></details>
+<details class="health-chart-sm" id="anthropic-incidents-details" open><summary class="health-chart-summary"><span id="anthropic-scatter-chart-title">Outage hours vs incidents (per day)</span></summary><div class="health-chart-canvas-host"><div id="c-anthropic-incidents" style="width:100%;height:100%"></div></div></details>
+<details class="health-chart-sm" id="outage-timeline-details" open><summary class="health-chart-summary"><span id="outage-timeline-title">Service Quality (24h per day)</span></summary><div class="health-chart-canvas-host"><div id="c-outage-timeline" style="width:100%;height:100%"></div></div></details></div>
 <details class="avail-kpi-details" id="avail-kpi-details">
-<summary class="avail-kpi-summary" id="avail-kpi-summary"></summary>
+<summary class="avail-kpi-summary" id="avail-kpi-summary">Key Metrics</summary>
 <div class="avail-kpi-panel" id="avail-kpi-panel"></div>
 </details>
 <p id="anthropic-status-line" style="font-size:.72rem;margin-top:6px;color:#94a3b8"></p>
@@ -160,6 +160,7 @@
 
 <div class="health-score" id="health-score">
 <div class="health-header" id="health-header"></div>
+<p class="health-kpi-all-hidden-hint" id="health-kpi-all-hidden-hint" aria-live="polite"></p>
 <div class="health-grid" id="health-grid"></div>
 </div>
 <div class="key-findings" id="key-findings">

@@ -811,6 +811,14 @@ details.sidebar-section[open]>.sidebar-section-title::before{transform:rotate(90
 .widget-tree-charts{list-style:none;margin:0;padding:2px 0 4px 28px}
 .widget-tree-charts .widget-tree-item{padding:3px 0;font-size:.72rem;color:#94a3b8}
 .widget-tree-group-cluster{list-style:none;margin:4px 0 2px 0;padding:0}
+.widget-tree-charts > .widget-tree-group-cluster + .widget-tree-group-cluster{
+  margin-top:10px;
+  padding-top:8px;
+  border-top:1px solid rgba(51,65,85,.85);
+}
+.health-kpi-all-hidden-hint{display:none;margin:6px 0 2px;font-size:.72rem;color:#64748b;line-height:1.45}
+.health-kpi-all-hidden-hint.is-visible{display:block}
+.key-findings-all-hidden-hint{margin:6px 0 0;font-size:.72rem;color:#64748b;line-height:1.45}
 .widget-tree-group-head{display:flex;align-items:center;gap:6px;padding:3px 0 2px 0;font-size:.72rem;color:#94a3b8;flex-wrap:nowrap}
 .widget-tree-group-head .widget-tree-check{flex-shrink:0}
 .widget-tree-group-head .widget-tree-expand--group{flex-shrink:0}

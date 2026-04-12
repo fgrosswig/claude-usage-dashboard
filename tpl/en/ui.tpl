@@ -437,6 +437,8 @@
   "findingsTitle": "Key Findings",
   "findingsSummary": "{total} findings — {reds} critical, {yellows} warnings",
   "findingsNoData": "Key Findings — waiting for data",
+  "findingsAllHiddenHint": "All Key Finding cards are turned off in Layout. Re-enable them under LAYOUT → Health Score → Kernbefunde.",
+  "healthKpiAllHiddenHint": "All Health KPI tiles are turned off in Layout. Re-enable them under LAYOUT → Health Score → Health KPIs.",
   "findingThinkingGap": "Thinking Token Gap",
   "findingThinkingGapDetail": "JSONL reports {jsonl}, Proxy sees {proxy}. PRELIM duplication inflates JSONL counts.",
   "findingOverhead": "Token Overhead",

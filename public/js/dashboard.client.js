@@ -5263,6 +5263,11 @@ function renderHealthScore(data) {
   if (!days.length && !pdays.length) {
     headerEl.innerHTML = "<span style=\"color:#94a3b8\">" + escHtml(t("healthScoreNoData")) + "</span>";
     gridEl.innerHTML = "";
+    var hintNoData = document.getElementById("health-kpi-all-hidden-hint");
+    if (hintNoData) {
+      hintNoData.textContent = "";
+      hintNoData.classList.remove("is-visible");
+    }
     return;
   }
 
@@ -5329,6 +5334,26 @@ function renderHealthScore(data) {
     gh += "</div></div>";
   }
   if (gridEl.innerHTML !== gh) gridEl.innerHTML = gh;
+
+  var hintAll = document.getElementById("health-kpi-all-hidden-hint");
+  if (hintAll) {
+    var anyK = false;
+    var wd = global.__widgetDispatcher;
+    for (var hk = 0; hk < indicators.length; hk++) {
+      var kpid = "health-kpi-" + indicators[hk].id;
+      if (!wd || typeof wd.isChartVisible !== "function" || wd.isChartVisible(kpid)) {
+        anyK = true;
+        break;
+      }
+    }
+    if (indicators.length && !anyK) {
+      hintAll.textContent = t("healthKpiAllHiddenHint");
+      hintAll.classList.add("is-visible");
+    } else {
+      hintAll.textContent = "";
+      hintAll.classList.remove("is-visible");
+    }
+  }
 }
 
 // ── Key Findings Panel ────────────────────────────────────────────────────
@@ -5520,7 +5545,8 @@ function renderKeyFindings(data) {
   __lastFindingsFingerprint = fp;
 
   var days = data.days || [];
-  var pdays = data.proxy?.proxy_days || [];
+  var px = data.proxy;
+  var pdays = (px && px.proxy_days) || [];
   if (!days.length && !pdays.length) {
     if (headerEl) headerEl.textContent = t("findingsNoData");
     el.innerHTML = "";
@@ -5559,6 +5585,9 @@ function renderKeyFindings(data) {
     html += "<span class=\"finding-value\">" + escHtml(f.value) + "</span></div>";
     html += "<div class=\"finding-detail\">" + escHtml(f.detail) + "</div>";
     html += "</div></div>";
+  }
+  if (!html && findings.length) {
+    html = "<p class=\"key-findings-all-hidden-hint\">" + escHtml(t("findingsAllHiddenHint")) + "</p>";
   }
   if (el.innerHTML !== html) el.innerHTML = html;
 }
@@ -5766,11 +5795,11 @@ function buildHealthScoreHistory(data) {
 
 // ── Uptime Chart (24h stacked by component status) ───────────────────────
 function renderUptimeChart(data) {
-  if (typeof echarts === "undefined") return;
-  var el = document.getElementById("c-uptime-chart");
-  if (!el) return;
   var titleEl = document.getElementById("uptime-chart-title");
   if (titleEl) titleEl.textContent = t("uptimeChartTitle");
+  var el = document.getElementById("c-uptime-chart");
+  if (!el) return;
+  if (typeof echarts === "undefined") return;
 
   // Apply month filter (same as outage timeline)
   var srcDays = _outageTimelineMonthFilter ? (data.days || []) : getFilteredDays(data.days || []);
@@ -5875,14 +5904,13 @@ function renderUptimeChart(data) {
 
 // ── Incident History Chart ────────────────────────────────────────────────
 function renderIncidentHistory(data) {
-  if (typeof echarts === "undefined") return;
-  var el = document.getElementById("c-incident-history");
-  if (!el) return;
   var titleEl = document.getElementById("incident-history-title");
   if (titleEl) titleEl.textContent = t("incidentHistoryLabel");
-
   var titleOT = document.getElementById("outage-timeline-title");
   if (titleOT) titleOT.textContent = t("outageTimelineTitle");
+  var el = document.getElementById("c-incident-history");
+  if (!el) return;
+  if (typeof echarts === "undefined") return;
 
   var srcDays = _outageTimelineMonthFilter ? (data.days || []) : getFilteredDays(data.days || []);
   var days = [];
@@ -5962,12 +5990,11 @@ function renderIncidentHistory(data) {
 
 
 function updateAnthropicPopup(data) {
-  if (typeof echarts === "undefined") return;
-  var el = document.getElementById("c-anthropic-incidents");
-  if (!el) return;
-
   var scatterTitle = document.getElementById("anthropic-scatter-chart-title");
   if (scatterTitle) scatterTitle.textContent = t("chartStatusOutageScatter");
+  var el = document.getElementById("c-anthropic-incidents");
+  if (!el) return;
+  if (typeof echarts === "undefined") return;
 
   var label = document.getElementById("anthropic-label");
   if (label) label.textContent = "Anthropic";
@@ -6036,9 +6063,11 @@ var _outageTimelineMonthFilter = null;   // null = all, "2026-03" = single month
 var _outageImpactExclude = {};            // { "critical": true, "minor": true } = hidden
 var _outageStatusExclude = {};            // { "major_outage": true } = hidden (uptime chart)
 function renderOutageTimeline(data, monthFilter) {
-  if (typeof echarts === "undefined") return;
+  var titleOT = document.getElementById("outage-timeline-title");
+  if (titleOT) titleOT.textContent = t("outageTimelineTitle");
   var el = document.getElementById("c-outage-timeline");
   if (!el) return;
+  if (typeof echarts === "undefined") return;
   if (monthFilter !== undefined) _outageTimelineMonthFilter = monthFilter;
 
   var srcDays = _outageTimelineMonthFilter ? (data.days || []) : getFilteredDays(data.days || []);

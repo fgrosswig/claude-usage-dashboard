@@ -348,6 +348,8 @@
   "findingsTitle": "주요 발견 사항",
   "findingsSummary": "총 {total}건 — 심각 {reds}건, 경고 {yellows}건",
   "findingsNoData": "주요 발견 사항 — 데이터 대기 중",
+  "findingsAllHiddenHint": "레이아웃에서 주요 발견 카드가 모두 꺼져 있습니다. LAYOUT → Health Score → Kernbefunde에서 다시 켜 주세요.",
+  "healthKpiAllHiddenHint": "레이아웃에서 Health KPI 타일이 모두 꺼져 있습니다. LAYOUT → Health Score → Health KPIs에서 다시 켜 주세요.",
   "findingThinkingGap": "Thinking Token Gap",
   "findingThinkingGapDetail": "JSONL 보고: {jsonl}, Proxy 확인: {proxy}. PRELIM 중복이 JSONL 수치를 부풀림.",
   "findingOverhead": "Token Overhead",
