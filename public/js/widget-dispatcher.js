@@ -14,7 +14,17 @@
 'use strict';
 
 (function (global) {
+  /**
+   * Layout-Prefs (Reihenfolge, Sichtbarkeit, widgets[]):
+   * - Primärquelle: localStorage unter PREFS_KEY — nach DOM-Reload ist nur das sofort wieder da.
+   * - GET/PUT /api/layout: immer derselbe Origin wie die Seite (lokaler dashboard-server). Datei = os.homedir()/.claude/…
+   *   auf dem Rechner, auf dem Node läuft — auch bei DEV_MODE=full: dort kommen nur Nutzungsdaten von DEV_PROXY_SOURCE,
+   *   nicht das Layout; deine gespeicherte usage-dashboard-layout.json bleibt lokal (z. B. C:\\Users\\…\\.claude\\…).
+   *   loadPrefs: GET + X-Layout-Mtime; ist die Datei neuer als cud_layout_file_mtime, LS aus Datei überschreiben.
+   */
   var PREFS_KEY = 'cud_widget_prefs';
+  /** Letzter bekannter mtimeMs der Layout-Datei auf dem Server (Abgleich Handedit vs. LS). */
+  var LAYOUT_FILE_MTIME_KEY = 'cud_layout_file_mtime';
   var PREFS_VERSION = 1;
 
   var _initialized = false;
@@ -24,6 +34,8 @@
   var _wtreeDropState = null;
   var _sidebarEventsBound = false;
   var _sidebarRestoreScheduled = false;
+  /** Sidebar layout tree: Bearbeiten aktiv (bleibt über renderWidgetTree erhalten). */
+  var _layoutTreeEditMode = false;
 
   function wtreeNextSectionLi(li) {
     if (!li || !li.parentNode) return null;
@@ -109,6 +121,13 @@
 
   // ── Preferences (localStorage) ──────────────────────────────────
 
+  function sanitizeLayoutJsonRaw(raw) {
+    if (raw == null || raw === '') return '';
+    var s = String(raw);
+    if (s.charCodeAt(0) === 0xfeff) s = s.slice(1);
+    return s.trim();
+  }
+
   function normalizePrefsShape(p) {
     if (!p || typeof p !== 'object') return p;
     if (!Array.isArray(p.hiddenSections)) p.hiddenSections = [];
@@ -120,6 +139,10 @@
    * Akzeptiert Layout-JSON: fehlendes v, oder v als String ("1") aus Export/Handedit —
    * striktes p.v === 1 scheitert sonst und loadPrefs liefert jedes Mal defaultPrefs.
    */
+  function prefsHasUsableWidgets(p) {
+    return !!(p && Array.isArray(p.widgets) && p.widgets.length);
+  }
+
   function tryAcceptPrefsPayload(p) {
     if (!p || typeof p !== 'object') return null;
     if (p.v != null && Number(p.v) === PREFS_VERSION) p.v = PREFS_VERSION;
@@ -133,44 +156,103 @@
     return normalizePrefsShape(p);
   }
 
-  /** Re-read hiddenSections / hiddenCharts from localStorage so the sidebar matches saved prefs. */
+  /**
+   * Re-read layout JSON from localStorage (PREFS_KEY) into _prefs.
+   * Wichtig: nicht nur hidden* — sonst bleibt widgets[] aus init() stehen, obwohl LS schon die Datei/JSON enthält;
+   * getSortedSections() fällt dann auf Registry-Sortierung zurück (wie in deinem DOM: economic zuletzt).
+   */
   function syncVisibilityPrefsFromLocalStorage() {
     if (!_prefs) return;
     try {
-      var raw = localStorage.getItem(PREFS_KEY);
+      var raw = sanitizeLayoutJsonRaw(localStorage.getItem(PREFS_KEY));
       if (!raw) return;
       var o = JSON.parse(raw);
       if (!o) return;
       if (!tryAcceptPrefsPayload(o)) return;
       if (Array.isArray(o.hiddenCharts)) _prefs.hiddenCharts = o.hiddenCharts.slice();
       if (Array.isArray(o.hiddenSections)) _prefs.hiddenSections = o.hiddenSections.slice();
+      if (Array.isArray(o.widgets) && o.widgets.length) {
+        _prefs.widgets = [];
+        for (var wi = 0; wi < o.widgets.length; wi++) {
+          var w = o.widgets[wi];
+          if (!w || !w.id) continue;
+          _prefs.widgets.push({ id: String(w.id), span: w.span != null ? Number(w.span) : 12 });
+        }
+        syncPrefsOrderFromWidgets();
+      } else if (Array.isArray(o.order) && o.order.length) {
+        _prefs.order = o.order.slice();
+      }
+      if (o.v != null && Number(o.v) === PREFS_VERSION) _prefs.v = PREFS_VERSION;
     } catch (e) {}
   }
 
   function loadPrefs() {
-    // Primary: localStorage
+    var fromLs = null;
     try {
-      var raw = localStorage.getItem(PREFS_KEY);
+      var raw = sanitizeLayoutJsonRaw(localStorage.getItem(PREFS_KEY));
       if (raw) {
         var p = JSON.parse(raw);
-        var ok = tryAcceptPrefsPayload(p);
-        if (ok) return ok;
+        fromLs = tryAcceptPrefsPayload(p);
       }
     } catch (e) {}
-    // Fallback: server wenn localStorage leer oder unbenutzbar
+
+    var storedFileMtime = 0;
     try {
-      var xhr = new XMLHttpRequest();
-      xhr.open('GET', '/api/layout', false);
-      xhr.send();
-      if (xhr.status === 200 && xhr.responseText && xhr.responseText !== 'null') {
-        var sp = JSON.parse(xhr.responseText);
-        var ok2 = tryAcceptPrefsPayload(sp);
-        if (ok2) {
-          try { localStorage.setItem(PREFS_KEY, JSON.stringify(sp)); } catch (e2) {}
-          return ok2;
+      storedFileMtime = parseInt(localStorage.getItem(LAYOUT_FILE_MTIME_KEY) || '0', 10) || 0;
+    } catch (eSt) {}
+
+    var fromApi = null;
+    var apiMtime = 0;
+    try {
+      var xhrGet = new XMLHttpRequest();
+      xhrGet.open('GET', '/api/layout', false);
+      xhrGet.send();
+      if (xhrGet.status === 200 && xhrGet.responseText) {
+        try {
+          var hm = xhrGet.getResponseHeader('X-Layout-Mtime');
+          if (hm) apiMtime = parseInt(hm, 10) || 0;
+        } catch (eH) {}
+        var rt = sanitizeLayoutJsonRaw(xhrGet.responseText);
+        if (rt && rt !== 'null') {
+          var sp = JSON.parse(rt);
+          fromApi = tryAcceptPrefsPayload(sp);
         }
       }
-    } catch (e) { /* server unreachable */ }
+    } catch (e2) { /* offline / kein dashboard-server */ }
+
+    var diskNewerThanTracked = storedFileMtime > 0 && apiMtime > storedFileMtime;
+
+    if (fromApi && prefsHasUsableWidgets(fromApi)) {
+      if (!fromLs || !prefsHasUsableWidgets(fromLs) || diskNewerThanTracked) {
+        try {
+          localStorage.setItem(PREFS_KEY, JSON.stringify(fromApi));
+          if (apiMtime > 0) localStorage.setItem(LAYOUT_FILE_MTIME_KEY, String(apiMtime));
+        } catch (e3) {}
+        return fromApi;
+      }
+    }
+    if (
+      fromApi &&
+      (!fromLs || !prefsHasUsableWidgets(fromLs)) &&
+      Array.isArray(fromApi.order) &&
+      fromApi.order.length &&
+      !prefsHasUsableWidgets(fromApi)
+    ) {
+      try {
+        localStorage.setItem(PREFS_KEY, JSON.stringify(fromApi));
+        if (apiMtime > 0) localStorage.setItem(LAYOUT_FILE_MTIME_KEY, String(apiMtime));
+      } catch (e4) {}
+      return fromApi;
+    }
+    if (fromLs) {
+      try {
+        if (apiMtime > 0) {
+          var stNow = parseInt(localStorage.getItem(LAYOUT_FILE_MTIME_KEY) || '0', 10) || 0;
+          localStorage.setItem(LAYOUT_FILE_MTIME_KEY, String(Math.max(stNow, apiMtime)));
+        }
+      } catch (eB) {}
+      return fromLs;
+    }
     return defaultPrefs();
   }
 
@@ -178,12 +260,20 @@
     if (!_prefs) return;
     var json = JSON.stringify(_prefs);
     try { localStorage.setItem(PREFS_KEY, json); } catch (e) {}
-    // Async server sync (fire and forget)
+    // Optional: PUT /api/layout (fire-and-forget) — gleiches Layout im Backend/Container; LS bleibt die sofort gültige Quelle im Tab.
     try {
-      var xhr = new XMLHttpRequest();
-      xhr.open('PUT', '/api/layout', true);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.send(json);
+      var xhrPut = new XMLHttpRequest();
+      xhrPut.open('PUT', '/api/layout', true);
+      xhrPut.setRequestHeader('Content-Type', 'application/json');
+      xhrPut.onload = function () {
+        if (xhrPut.status === 200) {
+          try {
+            var mPut = xhrPut.getResponseHeader('X-Layout-Mtime');
+            if (mPut) localStorage.setItem(LAYOUT_FILE_MTIME_KEY, mPut);
+          } catch (eM) {}
+        }
+      };
+      xhrPut.send(json);
     } catch (e) { /* offline or error — localStorage is primary */ }
   }
 
@@ -203,6 +293,50 @@
     return global.__widgetRegistry || null;
   }
 
+  /** Gleiche Zeile wie applyGridLayout: nur echte Top-Level-Layout-<details> mit domId. */
+  function isTopLevelLayoutPlacementId(reg, wid) {
+    if (!reg || !wid) return false;
+    var sec = reg.findSection(wid);
+    if (!sec || !sec.domId) return false;
+    if (sec.parentSection) return false;
+    return true;
+  }
+
+  /**
+   * Reihenfolge der Layout-Zeilen aus widgets[] exakt wie applyGridLayout (appendChild):
+   * nur placement-fähige IDs; bei Duplikaten gewinnt die letzte Position in der JSON-Liste.
+   */
+  function getPlacementOrderSectionIdsFromWidgets() {
+    if (!_prefs || !_prefs.widgets || !_prefs.widgets.length) return [];
+    var reg = getRegistry();
+    if (!reg) return [];
+    var w = _prefs.widgets;
+    var lastOk = {};
+    for (var i = 0; i < w.length; i++) {
+      if (!isTopLevelLayoutPlacementId(reg, w[i].id)) continue;
+      lastOk[w[i].id] = i;
+    }
+    var out = [];
+    var seen = {};
+    for (var j = 0; j < w.length; j++) {
+      var id = w[j].id;
+      if (!isTopLevelLayoutPlacementId(reg, id)) continue;
+      if (lastOk[id] !== j) continue;
+      if (seen[id]) continue;
+      seen[id] = true;
+      out.push(id);
+    }
+    return out;
+  }
+
+  function idOccursInWidgetList(widgetsArr, id) {
+    if (!widgetsArr || !id) return false;
+    for (var z = 0; z < widgetsArr.length; z++) {
+      if (widgetsArr[z].id === id) return true;
+    }
+    return false;
+  }
+
   function getSortedSections() {
     var reg = getRegistry();
     if (!reg) return [];
@@ -210,17 +344,18 @@
     for (var s0 = 0; s0 < reg.sections.length; s0++) {
       byId[reg.sections[s0].id] = reg.sections[s0];
     }
-    /** v2: widgets[] ist dieselbe Quelle wie applyGridLayout — Sidebar muss gleich sortieren. */
+    /** v2: Reihenfolge = gespeicherte widgets[] wie applyGridLayout; remW nur für nie in JSON vorkommende Zeilen. */
     if (_prefs && _prefs.widgets && _prefs.widgets.length) {
       var outW = [];
       var seenW = {};
-      for (var wi = 0; wi < _prefs.widgets.length; wi++) {
-        var wid = _prefs.widgets[wi].id;
-        var secW = byId[wid];
+      var placementIds = getPlacementOrderSectionIdsFromWidgets();
+      for (var pi = 0; pi < placementIds.length; pi++) {
+        var pid = placementIds[pi];
+        var secW = byId[pid];
         if (!secW || secW.reorderable === false) continue;
         if (secW.parentSection) continue;
         outW.push(secW);
-        seenW[wid] = true;
+        seenW[pid] = true;
       }
       var remW = Object.keys(byId).sort(function (a, b) {
         return (byId[a].order || 0) - (byId[b].order || 0);
@@ -231,7 +366,10 @@
         var s2 = byId[rid];
         if (!s2 || s2.reorderable === false) continue;
         if (s2.parentSection) continue;
+        if (!s2.domId) continue;
+        if (idOccursInWidgetList(_prefs.widgets, rid)) continue;
         outW.push(s2);
+        seenW[rid] = true;
       }
       return outW;
     }
@@ -485,21 +623,34 @@
     }
   }
 
-  /** Keep hiddenSections aligned with widgets[] so JSON and sidebar checkboxes match the grid. */
+  /**
+   * hiddenSections = (nicht in widgets[]) union (Checkbox-aus, aber noch in widgets[]).
+   * So bleibt Sichtbarkeit beim Reload erhalten, ohne Reihenfolge aus widgets[] zu streichen.
+   */
   function reconcileHiddenSectionsWithWidgets() {
     if (!_prefs || !_prefs.widgets || !_prefs.widgets.length) return false;
     var reg = getRegistry();
     if (!reg) return false;
     var inW = {};
     for (var ii = 0; ii < _prefs.widgets.length; ii++) inW[_prefs.widgets[ii].id] = true;
-    var next = [];
+    var notInWidgets = [];
     for (var jj = 0; jj < reg.sections.length; jj++) {
       var s = reg.sections[jj];
       if (s.reorderable === false || s.parentSection) continue;
-      if (!inW[s.id]) next.push(s.id);
+      if (!inW[s.id]) notInWidgets.push(s.id);
     }
-    next.sort();
-    var cur = (_prefs.hiddenSections || []).slice().sort();
+    var curHs = _prefs.hiddenSections || [];
+    var checkboxHiddenInLayout = [];
+    for (var hk = 0; hk < curHs.length; hk++) {
+      var hid = curHs[hk];
+      if (inW[hid]) checkboxHiddenInLayout.push(hid);
+    }
+    var nextMap = {};
+    var u;
+    for (u = 0; u < notInWidgets.length; u++) nextMap[notInWidgets[u]] = true;
+    for (u = 0; u < checkboxHiddenInLayout.length; u++) nextMap[checkboxHiddenInLayout[u]] = true;
+    var next = Object.keys(nextMap).sort();
+    var cur = curHs.slice().sort();
     if (cur.length !== next.length) {
       _prefs.hiddenSections = next;
       return true;
@@ -549,24 +700,19 @@
     } else if (!visible && idx === -1) {
       _prefs.hiddenSections.push(id);
     }
-    // Sync v2 widgets array
-    if (_prefs.widgets) {
-      if (!visible) {
-        _prefs.widgets = _prefs.widgets.filter(function (w) { return w.id !== id; });
-        if (_prefs.order) {
-          var oix = _prefs.order.indexOf(id);
-          if (oix >= 0) _prefs.order.splice(oix, 1);
+    if (visible && _prefs.widgets) {
+      var found = false;
+      for (var wi = 0; wi < _prefs.widgets.length; wi++) {
+        if (_prefs.widgets[wi].id === id) {
+          found = true;
+          break;
         }
-      } else {
-        var found = false;
-        for (var wi = 0; wi < _prefs.widgets.length; wi++) {
-          if (_prefs.widgets[wi].id === id) { found = true; break; }
-        }
-        if (!found) {
-          _prefs.widgets.push({ id: id, span: 12 });
-          if (!_prefs.order) _prefs.order = [];
-          if (_prefs.order.indexOf(id) === -1) _prefs.order.push(id);
-        }
+      }
+      if (!found) {
+        _prefs.widgets.push({ id: id, span: 12 });
+        if (!_prefs.order) _prefs.order = [];
+        if (_prefs.order.indexOf(id) === -1) _prefs.order.push(id);
+        syncPrefsOrderFromWidgets();
       }
     }
     savePrefs();
@@ -906,6 +1052,15 @@
 
   // ── Widget Tree (Layout section) ────────────────────────────────
 
+  /** Außerhalb Bearbeiten: alle Layout-Häkchen disabled (checked bleibt); im Modus widget-tree--edit aktiv. */
+  function applyWidgetTreeCheckboxLock(treeEl, editing) {
+    if (!treeEl) return;
+    var checks = treeEl.querySelectorAll('.widget-tree-check');
+    for (var ci = 0; ci < checks.length; ci++) {
+      checks[ci].disabled = !editing;
+    }
+  }
+
   function renderWidgetTree() {
     var body = document.getElementById('sidebar-layout-body');
     if (!body) return;
@@ -921,7 +1076,7 @@
       var hasCharts = sec.charts && sec.charts.length > 0;
       var spanVal = getWidgetSpan(sec.id);
       var spanDisp = spanVal || 12;
-      html += '<li class="widget-tree-item" data-section="' + sec.id + '" draggable="true">';
+      html += '<li class="widget-tree-item" data-section="' + sec.id + '" draggable="false">';
       html += '<div class="widget-tree-head">';
       html += '<span class="widget-tree-drag" title="Drag to reorder">&#x2630;</span>';
       html += '<input type="checkbox" class="widget-tree-check" data-type="section" data-id="' + sec.id + '"' + (secVis ? ' checked' : '') + '>';
@@ -951,6 +1106,7 @@
       body.addEventListener('change', function (e) {
         var cb = e.target;
         if (!cb.classList.contains('widget-tree-check')) return;
+        if (cb.disabled) return;
         var type = cb.dataset.type;
         var id = cb.dataset.id;
         if (type === 'section') setVisibility(id, cb.checked);
@@ -1001,6 +1157,11 @@
       body.addEventListener('dragstart', function (e) {
         var item = e.target.closest('.widget-tree-item[data-section]');
         if (!item) { e.preventDefault(); return; }
+        var ulEdit = body.querySelector('.widget-tree');
+        if (!ulEdit || !ulEdit.classList.contains('widget-tree--edit')) {
+          e.preventDefault();
+          return;
+        }
         _wtreeDragSrc = item;
         _wtreeDropState = null;
         item.classList.add('is-dragging');
@@ -1094,14 +1255,30 @@
     if (resetBtn && !resetBtn.dataset.bound) {
       resetBtn.dataset.bound = '1';
       resetBtn.addEventListener('click', function () {
+        _layoutTreeEditMode = false;
         resetPrefs();
         renderWidgetTree();
       });
     }
+    var treeAfter = body.querySelector('.widget-tree');
     var editBtnLbl = document.getElementById('sidebar-layout-edit');
-    if (editBtnLbl) {
-      editBtnLbl.textContent = _t('settingsEditLayout');
-      editBtnLbl.classList.remove('is-active');
+    if (treeAfter && editBtnLbl) {
+      var secLisApply = treeAfter.querySelectorAll(':scope > li.widget-tree-item[data-section]');
+      var sxa;
+      if (_layoutTreeEditMode) {
+        treeAfter.classList.add('widget-tree--edit');
+        editBtnLbl.textContent = _t('settingsSaveLayout');
+        editBtnLbl.classList.add('is-active');
+        for (sxa = 0; sxa < secLisApply.length; sxa++) secLisApply[sxa].setAttribute('draggable', 'true');
+      } else {
+        treeAfter.classList.remove('widget-tree--edit');
+        editBtnLbl.textContent = _t('settingsEditLayout');
+        editBtnLbl.classList.remove('is-active');
+        for (sxa = 0; sxa < secLisApply.length; sxa++) secLisApply[sxa].setAttribute('draggable', 'false');
+      }
+      applyWidgetTreeCheckboxLock(treeAfter, _layoutTreeEditMode);
+    } else if (treeAfter) {
+      applyWidgetTreeCheckboxLock(treeAfter, _layoutTreeEditMode);
     }
     applyAllChartVisibility();
   }
@@ -1579,8 +1756,9 @@
       var el = document.getElementById(sec.domId);
       if (!el) continue;
 
+      var vis = isSectionVisible(sec.id);
       el.setAttribute('data-span', String(w.span || 12));
-      el.style.display = '';
+      el.style.display = vis ? '' : 'none';
       gridEl.appendChild(el);
       placed[w.id] = true;
       // If this section has child sections, mark them as placed too
@@ -1594,7 +1772,7 @@
           var comp = document.getElementById(sec.companionIds[ci]);
           if (comp) {
             comp.setAttribute('data-span', String(w.span || 12));
-            comp.style.display = '';
+            comp.style.display = vis ? '' : 'none';
             gridEl.appendChild(comp);
           }
         }
@@ -2486,23 +2664,24 @@
         var tree = document.querySelector('.widget-tree');
         if (!tree) return;
         var wasEdit = tree.classList.contains('widget-tree--edit');
+        var secLis = tree.querySelectorAll(':scope > li.widget-tree-item[data-section]');
+        var si;
         if (wasEdit) {
           savePrefs();
+          _layoutTreeEditMode = false;
           tree.classList.remove('widget-tree--edit');
           editBtn.classList.remove('is-active');
           editBtn.textContent = _t('settingsEditLayout');
+          for (si = 0; si < secLis.length; si++) secLis[si].setAttribute('draggable', 'false');
         } else {
+          _layoutTreeEditMode = true;
           tree.classList.add('widget-tree--edit');
           editBtn.classList.add('is-active');
           editBtn.textContent = _t('settingsSaveLayout');
+          for (si = 0; si < secLis.length; si++) secLis[si].setAttribute('draggable', 'true');
         }
+        applyWidgetTreeCheckboxLock(tree, _layoutTreeEditMode);
       });
-    }
-    var editBtnAfterTitles = document.getElementById('sidebar-layout-edit');
-    var treeAfterTitles = document.querySelector('.widget-tree');
-    if (editBtnAfterTitles && treeAfterTitles && treeAfterTitles.classList.contains('widget-tree--edit')) {
-      editBtnAfterTitles.textContent = _t('settingsSaveLayout');
-      editBtnAfterTitles.classList.add('is-active');
     }
     // Version — set immediately from inline global
     var verEl = document.getElementById('sidebar-version');
