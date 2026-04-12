@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-208",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "b4ce73a",
+      "commit_full": "b4ce73a52a8181901f93457e25bb43c9041588e3",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ui): bind sidebar toggle immediately on DOMContentLoaded",
+      "detail": "Sidebar gear button was unresponsive in DEV_MODE because\nbindSidebarEvents() only ran inside initFull() which waits\nfor API data. Now binds immediately on script load via\nDOMContentLoaded, independent of data fetch timing.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-207",
       "timestamp": "2026-04-12",
       "session": "auto",
