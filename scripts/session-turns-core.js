@@ -152,9 +152,73 @@ function populateSessionTurnsCacheForDatesBench(dateKeys, tagged, forEachJsonlLi
   return stByDate;
 }
 
+/**
+ * Extract-Cache accelerated: collect sessions from pre-extracted mini-records
+ * instead of re-parsing full JSONL files.
+ *
+ * @param {string[]} dateKeys - dates to collect
+ * @param {object} extractCache - loaded extract cache (from extract-cache.js)
+ * @returns {object} allSessions map (same format as pass1)
+ */
+function pass1FromExtractCache(dateKeys, extractCache) {
+  var allowedDays = Object.create(null);
+  for (var di = 0; di < dateKeys.length; di++) {
+    var dk = dateKeys[di];
+    var d = new Date(dk + 'T00:00:00Z');
+    var prevDay = new Date(d.getTime() - 86400000).toISOString().slice(0, 10);
+    var nextDay = new Date(d.getTime() + 86400000).toISOString().slice(0, 10);
+    allowedDays[dk] = true;
+    allowedDays[prevDay] = true;
+    allowedDays[nextDay] = true;
+  }
+  var allSessions = Object.create(null);
+  var files = extractCache.files || {};
+  for (var fp in files) {
+    if (!Object.prototype.hasOwnProperty.call(files, fp)) continue;
+    var entry = files[fp];
+    var records = entry.records || [];
+    for (var ri = 0; ri < records.length; ri++) {
+      var r = records[ri];
+      if (r.tp !== 'assistant') continue;
+      var ts = r.ts;
+      if (!ts || ts.length < 19) continue;
+      var turnDay = ts.slice(0, 10);
+      if (!allowedDays[turnDay]) continue;
+      var inp = r.inp || 0;
+      var out = r.out || 0;
+      var cr = r.cr || 0;
+      var cc = r.cc || 0;
+      if (inp + out + cr + cc === 0) continue;
+      var sid = r.sid;
+      if (!sid) continue;
+      if (!allSessions[sid]) allSessions[sid] = [];
+      allSessions[sid].push({
+        ts: ts,
+        day: turnDay,
+        input: inp,
+        output: out,
+        cache_read: cr,
+        cache_creation: cc,
+        model: r.mod || 'unknown'
+      });
+    }
+  }
+  return allSessions;
+}
+
+/**
+ * Build session turns from extract cache (fast path).
+ */
+function buildSessionTurnsFromCache(dateKey, extractCache) {
+  var allSessions = pass1FromExtractCache([dateKey], extractCache);
+  return finalizeSessionTurnsForDate(dateKey, allSessions);
+}
+
 module.exports = {
   pass1CollectSessionsForDayWindowFromFiles: pass1CollectSessionsForDayWindowFromFiles,
+  pass1FromExtractCache: pass1FromExtractCache,
   finalizeSessionTurnsForDate: finalizeSessionTurnsForDate,
   buildSessionTurnsForDateWithCollected: buildSessionTurnsForDateWithCollected,
+  buildSessionTurnsFromCache: buildSessionTurnsFromCache,
   populateSessionTurnsCacheForDatesBench: populateSessionTurnsCacheForDatesBench
 };

@@ -42,6 +42,9 @@ var collectTaggedJsonlFilesAsync = usageScanRoots.collectTaggedJsonlFilesAsync;
 var forEachJsonlLineSync = usageScanRoots.forEachJsonlLineSync;
 var sessionTurnsCore = require('./session-turns-core');
 var benchmarkSessionTurns = require('./benchmark-session-turns');
+var extractCache = require('./extract-cache');
+var __extractCache = null;
+var __extractCacheLoaded = false;
 var getProxyLogDir = usageScanRoots.getProxyLogDir;
 var collectProxyNdjsonFiles = usageScanRoots.collectProxyNdjsonFiles;
 var serviceLog = require('./service-logger');
@@ -2595,6 +2598,17 @@ function parseAllUsageIncremental(done, onProgress) {
             ' result_days=' +
             (result.days ? result.days.length : 0)
         );
+        // ── Extract-Cache: sync after scan so session-turns can use it ──
+        try {
+          var ecT0 = Date.now();
+          if (!__extractCache) __extractCache = extractCache.load();
+          var ecResult = extractCache.sync(__extractCache, tagged);
+          if (ecResult.miss > 0) extractCache.save(__extractCache);
+          __extractCacheLoaded = true;
+          serviceLog.info('extract_cache', 'hit=' + ecResult.hit + ' miss=' + ecResult.miss + ' removed=' + ecResult.removed + ' records=' + ecResult.totalRecords + ' (' + (Date.now() - ecT0) + 'ms)');
+        } catch (ecErr) {
+          serviceLog.warn('extract_cache', 'sync failed: ' + (ecErr.message || ecErr));
+        }
         __lastScanJsonlFingerprint = scanFpForPersist;
         done(null, result);
       } catch (err) {
@@ -2632,6 +2646,10 @@ var DASHBOARD_TPL_FILE = path.join(DASHBOARD_SCRIPT_DIR, 'tpl', 'dashboard.html'
 var DASHBOARD_CSS_FILE = path.join(DASHBOARD_SCRIPT_DIR, 'public', 'css', 'dashboard.css');
 var DASHBOARD_CLIENT_JS_FILE = path.join(DASHBOARD_SCRIPT_DIR, 'public', 'js', 'dashboard.client.js');
 var DASHBOARD_EXPLORER_JS_FILE = path.join(DASHBOARD_SCRIPT_DIR, 'public', 'js', 'cache-files-explorer.js');
+var DASHBOARD_REGISTRY_JS_FILE = path.join(DASHBOARD_SCRIPT_DIR, 'public', 'js', 'widget-registry.js');
+var DASHBOARD_DISPATCHER_JS_FILE = path.join(DASHBOARD_SCRIPT_DIR, 'public', 'js', 'widget-dispatcher.js');
+var DASHBOARD_SECTIONS_JS_FILE = path.join(DASHBOARD_SCRIPT_DIR, 'public', 'js', 'dashboard-sections.js');
+var DASHBOARD_METRICS_JS_FILE = path.join(DASHBOARD_SCRIPT_DIR, 'public', 'js', 'metrics-engine.js');
 
 function getPathMtimeMs(p) {
   try {
@@ -2689,6 +2707,23 @@ function jsonForInlineI18nScript() {
   return c.inlineJson;
 }
 
+var __appVersionCache = '';
+function getAppVersion() {
+  if (__appVersionCache) return __appVersionCache;
+  try {
+    var execSync = require('child_process').execSync;
+    __appVersionCache = execSync('git describe --tags --abbrev=7', { encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+  } catch (e) {
+    try {
+      __appVersionCache = execSync('git rev-parse --short=7 HEAD', { encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+      __appVersionCache = 'dev-' + __appVersionCache;
+    } catch (e2) {
+      __appVersionCache = 'dev';
+    }
+  }
+  return __appVersionCache;
+}
+
 function getDashboardHtml() {
   var c = __i18nPageCache;
   var mde = getUiTplMtimeMs('de');
@@ -2698,6 +2733,10 @@ function getDashboardHtml() {
   var mc = getPathMtimeMs(DASHBOARD_CSS_FILE);
   var mj = getPathMtimeMs(DASHBOARD_CLIENT_JS_FILE);
   var mex = getPathMtimeMs(DASHBOARD_EXPLORER_JS_FILE);
+  var mreg = getPathMtimeMs(DASHBOARD_REGISTRY_JS_FILE);
+  var mdisp = getPathMtimeMs(DASHBOARD_DISPATCHER_JS_FILE);
+  var msec = getPathMtimeMs(DASHBOARD_SECTIONS_JS_FILE);
+  var mmet = getPathMtimeMs(DASHBOARD_METRICS_JS_FILE);
   if (
     c.fullHtml &&
     c.mde === mde &&
@@ -2706,17 +2745,27 @@ function getDashboardHtml() {
     c.mdashboard === md &&
     c.mcss === mc &&
     c.mjs === mj &&
-    c.mexplorer === mex
+    c.mexplorer === mex &&
+    c.mregistry === mreg &&
+    c.mdispatcher === mdisp &&
+    c.msections === msec &&
+    c.mmetrics === mmet
   ) {
     return c.fullHtml;
   }
   buildI18nBundles();
   var shell = fs.readFileSync(DASHBOARD_TPL_FILE, 'utf8');
-  c.fullHtml = shell.replace('__I18N_PLACEHOLDER__', jsonForInlineI18nScript());
+  c.fullHtml = shell
+    .replace('__I18N_PLACEHOLDER__', jsonForInlineI18nScript())
+    .replace('__APP_VERSION__', getAppVersion());
   c.mdashboard = md;
   c.mcss = mc;
   c.mjs = mj;
   c.mexplorer = mex;
+  c.mregistry = mreg;
+  c.mdispatcher = mdisp;
+  c.msections = msec;
+  c.mmetrics = mmet;
   return c.fullHtml;
 }
 
@@ -3564,11 +3613,19 @@ function getSessionTurnsCached(dateKey) {
     serviceLog.info('session-turns', 'date=' + dateKey + ' fingerprint HIT (' + fpMs + 'ms stat)');
     return cached.result;
   }
-  var result = buildSessionTurnsForDateWithCollected(dateKey, collected.tagged);
+  // Fast path: use extract-cache if available (avoids full JSONL re-parse)
+  var result;
+  var usedCache = false;
+  if (__extractCacheLoaded && __extractCache) {
+    result = sessionTurnsCore.buildSessionTurnsFromCache(dateKey, __extractCache);
+    usedCache = true;
+  } else {
+    result = buildSessionTurnsForDateWithCollected(dateKey, collected.tagged);
+  }
   var totalMs = Date.now() - t0;
   var sessions = result?.sessions ? result.sessions.length : 0;
   var turns = result?.total_turns ? result.total_turns : 0;
-  serviceLog.info('session-turns', 'date=' + dateKey + (noCache ? ' NO_CACHE REBUILD ' : ' REBUILD ') + collected.tagged.length + ' files → ' + sessions + ' sessions, ' + turns + ' turns (' + totalMs + 'ms, fp=' + fpMs + 'ms)');
+  serviceLog.info('session-turns', 'date=' + dateKey + (noCache ? ' NO_CACHE REBUILD ' : ' REBUILD ') + (usedCache ? '[extract-cache] ' : '') + collected.tagged.length + ' files → ' + sessions + ' sessions, ' + turns + ' turns (' + totalMs + 'ms, fp=' + fpMs + 'ms)');
   if (!noCache) _sessionTurnsCache[dateKey] = { result: result, fingerprint: fp };
   return result;
 }
@@ -3589,7 +3646,13 @@ function buildSessionTurnsForDateWithCollected(dateKey, tagged) {
 /** One JSONL scan for multiple calendar days; fills _sessionTurnsCache (unless NO_CACHE). */
 function populateSessionTurnsCacheForDates(dateKeys, collectedTagged, fp) {
   var noCache = process.env.CLAUDE_USAGE_NO_CACHE === '1' || process.env.CLAUDE_USAGE_NO_CACHE === 'true';
-  var allSessions = sessionTurnsCore.pass1CollectSessionsForDayWindowFromFiles(dateKeys, collectedTagged, forEachJsonlLineSync);
+  // Fast path: use extract-cache if loaded
+  var allSessions;
+  if (__extractCacheLoaded && __extractCache) {
+    allSessions = sessionTurnsCore.pass1FromExtractCache(dateKeys, __extractCache);
+  } else {
+    allSessions = sessionTurnsCore.pass1CollectSessionsForDayWindowFromFiles(dateKeys, collectedTagged, forEachJsonlLineSync);
+  }
   var stByDate = {};
   for (var i = 0; i < dateKeys.length; i++) {
     var dk = dateKeys[i];
@@ -4424,6 +4487,50 @@ var server = http.createServer(function (req, res) {
         Pragma: 'no-cache'
       });
       res.end(JSON.stringify(stResult));
+    }
+  } else if (pathname === '/api/layout') {
+    // Layout: immer lokale Datei auf dem Host, der diesen Node-Prozess ausführt (os.homedir() + .claude/…).
+    // DEV_MODE=full/proxy: Nutzungsdaten können von DEV_PROXY_SOURCE kommen — Layout GET/PUT wird NICHT an
+    // den Remote gespiegelt; der Browser spricht localhost, die JSON liegt z. B. unter C:\Users\…\.claude\…
+    var layoutFile = path.join(os.homedir(), '.claude', 'usage-dashboard-layout.json');
+    if (req.method === 'GET') {
+      try {
+        var layoutData = fs.readFileSync(layoutFile, 'utf8');
+        var stGet = fs.statSync(layoutFile);
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+          'X-Layout-Mtime': String(stGet.mtimeMs)
+        });
+        res.end(layoutData);
+      } catch (e) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end('null');
+      }
+    } else if (req.method === 'PUT' || req.method === 'POST') {
+      var layoutBody = '';
+      req.on('data', function (chunk) { layoutBody += chunk; });
+      req.on('end', function () {
+        try {
+          var parsed = JSON.parse(layoutBody);
+          var layoutDir = path.dirname(layoutFile);
+          if (!fs.existsSync(layoutDir)) fs.mkdirSync(layoutDir, { recursive: true });
+          fs.writeFileSync(layoutFile, JSON.stringify(parsed, null, 2), 'utf8');
+          var stPut = fs.statSync(layoutFile);
+          serviceLog.info('layout', 'saved ' + layoutBody.length + ' bytes to ' + layoutFile);
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'X-Layout-Mtime': String(stPut.mtimeMs)
+          });
+          res.end('{"ok":true}');
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end('{"error":"invalid JSON"}');
+        }
+      });
+    } else {
+      res.writeHead(405);
+      res.end();
     }
   } else {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
