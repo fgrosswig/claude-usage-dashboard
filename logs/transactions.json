@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-228",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "459f5c2",
+      "commit_full": "459f5c2e8450d709a8c261987aa30489822d326c",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ui): indent layout widget-tree submenus, hide key-findings when all cards off refs #216",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-227",
       "timestamp": "2026-04-12",
       "session": "auto",
