@@ -2,6 +2,48 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-213",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "3789cd4",
+      "commit_full": "3789cd4fe1f0bddb73bb45443511757a73d802f2",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(builder): live grid preview, drag fix, span update, button binding",
+      "detail": "- Grid preview: blue 12-col visual preview updates live on span change\n- updateBuilderPreview() called on every span select change\n- draggable=\"true\" on .tb-row for working drag & drop\n- bindTemplateBuilder() called in initFull() (not only sidebar toggle)\n- \"Build Template\" button moved to Layout section footer (always visible)\n- Widget tree: span badge always shown, expand arrow ▶ with rotate transition\n- Add Row: feedback message when all widgets used\n- Layout grid: 14px padding-top for top-nav spacing\n- i18n: tbWidgets key added (DE/EN/KO)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-212",
       "timestamp": "2026-04-12",
       "session": "auto",
