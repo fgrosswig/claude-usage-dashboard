@@ -1034,32 +1034,210 @@ function updateScanSourcesRow(data) {
     el.style.display = "none";
   }
 }
+var __liveScannedJsonlChart = null;
+function resizeLiveScannedJsonlChartIfAny() {
+  if (!__liveScannedJsonlChart) return;
+  try {
+    __liveScannedJsonlChart.resize();
+  } catch (eRs) {}
+}
+function liveScannedJsonlBucket(line) {
+  var s = String(line || "").replace(/\\/g, "/");
+  var dot = " \u00b7 ";
+  var pathPart = s;
+  var di = s.indexOf(dot);
+  if (di >= 0) pathPart = s.slice(di + dot.length).trim();
+  var marker = "/.claude/projects/";
+  var ix = pathPart.indexOf(marker);
+  if (ix >= 0) {
+    var rest = pathPart.slice(ix + marker.length);
+    var seg0 = rest.split("/")[0];
+    if (seg0) return seg0;
+  }
+  var fn = pathPart.split("/").pop() || pathPart;
+  if (fn.length > 24) return fn.slice(0, 22) + "\u2026";
+  return fn || "(?)";
+}
 function updateLiveFilesPanel(data) {
-  var ul = document.getElementById("live-files-list");
+  var host = document.getElementById("live-files-chart-host");
   var head = document.getElementById("live-files-head");
   var trig = document.getElementById("live-trigger");
-  if (!ul) return;
-  ul.innerHTML = "";
+  if (!host) return;
+  if (__liveScannedJsonlChart) {
+    try {
+      __liveScannedJsonlChart.dispose();
+    } catch (eLc) {}
+    __liveScannedJsonlChart = null;
+  }
+  host.innerHTML = "";
+  host.style.display = "";
   var files = (data && data.scanned_files) ? data.scanned_files : [];
   var n = files.length;
   if (head) head.textContent = n ? tr("liveFilesHeadN", { n: n }) : t("liveFilesHead0");
   if (data && data.scanning && n === 0) {
-    ul.innerHTML = "<li>" + escHtml(t("scanStill")) + "</li>";
+    host.innerHTML = '<p class="live-files-chart-empty">' + escHtml(t("scanStill")) + "</p>";
     if (trig) trig.setAttribute("title", t("liveTriggerScanning"));
     return;
   }
   if (n === 0) {
-    ul.innerHTML = "<li>" + escHtml(t("noJsonlList")) + "</li>";
+    host.innerHTML = '<p class="live-files-chart-empty">' + escHtml(t("noJsonlList")) + "</p>";
     if (trig) trig.setAttribute("title", t("liveTriggerZero"));
     return;
   }
-  for (var lf = 0; lf < n; lf++) {
-    var li = document.createElement("li");
-    li.textContent = files[lf];
-    ul.appendChild(li);
+  if (typeof echarts === "undefined" || !echarts.init) {
+    host.innerHTML = '<p class="live-files-chart-empty">' + escHtml(String(n) + " JSONL") + "</p>";
+    if (trig) trig.setAttribute("title", tr("liveTriggerMany", { n: n }));
+    return;
+  }
+  var counts = Object.create(null);
+  for (var bi = 0; bi < n; bi++) {
+    var b = liveScannedJsonlBucket(files[bi]);
+    counts[b] = (counts[b] || 0) + 1;
+  }
+  var pairs = [];
+  for (var k in counts) {
+    if (Object.prototype.hasOwnProperty.call(counts, k)) pairs.push({ name: k, value: counts[k] });
+  }
+  pairs.sort(function (a, b) {
+    return a.value - b.value;
+  });
+  var maxBars = 15;
+  if (pairs.length > maxBars) pairs = pairs.slice(pairs.length - maxBars);
+  var names = [];
+  var vals = [];
+  for (var pi = 0; pi < pairs.length; pi++) {
+    names.push(pairs[pi].name);
+    vals.push(pairs[pi].value);
+  }
+  var cw = host.clientWidth || host.offsetWidth;
+  var ch = host.clientHeight || host.offsetHeight;
+  var initW = cw > 48 ? undefined : Math.min(520, Math.max(280, (window.innerWidth || 800) - 48));
+  var initH = ch > 48 ? undefined : 220;
+  var initOpts = { renderer: "canvas" };
+  if (initW != null) initOpts.width = initW;
+  if (initH != null) initOpts.height = initH;
+  __liveScannedJsonlChart = echarts.init(host, null, initOpts);
+  __liveScannedJsonlChart.setOption({
+    animation: false,
+    grid: { left: 6, right: 18, top: 6, bottom: 6, containLabel: true },
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "shadow" },
+      backgroundColor: "rgba(15,23,42,0.95)",
+      borderColor: "#334155",
+      textStyle: { color: "#e2e8f0" },
+      formatter: function (params) {
+        if (!params || !params.length) return "";
+        var p0 = params[0];
+        return escHtml(p0.name) + "<br/>" + p0.marker + String(p0.value) + " " + t("liveFilesChartFilesSuffix");
+      }
+    },
+    xAxis: {
+      type: "value",
+      axisLabel: { color: "#94a3b8" },
+      splitLine: { lineStyle: { color: "rgba(51,65,85,0.45)" } }
+    },
+    yAxis: {
+      type: "category",
+      data: names,
+      axisLabel: { color: "#94a3b8", width: 110, overflow: "truncate" }
+    },
+    series: [
+      {
+        type: "bar",
+        data: vals,
+        itemStyle: { color: "rgba(59,130,246,0.78)" },
+        label: { show: true, position: "right", color: "#cbd5e1", fontSize: 10 }
+      }
+    ]
+  });
+  function scheduleLiveChartResize() {
+    resizeLiveScannedJsonlChartIfAny();
+  }
+  if (typeof requestAnimationFrame !== "undefined") {
+    requestAnimationFrame(function () {
+      requestAnimationFrame(scheduleLiveChartResize);
+    });
+  } else {
+    setTimeout(scheduleLiveChartResize, 0);
   }
   if (trig) trig.setAttribute("title", tr("liveTriggerMany", { n: n }));
 }
+(function wireLiveReleasePanelChrome() {
+  function go() {
+    var det = document.getElementById("live-release-details");
+    if (!det || det.getAttribute("data-live-rel-chrome-wired") === "1") return;
+    det.setAttribute("data-live-rel-chrome-wired", "1");
+    if (typeof window !== "undefined" && window.CacheFilesExplorer && window.CacheFilesExplorer.wireOpenButton) {
+      window.CacheFilesExplorer.wireOpenButton("live-cache-files-open");
+    }
+    var expandBtn = document.getElementById("live-rel-expand-btn");
+    var relOverlay = document.getElementById("release-modal-overlay");
+    var relBody = document.getElementById("release-modal-body");
+    var relClose = document.getElementById("release-modal-close");
+    if (expandBtn && relOverlay && relBody) {
+      expandBtn.addEventListener("click", function () {
+        relOverlay.classList.add("is-open");
+        document.body.style.overflow = "hidden";
+        if (relBody.dataset.loaded) return;
+        relBody.innerHTML = '<p style="color:#64748b;font-size:.75rem">Loading releases...</p>';
+        var rlXhr = new XMLHttpRequest();
+        rlXhr.open("GET", "https://api.github.com/repos/fgrosswig/claude-usage-dashboard/releases?per_page=20", true);
+        rlXhr.onload = function () {
+          if (rlXhr.status !== 200) {
+            relBody.innerHTML = '<p style="color:#ef4444;font-size:.75rem">Failed to load releases</p>';
+            return;
+          }
+          try {
+            var releases = JSON.parse(rlXhr.responseText);
+            if (!releases.length) {
+              relBody.innerHTML = '<p style="color:#64748b;font-size:.75rem">No releases found</p>';
+              return;
+            }
+            var rh = "";
+            var isFirst = true;
+            for (var rxi = 0; rxi < releases.length; rxi++) {
+              var rel = releases[rxi];
+              var rDate = rel.published_at ? rel.published_at.slice(0, 10) : "";
+              var rBody2 = (rel.body || "").replace(/^## .+\n?/m, "");
+              rh += "<details class=\"release-modal-item\"" + (isFirst ? " open" : "") + ">";
+              isFirst = false;
+              rh += "<summary class=\"release-modal-item-head\">";
+              rh += "<span class=\"rel-tag\">" + escHtml(rel.tag_name) + "</span>";
+              rh += "<span class=\"rel-date\">" + escHtml(rDate) + "</span>";
+              if (rel.name && rel.name !== rel.tag_name) rh += " — " + escHtml(rel.name);
+              rh += "</summary>";
+              rh += "<div class=\"release-modal-item-body\">" + miniMd(rBody2) + "</div>";
+              rh += "</details>";
+            }
+            relBody.innerHTML = rh;
+            relBody.dataset.loaded = "1";
+          } catch (eRel) {
+            relBody.innerHTML = '<p style="color:#ef4444;font-size:.75rem">Parse error</p>';
+          }
+        };
+        rlXhr.send();
+      });
+      if (relClose) {
+        relClose.addEventListener("click", function () {
+          relOverlay.classList.remove("is-open");
+          document.body.style.overflow = "";
+        });
+      }
+      relOverlay.addEventListener("click", function (e) {
+        if (e.target === relOverlay) {
+          relOverlay.classList.remove("is-open");
+          document.body.style.overflow = "";
+        }
+      });
+    }
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", go);
+  } else {
+    go();
+  }
+})();
 function liveExtOneLiner(d) {
   var vc = d.version_change;
   if (!vc) return d.date;
@@ -3057,6 +3235,15 @@ function copyReport(){
       if (open) lp.classList.add("live-files-open");
       else lp.classList.remove("live-files-open");
       tr.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) {
+        if (typeof requestAnimationFrame !== "undefined") {
+          requestAnimationFrame(function () {
+            requestAnimationFrame(resizeLiveScannedJsonlChartIfAny);
+          });
+        } else {
+          setTimeout(resizeLiveScannedJsonlChartIfAny, 50);
+        }
+      }
     }
     tr.setAttribute("aria-expanded", "false");
     tr.addEventListener("click", function (e) {
@@ -6965,60 +7152,21 @@ function applyDevCacheFromStatus(info) {
     if (xhr.status !== 200) return;
     try {
       var info = JSON.parse(xhr.responseText);
-      // Show release version in Live panel — compact row
-      var relRow = document.getElementById("live-release-row");
-      var ver = info.version?.length && info.version !== "dev" ? info.version : null;
-      if (relRow) {
+      var meta = document.getElementById("live-release-meta");
+      var ver = info.version && info.version.length && info.version !== "dev" ? info.version : null;
+      if (meta) {
         if (ver) {
-          relRow.innerHTML = '<span class="live-rel-badge live-rel-badge-ok">' + escHtml(ver) + '</span>' +
-            '<a class="live-rel-link" href="https://github.com/fgrosswig/claude-usage-dashboard/releases/tag/' + escHtml(ver) + '" target="_blank" rel="noopener">GitHub</a>' +
-            '<button class="live-rel-expand" id="live-rel-expand-btn">History</button>';
+          meta.innerHTML =
+            '<span class="live-rel-badge live-rel-badge-ok">' +
+            escHtml(ver) +
+            "</span>" +
+            '<a class="live-rel-link" href="https://github.com/fgrosswig/claude-usage-dashboard/releases/tag/' +
+            escHtml(ver) +
+            '" target="_blank" rel="noopener">GitHub</a>';
         } else {
-          relRow.innerHTML = '<span class="live-rel-badge live-rel-badge-dev">dev</span>' +
-            '<a class="live-rel-link" href="https://github.com/fgrosswig/claude-usage-dashboard/releases" target="_blank" rel="noopener">GitHub</a>' +
-            '<button class="live-rel-expand" id="live-rel-expand-btn">History</button>';
-        }
-        // Release History popout
-        var expandBtn = document.getElementById("live-rel-expand-btn");
-        var relOverlay = document.getElementById("release-modal-overlay");
-        var relBody = document.getElementById("release-modal-body");
-        var relClose = document.getElementById("release-modal-close");
-        if (expandBtn && relOverlay && relBody) {
-          expandBtn.addEventListener("click", function() {
-            relOverlay.classList.add("is-open");
-            document.body.style.overflow = "hidden";
-            if (relBody.dataset.loaded) return;
-            relBody.innerHTML = '<p style="color:#64748b;font-size:.75rem">Loading releases...</p>';
-            var rlXhr = new XMLHttpRequest();
-            rlXhr.open("GET", "https://api.github.com/repos/fgrosswig/claude-usage-dashboard/releases?per_page=20", true);
-            rlXhr.onload = function() {
-              if (rlXhr.status !== 200) { relBody.innerHTML = '<p style="color:#ef4444;font-size:.75rem">Failed to load releases</p>'; return; }
-              try {
-                var releases = JSON.parse(rlXhr.responseText);
-                if (!releases.length) { relBody.innerHTML = '<p style="color:#64748b;font-size:.75rem">No releases found</p>'; return; }
-                var rh = "";
-                var isFirst = true;
-                for (var rel of releases) {
-                  var rDate = rel.published_at ? rel.published_at.slice(0, 10) : "";
-                  var rBody2 = (rel.body || "").replace(/^## .+\n?/m, "");
-                  rh += "<details class=\"release-modal-item\"" + (isFirst ? " open" : "") + ">";
-                  isFirst = false;
-                  rh += "<summary class=\"release-modal-item-head\">";
-                  rh += "<span class=\"rel-tag\">" + escHtml(rel.tag_name) + "</span>";
-                  rh += "<span class=\"rel-date\">" + escHtml(rDate) + "</span>";
-                  if (rel.name && rel.name !== rel.tag_name) rh += " — " + escHtml(rel.name);
-                  rh += "</summary>";
-                  rh += "<div class=\"release-modal-item-body\">" + miniMd(rBody2) + "</div>";
-                  rh += "</details>";
-                }
-                relBody.innerHTML = rh;
-                relBody.dataset.loaded = "1";
-              } catch (e) { relBody.innerHTML = '<p style="color:#ef4444;font-size:.75rem">Parse error</p>'; }
-            };
-            rlXhr.send();
-          });
-          if (relClose) relClose.addEventListener("click", function() { relOverlay.classList.remove("is-open"); document.body.style.overflow = ""; });
-          relOverlay.addEventListener("click", function(e) { if (e.target === relOverlay) { relOverlay.classList.remove("is-open"); document.body.style.overflow = ""; } });
+          meta.innerHTML =
+            '<span class="live-rel-badge live-rel-badge-dev">dev</span>' +
+            '<a class="live-rel-link" href="https://github.com/fgrosswig/claude-usage-dashboard/releases" target="_blank" rel="noopener">GitHub</a>';
         }
       }
       if (!info.dev_mode) return;
@@ -7169,289 +7317,9 @@ function applyDevCacheFromStatus(info) {
           bq.send(JSON.stringify({ days_back: nd }));
         });
       })();
-      (function wireDevCacheFilesModal() {
-        var openBtn = document.getElementById("dev-cache-files-open");
-        if (!openBtn) return;
-        var cacheModalEl = null;
-        function setLoadStatus(text) {
-          var s = document.getElementById("dev-cache-files-load-status");
-          if (s) s.textContent = text || "";
-        }
-        function onFilterInput() {
-          var inp = document.getElementById("dev-cache-files-filter");
-          var q = (inp && String(inp.value).toLowerCase().trim()) || "";
-          var acc = document.getElementById("dev-cache-files-accordion");
-          if (!acc) return;
-          var dets = acc.querySelectorAll("details.dev-cache-folder");
-          for (var di = 0; di < dets.length; di++) {
-            var det = dets[di];
-            var rows = det.querySelectorAll("tbody tr");
-            var any = false;
-            for (var ri = 0; ri < rows.length; ri++) {
-              var row = rows[ri];
-              var hay = String(row.getAttribute("data-search") || "").toLowerCase();
-              var show = !q || hay.indexOf(q) >= 0;
-              row.style.display = show ? "" : "none";
-              if (show) any = true;
-            }
-            det.style.display = any ? "" : "none";
-          }
-        }
-        function appendFileRowToTbody(tbody, f) {
-          var tr = document.createElement("tr");
-          var searchHay =
-            (f.kind || "") +
-            " " +
-            (f.label || "") +
-            " " +
-            (f.file_name || "") +
-            " " +
-            (f.path_ui || "") +
-            " " +
-            (f.folder_ui || "");
-          tr.setAttribute("data-search", searchHay);
-          function tdText(txt) {
-            var x = document.createElement("td");
-            x.textContent = txt;
-            return x;
-          }
-          tr.appendChild(tdText(f.kind || ""));
-          tr.appendChild(tdText(f.label || ""));
-          var tdFile = document.createElement("td");
-          tdFile.className = "dev-cache-file-cell";
-          tdFile.title = f.path_ui || "";
-          tdFile.textContent = f.file_name || "";
-          tr.appendChild(tdFile);
-          var tdSz = document.createElement("td");
-          tdSz.textContent = formatBytes(f.size || 0);
-          tr.appendChild(tdSz);
-          var tdMt = document.createElement("td");
-          tdMt.textContent = new Date(f.mtime_ms || 0).toLocaleString();
-          tr.appendChild(tdMt);
-          var tdAct = document.createElement("td");
-          var bt = document.createElement("button");
-          bt.type = "button";
-          bt.className = "dev-cache-rebuild-btn dev-cache-view-btn";
-          bt.textContent = "Ansehen";
-          bt.setAttribute("data-path-enc", encodeURIComponent(f.path_abs));
-          tdAct.appendChild(bt);
-          tr.appendChild(tdAct);
-          tbody.appendChild(tr);
-        }
-        function formatBytes(n) {
-          if (n >= 1048576) return (n / 1048576).toFixed(2) + " MiB";
-          if (n >= 1024) return (n / 1024).toFixed(1) + " KiB";
-          return String(n) + " B";
-        }
-        function buildAccordion(files) {
-          var acc = document.getElementById("dev-cache-files-accordion");
-          if (!acc) return;
-          acc.innerHTML = "";
-          var groups = Object.create(null);
-          for (var i = 0; i < files.length; i++) {
-            var fi = files[i];
-            var key = fi.folder_ui != null ? fi.folder_ui : "(?)";
-            if (!groups[key]) groups[key] = [];
-            groups[key].push(fi);
-          }
-          var keys = Object.keys(groups).sort();
-          for (var ki = 0; ki < keys.length; ki++) {
-            var gkey = keys[ki];
-            var list = groups[gkey];
-            list.sort(function (a, b) {
-              var na = String(a.file_name || "").toLowerCase();
-              var nb = String(b.file_name || "").toLowerCase();
-              return na < nb ? -1 : na > nb ? 1 : 0;
-            });
-            var det = document.createElement("details");
-            det.className = "dev-cache-folder";
-            det.open = true;
-            var sum = document.createElement("summary");
-            sum.className = "dev-cache-folder-summary";
-            sum.textContent = gkey + " (" + list.length + ")";
-            det.appendChild(sum);
-            var fbody = document.createElement("div");
-            fbody.className = "dev-cache-folder-body";
-            var tbl = document.createElement("table");
-            tbl.className = "dev-cache-subtable";
-            var thead = document.createElement("thead");
-            var hr = document.createElement("tr");
-            var heads = ["Kind", "Label", "Datei", "Bytes", "Geaendert", "Aktion"];
-            for (var hi = 0; hi < heads.length; hi++) {
-              var th = document.createElement("th");
-              th.textContent = heads[hi];
-              hr.appendChild(th);
-            }
-            thead.appendChild(hr);
-            tbl.appendChild(thead);
-            var tbod = document.createElement("tbody");
-            for (var ji = 0; ji < list.length; ji++) appendFileRowToTbody(tbod, list[ji]);
-            tbl.appendChild(tbod);
-            fbody.appendChild(tbl);
-            det.appendChild(fbody);
-            acc.appendChild(det);
-          }
-        }
-        function ensureModal() {
-          if (cacheModalEl) return cacheModalEl;
-          var wrap = document.createElement("div");
-          wrap.id = "dev-cache-files-modal";
-          wrap.className = "dev-cache-files-modal";
-          wrap.style.display = "none";
-          wrap.setAttribute("aria-hidden", "true");
-          wrap.innerHTML =
-            '<div class="dev-cache-files-modal-backdrop" id="dev-cache-files-backdrop"></div>' +
-            '<div class="dev-cache-files-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="dev-cache-files-title">' +
-            '<div class="dev-cache-files-modal-head">' +
-            '<span id="dev-cache-files-title" class="dev-cache-files-modal-title">Cache-Dateien</span>' +
-            '<span id="dev-cache-files-load-status" class="dev-cache-meta"></span>' +
-            '<button type="button" class="dev-cache-rebuild-btn" id="dev-cache-files-close">Schliessen</button>' +
-            "</div>" +
-            '<p class="dev-cache-files-modal-hint">Gruppiert nach Unterordner (~/.claude, JSONL-Pfade, Proxy-Logs, Session-Turns-Cache). Suchfeld filtert Zeilen.</p>' +
-            '<input type="search" id="dev-cache-files-filter" class="dev-cache-files-filter" placeholder="Filter (Name, Pfad, Kind) …" autocomplete="off" />' +
-            '<div id="dev-cache-files-accordion" class="dev-cache-files-accordion"></div>' +
-            '<div id="dev-cache-file-preview" class="dev-cache-file-preview" style="display:none">' +
-            '<div class="dev-cache-file-preview-head">' +
-            '<span id="dev-cache-preview-title" class="dev-cache-meta"></span>' +
-            '<button type="button" class="dev-cache-rebuild-btn" id="dev-cache-preview-close">Preview zu</button>' +
-            "</div>" +
-            '<pre id="dev-cache-preview-body" class="dev-cache-preview-pre"></pre>' +
-            "</div>" +
-            "</div>";
-          document.body.appendChild(wrap);
-          cacheModalEl = wrap;
-          document.getElementById("dev-cache-files-backdrop").addEventListener("click", closeModal);
-          document.getElementById("dev-cache-files-close").addEventListener("click", closeModal);
-          document.getElementById("dev-cache-preview-close").addEventListener("click", function () {
-            var pr = document.getElementById("dev-cache-file-preview");
-            if (pr) pr.style.display = "none";
-          });
-          var filterInp = document.getElementById("dev-cache-files-filter");
-          if (filterInp && !filterInp.getAttribute("data-dev-filter-wired")) {
-            filterInp.setAttribute("data-dev-filter-wired", "1");
-            filterInp.addEventListener("input", onFilterInput);
-            filterInp.addEventListener("change", onFilterInput);
-          }
-          document.addEventListener("click", function (ev) {
-            var modal = document.getElementById("dev-cache-files-modal");
-            if (!modal) return;
-            var dsp = modal.style.display;
-            if (dsp === "none" || dsp === "") return;
-            var el = ev.target;
-            var btn = null;
-            if (el && el.closest) {
-              btn = el.closest("button.dev-cache-view-btn");
-            } else {
-              var n = el;
-              while (n && n.nodeName !== "BUTTON") n = n.parentElement;
-              if (n && n.className && (" " + n.className + " ").indexOf(" dev-cache-view-btn ") >= 0) btn = n;
-            }
-            if (!btn) return;
-            var enc = btn.getAttribute("data-path-enc");
-            if (!enc) return;
-            var pAbs = decodeURIComponent(enc);
-            var pre = document.getElementById("dev-cache-preview-body");
-            var title = document.getElementById("dev-cache-preview-title");
-            var pr = document.getElementById("dev-cache-file-preview");
-            if (!pre || !pr) return;
-            try {
-              ev.preventDefault();
-            } catch (ePe) {}
-            pre.textContent = "Lade …";
-            pr.style.display = "block";
-            if (title) title.textContent = pAbs;
-            var rq = new XMLHttpRequest();
-            rq.open("POST", "/api/debug/cache-file-view", true);
-            rq.setRequestHeader("Content-Type", "application/json");
-            rq.onload = function () {
-              if (rq.status !== 200) {
-                pre.textContent = "HTTP " + rq.status;
-                return;
-              }
-              try {
-                var o = JSON.parse(rq.responseText);
-                if (!o.ok) {
-                  pre.textContent = o.error || "error";
-                  return;
-                }
-                if (title) title.textContent = (o.path_ui || "") + (o.truncated ? " (gekuerzt)" : "");
-                pre.textContent = o.content != null ? String(o.content) : "";
-              } catch (eZ) {
-                pre.textContent = "parse error: " + String(eZ && eZ.message ? eZ.message : eZ);
-              }
-            };
-            rq.onerror = function () {
-              pre.textContent = "network error";
-            };
-            rq.send(JSON.stringify({ path_abs: pAbs }));
-          });
-          document.addEventListener("keydown", function (evK) {
-            if (!cacheModalEl || cacheModalEl.style.display === "none") return;
-            if (evK.keyCode === 27) closeModal();
-          });
-          return cacheModalEl;
-        }
-        function closeModal() {
-          if (!cacheModalEl) return;
-          var acc = document.getElementById("dev-cache-files-accordion");
-          if (acc) acc.innerHTML = "";
-          var fin = document.getElementById("dev-cache-files-filter");
-          if (fin) fin.value = "";
-          cacheModalEl.style.display = "none";
-          cacheModalEl.setAttribute("aria-hidden", "true");
-          document.body.style.overflow = "";
-          setLoadStatus("");
-          var pr2 = document.getElementById("dev-cache-file-preview");
-          if (pr2) pr2.style.display = "none";
-        }
-        function openModal() {
-          ensureModal();
-          cacheModalEl.style.display = "flex";
-          cacheModalEl.setAttribute("aria-hidden", "false");
-          document.body.style.overflow = "hidden";
-          var acc = document.getElementById("dev-cache-files-accordion");
-          if (acc) acc.innerHTML = "";
-          var fin = document.getElementById("dev-cache-files-filter");
-          if (fin) fin.value = "";
-          setLoadStatus("Lade …");
-          var pr = document.getElementById("dev-cache-file-preview");
-          if (pr) pr.style.display = "none";
-          var xhr = new XMLHttpRequest();
-          xhr.open("GET", "/api/debug/cache-files", true);
-          xhr.onload = function () {
-            if (xhr.status !== 200) {
-              setLoadStatus("Fehler " + xhr.status);
-              return;
-            }
-            var data;
-            try {
-              data = JSON.parse(xhr.responseText);
-            } catch (eP) {
-              setLoadStatus("JSON Fehler");
-              return;
-            }
-            if (!data.ok || !data.files) {
-              setLoadStatus("Keine Daten");
-              return;
-            }
-            var files = data.files;
-            var folderSet = Object.create(null);
-            for (var gi = 0; gi < files.length; gi++) {
-              var fk = files[gi].folder_ui || "(?)";
-              folderSet[fk] = true;
-            }
-            var folderCount = Object.keys(folderSet).length;
-            setLoadStatus(String(files.length) + " Dateien in " + folderCount + " Ordnern");
-            buildAccordion(files);
-            onFilterInput();
-          };
-          xhr.onerror = function () {
-            setLoadStatus("Netzwerkfehler");
-          };
-          xhr.send();
-        }
-        openBtn.addEventListener("click", openModal);
-      })();
+      if (typeof window !== "undefined" && window.CacheFilesExplorer && window.CacheFilesExplorer.wireOpenButton) {
+        window.CacheFilesExplorer.wireOpenButton("dev-cache-files-open");
+      }
       var devPoll = setInterval(function () {
         if (!document.getElementById("dev-overlay")) {
           clearInterval(devPoll);

@@ -9,6 +9,7 @@
   "liveFilesHint": "Panel per Klick auf „Live“ öffnen/schließen. Pro Zeile: Quelle · Pfad (~ = User-Home dieses Rechners).",
   "liveFilesHead0": "Gescannte JSONL",
   "liveFilesHeadN": "Gescannte JSONL ({n})",
+  "liveFilesChartFilesSuffix": "Dateien",
   "scanStill": "Scan läuft noch…",
   "noJsonlList": "Keine .jsonl in den konfigurierten Scan-Wurzeln (siehe Datenquelle / CLAUDE_USAGE_EXTRA_BASES).",
   "sseDisconnected": "Getrennt — verbinde erneut…",

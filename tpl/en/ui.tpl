@@ -9,6 +9,7 @@
   "liveFilesHint": "Click “Live” to open or close this panel. Each line: source · path (~ = home on this machine).",
   "liveFilesHead0": "Scanned JSONL",
   "liveFilesHeadN": "Scanned JSONL ({n})",
+  "liveFilesChartFilesSuffix": "files",
   "scanStill": "Scan still running…",
   "noJsonlList": "No .jsonl under configured scan roots (see data source / CLAUDE_USAGE_EXTRA_BASES).",
   "sseDisconnected": "Disconnected — retrying…",

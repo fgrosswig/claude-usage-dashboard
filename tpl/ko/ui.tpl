@@ -9,6 +9,7 @@
   "liveFilesHint": "\"Live\"를 클릭하여 패널을 열거나 닫습니다. 각 줄: 소스 · 경로 (~ = 이 머신의 홈 디렉토리).",
   "liveFilesHead0": "스캔된 JSONL",
   "liveFilesHeadN": "스캔된 JSONL ({n})",
+  "liveFilesChartFilesSuffix": "개 파일",
   "scanStill": "스캔 진행 중…",
   "noJsonlList": "설정된 스캔 경로에 .jsonl 파일 없음 (데이터 소스 / CLAUDE_USAGE_EXTRA_BASES 확인).",
   "sseDisconnected": "연결 끊김 — 재연결 중…",

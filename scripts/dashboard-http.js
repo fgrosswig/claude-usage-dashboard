@@ -14,6 +14,7 @@ var MIME = {
 /** pathname -> path segments relative to script root (must stay under public/) */
 var ASSET_ROUTES = {
   '/assets/dashboard.css': ['public', 'css', 'dashboard.css'],
+  '/assets/cache-files-explorer.js': ['public', 'js', 'cache-files-explorer.js'],
   '/assets/dashboard.client.js': ['public', 'js', 'dashboard.client.js']
 };
 

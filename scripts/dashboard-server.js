@@ -2602,7 +2602,7 @@ function parseAllUsageIncremental(done, onProgress) {
 
 // ── HTML Dashboard (Shell: tpl/dashboard.html; UI-Texte: tpl/{de,en}/ui.tpl als JSON) ───
 // In-Memory-Cache: Shell + i18n-JSON nur neu einlesen, wenn mtime von dashboard.html, dashboard.css,
-// dashboard.client.js oder den ui.tpl-Dateien sich ändert.
+// dashboard.client.js, cache-files-explorer.js oder den ui.tpl-Dateien sich ändert.
 
 /** Repo-Root (tpl/, public/ liegen eine Ebene über scripts/) */
 var DASHBOARD_SCRIPT_DIR = path.join(__dirname, '..');
@@ -2621,6 +2621,7 @@ var __i18nPageCache = {
 var DASHBOARD_TPL_FILE = path.join(DASHBOARD_SCRIPT_DIR, 'tpl', 'dashboard.html');
 var DASHBOARD_CSS_FILE = path.join(DASHBOARD_SCRIPT_DIR, 'public', 'css', 'dashboard.css');
 var DASHBOARD_CLIENT_JS_FILE = path.join(DASHBOARD_SCRIPT_DIR, 'public', 'js', 'dashboard.client.js');
+var DASHBOARD_EXPLORER_JS_FILE = path.join(DASHBOARD_SCRIPT_DIR, 'public', 'js', 'cache-files-explorer.js');
 
 function getPathMtimeMs(p) {
   try {
@@ -2686,6 +2687,7 @@ function getDashboardHtml() {
   var md = getPathMtimeMs(DASHBOARD_TPL_FILE);
   var mc = getPathMtimeMs(DASHBOARD_CSS_FILE);
   var mj = getPathMtimeMs(DASHBOARD_CLIENT_JS_FILE);
+  var mex = getPathMtimeMs(DASHBOARD_EXPLORER_JS_FILE);
   if (
     c.fullHtml &&
     c.mde === mde &&
@@ -2693,7 +2695,8 @@ function getDashboardHtml() {
     c.mko === mko &&
     c.mdashboard === md &&
     c.mcss === mc &&
-    c.mjs === mj
+    c.mjs === mj &&
+    c.mexplorer === mex
   ) {
     return c.fullHtml;
   }
@@ -2703,6 +2706,7 @@ function getDashboardHtml() {
   c.mdashboard = md;
   c.mcss = mc;
   c.mjs = mj;
+  c.mexplorer = mex;
   return c.fullHtml;
 }
 

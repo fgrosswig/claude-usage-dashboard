@@ -102,6 +102,7 @@ var htmlShell =
   '\n' +
   i18nMark +
   '\n' +
+  '<script src="/assets/cache-files-explorer.js"></script>\n' +
   '<script src="/assets/dashboard.client.js"></script>\n' +
   bodyAfterScripts +
   '\n';
