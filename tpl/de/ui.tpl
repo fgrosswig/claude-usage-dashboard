@@ -579,6 +579,7 @@
   "settingsFilterTitle": "Filter",
   "settingsLayoutTitle": "Layout",
   "settingsLayoutGridSpanTitle": "Sektionsbreite im Layout-Raster (von 12 Spalten). Das ist nicht die Anzahl der Diagramme.",
+  "widgetTreeGroupToggleTitle": "Alle Widgets dieser Gruppe ein- oder ausblenden (einzelne Zeilen darunter weiter schaltbar)",
   "settingsTemplatesTitle": "Vorlagen",
   "settingsSettingsTitle": "Einstellungen",
   "settingsStatsTitle": "Statistiken",

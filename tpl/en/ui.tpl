@@ -579,6 +579,7 @@
   "settingsFilterTitle": "Filters",
   "settingsLayoutTitle": "Layout",
   "settingsLayoutGridSpanTitle": "Section width on the layout grid (of 12 columns). This is not the number of charts.",
+  "widgetTreeGroupToggleTitle": "Show or hide all widgets in this group (you can still toggle each row below)",
   "settingsTemplatesTitle": "Templates",
   "settingsSettingsTitle": "Settings",
   "settingsStatsTitle": "Statistics",

@@ -524,6 +524,89 @@
     else applyVisibility();
   }
 
+  /** Show/hide all charts in a widgetGroup in one prefs write (leaves stay individually toggleable). */
+  function setGroupChartsVisibility(childIds, visible) {
+    if (!childIds || !childIds.length) return;
+    if (!_prefs) _prefs = defaultPrefs();
+    if (!Array.isArray(_prefs.hiddenCharts)) _prefs.hiddenCharts = [];
+    for (var gi = 0; gi < childIds.length; gi++) {
+      var cid = childIds[gi];
+      if (!cid) continue;
+      var idx = _prefs.hiddenCharts.indexOf(cid);
+      if (visible && idx >= 0) {
+        _prefs.hiddenCharts.splice(idx, 1);
+      } else if (!visible && idx === -1) {
+        _prefs.hiddenCharts.push(cid);
+      }
+    }
+    savePrefs();
+    applyAllChartVisibility();
+    var needsHealth = false;
+    for (var hk = 0; hk < childIds.length; hk++) {
+      var id0 = childIds[hk];
+      if (!id0) continue;
+      if (id0.indexOf('health-kpi-') === 0 || id0.indexOf('health-finding-') === 0) {
+        needsHealth = true;
+        break;
+      }
+    }
+    if (needsHealth) {
+      if (typeof global.invalidateHealthAndFindingsRender === 'function') {
+        global.invalidateHealthAndFindingsRender();
+      }
+      var dd = global.__lastUsageData;
+      if (dd) {
+        if (typeof global.renderHealthScore === 'function') global.renderHealthScore(dd);
+        if (typeof global.renderKeyFindings === 'function') global.renderKeyFindings(dd);
+      }
+    }
+    scheduleResizeAfterChartVisibility();
+  }
+
+  function syncChartGroupCheckboxFromLeaves(leafCb) {
+    if (!leafCb || !leafCb.parentNode) return;
+    var li = leafCb.closest('li.widget-tree-item');
+    if (!li) return;
+    var groupUl = li.parentNode;
+    if (!groupUl || !groupUl.classList || !groupUl.classList.contains('widget-tree-group-charts')) return;
+    var cluster = groupUl.closest('li.widget-tree-group-cluster');
+    if (!cluster) return;
+    var head = cluster.querySelector('.widget-tree-group-head');
+    if (!head) return;
+    var groupCb = head.querySelector('input[data-type="chart-group"]');
+    if (!groupCb) return;
+    var checks = groupUl.querySelectorAll('.widget-tree-check[data-type="chart"]');
+    var total = 0;
+    var checked = 0;
+    for (var ci = 0; ci < checks.length; ci++) {
+      total++;
+      if (checks[ci].checked) checked++;
+    }
+    groupCb.checked = total > 0 && checked === total;
+    groupCb.indeterminate = checked > 0 && checked < total;
+  }
+
+  function syncAllWidgetTreeGroupCheckboxes(root) {
+    if (!root) return;
+    var heads = root.querySelectorAll('.widget-tree-group-head input[data-type="chart-group"]');
+    for (var hi = 0; hi < heads.length; hi++) {
+      var gcb = heads[hi];
+      var cluster = gcb.closest('li.widget-tree-group-cluster');
+      if (!cluster) continue;
+      var ul = cluster.querySelector(':scope > ul.widget-tree-group-charts');
+      if (!ul) continue;
+      var checks = ul.querySelectorAll('.widget-tree-check[data-type="chart"]');
+      var total = 0;
+      var checked = 0;
+      for (var cj = 0; cj < checks.length; cj++) {
+        total++;
+        if (checks[cj].checked) checked++;
+      }
+      gcb.checked = total > 0 && checked === total;
+      gcb.indeterminate = checked > 0 && checked < total;
+    }
+  }
+
   function setChartVisibility(chartId, visible) {
     if (!_prefs) _prefs = defaultPrefs();
     if (!Array.isArray(_prefs.hiddenCharts)) _prefs.hiddenCharts = [];
@@ -796,6 +879,7 @@
     }
     html += '</ul>';
     body.innerHTML = html;
+    syncAllWidgetTreeGroupCheckboxes(body);
 
     // Delegated events (once per sidebar body — survives re-renders)
     if (!body.dataset.wtreeChangeBound) {
@@ -806,7 +890,26 @@
         var type = cb.dataset.type;
         var id = cb.dataset.id;
         if (type === 'section') setVisibility(id, cb.checked);
-        else if (type === 'chart') setChartVisibility(id, cb.checked);
+        else if (type === 'chart-group') {
+          var raw = cb.getAttribute('data-child-ids') || '';
+          var ids = raw.split('|');
+          var clean = [];
+          for (var ii = 0; ii < ids.length; ii++) {
+            if (ids[ii]) clean.push(ids[ii]);
+          }
+          setGroupChartsVisibility(clean, cb.checked);
+          var cluster = cb.closest('li.widget-tree-group-cluster');
+          if (cluster) {
+            var leafChecks = cluster.querySelectorAll('.widget-tree-group-charts .widget-tree-check[data-type="chart"]');
+            for (var qi = 0; qi < leafChecks.length; qi++) {
+              leafChecks[qi].checked = cb.checked;
+            }
+          }
+          cb.indeterminate = false;
+        } else if (type === 'chart') {
+          setChartVisibility(id, cb.checked);
+          syncChartGroupCheckboxFromLeaves(cb);
+        }
       });
       body.addEventListener('click', function (e) {
         var btn = e.target.closest('.widget-tree-expand');
@@ -1196,9 +1299,24 @@
       var gj = gi + 1;
       while (gj < ordered.length && ordered[gj].widgetGroup === wg) gj++;
       var gdom = wtreeGroupDomId(sec.id, wg);
+      var childIdsArr = [];
+      var allVis = true;
+      for (var ck = gi; ck < gj; ck++) {
+        childIdsArr.push(ordered[ck].id);
+        if (!isChartVisible(ordered[ck].id)) allVis = false;
+      }
+      var childIdsAttr = childIdsArr.join('|');
       html += '<li class="widget-tree-group-cluster">';
       html += '<div class="widget-tree-group-head">';
       html += '<span class="widget-tree-group-spacer"></span>';
+      html +=
+        '<input type="checkbox" class="widget-tree-check" data-type="chart-group" data-child-ids="' +
+        escT(childIdsAttr) +
+        '" title="' +
+        escT(_t('widgetTreeGroupToggleTitle')) +
+        '"' +
+        (allVis ? ' checked' : '') +
+        '>';
       html += '<button type="button" class="widget-tree-expand widget-tree-expand--group" data-wtree-group-id="' + escT(gdom) + '">&#x25B6;</button>';
       html += '<span class="widget-tree-label">' + _t(widgetGroupTitleKey(sec.id, wg)) + '</span>';
       html += '</div>';

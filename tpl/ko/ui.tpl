@@ -579,6 +579,7 @@
   "settingsFilterTitle": "필터",
   "settingsLayoutTitle": "레이아웃",
   "settingsLayoutGridSpanTitle": "레이아웃 그리드에서 이 섹션이 차지하는 너비(12칸 기준). 차트 개수와는 무관합니다.",
+  "widgetTreeGroupToggleTitle": "이 그룹의 위젯을 모두 표시하거나 숨기기(아래에서 항목별로 계속 전환 가능)",
   "settingsTemplatesTitle": "템플릿",
   "settingsSettingsTitle": "설정",
   "settingsStatsTitle": "통계",
