@@ -116,16 +116,18 @@
     return p;
   }
 
-  /** Manual JSON often omits v — sonst loadPrefs -> defaultPrefs bei jedem Refresh. */
+  /**
+   * Akzeptiert Layout-JSON: fehlendes v, oder v als String ("1") aus Export/Handedit —
+   * striktes p.v === 1 scheitert sonst und loadPrefs liefert jedes Mal defaultPrefs.
+   */
   function tryAcceptPrefsPayload(p) {
     if (!p || typeof p !== 'object') return null;
-    if (p.v !== PREFS_VERSION) {
-      if (
-        p.v == null &&
-        ((Array.isArray(p.widgets) && p.widgets.length) || (Array.isArray(p.order) && p.order.length))
-      ) {
-        p.v = PREFS_VERSION;
-      }
+    if (p.v != null && Number(p.v) === PREFS_VERSION) p.v = PREFS_VERSION;
+    else if (
+      p.v == null &&
+      ((Array.isArray(p.widgets) && p.widgets.length) || (Array.isArray(p.order) && p.order.length))
+    ) {
+      p.v = PREFS_VERSION;
     }
     if (p.v !== PREFS_VERSION) return null;
     return normalizePrefsShape(p);
@@ -138,8 +140,8 @@
       var raw = localStorage.getItem(PREFS_KEY);
       if (!raw) return;
       var o = JSON.parse(raw);
-      if (!o || o.v !== PREFS_VERSION) return;
-      normalizePrefsShape(o);
+      if (!o) return;
+      if (!tryAcceptPrefsPayload(o)) return;
       if (Array.isArray(o.hiddenCharts)) _prefs.hiddenCharts = o.hiddenCharts.slice();
       if (Array.isArray(o.hiddenSections)) _prefs.hiddenSections = o.hiddenSections.slice();
     } catch (e) {}
@@ -155,7 +157,7 @@
         if (ok) return ok;
       }
     } catch (e) {}
-    // Fallback: server (sync XHR, only when localStorage empty)
+    // Fallback: server wenn localStorage leer oder unbenutzbar
     try {
       var xhr = new XMLHttpRequest();
       xhr.open('GET', '/api/layout', false);
@@ -518,10 +520,11 @@
     _initialized = true;
     _prefs = loadPrefs();
     if (migrateHiddenChartsLegacy()) savePrefs();
-    // Migrate prefs to v2 if needed
-    if (!_prefs.widgets && _prefs.order) {
+    // Migrate prefs to v2 if needed (auch widgets: [] mit gültigem order[])
+    if ((!_prefs.widgets || !_prefs.widgets.length) && _prefs.order && _prefs.order.length) {
       var migrated = migrateTemplateV1toV2({ order: _prefs.order, hiddenSections: _prefs.hiddenSections });
       _prefs.widgets = migrated.widgets;
+      savePrefs();
     }
     if (_prefs.widgets && _prefs.widgets.length) {
       if (syncPrefsOrderFromWidgets()) savePrefs();
