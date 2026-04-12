@@ -216,6 +216,11 @@
     if (!Array.isArray(hs)) hs = [];
     var reg = getRegistry();
     var secDef = reg && reg.findSection ? reg.findSection(sectionId) : null;
+    // Sections without a layout <details> host (e.g. anthropic-status in the top bar) are not
+    // listed in widgets[] — they must stay "visible" so chart visibility only uses hiddenCharts.
+    if (secDef && secDef.domId === null && secDef.reorderable === false) {
+      return true;
+    }
     if (secDef && secDef.parentSection) {
       if (hs.indexOf(sectionId) !== -1) return false;
       return isSectionVisible(secDef.parentSection);
