@@ -2,6 +2,33 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-237",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "cd3ff34",
+      "commit_full": "cd3ff34c3cbdfe102e69066a04775c87eccc1bd6",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(perf): extract-cache + metrics-engine modules",
+      "detail": "- extract-cache.js: pre-extract JSONL records into ~150B mini-records\n  (vs 5-50KB raw), file manifest with mtime+size for incremental sync\n- session-turns-core.js: pass1FromExtractCache() + buildSessionTurnsFromCache()\n  bypass full JSONL re-parse when extract-cache is loaded\n- metrics-engine.js: pure-function modules for saturation score, quota ETA,\n  EWMA, composite health, root cause, narrative, seasonality baseline\n\nrefs #218\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/metrics-engine.js",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "scripts/extract-cache.js",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "scripts/session-turns-core.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-236",
       "timestamp": "2026-04-12",
       "session": "auto",
