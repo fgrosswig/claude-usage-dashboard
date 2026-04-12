@@ -885,7 +885,9 @@ function buildExtensionTimelineApiResponse() {
   var byDateRaw = buildByDateFromVersionTimelineItems(items);
   var byDateOut = Object.create(null);
   if (byDateRaw) {
-    var keys = Object.keys(byDateRaw).sort();
+    var keys = Object.keys(byDateRaw).sort(function (a, b) {
+      return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+    });
     var synthetic = [];
     for (var i = 0; i < keys.length; i++) {
       var dk = keys[i];
@@ -2135,7 +2137,9 @@ function buildReleaseStabilityData() {
 }
 
 function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
-  var days = Object.keys(daily).sort();
+  var days = Object.keys(daily).sort(function (a, b) {
+    return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+  });
   var result = [];
   for (var di = 0; di < days.length; di++) {
     var key = days[di];
@@ -2144,7 +2148,9 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
     var activeH = unionHourKeyCount(r.hours, r.hour_signals);
     var hostsRaw = r.hosts || {};
     var hostsApi = {};
-    var hKeys = Object.keys(hostsRaw).sort();
+    var hKeys = Object.keys(hostsRaw).sort(function (a, b) {
+      return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+    });
     for (var hi = 0; hi < hKeys.length; hi++) {
       hostsApi[hKeys[hi]] = hostSliceToApi(hostsRaw[hKeys[hi]]);
     }
@@ -2195,9 +2201,13 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
 
   // Model-Change-Detection
   for (var mci = 0; mci < result.length; mci++) {
-    var curModels = Object.keys(result[mci].models || {}).sort();
+    var curModels = Object.keys(result[mci].models || {}).sort(function (a, b) {
+      return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+    });
     if (mci === 0) { result[mci].model_set = curModels; continue; }
-    var prevModels = Object.keys(result[mci - 1].models || {}).sort();
+    var prevModels = Object.keys(result[mci - 1].models || {}).sort(function (a, b) {
+      return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+    });
     result[mci].model_set = curModels;
     var added = [];
     var removed = [];
@@ -3267,7 +3277,9 @@ function parseProxyNdjsonFiles() {
   }
 
   // Build result array
-  var days = Object.keys(daily).sort();
+  var days = Object.keys(daily).sort(function (a, b) {
+    return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+  });
   var result = [];
   for (var di = 0; di < days.length; di++) {
     var key = days[di];

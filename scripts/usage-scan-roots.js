@@ -87,7 +87,9 @@ function scanRootsCacheKey(roots) {
       paths.push(String(roots[ri].path));
     }
   }
-  paths.sort();
+  paths.sort(function (a, b) {
+    return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+  });
   return paths.join('|');
 }
 
@@ -285,6 +287,8 @@ function collectProxyNdjsonFiles() {
       }
     }
   } catch (e) {}
-  files.sort();
+  files.sort(function (a, b) {
+    return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+  });
   return files;
 }

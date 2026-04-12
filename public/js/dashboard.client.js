@@ -4797,7 +4797,9 @@ function renderProxyAnalysis(data) {
   // Status code breakdown for request card sub text
   var sc = pd.status_codes || {};
   var scParts = [];
-  var scKeys = Object.keys(sc).sort();
+  var scKeys = Object.keys(sc).sort(function (a, b) {
+    return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+  });
   for (var si = 0; si < scKeys.length; si++) {
     if (scKeys[si] !== "200" && sc[scKeys[si]] > 0) scParts.push(scKeys[si] + ":" + sc[scKeys[si]]);
   }

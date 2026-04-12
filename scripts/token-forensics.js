@@ -292,7 +292,9 @@ function detectModelChanges(daily, days) {
   var changes = {};
   var prevSet = null;
   for (var i = 0; i < days.length; i++) {
-    var curSet = Object.keys(daily[days[i]].models || {}).sort();
+    var curSet = Object.keys(daily[days[i]].models || {}).sort(function (a, b) {
+      return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+    });
     if (prevSet) {
       var added = [], removed = [];
       for (var c = 0; c < curSet.length; c++) {
@@ -354,7 +356,9 @@ function findBestLimitDayForComparison(limitDays, daily) {
   return limitDays.length > 0 ? limitDays[limitDays.length - 1].day : null;
 }
 
-var days = Object.keys(daily).sort();
+var days = Object.keys(daily).sort(function (a, b) {
+  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+});
 var peakDay = detectPeakDay(daily, days);
 var limitDays = detectLimitDays(daily, days);
 var modelChanges = detectModelChanges(daily, days);
