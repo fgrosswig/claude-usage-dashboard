@@ -2,6 +2,43 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-214",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "ee945bb",
+      "commit_full": "ee945bb915d33c1f3da66c7b5b34d5971a317158",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(builder): drag-to-resize preview, sections label, full-width modal",
+      "detail": "- Resize handle on preview cells: drag right edge to change span (1-12)\n- bindPreviewResize(): mousedown/mousemove/mouseup with col-width calculation\n- Live preview update syncs span select dropdowns\n- Modal full-width (removed max-width:1100px)\n- Renamed \"Widgets\" to \"Sections\" in builder list (DE/EN/KO)\n- CSS: .tb-resize-handle, body.tb-resizing cursor override\n- Fixed duplicate .tb-preview-cell selector\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-213",
       "timestamp": "2026-04-12",
       "session": "auto",
