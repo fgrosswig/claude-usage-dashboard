@@ -168,7 +168,7 @@ tr:hover td{background:#334155}
 .bar-wrap{height:6px;background:#334155;border-radius:3px;min-width:80px}
 .bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#3b82f6,#8b5cf6)}
 .bar-fill.warn{background:linear-gradient(90deg,#f59e0b,#ef4444)}
-.top-bar{position:sticky;top:var(--dev-bar-h,0px);z-index:250;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px;margin:0 0 0 0;padding:6px 12px;background:rgba(15,23,42,.94);border-bottom:1px solid #334155;backdrop-filter:blur(8px)}
+.top-bar{position:sticky;top:var(--dev-bar-h,0px);z-index:500;min-height:44px;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px;margin:0 0 0 0;padding:6px 12px;background:rgba(15,23,42,.94);border-bottom:1px solid #334155;backdrop-filter:blur(8px)}
 .top-bar-cluster{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .live-pop{position:static}
 .live-pop .refresh{background:#334155;color:#e2e8f0;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:.8rem;display:block;width:auto;min-width:9rem;text-align:left}

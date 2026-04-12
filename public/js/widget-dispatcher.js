@@ -655,7 +655,17 @@
       }
       if (show) break;
     }
-    var el = document.getElementById(canvasId);
+    var el = null;
+    if (
+      canvasId === 'c-uptime-chart' ||
+      canvasId === 'c-incident-history' ||
+      canvasId === 'c-outage-timeline' ||
+      canvasId === 'c-anthropic-incidents'
+    ) {
+      var ab = document.getElementById('anthropic-badge');
+      if (ab) el = ab.querySelector('#' + canvasId);
+    }
+    if (!el) el = document.getElementById(canvasId);
     if (!el) return;
     var box = el.closest('.chart-box');
     if (box) {

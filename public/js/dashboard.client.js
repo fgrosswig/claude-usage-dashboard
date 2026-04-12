@@ -837,6 +837,7 @@ function __scheduleAnthropicHealthChartsResize() {
     __anthropicHealthResizeT = null;
     __safeChartResize(_proxyCharts.uptimeChart);
     __safeChartResize(_proxyCharts.incidentHistory);
+    __safeChartResize(_proxyCharts.anthropicIncidents);
     __safeChartResize(_proxyCharts.outageTimeline);
   }, 80);
 }
@@ -844,6 +845,7 @@ function __scheduleAnthropicHealthChartsResize() {
 function __bumpAnthropicHealthCharts() {
   __safeChartResize(_proxyCharts.uptimeChart);
   __safeChartResize(_proxyCharts.incidentHistory);
+  __safeChartResize(_proxyCharts.anthropicIncidents);
   __safeChartResize(_proxyCharts.outageTimeline);
 }
 
@@ -5964,6 +5966,9 @@ function updateAnthropicPopup(data) {
   var el = document.getElementById("c-anthropic-incidents");
   if (!el) return;
 
+  var scatterTitle = document.getElementById("anthropic-scatter-chart-title");
+  if (scatterTitle) scatterTitle.textContent = t("chartStatusOutageScatter");
+
   var label = document.getElementById("anthropic-label");
   if (label) label.textContent = "Anthropic";
 
@@ -5986,6 +5991,20 @@ function updateAnthropicPopup(data) {
     if (ic > 0) scatterData.push([i, ic]);
   }
 
+  if (_proxyCharts.anthropicIncidents) {
+    try {
+      var domA = _proxyCharts.anthropicIncidents.getDom ? _proxyCharts.anthropicIncidents.getDom() : null;
+      if (domA !== el) {
+        _proxyCharts.anthropicIncidents.dispose();
+        _proxyCharts.anthropicIncidents = null;
+      }
+    } catch (eAnth) {
+      try {
+        _proxyCharts.anthropicIncidents.dispose();
+      } catch (eAnth2) {}
+      _proxyCharts.anthropicIncidents = null;
+    }
+  }
   if (!_proxyCharts.anthropicIncidents) {
     _proxyCharts.anthropicIncidents = echarts.init(el, null, { renderer: 'canvas' });
   }
@@ -6506,7 +6525,7 @@ function renderAvailabilityKpis(data) {
 // ── Auto-collapse charts when Kennzahlen opens (and vice versa) ──────────
 (function() {
   var kpiDet = document.getElementById("avail-kpi-details");
-  var chartIds = ["uptime-chart-details", "incident-history-details"];
+  var chartIds = ["uptime-chart-details", "incident-history-details", "anthropic-incidents-details"];
   var keepOpen = "outage-timeline-details";
   if (!kpiDet) return;
   function isInModal() {
@@ -6561,7 +6580,7 @@ function renderAvailabilityKpis(data) {
   var badge = document.getElementById("anthropic-badge");
   if (!expandBtn || !overlay || !modalBody || !popup) return;
 
-  var chartDetailIds = ["uptime-chart-details", "incident-history-details", "outage-timeline-details"];
+  var chartDetailIds = ["uptime-chart-details", "incident-history-details", "anthropic-incidents-details", "outage-timeline-details"];
 
   function forceChartsOpen() {
     for (var i = 0; i < chartDetailIds.length; i++) {
@@ -6603,6 +6622,7 @@ function renderAvailabilityKpis(data) {
       renderIncidentHistory(_lastAvailKpiData);
       renderOutageTimeline(_lastAvailKpiData);
       renderAvailabilityKpis(_lastAvailKpiData);
+      updateAnthropicPopup(_lastAvailKpiData);
     }
     requestAnimationFrame(function () {
       __bumpAnthropicHealthCharts();
@@ -6634,6 +6654,7 @@ function renderAvailabilityKpis(data) {
       renderIncidentHistory(_lastAvailKpiData);
       renderOutageTimeline(_lastAvailKpiData);
       renderAvailabilityKpis(_lastAvailKpiData);
+      updateAnthropicPopup(_lastAvailKpiData);
     }
     requestAnimationFrame(function () {
       __bumpAnthropicHealthCharts();
@@ -6664,12 +6685,12 @@ function renderAvailabilityKpis(data) {
   var winH = globalThis.window;
   if (!winH) return;
   winH.addEventListener("resize", __scheduleAnthropicHealthChartsResize);
-  ["uptime-chart-details", "incident-history-details", "outage-timeline-details"].forEach(function (id) {
+  ["uptime-chart-details", "incident-history-details", "anthropic-incidents-details", "outage-timeline-details"].forEach(function (id) {
     var d = document.getElementById(id);
     if (d) d.addEventListener("toggle", __scheduleAnthropicHealthChartsResize);
   });
   if (typeof ResizeObserver === "undefined") return;
-  var ids = ["c-uptime-chart", "c-incident-history", "c-outage-timeline"];
+  var ids = ["c-uptime-chart", "c-incident-history", "c-anthropic-incidents", "c-outage-timeline"];
   for (var ri = 0; ri < ids.length; ri++) {
     var chartEl = document.getElementById(ids[ri]);
     var host = chartEl?.parentElement;

@@ -486,6 +486,7 @@
   "availKpiImpact": "By Severity",
   "availKpiKind": "By Source",
   "uptimeChartTitle": "Service Uptime (24h per day)",
+  "chartStatusOutageScatter": "Outage hours vs incidents (per day)",
   "uptimeOperational": "Operational",
   "uptimeDegraded": "Degraded",
   "uptimePartial": "Partial Outage",

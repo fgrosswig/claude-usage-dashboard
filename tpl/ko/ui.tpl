@@ -397,6 +397,7 @@
   "availKpiImpact": "심각도별",
   "availKpiKind": "소스별",
   "uptimeChartTitle": "Service Uptime (일별 24h)",
+  "chartStatusOutageScatter": "장애 시간 대 사건 수(일별)",
   "uptimeOperational": "정상 운영",
   "uptimeDegraded": "성능 저하",
   "uptimePartial": "부분 장애",
