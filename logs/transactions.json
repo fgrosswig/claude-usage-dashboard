@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-230",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "e8d81ca",
+      "commit_full": "e8d81ca80241e4ea04c6f80b597a375f512bd39e",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ui): anthropic popup default open first two charts, kpi collapsed refs #216",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-229",
       "timestamp": "2026-04-12",
       "session": "auto",
