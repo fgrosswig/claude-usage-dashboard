@@ -2,6 +2,58 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-195",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "4483c1d",
+      "commit_full": "4483c1d30d447a352e128869baf6ae76af7e2389",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(sonar): reduce MAJOR and CRITICAL findings in JS and Python refs #213",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/anthropic-proxy-core.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/benchmark-session-turns.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/session-turns-core.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/session-turns-warm-cache.py",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/udaa-fieldstudy-export.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/usage-scan-roots.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-194",
       "timestamp": "2026-04-12",
       "session": "auto",
