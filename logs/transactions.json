@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-229",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "0ef9ac0",
+      "commit_full": "0ef9ac04960f9725aa6dceac63b55f746869b0d5",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ui): anthropic charts row service then incidents refs #216",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-228",
       "timestamp": "2026-04-12",
       "session": "auto",
