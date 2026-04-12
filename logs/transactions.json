@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-224",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "77a261a",
+      "commit_full": "77a261a3d2976784d1077f2415e49b4915c6d936",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(layout): nest widget-tree charts inside section li for valid HTML refs #216",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-223",
       "timestamp": "2026-04-12",
       "session": "auto",
