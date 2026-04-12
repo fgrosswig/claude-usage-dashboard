@@ -12,6 +12,12 @@
  *   visible (boolean), order (number), tags (string[])
  * via normalizeWidgetRegistryLayer1() — defaults can be overridden on literals later.
  *
+ * Layer 2 (registry v3): every section gets dispatcher fields:
+ *   domId (string|null)      — <details> element ID for visibility/reorder
+ *   sectionRenderFn (string) — global function name called by dispatcher
+ *   companionIds (string[])  — sibling DOM elements that move with the section
+ *   reorderable (boolean)    — false for popup/nested sections
+ *
  * Usage:
  *   window.__widgetRegistry.sections  — all section definitions
  *   window.__widgetRegistry.findChart("token-hourly")  — lookup by chart ID
@@ -87,12 +93,15 @@
   }
 
   var registry = {
-    version: 2,
+    version: 3,
     sections: [
       // ── Health Score ────────────────────────────────────────────
       {
         id: 'health',
         titleKey: 'healthScoreTitle',
+        domId: 'health-collapse',
+        sectionRenderFn: 'renderHealthScore',
+        reorderable: true,
         defaultOpen: false,
         dataSource: '/api/usage',
         requires: ['usage'],
@@ -103,6 +112,10 @@
       {
         id: 'token-stats',
         titleKey: 'sectionTokenStats',
+        domId: 'token-stats-collapse',
+        sectionRenderFn: 'renderTokenStatsSection',
+        companionIds: ['day-picker-row', 'main-charts-scope-wrap'],
+        reorderable: true,
         defaultOpen: true,
         dataSource: '/api/usage',
         requires: ['usage'],
@@ -195,6 +208,9 @@
       {
         id: 'forensic',
         titleKey: 'sectionForensic',
+        domId: 'forensic-collapse',
+        sectionRenderFn: 'renderForensicSection',
+        reorderable: true,
         defaultOpen: true,
         dataSource: '/api/usage',
         requires: ['usage'],
@@ -233,6 +249,9 @@
       {
         id: 'user-profile',
         titleKey: 'sectionUserProfile',
+        domId: 'user-profile-collapse',
+        sectionRenderFn: 'renderUserProfileCharts',
+        reorderable: true,
         defaultOpen: false,
         dataSource: '/api/usage',
         requires: ['usage'],
@@ -271,6 +290,9 @@
       {
         id: 'budget',
         titleKey: 'sectionBudget',
+        domId: 'budget-collapse',
+        sectionRenderFn: 'renderBudgetEfficiency',
+        reorderable: true,
         defaultOpen: false,
         dataSource: '/api/usage',
         requires: ['usage'],
@@ -309,6 +331,9 @@
       {
         id: 'proxy',
         titleKey: 'sectionProxy',
+        domId: 'proxy-collapse',
+        sectionRenderFn: 'renderProxyAnalysis',
+        reorderable: true,
         defaultOpen: false,
         dataSource: '/api/usage',
         requires: ['usage'],
@@ -383,6 +408,8 @@
       {
         id: 'anthropic-status',
         titleKey: 'sectionAnthropicStatus',
+        domId: null,
+        reorderable: false,
         defaultOpen: false,
         dataSource: '/api/usage',
         requires: ['usage', 'status'],
@@ -430,6 +457,9 @@
       {
         id: 'economic',
         titleKey: 'sectionEconomic',
+        domId: 'economic-collapse',
+        sectionRenderFn: 'renderEconomicSection',
+        reorderable: true,
         defaultOpen: false,
         lazy: true,
         dataSource: '/api/session-turns',
@@ -487,6 +517,8 @@
       {
         id: 'efficiency-range',
         titleKey: 'sectionEfficiencyRange',
+        domId: 'econ-range-collapse',
+        reorderable: false,
         defaultOpen: false,
         parentSection: 'economic',
         dataSource: '/api/session-turns',

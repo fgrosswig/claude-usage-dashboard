@@ -15,6 +15,9 @@ var MIME = {
 var ASSET_ROUTES = {
   '/assets/dashboard.css': ['public', 'css', 'dashboard.css'],
   '/assets/cache-files-explorer.js': ['public', 'js', 'cache-files-explorer.js'],
+  '/assets/widget-registry.js': ['public', 'js', 'widget-registry.js'],
+  '/assets/widget-dispatcher.js': ['public', 'js', 'widget-dispatcher.js'],
+  '/assets/dashboard-sections.js': ['public', 'js', 'dashboard-sections.js'],
   '/assets/dashboard.client.js': ['public', 'js', 'dashboard.client.js']
 };
 

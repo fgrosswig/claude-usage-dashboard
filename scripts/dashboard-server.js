@@ -2632,6 +2632,9 @@ var DASHBOARD_TPL_FILE = path.join(DASHBOARD_SCRIPT_DIR, 'tpl', 'dashboard.html'
 var DASHBOARD_CSS_FILE = path.join(DASHBOARD_SCRIPT_DIR, 'public', 'css', 'dashboard.css');
 var DASHBOARD_CLIENT_JS_FILE = path.join(DASHBOARD_SCRIPT_DIR, 'public', 'js', 'dashboard.client.js');
 var DASHBOARD_EXPLORER_JS_FILE = path.join(DASHBOARD_SCRIPT_DIR, 'public', 'js', 'cache-files-explorer.js');
+var DASHBOARD_REGISTRY_JS_FILE = path.join(DASHBOARD_SCRIPT_DIR, 'public', 'js', 'widget-registry.js');
+var DASHBOARD_DISPATCHER_JS_FILE = path.join(DASHBOARD_SCRIPT_DIR, 'public', 'js', 'widget-dispatcher.js');
+var DASHBOARD_SECTIONS_JS_FILE = path.join(DASHBOARD_SCRIPT_DIR, 'public', 'js', 'dashboard-sections.js');
 
 function getPathMtimeMs(p) {
   try {
@@ -2698,6 +2701,9 @@ function getDashboardHtml() {
   var mc = getPathMtimeMs(DASHBOARD_CSS_FILE);
   var mj = getPathMtimeMs(DASHBOARD_CLIENT_JS_FILE);
   var mex = getPathMtimeMs(DASHBOARD_EXPLORER_JS_FILE);
+  var mreg = getPathMtimeMs(DASHBOARD_REGISTRY_JS_FILE);
+  var mdisp = getPathMtimeMs(DASHBOARD_DISPATCHER_JS_FILE);
+  var msec = getPathMtimeMs(DASHBOARD_SECTIONS_JS_FILE);
   if (
     c.fullHtml &&
     c.mde === mde &&
@@ -2706,7 +2712,10 @@ function getDashboardHtml() {
     c.mdashboard === md &&
     c.mcss === mc &&
     c.mjs === mj &&
-    c.mexplorer === mex
+    c.mexplorer === mex &&
+    c.mregistry === mreg &&
+    c.mdispatcher === mdisp &&
+    c.msections === msec
   ) {
     return c.fullHtml;
   }
@@ -2717,6 +2726,9 @@ function getDashboardHtml() {
   c.mcss = mc;
   c.mjs = mj;
   c.mexplorer = mex;
+  c.mregistry = mreg;
+  c.mdispatcher = mdisp;
+  c.msections = msec;
   return c.fullHtml;
 }
 
