@@ -290,6 +290,7 @@
       renderSettingsSection();
       renderTemplatesSection();
       renderExportSection();
+      bindStatsToggle();
       // Resize charts after layout shift
       setTimeout(function () { resizeAll(); }, 250);
     }
@@ -418,6 +419,103 @@
         resetPrefs();
         renderWidgetTree();
       });
+    }
+  }
+
+  // ── Stats Section (User Profile Charts in Sidebar) ─────────────
+
+  var _statsCharts = {};
+
+  function renderStatsSection() {
+    var body = document.getElementById('sidebar-stats-body');
+    if (!body) return;
+    if (!body.dataset.built) {
+      body.dataset.built = '1';
+      body.innerHTML =
+        '<div id="sb-user-versions" style="width:100%;height:220px"></div>' +
+        '<div id="sb-user-entrypoints" style="width:100%;height:220px;margin-top:12px"></div>' +
+        '<div id="sb-user-stability" style="width:100%;height:220px;margin-top:12px"></div>';
+    }
+    // Render mini versions of the user profile charts
+    if (typeof echarts === 'undefined') return;
+    var data = global.__lastUsageData;
+    if (!data) return;
+    var days = typeof getFilteredDays === 'function' ? getFilteredDays(data.days) : data.days || [];
+    if (!days.length) return;
+    var relStab = data.release_stability || null;
+
+    // --- Versions chart (horizontal bar) ---
+    var verEl = document.getElementById('sb-user-versions');
+    if (verEl) {
+      if (!_statsCharts.versions) _statsCharts.versions = echarts.init(verEl, null, { renderer: 'canvas' });
+      var verCounts = {};
+      for (var vi = 0; vi < days.length; vi++) {
+        var dv = days[vi].versions;
+        if (!dv) continue;
+        for (var vk in dv) {
+          verCounts[vk] = (verCounts[vk] || 0) + dv[vk];
+        }
+      }
+      var verLabels = Object.keys(verCounts).sort(function (a, b) { return verCounts[a] - verCounts[b]; });
+      var verData = verLabels.map(function (k) { return verCounts[k]; });
+      _statsCharts.versions.setOption({
+        animation: false,
+        grid: { left: 100, right: 16, top: 8, bottom: 20 },
+        tooltip: { trigger: 'axis' },
+        xAxis: { type: 'value', axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+        yAxis: { type: 'category', data: verLabels, axisLabel: { color: '#94a3b8', fontSize: 10 } },
+        series: [{ type: 'bar', data: verData, itemStyle: { color: 'rgba(59,130,246,0.7)' } }]
+      }, true);
+    }
+
+    // --- Entrypoints chart ---
+    var epEl = document.getElementById('sb-user-entrypoints');
+    if (epEl) {
+      if (!_statsCharts.entrypoints) _statsCharts.entrypoints = echarts.init(epEl, null, { renderer: 'canvas' });
+      var epCounts = {};
+      for (var ei = 0; ei < days.length; ei++) {
+        var de = days[ei].entrypoints;
+        if (!de) continue;
+        for (var ek in de) {
+          epCounts[ek] = (epCounts[ek] || 0) + de[ek];
+        }
+      }
+      var epLabels = Object.keys(epCounts).sort(function (a, b) { return epCounts[a] - epCounts[b]; });
+      var epData = epLabels.map(function (k) { return epCounts[k]; });
+      _statsCharts.entrypoints.setOption({
+        animation: false,
+        grid: { left: 100, right: 16, top: 8, bottom: 20 },
+        tooltip: { trigger: 'axis' },
+        xAxis: { type: 'value', axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+        yAxis: { type: 'category', data: epLabels, axisLabel: { color: '#94a3b8', fontSize: 10 } },
+        series: [{ type: 'bar', data: epData, itemStyle: { color: 'rgba(6,182,212,0.7)' } }]
+      }, true);
+    }
+
+    // --- Release Stability chart ---
+    var rsEl = document.getElementById('sb-user-stability');
+    if (rsEl && relStab) {
+      if (!_statsCharts.stability) _statsCharts.stability = echarts.init(rsEl, null, { renderer: 'canvas' });
+      var rsLabels = [];
+      var rsGood = [];
+      var rsBad = [];
+      for (var ri = 0; ri < relStab.length; ri++) {
+        var r = relStab[ri];
+        rsLabels.push(r.version || '?');
+        rsGood.push(r.good || 0);
+        rsBad.push(r.bad || 0);
+      }
+      _statsCharts.stability.setOption({
+        animation: false,
+        grid: { left: 100, right: 16, top: 8, bottom: 20 },
+        tooltip: { trigger: 'axis' },
+        xAxis: { type: 'value', axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+        yAxis: { type: 'category', data: rsLabels, axisLabel: { color: '#94a3b8', fontSize: 10 } },
+        series: [
+          { name: 'Good', type: 'bar', stack: 's', data: rsGood, itemStyle: { color: 'rgba(34,197,94,0.7)' } },
+          { name: 'Bad', type: 'bar', stack: 's', data: rsBad, itemStyle: { color: 'rgba(239,68,68,0.7)' } }
+        ]
+      }, true);
     }
   }
 
@@ -582,6 +680,26 @@
         hostSlot.appendChild(hostClone);
       }
     }
+  }
+
+  // ── Stats Toggle Binding ─────────────────────────────────────────
+
+  function bindStatsToggle() {
+    var det = document.getElementById('sidebar-stats');
+    if (!det || det.dataset.statsBound) return;
+    det.dataset.statsBound = '1';
+    det.addEventListener('toggle', function () {
+      if (det.open) {
+        renderStatsSection();
+        setTimeout(function () {
+          for (var k in _statsCharts) {
+            if (_statsCharts[k] && typeof _statsCharts[k].resize === 'function') {
+              try { _statsCharts[k].resize(); } catch (e) {}
+            }
+          }
+        }, 60);
+      }
+    });
   }
 
   // ── Enhanced Init ───────────────────────────────────────────────
