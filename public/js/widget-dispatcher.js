@@ -343,6 +343,7 @@
       initDevSection();
       bindToolsSection();
       renderExportSection();
+      bindUserSettingsModal();
       // Resize charts after layout shift
       setTimeout(function () { resizeAll(); }, 250);
     }
@@ -899,6 +900,212 @@
     }
   }
 
+  // ── User Settings Modal ──────────────────────────────────────────
+  var _userSettingsOrigParents = {};
+
+  function _saveDomPos(el, key) {
+    if (!el) return;
+    _userSettingsOrigParents[key] = { parent: el.parentNode, next: el.nextSibling };
+  }
+  function _restoreDomPos(el, key) {
+    var info = _userSettingsOrigParents[key];
+    if (!el || !info) return;
+    if (info.next && info.next.parentNode === info.parent) info.parent.insertBefore(el, info.next);
+    else if (info.parent) info.parent.appendChild(el);
+  }
+
+  function populateLangSection() {
+    var body = document.getElementById('us-lang-body');
+    if (!body || body.dataset.filled) return;
+    body.dataset.filled = '1';
+    var langs = ['de', 'en', 'ko'];
+    var labels = { de: 'DE', en: 'EN', ko: 'KO' };
+    var currentLang = (typeof getLang === 'function') ? getLang() : (localStorage.getItem('usageDashboardLang') || 'en');
+    var html = '<div class="us-lang-row">';
+    for (var i = 0; i < langs.length; i++) {
+      var l = langs[i];
+      html += '<button type="button" class="lang-btn' + (l === currentLang ? ' active' : '') + '" data-lang="' + l + '">' + labels[l] + '</button>';
+    }
+    html += '<span class="us-lang-saved" id="us-lang-indicator">' + _t('usPlanActive') + ': ' + (labels[currentLang] || 'EN') + '</span>';
+    html += '</div>';
+    body.innerHTML = html;
+    body.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-lang]');
+      if (!btn) return;
+      var origBtn = document.getElementById('lang-' + btn.dataset.lang);
+      if (origBtn) origBtn.click();
+      // Update active states
+      var all = body.querySelectorAll('.lang-btn');
+      for (var j = 0; j < all.length; j++) all[j].classList.remove('active');
+      btn.classList.add('active');
+      var indicator = document.getElementById('us-lang-indicator');
+      if (indicator) indicator.textContent = _t('usPlanActive') + ': ' + btn.textContent;
+    });
+  }
+
+  function populatePlanSection() {
+    var body = document.getElementById('us-plan-body');
+    if (!body || body.dataset.filled) return;
+    body.dataset.filled = '1';
+    var plans = { max5: 'MAX 5', max20: 'MAX 20', pro: 'Pro', free: 'Free', api: 'API' };
+    var current = localStorage.getItem('cud_plan') || 'max5';
+    var html = '<div class="us-plan-row">';
+    html += '<select class="plan-select" id="us-plan-select">';
+    for (var k in plans) {
+      html += '<option value="' + k + '"' + (k === current ? ' selected' : '') + '>' + plans[k] + '</option>';
+    }
+    html += '</select>';
+    html += '<span class="us-plan-active" id="us-plan-badge">' + _t('usPlanActive') + '</span>';
+    html += '</div>';
+    html += '<p class="us-plan-info">' + _t('usPlanInfo') + '</p>';
+    body.innerHTML = html;
+    var sel = document.getElementById('us-plan-select');
+    if (sel) {
+      sel.addEventListener('change', function () {
+        var origPlan = document.getElementById('plan-select');
+        if (origPlan) {
+          origPlan.value = this.value;
+          origPlan.dispatchEvent(new Event('change'));
+        }
+        // Also update sidebar clone if present
+        var sidebarPlan = document.getElementById('sidebar-plan-select');
+        if (sidebarPlan) sidebarPlan.value = this.value;
+      });
+    }
+  }
+
+  function populateProfileSection() {
+    var body = document.getElementById('us-profile-body');
+    if (!body) return;
+    var profileCollapse = document.getElementById('user-profile-collapse');
+    if (profileCollapse) {
+      _saveDomPos(profileCollapse, 'profile');
+      body.appendChild(profileCollapse);
+      profileCollapse.open = true;
+      profileCollapse.style.display = '';
+      // Resize charts after move
+      setTimeout(function () {
+        var charts = body.querySelectorAll('[id^="c-user-"]');
+        for (var i = 0; i < charts.length; i++) {
+          var inst = typeof echarts !== 'undefined' ? echarts.getInstanceByDom(charts[i]) : null;
+          if (inst) inst.resize();
+        }
+      }, 100);
+    }
+  }
+
+  function populatePatSection() {
+    var body = document.getElementById('us-pat-body');
+    if (!body) return;
+    var patPanel = document.getElementById('github-token-panel');
+    if (patPanel) {
+      _saveDomPos(patPanel, 'pat');
+      body.appendChild(patPanel);
+      patPanel.style.display = '';
+    }
+  }
+
+  function populateMarketplaceSection() {
+    var body = document.getElementById('us-marketplace-body');
+    if (!body) return;
+    // Marketplace refresh button — move from meta-details
+    var mkRow = document.querySelector('.github-token-row');
+    if (mkRow) {
+      _saveDomPos(mkRow, 'marketplace');
+      body.appendChild(mkRow);
+      mkRow.style.display = '';
+      // Fix button style to match modal CSS
+      var btn = mkRow.querySelector('#marketplace-extension-refresh');
+      if (btn) {
+        btn.className = 'us-marketplace-btn';
+      }
+    }
+    // Show last sync time
+    var syncEl = document.getElementById('us-marketplace-sync-time');
+    if (!syncEl) {
+      syncEl = document.createElement('p');
+      syncEl.className = 'us-marketplace-sync';
+      syncEl.id = 'us-marketplace-sync-time';
+      body.insertBefore(syncEl, body.firstChild);
+    }
+    // Get marketplace_fetched_at from last API data
+    var data = global.__lastUsageData;
+    if (data && data.versionTimeline && data.versionTimeline.marketplace_fetched_at) {
+      syncEl.textContent = _t('usMarketplaceLastSync') + ': ' + new Date(data.versionTimeline.marketplace_fetched_at).toLocaleString();
+    } else {
+      syncEl.textContent = _t('usMarketplaceLastSync') + ': —';
+    }
+  }
+
+  function openUserSettingsModal() {
+    var overlay = document.getElementById('user-settings-overlay');
+    if (!overlay) return;
+
+    // Set i18n titles
+    var titleEl = document.getElementById('user-settings-modal-title');
+    if (titleEl) titleEl.textContent = _t('userSettingsTitle');
+    var sectionTitles = {
+      'us-profile-title': 'usProfileTitle',
+      'us-lang-title': 'usLangTitle',
+      'us-plan-title': 'usPlanTitle',
+      'us-health-title': 'usHealthTitle',
+      'us-pat-title': 'usPatTitle',
+      'us-marketplace-title': 'usMarketplaceTitle'
+    };
+    for (var id in sectionTitles) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = el.textContent.split('\u25B6').pop().trim() ? el.textContent : _t(sectionTitles[id]);
+      if (el) el.textContent = _t(sectionTitles[id]);
+    }
+
+    // Populate sections
+    populateProfileSection();
+    populateLangSection();
+    populatePlanSection();
+    populatePatSection();
+    populateMarketplaceSection();
+
+    overlay.classList.add('is-open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeUserSettingsModal() {
+    var overlay = document.getElementById('user-settings-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('is-open');
+    document.body.style.overflow = '';
+
+    // Restore DOM-moved elements
+
+    _restoreDomPos(document.getElementById('user-profile-collapse'), 'profile');
+    _restoreDomPos(document.getElementById('github-token-panel'), 'pat');
+    var mkRow = document.querySelector('#us-marketplace-body > .github-token-row');
+    _restoreDomPos(mkRow, 'marketplace');
+    _userSettingsOrigParents = {};
+  }
+
+  function bindUserSettingsModal() {
+    var openBtn = document.getElementById('sidebar-open-user-settings');
+    if (openBtn && !openBtn.dataset.bound) {
+      openBtn.dataset.bound = '1';
+      openBtn.addEventListener('click', function () {
+        openUserSettingsModal();
+      });
+    }
+    var closeBtn = document.getElementById('user-settings-modal-close');
+    if (closeBtn && !closeBtn.dataset.bound) {
+      closeBtn.dataset.bound = '1';
+      closeBtn.addEventListener('click', closeUserSettingsModal);
+    }
+    var overlay = document.getElementById('user-settings-overlay');
+    if (overlay && !overlay.dataset.bound) {
+      overlay.dataset.bound = '1';
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeUserSettingsModal();
+      });
+    }
+  }
+
   function renderExportSection() {
     // Export buttons are already in HTML, just add click handlers
     var jsonlBtn = document.getElementById('sidebar-export-jsonl');
@@ -996,7 +1203,8 @@
       'sidebar-export-jsonl': 'settingsExportJsonl',
       'sidebar-export-template': 'settingsExportTemplate',
       'sidebar-import-template': 'settingsImportTemplate',
-      'settings-nav-btn': 'settingsBtnTitle'
+      'settings-nav-btn': 'settingsBtnTitle',
+      'sidebar-open-user-settings': 'settingsUserSettings'
     };
     for (var id in titles) {
       var el = document.getElementById(id);
@@ -1004,6 +1212,17 @@
         if (el.tagName === 'BUTTON' && id === 'settings-nav-btn') el.title = _t(titles[id]);
         else el.textContent = _t(titles[id]);
       }
+    }
+    // Filter bar toggle
+    var filterBtn = document.getElementById('filter-toggle-btn');
+    var filterBar = document.getElementById('filter-bar');
+    if (filterBtn && filterBar && !filterBtn.dataset.bound) {
+      filterBtn.dataset.bound = '1';
+      filterBtn.textContent = _t('filterToggle');
+      filterBtn.addEventListener('click', function () {
+        filterBar.classList.toggle('is-open');
+        filterBtn.classList.toggle('is-active');
+      });
     }
     // Version — set immediately from inline global
     var verEl = document.getElementById('sidebar-version');

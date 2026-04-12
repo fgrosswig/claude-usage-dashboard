@@ -1,6 +1,6 @@
 {
   "pageTitle": "Claude Code 사용량 대시보드",
-  "heading": "Claude Code Token 사용량",
+  "heading": "Claude Usage Dashboard",
   "subModelsHtml": "<strong>Claude</strong> 모델(<code>claude-*</code>)만 집계 — <code>&lt;synthetic&gt;</code> 라인 제외.",
   "langLabel": "언어",
   "ariaLangGroup": "언어 선택",
@@ -585,5 +585,22 @@
   "settingsTemplateNamePrompt": "템플릿 이름:",
   "settingsToolsTitle": "도구",
   "settingsOpenExplorer": "파일 탐색기",
-  "settingsOpenReleases": "릴리스 노트"
+  "settingsOpenReleases": "릴리스 노트",
+  "filterToggle": "필터",
+  "warmupTitle": "Claude Usage Dashboard",
+  "warmupInit": "초기화 중…",
+  "warmupScanning": "로그 스캔 중… {done}/{total}",
+  "warmupCache": "캐시 생성 중…",
+  "warmupReady": "준비 완료",
+  "recomputeLabel": "재계산 중…",
+  "settingsUserSettings": "사용자 설정",
+  "userSettingsTitle": "사용자 설정",
+  "usLangTitle": "언어",
+  "usPlanTitle": "플랜",
+  "usPlanInfo": "차트에서 이 플랜을 예산 계산 기준으로 사용합니다 (쿼터 한도, 비용 예측, 소진율).",
+  "usPlanActive": "활성",
+    "usProfileTitle": "사용자 프로필",
+    "usPatTitle": "GitHub PAT",
+  "usMarketplaceTitle": "VS Marketplace",
+  "usMarketplaceLastSync": "마지막 동기화"
 }

@@ -1,6 +1,6 @@
 {
   "pageTitle": "Claude Code Nutzungs-Dashboard",
-  "heading": "Claude Code Token-Nutzung",
+  "heading": "Claude Usage Dashboard",
   "subModelsHtml": "Nur <strong>Claude</strong>-Modelle (<code>claude-*</code>) — keine <code>&lt;synthetic&gt;</code>-Zeilen.",
   "langLabel": "Sprache",
   "ariaLangGroup": "Sprache wählen",
@@ -585,5 +585,22 @@
   "settingsTemplateNamePrompt": "Name fuer das Template:",
   "settingsToolsTitle": "Werkzeuge",
   "settingsOpenExplorer": "Datei-Explorer",
-  "settingsOpenReleases": "Release Notes"
+  "settingsOpenReleases": "Release Notes",
+  "filterToggle": "Filter",
+  "warmupTitle": "Claude Usage Dashboard",
+  "warmupInit": "Initialisierung…",
+  "warmupScanning": "Logdateien scannen… {done}/{total}",
+  "warmupCache": "Cache erzeugen…",
+  "warmupReady": "Bereit",
+  "recomputeLabel": "Neuberechnung…",
+  "settingsUserSettings": "Benutzer-Einstellungen",
+  "userSettingsTitle": "Benutzer-Einstellungen",
+  "usLangTitle": "Sprache",
+  "usPlanTitle": "Plan",
+  "usPlanInfo": "Charts nutzen diesen Plan als Basis fuer Budget-Berechnungen (Quota-Limits, Kostenprognosen, Drain-Rate).",
+  "usPlanActive": "Aktiv",
+    "usProfileTitle": "Benutzerprofil",
+    "usPatTitle": "GitHub PAT",
+  "usMarketplaceTitle": "VS Marketplace",
+  "usMarketplaceLastSync": "Letzter Sync"
 }

@@ -7,16 +7,37 @@
 <link rel="stylesheet" href="/assets/dashboard.css">
 </head>
 <body>
+<!-- Warmup Splash -->
+<div class="warmup-overlay" id="warmup-overlay">
+<div class="warmup-card">
+<div class="warmup-anim">
+<div class="warmup-ring"></div>
+<div class="warmup-ring"></div>
+<div class="warmup-ring"></div>
+<div class="warmup-core"></div>
+</div>
+<h2 class="warmup-title" id="warmup-title">Claude Usage Dashboard</h2>
+<p class="warmup-status" id="warmup-status">Scanning token logs…</p>
+<p class="warmup-sub" id="warmup-sub"></p>
+<div class="warmup-tokens">
+<span class="warmup-token-dot"></span>
+<span class="warmup-token-dot"></span>
+<span class="warmup-token-dot"></span>
+<span class="warmup-token-dot"></span>
+<span class="warmup-token-dot"></span>
+</div>
+</div>
+</div>
 <header class="top-bar" role="banner">
 <div class="top-bar-cluster">
-<h1 class="top-bar-title" id="main-heading">Claude Code Token Usage</h1>
-<div class="lang-switch" id="lang-switch-wrap" role="group" aria-label="Language" style="display:none">
-<span id="lang-switch-label" class="lang-switch-label"></span>
+<h1 class="top-bar-title" id="main-heading">Claude Usage Dashboard</h1>
+<!-- Hidden originals: Sidebar clones dispatch events back to these -->
+<div style="display:none !important">
+<div class="lang-switch" id="lang-switch-wrap" role="group" aria-label="Language">
 <button type="button" class="lang-btn" id="lang-de" data-lang="de" aria-pressed="false">DE</button>
 <button type="button" class="lang-btn" id="lang-en" data-lang="en" aria-pressed="false">EN</button>
 <button type="button" class="lang-btn" id="lang-ko" data-lang="ko" aria-pressed="false">KO</button>
 </div>
-<div class="plan-switch" id="plan-switch-wrap" style="display:none">
 <select id="plan-select" class="plan-select">
 <option value="max5">MAX 5</option>
 <option value="max20">MAX 20</option>
@@ -25,7 +46,7 @@
 <option value="api">API</option>
 </select>
 </div>
-<button type="button" class="settings-nav-btn" id="settings-nav-btn" title="">&#x2699;</button>
+<button type="button" class="top-bar-filter-btn" id="filter-toggle-btn">Filter</button>
 <div class="live-pop" id="live-pop" tabindex="-1">
 <div class="refresh" id="live-trigger" tabindex="0" role="button" aria-expanded="false" aria-haspopup="true" aria-controls="live-files-panel" title="">
 <span id="live-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:6px;animation:pulse 2s infinite;vertical-align:middle"></span><span id="live-label">Live</span>
@@ -61,7 +82,7 @@
 </div>
 </div>
 
-<div class="top-bar-badge" id="anthropic-badge"><span id="anthropic-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#475569;margin-right:6px"></span><span id="anthropic-label">Anthropic</span><div class="anthropic-popup" id="anthropic-popup">
+<div class="top-bar-badge" id="anthropic-badge" style="margin-left:auto"><span id="anthropic-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#475569;margin-right:6px"></span><span id="anthropic-label">Anthropic</span><div class="anthropic-popup" id="anthropic-popup">
 <button type="button" class="anthropic-popup-expand" id="anthropic-popup-expand" title="Maximize">&#x26F6;</button>
 <div class="health-charts-row">
 <details class="health-chart-sm" id="uptime-chart-details" open><summary class="health-chart-summary"><span id="uptime-chart-title"></span></summary><div class="health-chart-canvas-host"><div id="c-uptime-chart" style="width:100%;height:100%"></div></div></details>
@@ -74,7 +95,7 @@
 <p id="anthropic-status-line" style="font-size:.72rem;margin-top:6px;color:#94a3b8"></p>
 <div id="anthropic-ext-section" style="margin-top:4px"><h4 style="font-size:.68rem;color:#64748b;margin-bottom:2px" id="anthropic-ext-head"></h4><ul class="anthropic-popup-list" id="anthropic-ext-list" style="font-size:.65rem;color:#64748b"></ul></div>
 </div></div>
-<details class="meta-details" id="meta-details">
+<details class="meta-details" id="meta-details" style="display:none">
 <summary class="meta-details-summary" id="meta-details-summary"></summary>
 <div class="meta-details-inner">
 <div class="subtitle" id="sub-models">Nur <strong>Claude</strong>-Modelle (<code>claude-*</code>) — keine <code>&lt;synthetic&gt;</code>-Zeilen.</div>
@@ -106,6 +127,7 @@
 
 </div>
 </details>
+<button type="button" class="settings-nav-btn" id="settings-nav-btn" title="">&#x2699;</button>
 </div>
 </header>
 <div class="filter-bar" id="filter-bar">
@@ -247,11 +269,11 @@
 <hr style="border:none;border-top:1px solid rgba(100,116,139,0.25);margin:18px 0 12px">
 <details id="econ-range-collapse">
 <summary style="cursor:pointer;color:#94a3b8;font-size:.78rem;padding:4px 0;user-select:none">Efficiency — Range</summary>
-<div style="display:flex;gap:12px;margin-top:8px;overflow:hidden;height:380px">
+<div style="display:flex;gap:12px;margin-top:8px">
 <div class="forensic-chart-panel" style="flex:1;min-width:0;overflow:hidden;display:flex;flex-direction:column">
 <h4 id="econ-efficiency-h3" style="font-size:.8rem;color:#e2e8f0;margin:0 0 2px"></h4>
 <p id="econ-efficiency-blurb" style="font-size:.72rem;color:#94a3b8;margin:0 0 8px;line-height:1.4"></p>
-<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-efficiency" style="flex:1;min-height:0"></div>
+<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-efficiency" style="height:300px"></div>
 </div>
 <div class="forensic-chart-panel" style="flex:1;min-width:0;display:flex;flex-direction:column">
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
@@ -262,12 +284,12 @@
 </div>
 </div>
 <p id="econ-waste-month-blurb" style="font-size:.72rem;color:#94a3b8;margin:0 0 8px;line-height:1.4"></p>
-<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-waste-month" style="flex:1;min-height:0"></div>
+<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-waste-month" style="height:300px"></div>
 </div>
 <div class="forensic-chart-panel" style="flex:1;min-width:0;display:flex;flex-direction:column">
 <h4 id="econ-daycompare-h3" style="font-size:.8rem;color:#e2e8f0;margin:0 0 2px"></h4>
 <p id="econ-daycompare-blurb" style="font-size:.72rem;color:#94a3b8;margin:0 0 8px;line-height:1.4"></p>
-<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-daycompare" style="flex:1;min-height:0"></div>
+<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-daycompare" style="height:300px"></div>
 </div>
 </div>
 </details>
@@ -448,6 +470,42 @@
 <div class="anthropic-modal-body" id="release-modal-body" style="padding:16px 20px"></div>
 </div>
 </div>
+<!-- User Settings Modal -->
+<div class="anthropic-modal-overlay" id="user-settings-overlay">
+<div class="anthropic-modal">
+<div class="anthropic-modal-header">
+<span class="anthropic-modal-title" id="user-settings-modal-title">User Settings</span>
+<button type="button" class="anthropic-modal-close" id="user-settings-modal-close">&times;</button>
+</div>
+<div class="anthropic-modal-body" id="user-settings-modal-body" style="padding:16px 20px">
+<!-- Language -->
+<details class="us-section" id="us-lang-section" open>
+<summary id="us-lang-title">Language</summary>
+<div class="us-section-body" id="us-lang-body"></div>
+</details>
+<!-- Plan -->
+<details class="us-section" id="us-plan-section" open>
+<summary id="us-plan-title">Plan</summary>
+<div class="us-section-body" id="us-plan-body"></div>
+</details>
+<!-- User Profile -->
+<details class="us-section" id="us-profile-section" open>
+<summary id="us-profile-title">User Profile</summary>
+<div class="us-section-body" id="us-profile-body"></div>
+</details>
+<!-- GitHub PAT -->
+<details class="us-section" id="us-pat-section" open>
+<summary id="us-pat-title">GitHub PAT</summary>
+<div class="us-section-body" id="us-pat-body"></div>
+</details>
+<!-- VS Marketplace -->
+<details class="us-section" id="us-marketplace-section" open>
+<summary id="us-marketplace-title">VS Marketplace</summary>
+<div class="us-section-body" id="us-marketplace-body"></div>
+</details>
+</div>
+</div>
+</div>
 <script>globalThis.__I18N_BUNDLES=__I18N_PLACEHOLDER__;globalThis.__APP_VERSION="__APP_VERSION__";</script>
 <script defer src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" crossorigin="anonymous"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js" crossorigin="anonymous"></script>
@@ -482,6 +540,25 @@
 <div class="sidebar-section-body" id="sidebar-settings-body">
 <div class="sidebar-setting-row" id="sidebar-lang-slot"></div>
 <div class="sidebar-setting-row" id="sidebar-plan-slot"></div>
+<div class="sidebar-setting-row" style="margin-top:8px">
+<button type="button" class="sidebar-btn" id="sidebar-open-user-settings"></button>
+</div>
+</div>
+</details>
+<!-- Tools -->
+<details class="sidebar-section" id="sidebar-tools" open>
+<summary class="sidebar-section-title" id="sidebar-tools-title"></summary>
+<div class="sidebar-section-body" id="sidebar-tools-body">
+<button type="button" class="sidebar-btn" id="sidebar-open-explorer"></button>
+</div>
+</details>
+<!-- Export -->
+<details class="sidebar-section" id="sidebar-export">
+<summary class="sidebar-section-title" id="sidebar-export-title"></summary>
+<div class="sidebar-section-body" id="sidebar-export-body">
+<button type="button" class="sidebar-btn" id="sidebar-export-jsonl"></button>
+<button type="button" class="sidebar-btn" id="sidebar-export-template"></button>
+<button type="button" class="sidebar-btn" id="sidebar-import-template"></button>
 </div>
 </details>
 <!-- DEV (only visible in DEV_MODE) -->
@@ -516,22 +593,6 @@
 </div>
 </div>
 </div>
-<!-- Tools -->
-<details class="sidebar-section" id="sidebar-tools" open>
-<summary class="sidebar-section-title" id="sidebar-tools-title"></summary>
-<div class="sidebar-section-body" id="sidebar-tools-body">
-<button type="button" class="sidebar-btn" id="sidebar-open-explorer"></button>
-</div>
-</details>
-<!-- Export -->
-<details class="sidebar-section" id="sidebar-export">
-<summary class="sidebar-section-title" id="sidebar-export-title"></summary>
-<div class="sidebar-section-body" id="sidebar-export-body">
-<button type="button" class="sidebar-btn" id="sidebar-export-jsonl"></button>
-<button type="button" class="sidebar-btn" id="sidebar-export-template"></button>
-<button type="button" class="sidebar-btn" id="sidebar-import-template"></button>
-</div>
-</details>
 </div>
 <div class="sidebar-footer">
 <span class="sidebar-version" id="sidebar-version"></span>

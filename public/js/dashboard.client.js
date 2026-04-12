@@ -625,6 +625,55 @@ function scheduleGithubTokenUiRefresh() {
   }
 }
 
+/** Warmup splash — dismiss once first real render completes */
+var __warmupDismissed = false;
+function updateWarmupOverlay(data) {
+  if (__warmupDismissed) return;
+  var overlay = document.getElementById('warmup-overlay');
+  if (!overlay) return;
+  var status = document.getElementById('warmup-status');
+  var sub = document.getElementById('warmup-sub');
+  if (!data) return;
+  var sp = data.scan_progress;
+  if (data.scanning && sp && sp.total > 0) {
+    if (status) status.textContent = t('warmupScanning').replace('{done}', sp.done).replace('{total}', sp.total);
+    if (sub) sub.textContent = Math.round(sp.done / sp.total * 100) + '%';
+  } else if (data.scanning) {
+    if (status) status.textContent = t('warmupInit');
+  }
+}
+function dismissWarmupOverlay() {
+  if (__warmupDismissed) return;
+  __warmupDismissed = true;
+  var overlay = document.getElementById('warmup-overlay');
+  if (!overlay) return;
+  var status = document.getElementById('warmup-status');
+  if (status) status.textContent = t('warmupReady');
+  setTimeout(function () {
+    overlay.classList.add('is-done');
+    setTimeout(function () { overlay.remove(); }, 500);
+  }, 300);
+}
+
+/** Recompute overlay — semi-transparent during re-render */
+function showRecomputeOverlay(show) {
+  var el = document.getElementById('recompute-overlay');
+  if (!el && show) {
+    el = document.createElement('div');
+    el.id = 'recompute-overlay';
+    el.className = 'recompute-overlay';
+    el.innerHTML = '<div class="recompute-indicator"><div class="recompute-spinner"></div><span>' + t('recomputeLabel') + '</span></div>';
+    document.body.appendChild(el);
+  }
+  if (el) {
+    if (show) el.classList.add('is-active');
+    else {
+      el.classList.remove('is-active');
+      setTimeout(function () { if (el.parentNode && !el.classList.contains('is-active')) el.remove(); }, 300);
+    }
+  }
+}
+
 /** Platzhalter-Gitter (#main-charts-skeleton) bis echte Chart-DOM aus renderDashboardCore kommt. */
 function showMainChartsSkeleton(show) {
   var sk = document.getElementById("main-charts-skeleton");
@@ -1691,7 +1740,9 @@ function getFilterHost() {
 
 function renderDashboard(data, urgent) {
   if (urgent) clearTimeout(__dashRenderCoreCoalesce);
+  if (__warmupDismissed && urgent) showRecomputeOverlay(true);
   __lastUsageData = data;
+  updateWarmupOverlay(data);
   updateGithubTokenPanelMode();
   updateLiveSidePanel(data);
   updateScanSourcesRow(data);
@@ -1922,7 +1973,9 @@ function renderDashboardCore(data) {
   }
   
   showMainChartsSkeleton(false);
-  
+  showRecomputeOverlay(false);
+  dismissWarmupOverlay();
+
   var calToday = data.calendar_today || "";
   var spM = data.scan_progress;
   var metaLine =

@@ -488,28 +488,10 @@
             titleKey: 'econBudgetDrainTitle',
             type: 'mixed',
             engine: 'echarts',
-            canvasId: 'chart-shell-econ-budget-drain',
+            canvasId: 'chart-shell-econ-drain',
             size: { cols: 3, minHeight: 400 },
             renderFn: 'renderBudgetDrain'
           },
-          {
-            id: 'econ-token-monthly',
-            titleKey: 'econWasteMonthTitle',
-            type: 'bar',
-            engine: 'echarts',
-            canvasId: 'chart-shell-econ-waste-month',
-            size: { cols: 1, minHeight: 300 },
-            renderFn: 'renderMonthlyTokenChart'
-          },
-          {
-            id: 'econ-efficiency',
-            titleKey: 'econEfficiencyTitle',
-            type: 'bar',
-            engine: 'echarts',
-            canvasId: 'chart-shell-econ-efficiency',
-            size: { cols: 1, minHeight: 300 },
-            renderFn: 'renderEfficiencyTimeline'
-          }
         ]
       },
 
@@ -525,31 +507,31 @@
         requires: ['sessions'],
         charts: [
           {
+            id: 'eff-efficiency-timeline',
+            titleKey: 'econEfficiencyTitle',
+            type: 'bar',
+            engine: 'echarts',
+            canvasId: 'chart-shell-econ-efficiency',
+            size: { cols: 1, minHeight: 300 },
+            renderFn: 'renderEfficiencyTimeline'
+          },
+          {
+            id: 'eff-monthly-butterfly',
+            titleKey: 'econWasteMonthTitle',
+            type: 'bar',
+            engine: 'echarts',
+            canvasId: 'chart-shell-econ-waste-month',
+            size: { cols: 1, minHeight: 300 },
+            renderFn: 'renderMonthlyButterfly'
+          },
+          {
             id: 'eff-day-comparison',
             titleKey: 'econDayCompTitle',
             type: 'mixed',
             engine: 'echarts',
-            canvasId: 'chart-shell-econ-day-comp',
+            canvasId: 'chart-shell-econ-daycompare',
             size: { cols: 1, minHeight: 300 },
             renderFn: 'renderDayComparison'
-          },
-          {
-            id: 'eff-heatmap',
-            titleKey: 'proxyEfficiencyTrendTitle',
-            type: 'heatmap',
-            engine: 'echarts',
-            canvasId: 'eff-heatmap',
-            size: { cols: 3, minHeight: 300 },
-            renderFn: 'renderEfficiencyHeatmap'
-          },
-          {
-            id: 'eff-butterfly',
-            titleKey: 'econButterflyTitle',
-            type: 'bar',
-            engine: 'echarts',
-            canvasId: 'chart-shell-econ-butterfly',
-            size: { cols: 1, minHeight: 300 },
-            renderFn: 'renderButterflyChart'
           }
         ]
       }
