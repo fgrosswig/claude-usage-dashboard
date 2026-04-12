@@ -4228,11 +4228,41 @@ var server = http.createServer(function (req, res) {
       return;
     }
     var listCf = collectDebugCacheFilesPayload();
+    // DEV_MODE: merge remote cache-files list (prod pod has files we don't have locally)
+    if (__devSource && __devMode) {
+      try {
+        var remProto = __devSource.startsWith('https') ? require('https') : require('http');
+        var remUrl = __devSource.replace(/\/$/, '') + '/api/debug/cache-files';
+        var remReq = remProto.get(remUrl, { timeout: 5000 }, function (remResp) {
+          var remBody = '';
+          remResp.on('data', function (ch) { remBody += ch; });
+          remResp.on('end', function () {
+            try {
+              var remJson = JSON.parse(remBody);
+              if (remJson.files && Array.isArray(remJson.files)) {
+                var localKinds = {};
+                listCf.forEach(function (f) { localKinds[f.kind + ':' + f.path_abs] = true; });
+                remJson.files.forEach(function (rf) {
+                  if (!localKinds[rf.kind + ':' + rf.path_abs]) listCf.push(rf);
+                });
+              }
+            } catch (eR) {}
+            res.writeHead(200, corsCf);
+            res.end(JSON.stringify({ ok: true, files: listCf }));
+          });
+        });
+        remReq.on('error', function () {
+          res.writeHead(200, corsCf);
+          res.end(JSON.stringify({ ok: true, files: listCf }));
+        });
+        return;
+      } catch (eRem) {}
+    }
     res.writeHead(200, corsCf);
     res.end(JSON.stringify({ ok: true, files: listCf }));
   } else if (pathname === '/api/debug/cache-file-view') {
     var corsView = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
-    if (!__devMode) {
+    if (!__devMode && process.env.DEBUG_API !== '1') {
       res.writeHead(403, corsView);
       res.end(JSON.stringify({ ok: false, error: 'dev_only' }));
       return;
@@ -4269,6 +4299,25 @@ var server = http.createServer(function (req, res) {
         return;
       }
       var target = path.resolve(rawPath);
+
+      // DEV_MODE: proxy view to remote if file doesn't exist locally
+      var _localFileExists = false;
+      try { _localFileExists = fs.statSync(target).isFile(); } catch (_eL) {}
+      if (!_localFileExists && __devSource && __devMode) {
+        var pBody = JSON.stringify({ path_abs: rawPath });
+        var pUrl = new URL(__devSource.replace(/\/$/, '') + '/api/debug/cache-file-view');
+        var pOpts = { method: 'POST', hostname: pUrl.hostname, port: pUrl.port, path: pUrl.pathname, headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(pBody) }, timeout: 15000 };
+        var pProto = pUrl.protocol === 'https:' ? require('https') : require('http');
+        var pReq = pProto.request(pOpts, function (pResp) {
+          var pData = '';
+          pResp.on('data', function (ch) { pData += ch; });
+          pResp.on('end', function () { res.writeHead(pResp.statusCode, corsView); res.end(pData); });
+        });
+        pReq.on('error', function (pErr) { res.writeHead(502, corsView); res.end(JSON.stringify({ ok: false, error: 'remote_proxy_failed' })); });
+        pReq.end(pBody);
+        return;
+      }
+
       if (!debugPathAllowedForRead(target)) {
         res.writeHead(403, corsView);
         res.end(JSON.stringify({ ok: false, error: 'path_not_allowed' }));

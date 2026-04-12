@@ -2,15 +2,38 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-244",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "b0e5039",
+      "commit_full": "b0e5039d1bb8140f162422a6c1ddb74f24397ab6",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(explorer): allow cache-file-view with DEBUG_API=1, proxy to remote in DEV_MODE",
+      "detail": "- Remote prod pod returned 403 because guard checked __devMode not DEBUG_API\n- Local DEV_MODE proxies view requests to remote when file doesn't exist locally\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-243",
       "timestamp": "2026-04-12",
       "session": "auto",
-      "commit": "63475ae",
-      "commit_full": "63475ae5b75ce1218ff59b79e2b32a91d6f19cb1",
+      "commit": "2fa2e78",
+      "commit_full": "2fa2e78eb65156f3cab7d9ec500274910daf0e1a",
       "status": "ABGESCHLOSSEN",
-      "description": "Merge branch 'feat/widget-dispatcher' into develop",
-      "detail": "# Conflicts:\n#\tlogs/transactions.json",
-      "changes": []
+      "description": "fix(explorer): merge remote cache-files in DEV_MODE",
+      "detail": "In DEV_MODE the cache-files endpoint only showed local files.\nNow fetches remote list from DEV_PROXY_SOURCE and merges\nnon-duplicate entries (e.g. extract_cache from prod pod).\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
     },
     {
       "id": "TX-242",
