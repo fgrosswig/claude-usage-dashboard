@@ -697,6 +697,41 @@ tr:hover td{background:#334155}
 .layout-grid>[data-span="11"]{--span:11}.layout-grid>[data-span="12"]{--span:12}
 @media(max-width:900px){.layout-grid>[data-span]{--span:12}}
 
+/* ── Template Builder Modal ───────────────────────────────────────── */
+.tb-header-left{display:flex;align-items:center;gap:12px}
+.tb-header-actions{display:flex;align-items:center;gap:8px}
+.tb-name-input{background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:6px;padding:6px 10px;font-size:.8rem;width:200px}
+.tb-name-input:focus{border-color:#3b82f6;outline:none}
+.tb-btn{padding:6px 16px;border-radius:6px;font-size:.78rem;cursor:pointer;border:none}
+.tb-btn--save{background:#3b82f6;color:#fff}.tb-btn--save:hover{background:#2563eb}
+.tb-row{border:1px solid #334155;border-radius:8px;padding:12px;margin-bottom:12px;background:rgba(30,41,59,.5)}
+.tb-row-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:.72rem;color:#94a3b8}
+.tb-row-header span{font-weight:600;color:#e2e8f0}
+.tb-col-btns{display:inline-flex;gap:2px}
+.tb-col-btn{background:#1e293b;color:#94a3b8;border:1px solid #475569;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:.68rem}
+.tb-col-btn.active{background:#3b82f6;color:#fff;border-color:#2563eb}
+.tb-col-btn:hover:not(.active){background:#334155}
+.tb-row-remove{margin-left:auto;background:none;border:none;color:#64748b;font-size:1rem;cursor:pointer;padding:2px 6px;border-radius:4px}
+.tb-row-remove:hover{color:#ef4444;background:rgba(239,68,68,.1)}
+.tb-row-drag{cursor:grab;color:#475569;margin-right:4px;font-size:.8rem}
+.tb-cells{display:grid;gap:8px}
+.tb-cell{background:#0f172a;border:1px solid #334155;border-radius:6px;padding:10px;min-height:52px;display:flex;align-items:center;justify-content:space-between}
+.tb-cell-name{font-size:.78rem;color:#e2e8f0;font-weight:500}
+.tb-cell-span{display:flex;align-items:center;gap:4px}
+.tb-cell-span select{background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:4px;padding:2px 4px;font-size:.68rem}
+.tb-cell-span label{font-size:.62rem;color:#64748b}
+.tb-cell-remove{background:none;border:none;color:#475569;cursor:pointer;font-size:.85rem;padding:2px 4px}
+.tb-cell-remove:hover{color:#ef4444}
+.tb-cell--empty{border-style:dashed;justify-content:center;cursor:pointer;color:#475569;font-size:.75rem}
+.tb-cell--empty:hover{border-color:#3b82f6;color:#3b82f6}
+.tb-add-row{width:100%;padding:10px;background:transparent;border:2px dashed #334155;border-radius:8px;color:#475569;font-size:.78rem;cursor:pointer;margin-top:4px}
+.tb-add-row:hover{border-color:#3b82f6;color:#3b82f6}
+.tb-unused{margin-top:16px;padding-top:12px;border-top:1px solid #334155}
+.tb-unused-title{font-size:.72rem;color:#64748b;margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.tb-unused-chips{display:flex;flex-wrap:wrap;gap:6px}
+.tb-unused-chip{background:#1e293b;color:#94a3b8;border:1px solid #475569;border-radius:6px;padding:4px 10px;font-size:.72rem;cursor:pointer}
+.tb-unused-chip:hover{border-color:#3b82f6;color:#3b82f6}
+
 /* ── Korean term tooltip (ko locale only) ─────────────────────────── */
 .tt{border-bottom:1px dotted rgba(148,163,184,.6);cursor:help}
 #tt-pop{position:fixed;pointer-events:none;opacity:0;transition:opacity .12s;z-index:99999;background:rgba(15,23,42,.96);color:#e2e8f0;font-size:.72rem;line-height:1.4;padding:5px 10px;border-radius:6px;border:1px solid rgba(71,85,105,.6);width:max-content;max-width:90vw}

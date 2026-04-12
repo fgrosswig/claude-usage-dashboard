@@ -508,6 +508,26 @@
 </div>
 </div>
 </div>
+<!-- Template Builder Modal -->
+<div class="anthropic-modal-overlay" id="tb-overlay">
+<div class="anthropic-modal" style="max-width:1100px">
+<div class="anthropic-modal-header">
+<div class="tb-header-left">
+<span class="anthropic-modal-title" id="tb-title">Template Builder</span>
+<input type="text" class="tb-name-input" id="tb-name-input" placeholder="Template name" maxlength="40">
+</div>
+<div class="tb-header-actions">
+<button type="button" class="tb-btn tb-btn--save" id="tb-save">Save</button>
+<button type="button" class="anthropic-modal-close" id="tb-close">&times;</button>
+</div>
+</div>
+<div class="anthropic-modal-body" id="tb-body" style="padding:16px 20px">
+<div id="tb-rows"></div>
+<button type="button" class="tb-add-row" id="tb-add-row">+ Add Row</button>
+<div class="tb-unused" id="tb-unused"></div>
+</div>
+</div>
+</div>
 <script>globalThis.__I18N_BUNDLES=__I18N_PLACEHOLDER__;globalThis.__APP_VERSION="__APP_VERSION__";</script>
 <script defer src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" crossorigin="anonymous"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js" crossorigin="anonymous"></script>
@@ -535,6 +555,9 @@
 <details class="sidebar-section" id="sidebar-templates">
 <summary class="sidebar-section-title" id="sidebar-templates-title"></summary>
 <div class="sidebar-section-body" id="sidebar-templates-body"></div>
+<div class="sidebar-section-footer">
+<button type="button" class="sidebar-btn-sm" id="sidebar-build-template"></button>
+</div>
 </details>
 <!-- Settings (Language, Plan) -->
 <details class="sidebar-section" id="sidebar-settings">

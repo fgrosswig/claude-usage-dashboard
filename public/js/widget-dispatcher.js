@@ -375,6 +375,7 @@
       bindToolsSection();
       renderExportSection();
       bindUserSettingsModal();
+      bindTemplateBuilder();
       // Resize charts after layout shift
       setTimeout(function () { resizeAll(); }, 250);
     }
@@ -1249,6 +1250,231 @@
       overlay.dataset.bound = '1';
       overlay.addEventListener('click', function (e) {
         if (e.target === overlay) closeUserSettingsModal();
+      });
+    }
+  }
+
+  // ── Template Builder ──────────────────────────────────────────────
+
+  var _tbWidgets = []; // working copy: [{id, span}]
+
+  function openTemplateBuilder(baseTpl) {
+    var overlay = document.getElementById('tb-overlay');
+    if (!overlay) return;
+    var nameInput = document.getElementById('tb-name-input');
+    var titleEl = document.getElementById('tb-title');
+    if (titleEl) titleEl.textContent = _t('tbTitle');
+    if (nameInput) nameInput.placeholder = _t('tbNamePlaceholder');
+
+    // Init from base template or current prefs
+    if (baseTpl && baseTpl.widgets) {
+      _tbWidgets = baseTpl.widgets.map(function (w) { return { id: w.id, span: w.span }; });
+      if (nameInput) nameInput.value = baseTpl.builtin ? '' : (baseTpl.name || '');
+    } else if (_prefs && _prefs.widgets) {
+      _tbWidgets = _prefs.widgets.map(function (w) { return { id: w.id, span: w.span }; });
+      if (nameInput) nameInput.value = '';
+    } else {
+      _tbWidgets = ALL_SECTION_IDS.map(function (id) { return { id: id, span: 12 }; });
+      if (nameInput) nameInput.value = '';
+    }
+
+    renderBuilderRows();
+    overlay.classList.add('is-open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeTemplateBuilder() {
+    var overlay = document.getElementById('tb-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('is-open');
+    document.body.style.overflow = '';
+    _tbWidgets = [];
+  }
+
+  function getUsedIds() {
+    var used = {};
+    for (var i = 0; i < _tbWidgets.length; i++) used[_tbWidgets[i].id] = true;
+    return used;
+  }
+
+  function getAvailableSections() {
+    var used = getUsedIds();
+    var reg = getRegistry();
+    if (!reg) return [];
+    var avail = [];
+    for (var i = 0; i < reg.sections.length; i++) {
+      var s = reg.sections[i];
+      if (!used[s.id]) avail.push(s);
+    }
+    return avail;
+  }
+
+  function renderBuilderRows() {
+    var container = document.getElementById('tb-rows');
+    var unusedEl = document.getElementById('tb-unused');
+    if (!container) return;
+    var reg = getRegistry();
+    if (!reg) return;
+
+    var html = '';
+    for (var i = 0; i < _tbWidgets.length; i++) {
+      var w = _tbWidgets[i];
+      var sec = reg.findSection(w.id);
+      var name = sec ? _t(sec.titleKey) : w.id;
+      html += '<div class="tb-row" data-idx="' + i + '">';
+      html += '<div class="tb-row-header">';
+      html += '<span class="tb-row-drag" draggable="true">&#x2630;</span>';
+      html += '<span>' + name + '</span>';
+      html += '<div class="tb-cell-span">';
+      html += '<label>span</label>';
+      html += '<select class="tb-span-select" data-idx="' + i + '">';
+      var spanOptions = [3, 4, 6, 8, 12];
+      for (var si = 0; si < spanOptions.length; si++) {
+        var sv = spanOptions[si];
+        html += '<option value="' + sv + '"' + (w.span === sv ? ' selected' : '') + '>' + sv + '/12';
+        if (sv === 4) html += ' (1/3)';
+        else if (sv === 6) html += ' (1/2)';
+        else if (sv === 8) html += ' (2/3)';
+        else if (sv === 12) html += ' (full)';
+        else if (sv === 3) html += ' (1/4)';
+        html += '</option>';
+      }
+      html += '</select>';
+      html += '</div>';
+      html += '<button type="button" class="tb-row-remove" data-idx="' + i + '" title="Remove">&times;</button>';
+      html += '</div>';
+      html += '</div>';
+    }
+    container.innerHTML = html;
+
+    // Available widgets (unused)
+    var avail = getAvailableSections();
+    var uHtml = '';
+    if (avail.length) {
+      uHtml += '<div class="tb-unused-title">' + _t('tbUnused') + '</div>';
+      uHtml += '<div class="tb-unused-chips">';
+      for (var ai = 0; ai < avail.length; ai++) {
+        uHtml += '<button type="button" class="tb-unused-chip" data-id="' + avail[ai].id + '">+ ' + _t(avail[ai].titleKey) + '</button>';
+      }
+      uHtml += '</div>';
+    }
+    if (unusedEl) unusedEl.innerHTML = uHtml;
+
+    // Event delegation
+    if (!container.dataset.bound) {
+      container.dataset.bound = '1';
+      container.addEventListener('change', function (e) {
+        var sel = e.target.closest('.tb-span-select');
+        if (!sel) return;
+        var idx = parseInt(sel.dataset.idx, 10);
+        if (_tbWidgets[idx]) {
+          _tbWidgets[idx].span = parseInt(sel.value, 10);
+        }
+      });
+      container.addEventListener('click', function (e) {
+        var rmBtn = e.target.closest('.tb-row-remove');
+        if (rmBtn) {
+          var idx = parseInt(rmBtn.dataset.idx, 10);
+          _tbWidgets.splice(idx, 1);
+          renderBuilderRows();
+        }
+      });
+      // Drag & drop reorder
+      var _dragIdx = -1;
+      container.addEventListener('dragstart', function (e) {
+        var row = e.target.closest('.tb-row');
+        if (!row) return;
+        _dragIdx = parseInt(row.dataset.idx, 10);
+        row.classList.add('is-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      container.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      });
+      container.addEventListener('drop', function (e) {
+        e.preventDefault();
+        var row = e.target.closest('.tb-row');
+        if (!row || _dragIdx < 0) return;
+        var dropIdx = parseInt(row.dataset.idx, 10);
+        if (_dragIdx === dropIdx) return;
+        var item = _tbWidgets.splice(_dragIdx, 1)[0];
+        _tbWidgets.splice(dropIdx, 0, item);
+        _dragIdx = -1;
+        renderBuilderRows();
+      });
+      container.addEventListener('dragend', function () { _dragIdx = -1; });
+    }
+    if (unusedEl && !unusedEl.dataset.bound) {
+      unusedEl.dataset.bound = '1';
+      unusedEl.addEventListener('click', function (e) {
+        var chip = e.target.closest('.tb-unused-chip');
+        if (!chip) return;
+        _tbWidgets.push({ id: chip.dataset.id, span: 12 });
+        renderBuilderRows();
+      });
+    }
+  }
+
+  function saveTemplateFromBuilder() {
+    var nameInput = document.getElementById('tb-name-input');
+    var name = nameInput ? nameInput.value.trim() : '';
+    if (!name) {
+      name = prompt(_t('tbNamePrompt'));
+      if (!name || !name.trim()) return;
+      name = name.trim();
+    }
+    var tpl = { name: name, version: 2, widgets: _tbWidgets.slice() };
+    // Save to user templates
+    var userTpls = loadTemplates();
+    var found = false;
+    for (var i = 0; i < userTpls.length; i++) {
+      if (userTpls[i].name === name) {
+        userTpls[i] = tpl;
+        found = true;
+        break;
+      }
+    }
+    if (!found) userTpls.push(tpl);
+    saveTemplates(userTpls);
+    // Apply immediately
+    applyTemplate(tpl);
+    renderTemplatesSection();
+    closeTemplateBuilder();
+  }
+
+  function bindTemplateBuilder() {
+    var buildBtn = document.getElementById('sidebar-build-template');
+    if (buildBtn && !buildBtn.dataset.bound) {
+      buildBtn.dataset.bound = '1';
+      buildBtn.textContent = _t('tbBuild');
+      buildBtn.addEventListener('click', function () { openTemplateBuilder(); });
+    }
+    var saveBtn = document.getElementById('tb-save');
+    if (saveBtn && !saveBtn.dataset.bound) {
+      saveBtn.dataset.bound = '1';
+      saveBtn.addEventListener('click', saveTemplateFromBuilder);
+    }
+    var closeBtn = document.getElementById('tb-close');
+    if (closeBtn && !closeBtn.dataset.bound) {
+      closeBtn.dataset.bound = '1';
+      closeBtn.addEventListener('click', closeTemplateBuilder);
+    }
+    var overlay = document.getElementById('tb-overlay');
+    if (overlay && !overlay.dataset.bound) {
+      overlay.dataset.bound = '1';
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeTemplateBuilder();
+      });
+    }
+    var addRowBtn = document.getElementById('tb-add-row');
+    if (addRowBtn && !addRowBtn.dataset.bound) {
+      addRowBtn.dataset.bound = '1';
+      addRowBtn.addEventListener('click', function () {
+        var avail = getAvailableSections();
+        if (!avail.length) return;
+        _tbWidgets.push({ id: avail[0].id, span: 12 });
+        renderBuilderRows();
       });
     }
   }
