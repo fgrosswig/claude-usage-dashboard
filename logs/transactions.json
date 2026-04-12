@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-244",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "b0e5039",
+      "commit_full": "b0e5039d1bb8140f162422a6c1ddb74f24397ab6",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(explorer): allow cache-file-view with DEBUG_API=1, proxy to remote in DEV_MODE",
+      "detail": "- Remote prod pod returned 403 because guard checked __devMode not DEBUG_API\n- Local DEV_MODE proxies view requests to remote when file doesn't exist locally\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-243",
       "timestamp": "2026-04-12",
       "session": "auto",
