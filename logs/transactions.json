@@ -2,6 +2,33 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-192",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "6e76e49",
+      "commit_full": "6e76e490727cf5a6f3b9f564af9489fd50bf4567",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(dev): group cache file modal by folder, add filter",
+      "detail": "API adds folder_ui and file_name; client uses details accordions per parent dir, search filter, compact subtables; remove DataTables from this modal.\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-191",
       "timestamp": "2026-04-12",
       "session": "auto",
