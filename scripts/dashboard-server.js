@@ -4437,6 +4437,39 @@ var server = http.createServer(function (req, res) {
       });
       res.end(JSON.stringify(stResult));
     }
+  } else if (pathname === '/api/layout') {
+    // ── Layout persistence: GET = load, PUT/POST = save ──
+    var layoutFile = path.join(os.homedir(), '.claude', 'usage-dashboard-layout.json');
+    if (req.method === 'GET') {
+      try {
+        var layoutData = fs.readFileSync(layoutFile, 'utf8');
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        res.end(layoutData);
+      } catch (e) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end('null');
+      }
+    } else if (req.method === 'PUT' || req.method === 'POST') {
+      var layoutBody = '';
+      req.on('data', function (chunk) { layoutBody += chunk; });
+      req.on('end', function () {
+        try {
+          var parsed = JSON.parse(layoutBody);
+          var layoutDir = path.dirname(layoutFile);
+          if (!fs.existsSync(layoutDir)) fs.mkdirSync(layoutDir, { recursive: true });
+          fs.writeFileSync(layoutFile, JSON.stringify(parsed, null, 2), 'utf8');
+          serviceLog.info('layout', 'saved ' + layoutBody.length + ' bytes to ' + layoutFile);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end('{"ok":true}');
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end('{"error":"invalid JSON"}');
+        }
+      });
+    } else {
+      res.writeHead(405);
+      res.end();
+    }
   } else {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(getDashboardHtml());

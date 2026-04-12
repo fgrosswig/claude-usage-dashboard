@@ -23,22 +23,41 @@
   // ── Preferences (localStorage) ──────────────────────────────────
 
   function loadPrefs() {
+    // Primary: localStorage
     try {
       var raw = localStorage.getItem(PREFS_KEY);
-      if (!raw) return defaultPrefs();
-      var p = JSON.parse(raw);
-      if (!p || p.v !== PREFS_VERSION) return defaultPrefs();
-      return p;
-    } catch (e) {
-      return defaultPrefs();
-    }
+      if (raw) {
+        var p = JSON.parse(raw);
+        if (p && p.v === PREFS_VERSION) return p;
+      }
+    } catch (e) {}
+    // Fallback: server (sync XHR, only when localStorage empty)
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', '/api/layout', false);
+      xhr.send();
+      if (xhr.status === 200 && xhr.responseText && xhr.responseText !== 'null') {
+        var sp = JSON.parse(xhr.responseText);
+        if (sp && sp.v === PREFS_VERSION) {
+          try { localStorage.setItem(PREFS_KEY, JSON.stringify(sp)); } catch (e2) {}
+          return sp;
+        }
+      }
+    } catch (e) { /* server unreachable */ }
+    return defaultPrefs();
   }
 
   function savePrefs() {
     if (!_prefs) return;
+    var json = JSON.stringify(_prefs);
+    try { localStorage.setItem(PREFS_KEY, json); } catch (e) {}
+    // Async server sync (fire and forget)
     try {
-      localStorage.setItem(PREFS_KEY, JSON.stringify(_prefs));
-    } catch (e) { /* quota exceeded or private mode */ }
+      var xhr = new XMLHttpRequest();
+      xhr.open('PUT', '/api/layout', true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.send(json);
+    } catch (e) { /* offline or error — localStorage is primary */ }
   }
 
   function defaultPrefs() {
