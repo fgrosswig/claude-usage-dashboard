@@ -600,6 +600,7 @@
   "tbUnused": "사용 가능한 위젯",
   "tbSave": "저장",
   "tbAddRow": "+ 행 추가",
+  "tbWidgets": "위젯",
   "settingsUserSettings": "사용자 설정",
   "userSettingsTitle": "사용자 설정",
   "usLangTitle": "언어",

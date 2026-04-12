@@ -419,10 +419,8 @@
       html += '<span class="widget-tree-drag" title="Drag to reorder">&#x2630;</span>';
       html += '<input type="checkbox" class="widget-tree-check" data-type="section" data-id="' + sec.id + '"' + (secVis ? ' checked' : '') + '>';
       html += '<span class="widget-tree-label">' + _t(sec.titleKey) + '</span>';
-      if (spanVal && secVis) html += '<span class="widget-tree-span" title="Grid span">' + spanVal + '/12</span>';
-      if (hasCharts) {
-        html += '<button type="button" class="widget-tree-expand" data-expand="' + sec.id + '">&#x25BC;</button>';
-      }
+      html += '<span class="widget-tree-span" title="Grid span">' + (spanVal || 12) + '/12</span>';
+      html += '<button type="button" class="widget-tree-expand" data-expand="' + sec.id + '"' + (hasCharts ? '' : ' style="visibility:hidden"') + '>&#x25B6;</button>';
       html += '</li>';
       if (hasCharts) {
         html += '<ul class="widget-tree-charts" data-charts-for="' + sec.id + '" style="display:none">';
@@ -457,7 +455,7 @@
       if (!charts) return;
       var open = charts.style.display !== 'none';
       charts.style.display = open ? 'none' : '';
-      btn.innerHTML = open ? '&#x25BC;' : '&#x25B2;';
+      btn.style.transform = open ? '' : 'rotate(90deg)';
     });
 
     // Drag & Drop for section reorder
@@ -1328,6 +1326,26 @@
     return avail;
   }
 
+  function updateBuilderPreview() {
+    var container = document.getElementById('tb-rows');
+    if (!container) return;
+    var preview = container.querySelector('.tb-preview-grid');
+    if (!preview) return;
+    var reg = getRegistry();
+    if (!reg) return;
+    var html = '';
+    for (var i = 0; i < _tbWidgets.length; i++) {
+      var w = _tbWidgets[i];
+      var sec = reg.findSection(w.id);
+      var name = sec ? _t(sec.titleKey) : w.id;
+      html += '<div class="tb-preview-cell" style="grid-column:span ' + (w.span || 12) + '">';
+      html += '<span class="tb-preview-name">' + name + '</span>';
+      html += '<span class="tb-preview-span">' + (w.span || 12) + '</span>';
+      html += '</div>';
+    }
+    preview.innerHTML = html;
+  }
+
   function renderBuilderRows() {
     var container = document.getElementById('tb-rows');
     var unusedEl = document.getElementById('tb-unused');
@@ -1335,14 +1353,28 @@
     var reg = getRegistry();
     if (!reg) return;
 
-    var html = '';
+    // Grid preview
+    var html = '<div class="tb-preview"><div class="tb-preview-grid">';
+    for (var pi = 0; pi < _tbWidgets.length; pi++) {
+      var pw = _tbWidgets[pi];
+      var psec = reg.findSection(pw.id);
+      var pname = psec ? _t(psec.titleKey) : pw.id;
+      html += '<div class="tb-preview-cell" style="grid-column:span ' + (pw.span || 12) + '">';
+      html += '<span class="tb-preview-name">' + pname + '</span>';
+      html += '<span class="tb-preview-span">' + (pw.span || 12) + '</span>';
+      html += '</div>';
+    }
+    html += '</div></div>';
+
+    // Widget list
+    html += '<div class="tb-list-title">' + _t('tbWidgets') + '</div>';
     for (var i = 0; i < _tbWidgets.length; i++) {
       var w = _tbWidgets[i];
       var sec = reg.findSection(w.id);
       var name = sec ? _t(sec.titleKey) : w.id;
-      html += '<div class="tb-row" data-idx="' + i + '">';
+      html += '<div class="tb-row" data-idx="' + i + '" draggable="true">';
       html += '<div class="tb-row-header">';
-      html += '<span class="tb-row-drag" draggable="true">&#x2630;</span>';
+      html += '<span class="tb-row-drag">&#x2630;</span>';
       html += '<span>' + name + '</span>';
       html += '<div class="tb-cell-span">';
       html += '<label>span</label>';
@@ -1388,6 +1420,7 @@
         var idx = parseInt(sel.dataset.idx, 10);
         if (_tbWidgets[idx]) {
           _tbWidgets[idx].span = parseInt(sel.value, 10);
+          updateBuilderPreview();
         }
       });
       container.addEventListener('click', function (e) {
@@ -1489,9 +1522,14 @@
     var addRowBtn = document.getElementById('tb-add-row');
     if (addRowBtn && !addRowBtn.dataset.bound) {
       addRowBtn.dataset.bound = '1';
+      addRowBtn.textContent = _t('tbAddRow');
       addRowBtn.addEventListener('click', function () {
         var avail = getAvailableSections();
-        if (!avail.length) return;
+        if (!avail.length) {
+          addRowBtn.textContent = _t('tbAddRow') + ' (all used)';
+          setTimeout(function () { addRowBtn.textContent = _t('tbAddRow'); }, 1500);
+          return;
+        }
         _tbWidgets.push({ id: avail[0].id, span: 12 });
         renderBuilderRows();
       });
@@ -1596,7 +1634,8 @@
       'sidebar-export-template': 'settingsExportTemplate',
       'sidebar-import-template': 'settingsImportTemplate',
       'settings-nav-btn': 'settingsBtnTitle',
-      'sidebar-open-user-settings': 'settingsUserSettings'
+      'sidebar-open-user-settings': 'settingsUserSettings',
+      'sidebar-build-template': 'tbBuild'
     };
     for (var id in titles) {
       var el = document.getElementById(id);
@@ -1616,6 +1655,8 @@
         filterBtn.classList.toggle('is-active');
       });
     }
+    // Bind template builder (modal buttons + sidebar button)
+    bindTemplateBuilder();
     // Version — set immediately from inline global
     var verEl = document.getElementById('sidebar-version');
     if (verEl && global.__APP_VERSION) {
