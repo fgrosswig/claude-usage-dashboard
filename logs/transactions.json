@@ -2,6 +2,48 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-206",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "710cab8",
+      "commit_full": "710cab8b5130b5b9dd04442c80ab81d794be2876",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(ui): sidebar tools section + version footer + release notes",
+      "detail": "- Tools section: File Explorer button (triggers existing modal),\n  Release Notes button (triggers existing release history modal)\n- Version footer at sidebar bottom with HR separator,\n  populated from server data on render\n- i18n: 4 new keys (DE/EN/KO) for tools + releases\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-205",
       "timestamp": "2026-04-12",
       "session": "auto",
