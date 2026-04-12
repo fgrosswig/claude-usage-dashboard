@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-239",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "150c1a2",
+      "commit_full": "150c1a22cc79df0cb2a1e460a6a83ee3e0511f55",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(metrics): guard q5_samples with Array.isArray before .slice",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/metrics-engine.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-238",
       "timestamp": "2026-04-12",
       "session": "auto",
