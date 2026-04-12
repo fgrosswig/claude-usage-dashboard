@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-233",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "7e3d910",
+      "commit_full": "7e3d910f3296831ee6ece82a6bf433f0e4e82835",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(layout): persist prefs without v, re-apply grid each renderDashboardCore refs #216",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-232",
       "timestamp": "2026-04-12",
       "session": "auto",
