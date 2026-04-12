@@ -2,6 +2,38 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-198",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "c568308",
+      "commit_full": "c56830872317e13289b6bd2d0b926b069e030016",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(sonar): explicit localeCompare for Object.keys sort (S2871)",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/token-forensics.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/usage-scan-roots.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-197",
       "timestamp": "2026-04-12",
       "session": "auto",
