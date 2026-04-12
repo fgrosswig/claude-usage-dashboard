@@ -2,6 +2,48 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-201",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "b26bf4b",
+      "commit_full": "b26bf4ba6d2d1bd67ca3f50e5c2aed9b7ad8f684",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(ui): settings sidebar with widget tree, filters, export (Phase B)",
+      "detail": "Slide-out sidebar (320px left) replaces modal concept:\n- Filter section (always visible): Day-Picker + Host-Filter migrated from top-bar\n- Layout section: Widget tree with section checkboxes, chart sub-toggles,\n  drag & drop reorder via HTML5 native DnD\n- Templates section: placeholder for future version\n- Settings section: Language + Plan cloned from top-bar into sidebar\n- Export section: JSONL data download, layout export/import (JSON)\n- Sidebar state persisted in localStorage (open/closed)\n- Gear button in top-bar toggles sidebar, ESC closes\n\nCSS: 69 new lines — sidebar, widget tree, template list, filter rows\ni18n: 18 new keys in DE/EN/KO for all sidebar sections\n\nRefs: Gitea #166 Phase 2b, Vikunja CUD-3\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-200",
       "timestamp": "2026-04-12",
       "session": "auto",
