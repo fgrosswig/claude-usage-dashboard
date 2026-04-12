@@ -3640,6 +3640,14 @@ function debugPathAllowedForRead(absPath) {
   return false;
 }
 
+function debugCacheFolderAndFile(absPath) {
+  var abs = path.resolve(absPath);
+  return {
+    folder_ui: displayPathForUi(path.dirname(abs)),
+    file_name: path.basename(abs)
+  };
+}
+
 function collectDebugCacheFilesPayload() {
   var out = [];
   var collected = collectTaggedJsonlFiles();
@@ -3647,11 +3655,15 @@ function collectDebugCacheFilesPayload() {
     var t = collected.tagged[fi];
     try {
       var st = fs.statSync(t.path);
+      var absJ = path.resolve(t.path);
+      var metaJ = debugCacheFolderAndFile(absJ);
       out.push({
         kind: 'jsonl',
         label: t.label || '',
-        path_abs: path.resolve(t.path),
+        path_abs: absJ,
         path_ui: displayPathForUi(t.path),
+        folder_ui: metaJ.folder_ui,
+        file_name: metaJ.file_name,
         size: st.size,
         mtime_ms: Math.floor(st.mtimeMs)
       });
@@ -3660,11 +3672,15 @@ function collectDebugCacheFilesPayload() {
   function pushKnown(kind, p) {
     try {
       var st2 = fs.statSync(p);
+      var absK = path.resolve(p);
+      var metaK = debugCacheFolderAndFile(absK);
       out.push({
         kind: kind,
         label: '',
-        path_abs: path.resolve(p),
+        path_abs: absK,
         path_ui: displayPathForUi(p),
+        folder_ui: metaK.folder_ui,
+        file_name: metaK.file_name,
         size: st2.size,
         mtime_ms: Math.floor(st2.mtimeMs)
       });
@@ -3680,11 +3696,15 @@ function collectDebugCacheFilesPayload() {
     for (var pxi = 0; pxi < pxs.length; pxi++) {
       try {
         var stp = fs.statSync(pxs[pxi]);
+        var absP = path.resolve(pxs[pxi]);
+        var metaP = debugCacheFolderAndFile(absP);
         out.push({
           kind: 'proxy_ndjson',
           label: path.basename(pxs[pxi]),
-          path_abs: path.resolve(pxs[pxi]),
+          path_abs: absP,
           path_ui: displayPathForUi(pxs[pxi]),
+          folder_ui: metaP.folder_ui,
+          file_name: metaP.file_name,
           size: stp.size,
           mtime_ms: Math.floor(stp.mtimeMs)
         });
@@ -3700,11 +3720,15 @@ function collectDebugCacheFilesPayload() {
         var fp = path.join(stDir, names[ni]);
         try {
           var st3 = fs.statSync(fp);
+          var absS = path.resolve(fp);
+          var metaS = debugCacheFolderAndFile(absS);
           out.push({
             kind: 'session_turns_disk',
             label: names[ni],
-            path_abs: path.resolve(fp),
+            path_abs: absS,
             path_ui: displayPathForUi(fp),
+            folder_ui: metaS.folder_ui,
+            file_name: metaS.file_name,
             size: st3.size,
             mtime_ms: Math.floor(st3.mtimeMs)
           });
@@ -3713,8 +3737,12 @@ function collectDebugCacheFilesPayload() {
     } catch (e6) {}
   }
   out.sort(function (a, b) {
-    if (a.kind !== b.kind) return a.kind < b.kind ? -1 : 1;
-    return a.path_ui < b.path_ui ? -1 : a.path_ui > b.path_ui ? 1 : 0;
+    var fa = a.folder_ui || '';
+    var fb = b.folder_ui || '';
+    if (fa !== fb) return fa < fb ? -1 : fa > fb ? 1 : 0;
+    var na = (a.file_name || '').toLowerCase();
+    var nb = (b.file_name || '').toLowerCase();
+    return na < nb ? -1 : na > nb ? 1 : 0;
   });
   return out;
 }

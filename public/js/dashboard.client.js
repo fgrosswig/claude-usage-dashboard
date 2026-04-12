@@ -7173,20 +7173,124 @@ function applyDevCacheFromStatus(info) {
         var openBtn = document.getElementById("dev-cache-files-open");
         if (!openBtn) return;
         var cacheModalEl = null;
-        var dtInstance = null;
-        var dtCssOnce = false;
-        var dtJsLoading = false;
-        var dtJsWaiters = [];
-        function destroyDt() {
-          if (!dtInstance) return;
-          try {
-            dtInstance.destroy();
-          } catch (eDt) {}
-          dtInstance = null;
-        }
         function setLoadStatus(text) {
           var s = document.getElementById("dev-cache-files-load-status");
           if (s) s.textContent = text || "";
+        }
+        function onFilterInput() {
+          var inp = document.getElementById("dev-cache-files-filter");
+          var q = (inp && String(inp.value).toLowerCase().trim()) || "";
+          var acc = document.getElementById("dev-cache-files-accordion");
+          if (!acc) return;
+          var dets = acc.querySelectorAll("details.dev-cache-folder");
+          for (var di = 0; di < dets.length; di++) {
+            var det = dets[di];
+            var rows = det.querySelectorAll("tbody tr");
+            var any = false;
+            for (var ri = 0; ri < rows.length; ri++) {
+              var row = rows[ri];
+              var hay = String(row.getAttribute("data-search") || "").toLowerCase();
+              var show = !q || hay.indexOf(q) >= 0;
+              row.style.display = show ? "" : "none";
+              if (show) any = true;
+            }
+            det.style.display = any ? "" : "none";
+          }
+        }
+        function appendFileRowToTbody(tbody, f) {
+          var tr = document.createElement("tr");
+          var searchHay =
+            (f.kind || "") +
+            " " +
+            (f.label || "") +
+            " " +
+            (f.file_name || "") +
+            " " +
+            (f.path_ui || "") +
+            " " +
+            (f.folder_ui || "");
+          tr.setAttribute("data-search", searchHay);
+          function tdText(txt) {
+            var x = document.createElement("td");
+            x.textContent = txt;
+            return x;
+          }
+          tr.appendChild(tdText(f.kind || ""));
+          tr.appendChild(tdText(f.label || ""));
+          var tdFile = document.createElement("td");
+          tdFile.className = "dev-cache-file-cell";
+          tdFile.title = f.path_ui || "";
+          tdFile.textContent = f.file_name || "";
+          tr.appendChild(tdFile);
+          var tdSz = document.createElement("td");
+          tdSz.textContent = formatBytes(f.size || 0);
+          tr.appendChild(tdSz);
+          var tdMt = document.createElement("td");
+          tdMt.textContent = new Date(f.mtime_ms || 0).toLocaleString();
+          tr.appendChild(tdMt);
+          var tdAct = document.createElement("td");
+          var bt = document.createElement("button");
+          bt.type = "button";
+          bt.className = "dev-cache-rebuild-btn dev-cache-view-btn";
+          bt.textContent = "Ansehen";
+          bt.setAttribute("data-path-enc", encodeURIComponent(f.path_abs));
+          tdAct.appendChild(bt);
+          tr.appendChild(tdAct);
+          tbody.appendChild(tr);
+        }
+        function formatBytes(n) {
+          if (n >= 1048576) return (n / 1048576).toFixed(2) + " MiB";
+          if (n >= 1024) return (n / 1024).toFixed(1) + " KiB";
+          return String(n) + " B";
+        }
+        function buildAccordion(files) {
+          var acc = document.getElementById("dev-cache-files-accordion");
+          if (!acc) return;
+          acc.innerHTML = "";
+          var groups = Object.create(null);
+          for (var i = 0; i < files.length; i++) {
+            var fi = files[i];
+            var key = fi.folder_ui != null ? fi.folder_ui : "(?)";
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(fi);
+          }
+          var keys = Object.keys(groups).sort();
+          for (var ki = 0; ki < keys.length; ki++) {
+            var gkey = keys[ki];
+            var list = groups[gkey];
+            list.sort(function (a, b) {
+              var na = String(a.file_name || "").toLowerCase();
+              var nb = String(b.file_name || "").toLowerCase();
+              return na < nb ? -1 : na > nb ? 1 : 0;
+            });
+            var det = document.createElement("details");
+            det.className = "dev-cache-folder";
+            det.open = true;
+            var sum = document.createElement("summary");
+            sum.className = "dev-cache-folder-summary";
+            sum.textContent = gkey + " (" + list.length + ")";
+            det.appendChild(sum);
+            var fbody = document.createElement("div");
+            fbody.className = "dev-cache-folder-body";
+            var tbl = document.createElement("table");
+            tbl.className = "dev-cache-subtable";
+            var thead = document.createElement("thead");
+            var hr = document.createElement("tr");
+            var heads = ["Kind", "Label", "Datei", "Bytes", "Geaendert", "Aktion"];
+            for (var hi = 0; hi < heads.length; hi++) {
+              var th = document.createElement("th");
+              th.textContent = heads[hi];
+              hr.appendChild(th);
+            }
+            thead.appendChild(hr);
+            tbl.appendChild(thead);
+            var tbod = document.createElement("tbody");
+            for (var ji = 0; ji < list.length; ji++) appendFileRowToTbody(tbod, list[ji]);
+            tbl.appendChild(tbod);
+            fbody.appendChild(tbl);
+            det.appendChild(fbody);
+            acc.appendChild(det);
+          }
         }
         function ensureModal() {
           if (cacheModalEl) return cacheModalEl;
@@ -7203,12 +7307,9 @@ function applyDevCacheFromStatus(info) {
             '<span id="dev-cache-files-load-status" class="dev-cache-meta"></span>' +
             '<button type="button" class="dev-cache-rebuild-btn" id="dev-cache-files-close">Schliessen</button>' +
             "</div>" +
-            '<p class="dev-cache-files-modal-hint">JSONL, ~/.claude Caches, Proxy-NDJSON, Session-Turns Disk-Cache. Tabelle: ' +
-            '<a href="https://datatables.net/" target="_blank" rel="noopener">DataTables</a> (CDN).</p>' +
-            '<div class="dev-cache-files-table-wrap">' +
-            '<table id="dev-cache-files-table" class="dev-cache-files-dt stripe hover" style="width:100%">' +
-            "<thead><tr><th>Kind</th><th>Label</th><th>Pfad</th><th>Bytes</th><th>Geaendert</th><th>Aktion</th></tr></thead><tbody></tbody>" +
-            "</table></div>" +
+            '<p class="dev-cache-files-modal-hint">Gruppiert nach Unterordner (~/.claude, JSONL-Pfade, Proxy-Logs, Session-Turns-Cache). Suchfeld filtert Zeilen.</p>' +
+            '<input type="search" id="dev-cache-files-filter" class="dev-cache-files-filter" placeholder="Filter (Name, Pfad, Kind) …" autocomplete="off" />' +
+            '<div id="dev-cache-files-accordion" class="dev-cache-files-accordion"></div>' +
             '<div id="dev-cache-file-preview" class="dev-cache-file-preview" style="display:none">' +
             '<div class="dev-cache-file-preview-head">' +
             '<span id="dev-cache-preview-title" class="dev-cache-meta"></span>' +
@@ -7225,8 +7326,12 @@ function applyDevCacheFromStatus(info) {
             var pr = document.getElementById("dev-cache-file-preview");
             if (pr) pr.style.display = "none";
           });
-          // Document delegation: DataTables 2 moves/wraps the table outside the modal root, so clicks
-          // on "Ansehen" no longer bubble to cacheModalEl (see https://datatables.net/ layout).
+          var filterInp = document.getElementById("dev-cache-files-filter");
+          if (filterInp && !filterInp.getAttribute("data-dev-filter-wired")) {
+            filterInp.setAttribute("data-dev-filter-wired", "1");
+            filterInp.addEventListener("input", onFilterInput);
+            filterInp.addEventListener("change", onFilterInput);
+          }
           document.addEventListener("click", function (ev) {
             var modal = document.getElementById("dev-cache-files-modal");
             if (!modal) return;
@@ -7288,9 +7393,10 @@ function applyDevCacheFromStatus(info) {
         }
         function closeModal() {
           if (!cacheModalEl) return;
-          destroyDt();
-          var tb = document.querySelector("#dev-cache-files-table tbody");
-          if (tb) tb.innerHTML = "";
+          var acc = document.getElementById("dev-cache-files-accordion");
+          if (acc) acc.innerHTML = "";
+          var fin = document.getElementById("dev-cache-files-filter");
+          if (fin) fin.value = "";
           cacheModalEl.style.display = "none";
           cacheModalEl.setAttribute("aria-hidden", "true");
           document.body.style.overflow = "";
@@ -7298,92 +7404,21 @@ function applyDevCacheFromStatus(info) {
           var pr2 = document.getElementById("dev-cache-file-preview");
           if (pr2) pr2.style.display = "none";
         }
-        function formatBytes(n) {
-          if (n >= 1048576) return (n / 1048576).toFixed(2) + " MiB";
-          if (n >= 1024) return (n / 1024).toFixed(1) + " KiB";
-          return String(n) + " B";
-        }
-        function appendFileRow(tbody, f) {
-          var tr = document.createElement("tr");
-          function tdText(txt) {
-            var x = document.createElement("td");
-            x.textContent = txt;
-            return x;
-          }
-          tr.appendChild(tdText(f.kind || ""));
-          tr.appendChild(tdText(f.label || ""));
-          var tdPath = document.createElement("td");
-          tdPath.className = "dev-cache-path-cell";
-          tdPath.title = f.path_ui || "";
-          tdPath.textContent = f.path_ui || "";
-          tr.appendChild(tdPath);
-          var tdSz = document.createElement("td");
-          tdSz.setAttribute("data-order", String(f.size != null ? f.size : 0));
-          tdSz.textContent = formatBytes(f.size || 0);
-          tr.appendChild(tdSz);
-          var tdMt = document.createElement("td");
-          tdMt.setAttribute("data-order", String(f.mtime_ms != null ? f.mtime_ms : 0));
-          tdMt.textContent = new Date(f.mtime_ms || 0).toLocaleString();
-          tr.appendChild(tdMt);
-          var tdAct = document.createElement("td");
-          var bt = document.createElement("button");
-          bt.type = "button";
-          bt.className = "dev-cache-rebuild-btn dev-cache-view-btn";
-          bt.textContent = "Ansehen";
-          bt.setAttribute("data-path-enc", encodeURIComponent(f.path_abs));
-          tdAct.appendChild(bt);
-          tr.appendChild(tdAct);
-          tbody.appendChild(tr);
-        }
-        function flushDtWaiters(err) {
-          var w = dtJsWaiters.slice();
-          dtJsWaiters.length = 0;
-          for (var wi = 0; wi < w.length; wi++) w[wi](err);
-        }
-        function loadDataTablesScripts(cb) {
-          if (window.DataTable) {
-            cb(null);
-            return;
-          }
-          dtJsWaiters.push(cb);
-          if (dtJsLoading) return;
-          dtJsLoading = true;
-          if (!dtCssOnce) {
-            var lk = document.createElement("link");
-            lk.rel = "stylesheet";
-            lk.href = "https://cdn.datatables.net/2.2.2/css/dataTables.dataTables.min.css";
-            document.head.appendChild(lk);
-            dtCssOnce = true;
-          }
-          var sc = document.createElement("script");
-          sc.src = "https://cdn.datatables.net/2.2.2/js/dataTables.min.js";
-          sc.onload = function () {
-            dtJsLoading = false;
-            flushDtWaiters(null);
-          };
-          sc.onerror = function () {
-            dtJsLoading = false;
-            flushDtWaiters(new Error("datatables_cdn"));
-          };
-          document.head.appendChild(sc);
-        }
         function openModal() {
           ensureModal();
           cacheModalEl.style.display = "flex";
           cacheModalEl.setAttribute("aria-hidden", "false");
           document.body.style.overflow = "hidden";
-          destroyDt();
-          var tbody = document.querySelector("#dev-cache-files-table tbody");
-          if (tbody) tbody.innerHTML = "";
+          var acc = document.getElementById("dev-cache-files-accordion");
+          if (acc) acc.innerHTML = "";
+          var fin = document.getElementById("dev-cache-files-filter");
+          if (fin) fin.value = "";
           setLoadStatus("Lade …");
           var pr = document.getElementById("dev-cache-file-preview");
           if (pr) pr.style.display = "none";
           var xhr = new XMLHttpRequest();
           xhr.open("GET", "/api/debug/cache-files", true);
           xhr.onload = function () {
-            destroyDt();
-            if (!tbody) return;
-            tbody.innerHTML = "";
             if (xhr.status !== 200) {
               setLoadStatus("Fehler " + xhr.status);
               return;
@@ -7400,22 +7435,15 @@ function applyDevCacheFromStatus(info) {
               return;
             }
             var files = data.files;
-            setLoadStatus(String(files.length) + " Dateien");
-            for (var i = 0; i < files.length; i++) appendFileRow(tbody, files[i]);
-            loadDataTablesScripts(function (errL) {
-              if (errL) {
-                setLoadStatus(String(files.length) + " Dateien (ohne DataTables)");
-                return;
-              }
-              try {
-                dtInstance = new window.DataTable("#dev-cache-files-table", {
-                  pageLength: 25,
-                  order: [[0, "asc"]]
-                });
-              } catch (eT) {
-                setLoadStatus(String(files.length) + " Dateien (DataTables Init fehlgeschlagen)");
-              }
-            });
+            var folderSet = Object.create(null);
+            for (var gi = 0; gi < files.length; gi++) {
+              var fk = files[gi].folder_ui || "(?)";
+              folderSet[fk] = true;
+            }
+            var folderCount = Object.keys(folderSet).length;
+            setLoadStatus(String(files.length) + " Dateien in " + folderCount + " Ordnern");
+            buildAccordion(files);
+            onFilterInput();
           };
           xhr.onerror = function () {
             setLoadStatus("Netzwerkfehler");
