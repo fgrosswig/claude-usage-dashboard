@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-181",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "ae443e3",
+      "commit_full": "ae443e352863ba2c389eb4e06a44fa0ff5d8e23c",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(scan): skip identical JSONL re-parse by default",
+      "detail": "Previously only CLAUDE_USAGE_SKIP_IDENTICAL_SCAN=1 skipped; default now skips when fingerprint matches. Set SKIP_IDENTICAL_SCAN=0 to force full scan every interval.\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-180",
       "timestamp": "2026-04-12",
       "session": "auto",
