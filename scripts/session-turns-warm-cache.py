@@ -20,6 +20,10 @@ Benchmark (no writes):
 Node (same logic as dashboard; collect+fingerprint from usage-scan-roots):
   node scripts/benchmark-session-turns.js --days-back=8
 
+Timing: pass1 here uses CPython stdlib json per line; Node benchmark uses V8 JSON.parse.
+Expect much lower pass1_s in Node for the same file list; per-day session_count / total_turns
+should still match when using the same --dates / --days-back.
+
 See scripts/session-turns-core.js and getSessionTurnsCached in dashboard-server.js.
 """
 from __future__ import annotations

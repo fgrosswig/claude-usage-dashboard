@@ -229,7 +229,8 @@ function main() {
       '  raw sid keys:  ' +
       last.raw_session_ids +
       '\n' +
-      '  note: pass1 always walks every .jsonl line; days-back widens which turn-days are kept.\n'
+      '  note: pass1 always walks every .jsonl line; day filter width follows date keys (prev+day+next).\n' +
+      '  vs Python warm-cache: same per-day counts; Python pass1 is usually slower (stdlib json vs V8).\n'
   );
   if (iters > 1) {
     var sum = 0;
