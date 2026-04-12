@@ -1,24 +1,33 @@
 'use strict';
-/**
- * Same session-turns pipeline as dashboard-server (collectTaggedJsonlFiles + fingerprint + pass1 + finalize).
- * Compare timings with: python3 scripts/session-turns-warm-cache.py --benchmark --days-back 8
- *
- * Usage (repo root):
- *   node scripts/benchmark-session-turns.js
- *   node scripts/benchmark-session-turns.js --days-back=8
- *   node scripts/benchmark-session-turns.js --dates=2026-04-01,2026-04-02
- *   node scripts/benchmark-session-turns.js --iterations=3
- *
- * Hinweis: pass1 iteriert immer alle .jsonl-Dateien; --days-back vergroessert nur
- * die Menge erlaubter Kalendertage (je Tag prev+self+next). Deshalb aehnliche
- * pass1-Zeit bei 3 vs 8 Tagen, wenn die Logs gross sind — das ist erwartbar.
- */
+// Same session-turns pipeline as dashboard-server (collectTaggedJsonlFiles + fingerprint + pass1 + finalize).
+// Compare timings: python3 scripts/session-turns-warm-cache.py --benchmark --days-back 8
+//
+// Usage (repo root):
+//   node scripts/benchmark-session-turns.js
+//   node scripts/benchmark-session-turns.js --days-back=8
+//   node scripts/benchmark-session-turns.js --dates 2026-04-01,2026-04-02
+//   node scripts/benchmark-session-turns.js --dates="2026-04-01,2026-04-02"
+//   node scripts/benchmark-session-turns.js --iterations=3
+//
+// PowerShell: avoid --dates=... with commas (comma is special); prefer --dates "a,b" or --dates a,b .
+// pass1 always walks all .jsonl lines; --days-back only widens the turn-day filter (see --help).
 var perf = require('node:perf_hooks').performance;
 var usageScanRoots = require('./usage-scan-roots');
 var collectTaggedJsonlFiles = usageScanRoots.collectTaggedJsonlFiles;
 var buildTaggedJsonlFingerprintSync = usageScanRoots.buildTaggedJsonlFingerprintSync;
 var forEachJsonlLineSync = usageScanRoots.forEachJsonlLineSync;
 var sessionTurnsCore = require('./session-turns-core');
+
+function stripOuterQuotes(s) {
+  s = String(s).trim();
+  if (s.length < 2) return s;
+  var c0 = s.charAt(0);
+  var c1 = s.charAt(s.length - 1);
+  if ((c0 === '"' && c1 === '"') || (c0 === "'" && c1 === "'")) {
+    return s.slice(1, -1).trim();
+  }
+  return s;
+}
 
 function parseArgs(argv) {
   var daysBack = 8;
@@ -38,11 +47,11 @@ function parseArgs(argv) {
     }
     m = a.match(/^--dates=(.+)$/);
     if (m) {
-      datesCsv = m[1];
+      datesCsv = stripOuterQuotes(m[1]);
       continue;
     }
     if (a === '--dates' && argv[i + 1]) {
-      datesCsv = argv[++i];
+      datesCsv = stripOuterQuotes(argv[++i]);
       continue;
     }
     m = a.match(/^--iterations=(\d+)$/);
@@ -82,7 +91,7 @@ function msToS(ms) {
   return ms / 1000;
 }
 
-/** Gleiche Regel wie pass1: Vereinigung (Vortag, Tag, Folgetag) pro dateKey. */
+// Gleiche Regel wie pass1: Vereinigung (Vortag, Tag, Folgetag) pro dateKey.
 function countAllowedTurnDays(dateKeys) {
   var allowedDays = Object.create(null);
   for (var di = 0; di < dateKeys.length; di++) {
@@ -159,6 +168,8 @@ function main() {
       'benchmark-session-turns.js — gleiche Pipeline wie dashboard (collect, fp, pass1, finalize).\n' +
         '\n' +
         '  node scripts/benchmark-session-turns.js [--days-back=N] [--dates=a,b] [--iterations=N]\n' +
+        '\n' +
+        'PowerShell: use --dates "a,b" or --dates a,b (avoid --dates=a,b — comma breaks the argument).\n' +
         '\n' +
         'Default --days-back=8 (wie Python warm-cache). Datumsreihenfolge: heute zuerst, dann zurueck.\n' +
         'pass1 liest immer alle JSONL-Zeilen; weniger Tage = engerer Tag-Filter, aber kaum schneller\n' +
