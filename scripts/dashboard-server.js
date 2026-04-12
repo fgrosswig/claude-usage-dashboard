@@ -3402,6 +3402,9 @@ function devFetchRemoteUsage(cb, retryCount) {
         }
         cachedData = remote;
         cachedData.release_stability = buildReleaseStabilityData();
+        refreshProxyCache();
+        if (__proxyCache.data) cachedData.proxy = __proxyCache.data;
+        __lastJsonlScanCompletedAt = cachedData.generated || new Date().toISOString();
         var remoteSt = parsed.session_turns;
         if (remoteSt) {
           var stKeys = Object.keys(remoteSt);

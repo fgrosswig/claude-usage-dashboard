@@ -7050,12 +7050,37 @@ function applyDevCacheFromStatus(info) {
       var devH = bar.offsetHeight;
       document.body.style.paddingTop = devH + "px";
       document.documentElement.style.setProperty("--dev-bar-h", devH + "px");
+      function pullDevNavCacheStatus() {
+        var px = new XMLHttpRequest();
+        px.open("GET", "/api/debug/status", true);
+        px.onload = function () {
+          if (px.status !== 200) return;
+          try {
+            var infPull = JSON.parse(px.responseText);
+            applyDevCacheFromStatus(infPull);
+          } catch (ePull) {}
+        };
+        px.send();
+      }
       document.getElementById("dev-sync-btn").addEventListener("click", function () {
         var st = document.getElementById("dev-sync-status");
         st.textContent = "syncing...";
         var sx = new XMLHttpRequest();
         sx.open("POST", "/api/debug/sync-proxy-logs", true);
-        sx.onload = function () { st.textContent = "synced " + new Date().toLocaleTimeString(); st.style.color = "#22c55e"; setTimeout(function(){ st.style.color = "#64748b"; }, 3000); };
+        sx.onload = function () {
+          if (sx.status !== 200) {
+            st.textContent = "sync failed (" + sx.status + ")";
+            st.style.color = "#ef4444";
+            return;
+          }
+          st.textContent = "synced " + new Date().toLocaleTimeString();
+          st.style.color = "#22c55e";
+          setTimeout(function () { st.style.color = "#64748b"; }, 3000);
+          pullDevNavCacheStatus();
+          setTimeout(pullDevNavCacheStatus, 400);
+          setTimeout(pullDevNavCacheStatus, 2500);
+          setTimeout(pullDevNavCacheStatus, 8000);
+        };
         sx.onerror = function () { st.textContent = "sync failed"; };
         sx.send();
       });
@@ -7073,21 +7098,11 @@ function applyDevCacheFromStatus(info) {
               if (st2) st2.textContent = (btnId === "dev-rebuild-jsonl" ? "JSONL" : "PROXY") + " rebuild failed";
               return;
             }
-            function pullStatusSoon() {
-              var px = new XMLHttpRequest();
-              px.open("GET", "/api/debug/status", true);
-              px.onload = function () {
-                if (px.status !== 200) return;
-                try {
-                  var inf2 = JSON.parse(px.responseText);
-                  applyDevCacheFromStatus(inf2);
-                } catch (e3) {}
-              };
-              px.send();
-            }
             try {
-              setTimeout(pullStatusSoon, 400);
-              setTimeout(pullStatusSoon, 2500);
+              pullDevNavCacheStatus();
+              setTimeout(pullDevNavCacheStatus, 400);
+              setTimeout(pullDevNavCacheStatus, 2500);
+              setTimeout(pullDevNavCacheStatus, 8000);
             } catch (e4) {}
             if (st2) st2.textContent = (btnId === "dev-rebuild-jsonl" ? "JSONL" : "PROXY") + " rebuild started";
           };
@@ -7102,16 +7117,7 @@ function applyDevCacheFromStatus(info) {
           clearInterval(devPoll);
           return;
         }
-        var px = new XMLHttpRequest();
-        px.open("GET", "/api/debug/status", true);
-        px.onload = function () {
-          if (px.status !== 200) return;
-          try {
-            var inf3 = JSON.parse(px.responseText);
-            applyDevCacheFromStatus(inf3);
-          } catch (e5) {}
-        };
-        px.send();
+        pullDevNavCacheStatus();
       }, 20000);
     } catch (e) {}
   };
