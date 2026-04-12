@@ -2,6 +2,48 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-211",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "77acdcc",
+      "commit_full": "77acdcc20636d9e61281e95c16d99a9ab327880a",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(builder): Template Builder modal with visual widget layout editor",
+      "detail": "- Fullscreen modal: widget list with span selectors (3/4/6/8/12), drag & drop reorder\n- Available widgets palette: unused sections shown as clickable chips\n- Add/remove widgets, name input, save to user templates\n- Applies v2 template immediately on save (triggers applyGridLayout)\n- \"Build Template\" button in sidebar templates section\n- CSS: .tb-row, .tb-cell, .tb-unused styling\n- i18n: 7 new keys (DE/EN/KO)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-210",
       "timestamp": "2026-04-12",
       "session": "auto",
