@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-217",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "26d7161",
+      "commit_full": "26d716117a0c0ecc1a19caf23a0d71c5d5a0cd1c",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(widgets): valid HTML for sidebar widget groups refs #216",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-216",
       "timestamp": "2026-04-12",
       "session": "auto",
