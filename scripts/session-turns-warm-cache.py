@@ -90,6 +90,46 @@ def _allowed_turn_days(date_keys: List[str]) -> Set[str]:
     return out
 
 
+def _pass1_append_assistant_row(
+    all_sessions: Dict[str, List[Dict[str, Any]]], allowed: Set[str], rec: Dict[str, Any]
+) -> None:
+    if rec.get("type") != "assistant":
+        return
+    if rec.get("isSidechain"):
+        return
+    ts = rec.get("timestamp")
+    if not isinstance(ts, str) or len(ts) < 19:
+        return
+    turn_day = ts[0:10]
+    if turn_day not in allowed:
+        return
+    msg = rec.get("message") or {}
+    usage = msg.get("usage")
+    if not isinstance(usage, Mapping):
+        return
+    inp = int(usage.get("input_tokens") or 0)
+    out_t = int(usage.get("output_tokens") or 0)
+    cr = int(usage.get("cache_read_input_tokens") or 0)
+    cc = int(usage.get("cache_creation_input_tokens") or 0)
+    if inp + out_t + cr + cc == 0:
+        return
+    sid = rec.get("sessionId")
+    if not sid:
+        return
+    model = str(msg.get("model") or "unknown")
+    model = MODEL_SUFFIX.sub("", model)
+    row = {
+        "ts": ts,
+        "day": turn_day,
+        "input": inp,
+        "output": out_t,
+        "cache_read": cr,
+        "cache_creation": cc,
+        "model": model,
+    }
+    all_sessions.setdefault(str(sid), []).append(row)
+
+
 def _pass1(paths: List[str], allowed: Set[str]) -> MutableMapping[str, List[Dict[str, Any]]]:
     all_sessions: Dict[str, List[Dict[str, Any]]] = {}
     for fp in paths:
@@ -106,41 +146,9 @@ def _pass1(paths: List[str], allowed: Set[str]) -> MutableMapping[str, List[Dict
                     rec = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                if rec.get("type") != "assistant":
+                if not isinstance(rec, dict):
                     continue
-                if rec.get("isSidechain"):
-                    continue
-                ts = rec.get("timestamp")
-                if not isinstance(ts, str) or len(ts) < 19:
-                    continue
-                turn_day = ts[0:10]
-                if turn_day not in allowed:
-                    continue
-                msg = rec.get("message") or {}
-                usage = msg.get("usage")
-                if not isinstance(usage, Mapping):
-                    continue
-                inp = int(usage.get("input_tokens") or 0)
-                out_t = int(usage.get("output_tokens") or 0)
-                cr = int(usage.get("cache_read_input_tokens") or 0)
-                cc = int(usage.get("cache_creation_input_tokens") or 0)
-                if inp + out_t + cr + cc == 0:
-                    continue
-                sid = rec.get("sessionId")
-                if not sid:
-                    continue
-                model = str(msg.get("model") or "unknown")
-                model = MODEL_SUFFIX.sub("", model)
-                row = {
-                    "ts": ts,
-                    "day": turn_day,
-                    "input": inp,
-                    "output": out_t,
-                    "cache_read": cr,
-                    "cache_creation": cc,
-                    "model": model,
-                }
-                all_sessions.setdefault(str(sid), []).append(row)
+                _pass1_append_assistant_row(all_sessions, allowed, rec)
         finally:
             f.close()
     return all_sessions

@@ -87,7 +87,9 @@ function finalizeSessionTurnsForDate(dateKey, allSessions) {
     var sid2 = resultSids[ri];
     var turns2 = sessions[sid2];
     turns2.sort(function (a, b) {
-      return a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0;
+      if (a.ts < b.ts) return -1;
+      if (a.ts > b.ts) return 1;
+      return 0;
     });
 
     var firstDay = turns2[0].day;

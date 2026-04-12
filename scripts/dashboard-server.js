@@ -2774,6 +2774,68 @@ function reapplyExtensionMarkersOnCachedDataAndBroadcast(reason) {
   }
 }
 
+function scheduleIdleSessionTurnsPreloadIfNeeded(scanOk) {
+  if (!scanOk || IDLE_SESSION_PRELOAD_MS <= 0 || __sessionTurnsIdlePreloadScheduled) return;
+  __sessionTurnsIdlePreloadScheduled = true;
+  setTimeout(function () {
+    try {
+      var preloadDay = new Date().toISOString().slice(0, 10);
+      var pt0 = Date.now();
+      getSessionTurnsCached(preloadDay);
+      serviceLog.info('session-turns', 'idle preload date=' + preloadDay + ' (' + (Date.now() - pt0) + 'ms)');
+    } catch (pe) {
+      serviceLog.warn('session-turns', 'idle preload failed: ' + (pe.message || pe));
+    }
+  }, IDLE_SESSION_PRELOAD_MS);
+}
+
+function handleUsageScanParseSuccess(data) {
+  data.refresh_sec = REFRESH_SEC;
+  data.scanning = false;
+  delete data.scan_progress;
+  if (data.scan_error) delete data.scan_error;
+  cachedData = data;
+  refreshProxyCache();
+  if (__proxyCache.data) cachedData.proxy = __proxyCache.data;
+  cachedData.release_stability = buildReleaseStabilityData();
+  __lastJsonlScanCompletedAt = data.generated || new Date().toISOString();
+}
+
+function handleUsageScanParseError(e) {
+  serviceLog.error('scan', 'parse failed: ' + (e && e.message ? e.message : String(e)));
+  var msg = e && e.message ? e.message : String(e);
+  if (!cachedData || !cachedData.days || cachedData.days.length === 0) {
+    cachedData = makeStubCachedData();
+  }
+  cachedData.scanning = false;
+  cachedData.scan_error = msg;
+}
+
+function finalizeUsageScanIncremental(err, data) {
+  var scanOk = false;
+  try {
+    if (err) throw err;
+    handleUsageScanParseSuccess(data);
+    scanOk = true;
+  } catch (e) {
+    handleUsageScanParseError(e);
+  } finally {
+    scanInProgress = false;
+    broadcastSse();
+    scheduleIdleSessionTurnsPreloadIfNeeded(scanOk);
+    if (scanOk && cachedData && cachedData.days && cachedData.days.length) {
+      backfillReleaseBodiesForDashboardDays(cachedData.days, function () {
+        cachedData.generated = new Date().toISOString();
+        broadcastSse();
+      });
+    }
+    if (scanQueued) {
+      scanQueued = false;
+      runScanAndBroadcast();
+    }
+  }
+}
+
 // Scan läuft inkrementell (setImmediate zwischen Datei-Batches): Server startet sofort, HTTP bleibt bedienbar.
 function runScanAndBroadcast() {
   if (scanInProgress) {
@@ -2804,58 +2866,7 @@ function runScanAndBroadcast() {
       broadcastSse();
     } catch (pe) {}
   }
-  parseAllUsageIncremental(function (err, data) {
-    var scanOk = false;
-    try {
-      if (err) throw err;
-      data.refresh_sec = REFRESH_SEC;
-      data.scanning = false;
-      delete data.scan_progress;
-      if (data.scan_error) delete data.scan_error;
-      cachedData = data;
-      refreshProxyCache();
-      if (__proxyCache.data) cachedData.proxy = __proxyCache.data;
-      cachedData.release_stability = buildReleaseStabilityData();
-      __lastJsonlScanCompletedAt = data.generated || new Date().toISOString();
-      scanOk = true;
-    } catch (e) {
-      serviceLog.error('scan', 'parse failed: ' + (e && e.message ? e.message : String(e)));
-      var msg = e && e.message ? e.message : String(e);
-      if (!cachedData || !cachedData.days || cachedData.days.length === 0) {
-        cachedData = makeStubCachedData();
-      }
-      cachedData.scanning = false;
-      cachedData.scan_error = msg;
-    } finally {
-      scanInProgress = false;
-      broadcastSse();
-      // Avoid stacking heavy work: refreshProxyCache already parsed all proxy NDJSON in try{}.
-      // Session-turns rebuild walks all JSONL again — defer once after first successful scan only.
-      if (scanOk && IDLE_SESSION_PRELOAD_MS > 0 && !__sessionTurnsIdlePreloadScheduled) {
-        __sessionTurnsIdlePreloadScheduled = true;
-        setTimeout(function () {
-          try {
-            var preloadDay = new Date().toISOString().slice(0, 10);
-            var pt0 = Date.now();
-            getSessionTurnsCached(preloadDay);
-            serviceLog.info('session-turns', 'idle preload date=' + preloadDay + ' (' + (Date.now() - pt0) + 'ms)');
-          } catch (pe) {
-            serviceLog.warn('session-turns', 'idle preload failed: ' + (pe.message || pe));
-          }
-        }, IDLE_SESSION_PRELOAD_MS);
-      }
-      if (scanOk && cachedData && cachedData.days && cachedData.days.length) {
-        backfillReleaseBodiesForDashboardDays(cachedData.days, function () {
-          cachedData.generated = new Date().toISOString();
-          broadcastSse();
-        });
-      }
-      if (scanQueued) {
-        scanQueued = false;
-        runScanAndBroadcast();
-      }
-    }
-  }, applyIncrementalProgress);
+  parseAllUsageIncremental(finalizeUsageScanIncremental, applyIncrementalProgress);
 }
 
 var claudeDataSyncBusy = false;
@@ -3351,6 +3362,61 @@ var SESSION_TURNS_REMOTE_TIMEOUT_MS = (function () {
   return !isNaN(n) && n >= 30000 ? n : 180000;
 })();
 
+function mergeLocalOutageIntoRemoteDays(remoteDays, localOutage) {
+  for (var rd = 0; rd < remoteDays.length; rd++) {
+    var lo = localOutage[remoteDays[rd].date];
+    if (!lo) continue;
+    remoteDays[rd].outage_spans = lo.spans;
+    remoteDays[rd].outage_hours = lo.outage_hours;
+    remoteDays[rd].outage_server_hours = lo.server_hours;
+    remoteDays[rd].outage_client_hours = lo.client_hours;
+    remoteDays[rd].outage_incidents = lo.incidents;
+  }
+}
+
+function devRemoteApplyProxyLogsBody(body, cb) {
+  try {
+    var parsed = JSON.parse(body);
+    var remote = parsed.usage || null;
+    if (!remote) {
+      serviceLog.warn('dev', 'remote has old format (no usage key) — need deploy with new /api/debug/proxy-logs');
+      return cb();
+    }
+    var remoteFiles = parsed.files || [];
+    if (remoteFiles.length > 0) {
+      var logDir = path.join(os.tmpdir(), 'claude-proxy-logs-dev');
+      if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+      for (var pfi = 0; pfi < remoteFiles.length; pfi++) {
+        fs.writeFileSync(path.join(logDir, remoteFiles[pfi].name), remoteFiles[pfi].content, 'utf8');
+      }
+      process.env.ANTHROPIC_PROXY_LOG_DIR = logDir;
+      serviceLog.info('dev', 'persisted ' + remoteFiles.length + ' proxy log files to ' + logDir);
+    }
+    remote.dev_source = __devSource;
+    remote.generated = new Date().toISOString();
+    mergeLocalOutageIntoRemoteDays(remote.days || [], getOutageDaysMap());
+    cachedData = remote;
+    cachedData.release_stability = buildReleaseStabilityData();
+    refreshProxyCache();
+    if (__proxyCache.data) cachedData.proxy = __proxyCache.data;
+    __lastJsonlScanCompletedAt = cachedData.generated || new Date().toISOString();
+    var remoteSt = parsed.session_turns;
+    if (remoteSt) {
+      var stKeys = Object.keys(remoteSt);
+      for (var sti = 0; sti < stKeys.length; sti++) {
+        _sessionTurnsCache[stKeys[sti]] = { result: remoteSt[stKeys[sti]], fingerprint: 'remote' };
+      }
+      serviceLog.info('dev', 'session-turns preloaded: ' + stKeys.length + ' days from remote');
+    }
+    var proxyDaysLen = remote.proxy && remote.proxy.proxy_days ? remote.proxy.proxy_days.length : 0;
+    serviceLog.info('dev', 'remote data fetched: ' + (remote.days || []).length + ' days, proxy_days=' + proxyDaysLen);
+    broadcastSse();
+  } catch (e) {
+    serviceLog.error('dev', 'remote data parse failed: ' + (e.message || e));
+  }
+  cb();
+}
+
 function devFetchRemoteUsage(cb, retryCount) {
   if (!__devSource) return cb();
   retryCount = retryCount || 0;
@@ -3373,58 +3439,7 @@ function devFetchRemoteUsage(cb, retryCount) {
         serviceLog.error('dev', 'remote returned ' + resp.statusCode + ': ' + body.slice(0, 200));
         return cb();
       }
-      try {
-        var parsed = JSON.parse(body);
-        var remote = parsed.usage || null;
-        if (!remote) {
-          serviceLog.warn('dev', 'remote has old format (no usage key) — need deploy with new /api/debug/proxy-logs');
-          return cb();
-        }
-        // Persist proxy NDJSON files locally so /api/quota-divisor can parse per-request data
-        var remoteFiles = parsed.files || [];
-        if (remoteFiles.length > 0) {
-          var logDir = path.join(os.tmpdir(), 'claude-proxy-logs-dev');
-          if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
-          for (var pfi = 0; pfi < remoteFiles.length; pfi++) {
-            fs.writeFileSync(path.join(logDir, remoteFiles[pfi].name), remoteFiles[pfi].content, 'utf8');
-          }
-          process.env.ANTHROPIC_PROXY_LOG_DIR = logDir;
-          serviceLog.info('dev', 'persisted ' + remoteFiles.length + ' proxy log files to ' + logDir);
-        }
-        remote.dev_source = __devSource;
-        remote.generated = new Date().toISOString();
-        // Re-enrich outage spans with comp_status from local outage cache
-        var localOutage = getOutageDaysMap();
-        var remoteDays = remote.days || [];
-        for (var rd = 0; rd < remoteDays.length; rd++) {
-          var lo = localOutage[remoteDays[rd].date];
-          if (lo) {
-            remoteDays[rd].outage_spans = lo.spans;
-            remoteDays[rd].outage_hours = lo.outage_hours;
-            remoteDays[rd].outage_server_hours = lo.server_hours;
-            remoteDays[rd].outage_client_hours = lo.client_hours;
-            remoteDays[rd].outage_incidents = lo.incidents;
-          }
-        }
-        cachedData = remote;
-        cachedData.release_stability = buildReleaseStabilityData();
-        refreshProxyCache();
-        if (__proxyCache.data) cachedData.proxy = __proxyCache.data;
-        __lastJsonlScanCompletedAt = cachedData.generated || new Date().toISOString();
-        var remoteSt = parsed.session_turns;
-        if (remoteSt) {
-          var stKeys = Object.keys(remoteSt);
-          for (var sti = 0; sti < stKeys.length; sti++) {
-            _sessionTurnsCache[stKeys[sti]] = { result: remoteSt[stKeys[sti]], fingerprint: 'remote' };
-          }
-          serviceLog.info('dev', 'session-turns preloaded: ' + stKeys.length + ' days from remote');
-        }
-        serviceLog.info('dev', 'remote data fetched: ' + (remote.days || []).length + ' days, proxy_days=' + (remote.proxy && remote.proxy.proxy_days ? remote.proxy.proxy_days.length : 0));
-        broadcastSse();
-      } catch (e) {
-        serviceLog.error('dev', 'remote data parse failed: ' + (e.message || e));
-      }
-      cb();
+      devRemoteApplyProxyLogsBody(body, cb);
     });
   }).on('error', function (e) {
     if (retryCount < maxRetries) {
@@ -3539,8 +3554,8 @@ function getSessionTurnsCached(dateKey) {
   }
   var result = buildSessionTurnsForDateWithCollected(dateKey, collected.tagged);
   var totalMs = Date.now() - t0;
-  var sessions = result && result.sessions ? result.sessions.length : 0;
-  var turns = result && result.total_turns ? result.total_turns : 0;
+  var sessions = result?.sessions ? result.sessions.length : 0;
+  var turns = result?.total_turns ? result.total_turns : 0;
   serviceLog.info('session-turns', 'date=' + dateKey + (noCache ? ' NO_CACHE REBUILD ' : ' REBUILD ') + collected.tagged.length + ' files → ' + sessions + ' sessions, ' + turns + ' turns (' + totalMs + 'ms, fp=' + fpMs + 'ms)');
   if (!noCache) _sessionTurnsCache[dateKey] = { result: result, fingerprint: fp };
   return result;
@@ -3616,13 +3631,25 @@ function isPathUnderDirectory(fileAbs, dirAbs) {
   return f.indexOf(d + path.sep) === 0;
 }
 
+function debugTaggedJsonlMatchesAbs(abs, tagged) {
+  for (var i = 0; i < tagged.length; i++) {
+    if (path.resolve(tagged[i].path) === abs) return true;
+  }
+  return false;
+}
+
+function debugProxyNdjsonMatchesAbs(abs, proxyPaths) {
+  for (var pi = 0; pi < proxyPaths.length; pi++) {
+    if (path.resolve(proxyPaths[pi]) === abs) return true;
+  }
+  return false;
+}
+
 function debugPathAllowedForRead(absPath) {
   var abs = path.resolve(absPath);
   try {
     var collected = collectTaggedJsonlFiles();
-    for (var i = 0; i < collected.tagged.length; i++) {
-      if (path.resolve(collected.tagged[i].path) === abs) return true;
-    }
+    if (debugTaggedJsonlMatchesAbs(abs, collected.tagged)) return true;
   } catch (e0) {}
   if (path.resolve(USAGE_DAY_CACHE_FILE) === abs) return true;
   if (path.resolve(JSONL_TODAY_INDEX_FILE) === abs) return true;
@@ -3631,9 +3658,7 @@ function debugPathAllowedForRead(absPath) {
   if (path.resolve(MARKETPLACE_CACHE) === abs) return true;
   try {
     var proxyPaths = collectProxyNdjsonFiles();
-    for (var pi = 0; pi < proxyPaths.length; pi++) {
-      if (path.resolve(proxyPaths[pi]) === abs) return true;
-    }
+    if (debugProxyNdjsonMatchesAbs(abs, proxyPaths)) return true;
   } catch (e1) {}
   var stDir = resolveSessionTurnsCacheDir();
   if (stDir && isPathUnderDirectory(abs, stDir)) {
@@ -3650,6 +3675,87 @@ function debugCacheFolderAndFile(absPath) {
     folder_ui: displayPathForUi(path.dirname(abs)),
     file_name: path.basename(abs)
   };
+}
+
+function tryPushDebugCacheKnownPath(out, kind, p) {
+  try {
+    var st2 = fs.statSync(p);
+    var absK = path.resolve(p);
+    var metaK = debugCacheFolderAndFile(absK);
+    out.push({
+      kind: kind,
+      label: '',
+      path_abs: absK,
+      path_ui: displayPathForUi(p),
+      folder_ui: metaK.folder_ui,
+      file_name: metaK.file_name,
+      size: st2.size,
+      mtime_ms: Math.floor(st2.mtimeMs)
+    });
+  } catch (e2) {}
+}
+
+function compareDebugCacheFileRows(a, b) {
+  var fa = a.folder_ui || '';
+  var fb = b.folder_ui || '';
+  if (fa !== fb) {
+    if (fa < fb) return -1;
+    if (fa > fb) return 1;
+    return 0;
+  }
+  var na = (a.file_name || '').toLowerCase();
+  var nb = (b.file_name || '').toLowerCase();
+  if (na < nb) return -1;
+  if (na > nb) return 1;
+  return 0;
+}
+
+function appendProxyNdjsonDebugEntries(out) {
+  try {
+    var pxs = collectProxyNdjsonFiles();
+    for (var pxi = 0; pxi < pxs.length; pxi++) {
+      try {
+        var stp = fs.statSync(pxs[pxi]);
+        var absP = path.resolve(pxs[pxi]);
+        var metaP = debugCacheFolderAndFile(absP);
+        out.push({
+          kind: 'proxy_ndjson',
+          label: path.basename(pxs[pxi]),
+          path_abs: absP,
+          path_ui: displayPathForUi(pxs[pxi]),
+          folder_ui: metaP.folder_ui,
+          file_name: metaP.file_name,
+          size: stp.size,
+          mtime_ms: Math.floor(stp.mtimeMs)
+        });
+      } catch (e3) {}
+    }
+  } catch (e4) {}
+}
+
+function appendSessionTurnsDiskDebugEntries(out, stDir) {
+  try {
+    var names = fs.readdirSync(stDir);
+    for (var ni = 0; ni < names.length; ni++) {
+      if (names[ni].length < 6 || names[ni].slice(-5) !== '.json') continue;
+      var fp = path.join(stDir, names[ni]);
+      try {
+        var st3 = fs.statSync(fp);
+        var absS = path.resolve(fp);
+        var metaS = debugCacheFolderAndFile(absS);
+        out.push({
+          kind: 'session_turns_disk',
+          label: names[ni],
+          path_abs: absS,
+          path_ui: displayPathForUi(fp),
+          folder_ui: metaS.folder_ui,
+          file_name: metaS.file_name,
+          size: st3.size,
+          mtime_ms: Math.floor(st3.mtimeMs)
+        });
+      } catch (e5) {}
+    }
+  } catch (e6) {}
 }
 
 function collectDebugCacheFilesPayload() {
@@ -3673,81 +3779,15 @@ function collectDebugCacheFilesPayload() {
       });
     } catch (e1) {}
   }
-  function pushKnown(kind, p) {
-    try {
-      var st2 = fs.statSync(p);
-      var absK = path.resolve(p);
-      var metaK = debugCacheFolderAndFile(absK);
-      out.push({
-        kind: kind,
-        label: '',
-        path_abs: absK,
-        path_ui: displayPathForUi(p),
-        folder_ui: metaK.folder_ui,
-        file_name: metaK.file_name,
-        size: st2.size,
-        mtime_ms: Math.floor(st2.mtimeMs)
-      });
-    } catch (e2) {}
-  }
-  pushKnown('day_cache', USAGE_DAY_CACHE_FILE);
-  pushKnown('jsonl_today_index', JSONL_TODAY_INDEX_FILE);
-  pushKnown('releases_disk', RELEASES_CACHE);
-  pushKnown('outages_disk', OUTAGE_DISK_CACHE);
-  pushKnown('marketplace_disk', MARKETPLACE_CACHE);
-  try {
-    var pxs = collectProxyNdjsonFiles();
-    for (var pxi = 0; pxi < pxs.length; pxi++) {
-      try {
-        var stp = fs.statSync(pxs[pxi]);
-        var absP = path.resolve(pxs[pxi]);
-        var metaP = debugCacheFolderAndFile(absP);
-        out.push({
-          kind: 'proxy_ndjson',
-          label: path.basename(pxs[pxi]),
-          path_abs: absP,
-          path_ui: displayPathForUi(pxs[pxi]),
-          folder_ui: metaP.folder_ui,
-          file_name: metaP.file_name,
-          size: stp.size,
-          mtime_ms: Math.floor(stp.mtimeMs)
-        });
-      } catch (e3) {}
-    }
-  } catch (e4) {}
+  tryPushDebugCacheKnownPath(out, 'day_cache', USAGE_DAY_CACHE_FILE);
+  tryPushDebugCacheKnownPath(out, 'jsonl_today_index', JSONL_TODAY_INDEX_FILE);
+  tryPushDebugCacheKnownPath(out, 'releases_disk', RELEASES_CACHE);
+  tryPushDebugCacheKnownPath(out, 'outages_disk', OUTAGE_DISK_CACHE);
+  tryPushDebugCacheKnownPath(out, 'marketplace_disk', MARKETPLACE_CACHE);
+  appendProxyNdjsonDebugEntries(out);
   var stDir = resolveSessionTurnsCacheDir();
-  if (stDir) {
-    try {
-      var names = fs.readdirSync(stDir);
-      for (var ni = 0; ni < names.length; ni++) {
-        if (names[ni].length < 6 || names[ni].slice(-5) !== '.json') continue;
-        var fp = path.join(stDir, names[ni]);
-        try {
-          var st3 = fs.statSync(fp);
-          var absS = path.resolve(fp);
-          var metaS = debugCacheFolderAndFile(absS);
-          out.push({
-            kind: 'session_turns_disk',
-            label: names[ni],
-            path_abs: absS,
-            path_ui: displayPathForUi(fp),
-            folder_ui: metaS.folder_ui,
-            file_name: metaS.file_name,
-            size: st3.size,
-            mtime_ms: Math.floor(st3.mtimeMs)
-          });
-        } catch (e5) {}
-      }
-    } catch (e6) {}
-  }
-  out.sort(function (a, b) {
-    var fa = a.folder_ui || '';
-    var fb = b.folder_ui || '';
-    if (fa !== fb) return fa < fb ? -1 : fa > fb ? 1 : 0;
-    var na = (a.file_name || '').toLowerCase();
-    var nb = (b.file_name || '').toLowerCase();
-    return na < nb ? -1 : na > nb ? 1 : 0;
-  });
+  if (stDir) appendSessionTurnsDiskDebugEntries(out, stDir);
+  out.sort(compareDebugCacheFileRows);
   return out;
 }
 
@@ -3775,6 +3815,57 @@ function devProxyFetchRemoteSessionTurns(remoteBase, dateStr, timeoutMs, cb) {
   stReq.on('error', function (stErr) {
     cb(stErr, 0, '', Date.now() - stT0r);
   });
+}
+
+/** One closure per proxy file: keeps prevQ5 state for quota-divisor NDJSON scan. */
+function createQuotaDivisorLineProcessor(PRICE, qfDate, requestPairs) {
+  var prevQ5 = null;
+  return function (line) {
+    if (!line.trim()) return;
+    var rec;
+    try {
+      rec = JSON.parse(line);
+    } catch (_e) {
+      return;
+    }
+    if (!rec.usage) return;
+    var rah = rec.response_anthropic_headers || {};
+    var q5Str = rah['anthropic-ratelimit-unified-5h-utilization'];
+    if (q5Str == null) return;
+    var q5 = parseFloat(q5Str);
+    if (isNaN(q5) || q5 < 0) return;
+
+    var u = rec.usage;
+    var cr = u.cache_read_input_tokens || 0;
+    var cc = u.cache_creation_input_tokens || 0;
+    var inp = u.input_tokens || 0;
+    var out = u.output_tokens || 0;
+    var cost =
+      (cr * PRICE.cache_read) / 1e6 +
+      (cc * PRICE.cache_creation) / 1e6 +
+      (inp * PRICE.input) / 1e6 +
+      (out * PRICE.output) / 1e6;
+
+    var delta = prevQ5 !== null ? q5 - prevQ5 : null;
+    if (delta !== null && delta > 0 && cost > 0) {
+      var impliedDivisor = cost / delta;
+      requestPairs.push({
+        date: qfDate,
+        ts: rec.ts_end || rec.ts_start || '',
+        q5_prev: prevQ5,
+        q5: q5,
+        delta: delta,
+        cost: Math.round(cost * 100) / 100,
+        implied_divisor: Math.round(impliedDivisor * 100) / 100,
+        cache_read: cr,
+        cache_creation: cc,
+        input: inp,
+        output: out,
+        cache_pct: cr > 0 ? Math.round(cr / (cr + cc + inp + out) * 100) : 0
+      });
+    }
+    prevQ5 = q5;
+  };
 }
 
 var server = http.createServer(function (req, res) {
@@ -3976,7 +4067,7 @@ var server = http.createServer(function (req, res) {
       return;
     }
     if (req.method !== 'POST') {
-      res.writeHead(405, Object.assign({ Allow: 'POST, OPTIONS' }, corsBench));
+      res.writeHead(405, { Allow: 'POST, OPTIONS', ...corsBench });
       res.end(JSON.stringify({ ok: false, error: 'method_not_allowed' }));
       return;
     }
@@ -3991,7 +4082,7 @@ var server = http.createServer(function (req, res) {
         res.end(JSON.stringify({ ok: false, error: 'invalid_json' }));
         return;
       }
-      var n = body && body.days_back != null ? parseInt(body.days_back, 10) : 8;
+      var n = body?.days_back != null ? parseInt(body.days_back, 10) : 8;
       if (isNaN(n) || n < 1) n = 8;
       if (n > 31) n = 31;
       var dateKeys = benchmarkSessionTurns.resolveDateKeys(n, '');
@@ -4054,7 +4145,7 @@ var server = http.createServer(function (req, res) {
       return;
     }
     if (req.method !== 'POST') {
-      res.writeHead(405, Object.assign({ Allow: 'POST, OPTIONS' }, corsView));
+      res.writeHead(405, { Allow: 'POST, OPTIONS', ...corsView });
       res.end(JSON.stringify({ ok: false, error: 'method_not_allowed' }));
       return;
     }
@@ -4108,7 +4199,7 @@ var server = http.createServer(function (req, res) {
         );
       } catch (eV) {
         res.writeHead(500, corsView);
-        res.end(JSON.stringify({ ok: false, error: 'read_failed', detail: String(eV && eV.message ? eV.message : eV) }));
+        res.end(JSON.stringify({ ok: false, error: 'read_failed', detail: String(eV?.message ? eV.message : eV) }));
       }
     });
     return;
@@ -4123,7 +4214,7 @@ var server = http.createServer(function (req, res) {
       claude_data_sync_enabled: !!getClaudeUsageSyncToken(),
       jsonl_cache_at: __lastJsonlScanCompletedAt,
       proxy_cache_at: __proxyCache.generated,
-      scanning: !!(cachedData && cachedData.scanning)
+      scanning: !!cachedData?.scanning
     }));
   } else if (pathname === '/api/debug/cache-reset' && req.method === 'POST' && process.env.DEBUG_API === '1') {
     // Loescht Day-Cache + Today-Index und triggert Full-Rescan
@@ -4157,22 +4248,10 @@ var server = http.createServer(function (req, res) {
     // Per-request quota divisor analysis: correlates token costs with q5 deltas
     var qdUrl = new URL(req.url, 'http://localhost');
     var qdDate = qdUrl.searchParams.get('date'); // optional: single day
-    var proxyData = __proxyCache.data || parseProxyNdjsonFiles();
-    var pdays = proxyData.proxy_days || [];
+    if (!__proxyCache.data) refreshProxyCache();
 
     // Opus 4.6 published pricing ($/MTok)
     var PRICE = { cache_read: 1.50, cache_creation: 18.75, input: 15.0, output: 75.0 };
-
-    var allSamples = [];
-    var dailySummaries = [];
-
-    for (var qi = 0; qi < pdays.length; qi++) {
-      var qd = pdays[qi];
-      if (qdDate && qd.date !== qdDate) continue;
-      var qs = qd._q5_samples_raw || qd.q5_samples_raw;
-      // Rebuild from cached proxy data — q5_samples are in-memory during parse
-      // We need the raw samples; fall back to re-parsing if not available
-    }
 
     // Re-parse proxy logs to get per-request q5 + full token data
     var proxyFiles = collectProxyNdjsonFiles();
@@ -4181,47 +4260,8 @@ var server = http.createServer(function (req, res) {
     for (var qfi = 0; qfi < proxyFiles.length; qfi++) {
       var qfDate = path.basename(proxyFiles[qfi]).replace('proxy-', '').replace('.ndjson', '');
       if (qdDate && qfDate !== qdDate) continue;
-      var prevQ5 = null;
       try {
-        forEachJsonlLineSync(proxyFiles[qfi], function(line) {
-          if (!line.trim()) return;
-          var rec;
-          try { rec = JSON.parse(line); } catch (_e) { return; }
-          if (!rec.usage) return;
-          var rah = rec.response_anthropic_headers || {};
-          var q5Str = rah['anthropic-ratelimit-unified-5h-utilization'];
-          if (q5Str == null) return;
-          var q5 = parseFloat(q5Str);
-          if (isNaN(q5) || q5 < 0) return;
-
-          var u = rec.usage;
-          var cr = u.cache_read_input_tokens || 0;
-          var cc = u.cache_creation_input_tokens || 0;
-          var inp = u.input_tokens || 0;
-          var out = u.output_tokens || 0;
-          var cost = cr * PRICE.cache_read / 1e6 + cc * PRICE.cache_creation / 1e6 +
-                     inp * PRICE.input / 1e6 + out * PRICE.output / 1e6;
-
-          var delta = (prevQ5 !== null) ? q5 - prevQ5 : null;
-          if (delta !== null && delta > 0 && cost > 0) {
-            var impliedDivisor = cost / delta;
-            requestPairs.push({
-              date: qfDate,
-              ts: rec.ts_end || rec.ts_start || '',
-              q5_prev: prevQ5,
-              q5: q5,
-              delta: delta,
-              cost: Math.round(cost * 100) / 100,
-              implied_divisor: Math.round(impliedDivisor * 100) / 100,
-              cache_read: cr,
-              cache_creation: cc,
-              input: inp,
-              output: out,
-              cache_pct: cr > 0 ? Math.round(cr / (cr + cc + inp + out) * 100) : 0
-            });
-          }
-          prevQ5 = q5;
-        });
+        forEachJsonlLineSync(proxyFiles[qfi], createQuotaDivisorLineProcessor(PRICE, qfDate, requestPairs));
       } catch (_e) { /* skip */ }
     }
 
@@ -4237,7 +4277,9 @@ var server = http.createServer(function (req, res) {
     }
 
     var dateSummaries = [];
-    var dateKeys = Object.keys(byDate).sort();
+    var dateKeys = Object.keys(byDate).sort(function (a, b) {
+      return a.localeCompare(b);
+    });
     for (var dk = 0; dk < dateKeys.length; dk++) {
       var bd = byDate[dateKeys[dk]];
       var divs = bd.divisors.slice().sort(function(a, b) { return a - b; });

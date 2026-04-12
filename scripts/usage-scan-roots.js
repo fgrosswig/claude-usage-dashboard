@@ -183,7 +183,9 @@ function buildTaggedJsonlFingerprintSync(tagged) {
       parts.push(abs + ':err');
     }
   }
-  parts.sort();
+  parts.sort(function (a, b) {
+    return a.localeCompare(b);
+  });
   return parts.join('\n');
 }
 

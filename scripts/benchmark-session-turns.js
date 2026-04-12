@@ -29,42 +29,45 @@ function stripOuterQuotes(s) {
   return s;
 }
 
-function parseArgs(argv) {
-  var daysBack = 8;
-  var datesCsv = '';
-  var iterations = 1;
-  for (var i = 0; i < argv.length; i++) {
-    var a = argv[i];
-    var m;
-    m = a.match(/^--days-back=(\d+)$/);
-    if (m) {
-      daysBack = parseInt(m[1], 10);
-      continue;
-    }
-    if (a === '--days-back' && argv[i + 1]) {
-      daysBack = parseInt(argv[++i], 10);
-      continue;
-    }
-    m = a.match(/^--dates=(.+)$/);
-    if (m) {
-      datesCsv = stripOuterQuotes(m[1]);
-      continue;
-    }
-    if (a === '--dates' && argv[i + 1]) {
-      datesCsv = stripOuterQuotes(argv[++i]);
-      continue;
-    }
-    m = a.match(/^--iterations=(\d+)$/);
-    if (m) {
-      iterations = parseInt(m[1], 10);
-      continue;
-    }
-    if (a === '--iterations' && argv[i + 1]) {
-      iterations = parseInt(argv[++i], 10);
-      continue;
-    }
+function tryParseBenchmarkArg(argv, idx, out) {
+  var a = argv[idx];
+  var m = a.match(/^--days-back=(\d+)$/);
+  if (m) {
+    out.daysBack = parseInt(m[1], 10);
+    return idx + 1;
   }
-  return { daysBack: daysBack, datesCsv: datesCsv, iterations: iterations };
+  if (a === '--days-back' && idx + 1 < argv.length) {
+    out.daysBack = parseInt(argv[idx + 1], 10);
+    return idx + 2;
+  }
+  m = a.match(/^--dates=(.+)$/);
+  if (m) {
+    out.datesCsv = stripOuterQuotes(m[1]);
+    return idx + 1;
+  }
+  if (a === '--dates' && idx + 1 < argv.length) {
+    out.datesCsv = stripOuterQuotes(argv[idx + 1]);
+    return idx + 2;
+  }
+  m = a.match(/^--iterations=(\d+)$/);
+  if (m) {
+    out.iterations = parseInt(m[1], 10);
+    return idx + 1;
+  }
+  if (a === '--iterations' && idx + 1 < argv.length) {
+    out.iterations = parseInt(argv[idx + 1], 10);
+    return idx + 2;
+  }
+  return idx + 1;
+}
+
+function parseArgs(argv) {
+  var out = { daysBack: 8, datesCsv: '', iterations: 1 };
+  var idx = 0;
+  while (idx < argv.length) {
+    idx = tryParseBenchmarkArg(argv, idx, out);
+  }
+  return out;
 }
 
 function resolveDateKeys(daysBack, datesCsv) {
@@ -191,7 +194,7 @@ function formatBenchmarkReport(repoDir, last, dateKeys, modeLine, iterations, to
     '  vs Python warm-cache: same per-day counts; Python pass1 is usually slower (stdlib json vs V8).'
   );
   var iters = iterations || 1;
-  if (iters > 1 && totals && totals.length) {
+  if (iters > 1 && totals?.length) {
     var sum = 0;
     for (var ti = 0; ti < totals.length; ti++) sum += totals[ti];
     var avg = sum / totals.length;

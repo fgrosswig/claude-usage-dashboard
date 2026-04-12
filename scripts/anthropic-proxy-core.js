@@ -234,7 +234,7 @@ function extractUsageFromJson(obj) {
   var u = null;
   if (obj.usage && typeof obj.usage === 'object') u = obj.usage;
   else if (obj.message && obj.message.usage) u = obj.message.usage;
-  else if (obj.delta && obj.delta.usage) u = obj.delta.usage;
+  else if (obj.delta?.usage) u = obj.delta.usage;
   if (!u) return null;
   // Promote ephemeral sub-fields from cache_creation (message_start event)
   var cc = u.cache_creation;

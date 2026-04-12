@@ -1041,6 +1041,18 @@ function resizeLiveScannedJsonlChartIfAny() {
     __liveScannedJsonlChart.resize();
   } catch (eRs) {}
 }
+function __disposeLiveScannedJsonlChartIfNeeded() {
+  if (!__liveScannedJsonlChart) return;
+  try {
+    __liveScannedJsonlChart.dispose();
+  } catch (eLc) {}
+  __liveScannedJsonlChart = null;
+}
+function __liveJsonlBarTooltipFormatter(params) {
+  if (!params?.length) return "";
+  var p0 = params[0];
+  return escHtml(p0.name) + "<br/>" + p0.marker + String(p0.value) + " " + t("liveFilesChartFilesSuffix");
+}
 function liveScannedJsonlBucket(line) {
   var s = String(line || "").replace(/\\/g, "/");
   var dot = " \u00b7 ";
@@ -1063,12 +1075,7 @@ function updateLiveFilesPanel(data) {
   var head = document.getElementById("live-files-head");
   var trig = document.getElementById("live-trigger");
   if (!host) return;
-  if (__liveScannedJsonlChart) {
-    try {
-      __liveScannedJsonlChart.dispose();
-    } catch (eLc) {}
-    __liveScannedJsonlChart = null;
-  }
+  __disposeLiveScannedJsonlChartIfNeeded();
   host.innerHTML = "";
   host.style.display = "";
   var files = (data && data.scanned_files) ? data.scanned_files : [];
@@ -1126,11 +1133,7 @@ function updateLiveFilesPanel(data) {
       backgroundColor: "rgba(15,23,42,0.95)",
       borderColor: "#334155",
       textStyle: { color: "#e2e8f0" },
-      formatter: function (params) {
-        if (!params || !params.length) return "";
-        var p0 = params[0];
-        return escHtml(p0.name) + "<br/>" + p0.marker + String(p0.value) + " " + t("liveFilesChartFilesSuffix");
-      }
+      formatter: __liveJsonlBarTooltipFormatter
     },
     xAxis: {
       type: "value",
@@ -1151,26 +1154,21 @@ function updateLiveFilesPanel(data) {
       }
     ]
   });
-  function scheduleLiveChartResize() {
-    resizeLiveScannedJsonlChartIfAny();
-  }
   if (typeof requestAnimationFrame !== "undefined") {
     requestAnimationFrame(function () {
-      requestAnimationFrame(scheduleLiveChartResize);
+      requestAnimationFrame(resizeLiveScannedJsonlChartIfAny);
     });
   } else {
-    setTimeout(scheduleLiveChartResize, 0);
+    setTimeout(resizeLiveScannedJsonlChartIfAny, 0);
   }
   if (trig) trig.setAttribute("title", tr("liveTriggerMany", { n: n }));
 }
 (function wireLiveReleasePanelChrome() {
   function go() {
     var det = document.getElementById("live-release-details");
-    if (!det || det.getAttribute("data-live-rel-chrome-wired") === "1") return;
-    det.setAttribute("data-live-rel-chrome-wired", "1");
-    if (typeof window !== "undefined" && window.CacheFilesExplorer && window.CacheFilesExplorer.wireOpenButton) {
-      window.CacheFilesExplorer.wireOpenButton("live-cache-files-open");
-    }
+    if (!det || det.dataset.liveRelChromeWired === "1") return;
+    det.dataset.liveRelChromeWired = "1";
+    window.CacheFilesExplorer?.wireOpenButton("live-cache-files-open");
     var expandBtn = document.getElementById("live-rel-expand-btn");
     var relOverlay = document.getElementById("release-modal-overlay");
     var relBody = document.getElementById("release-modal-body");
@@ -2769,7 +2767,8 @@ function generateForensicReportMd(data) {
 
   // Detect peak + limit days
   var peakDay = null, peakVal = 0;
-  for (var dy of days) {
+  for (var _dyi = 0; _dyi < days.length; _dyi++) {
+    var dy = days[_dyi];
     var tt = __rptDayTotal(dy);
     if (tt > peakVal) {
       peakVal = tt;
@@ -2777,11 +2776,12 @@ function generateForensicReportMd(data) {
     }
   }
   var limitDays = [];
-  for (var dy of days) {
+  for (var _dyi2 = 0; _dyi2 < days.length; _dyi2++) {
+    var dy2 = days[_dyi2];
     var fl = [];
-    if ((dy.hit_limit || 0) >= HIT_MIN) fl.push("HIT(" + dy.hit_limit + ")");
-    if ((dy.cache_read || 0) >= CACHE_THRESH) fl.push("CACHE\u2265500M");
-    if (fl.length) limitDays.push({ d: dy, flags: fl });
+    if ((dy2.hit_limit || 0) >= HIT_MIN) fl.push("HIT(" + dy2.hit_limit + ")");
+    if ((dy2.cache_read || 0) >= CACHE_THRESH) fl.push("CACHE\u2265500M");
+    if (fl.length) limitDays.push({ d: dy2, flags: fl });
   }
 
   md.push(
@@ -2797,14 +2797,15 @@ function generateForensicReportMd(data) {
     "|------------|----------|------------|--------|-------|-------|-------------|--------|"
   );
 
-  for (var dy of days) {
-    var cr = dy.output > 0 ? Math.round(dy.cache_read / dy.output) : 0;
+  for (var _dyi3 = 0; _dyi3 < days.length; _dyi3++) {
+    var dy3 = days[_dyi3];
+    var cr = dy3.output > 0 ? Math.round(dy3.cache_read / dy3.output) : 0;
     var lim = "\u2014";
-    if ((dy.hit_limit || 0) >= HIT_MIN) lim = "HIT(" + dy.hit_limit + ")";
-    if ((dy.cache_read || 0) >= CACHE_THRESH) {
+    if ((dy3.hit_limit || 0) >= HIT_MIN) lim = "HIT(" + dy3.hit_limit + ")";
+    if ((dy3.cache_read || 0) >= CACHE_THRESH) {
       lim = lim === "\u2014" ? "CACHE\u2265500M" : lim + ", CACHE\u2265500M";
     }
-    md.push("| " + dy.date + " | " + fmt(dy.output) + " | " + fmt(dy.cache_read) + " | " + cr + "x | " + dy.calls + " | " + (dy.active_hours || 0) + " | " + __rptSigCell(dy) + " | " + lim + " |");
+    md.push("| " + dy3.date + " | " + fmt(dy3.output) + " | " + fmt(dy3.cache_read) + " | " + cr + "x | " + dy3.calls + " | " + (dy3.active_hours || 0) + " | " + __rptSigCell(dy3) + " | " + lim + " |");
   }
   md.push("");
 
@@ -2814,12 +2815,13 @@ function generateForensicReportMd(data) {
     "| " + (isDE ? "Datum" : "Date") + " | Overhead | Output/h | Total/h | Subagent% |",
     "|------------|----------|----------|---------|-----------|"
   );
-  for (var dy of days) {
-    var tot2 = __rptDayTotal(dy);
-    var ah = Math.max(1, dy.active_hours || 1);
-    var oh = dy.output > 0 ? (tot2 / dy.output).toFixed(0) + "x" : "\u2014";
-    var sp = (dy.sub_pct || 0) + "%";
-    md.push("| " + dy.date + " | " + oh + " | " + fmt(Math.round(dy.output / ah)) + " | " + fmt(Math.round(tot2 / ah)) + " | " + sp + " |");
+  for (var _dyi4 = 0; _dyi4 < days.length; _dyi4++) {
+    var dy4 = days[_dyi4];
+    var tot2 = __rptDayTotal(dy4);
+    var ah = Math.max(1, dy4.active_hours || 1);
+    var oh = dy4.output > 0 ? (tot2 / dy4.output).toFixed(0) + "x" : "\u2014";
+    var sp = (dy4.sub_pct || 0) + "%";
+    md.push("| " + dy4.date + " | " + oh + " | " + fmt(Math.round(dy4.output / ah)) + " | " + fmt(Math.round(tot2 / ah)) + " | " + sp + " |");
   }
 
   // 3. Subagent
@@ -2830,7 +2832,12 @@ function generateForensicReportMd(data) {
     "| "+(isDE?"Datum":"Date")+" | "+(isDE?"Aufrufe":"Calls")+" | Sub | Sub-Cache | Sub-Cache% |",
     "|------------|--------|------|-----------|------------|"
   );
-  for (var dy of days){var sc=dy.sub_cache||0;var scp=(dy.sub_cache_pct||0)+"%";md.push("| "+dy.date+" | "+dy.calls+" | "+(dy.sub_calls||0)+" | "+fmt(sc)+" | "+scp+" |");}
+  for (var _dyi5 = 0; _dyi5 < days.length; _dyi5++) {
+    var dy5 = days[_dyi5];
+    var sc = dy5.sub_cache || 0;
+    var scp = (dy5.sub_cache_pct || 0) + "%";
+    md.push("| " + dy5.date + " | " + dy5.calls + " | " + (dy5.sub_calls || 0) + " | " + fmt(sc) + " | " + scp + " |");
+  }
   md.push("");
 
   // 4. Budget estimate
@@ -2844,7 +2851,8 @@ function generateForensicReportMd(data) {
       "|------------|---------|----------|---------|-------|--------|"
     );
     var prevI = 0;
-    for (var ld of limitDays) {
+    for (var _ldi = 0; _ldi < limitDays.length; _ldi++) {
+      var ld = limitDays[_ldi];
       var tot4 = __rptDayTotal(ld.d);
       var impl = Math.round(tot4 / 0.9);
       var vsp = peakVal > 0 ? (peakVal / impl).toFixed(1) + "x" : "\u2014";
@@ -2861,7 +2869,10 @@ function generateForensicReportMd(data) {
 
     // Median
     var ivs=[];
-    for (var ld of limitDays){if(ld.d.calls>=50&&(ld.d.active_hours||0)>=2)ivs.push(Math.round(__rptDayTotal(ld.d)/0.9));}
+    for (var _ldi2 = 0; _ldi2 < limitDays.length; _ldi2++) {
+      var ld2 = limitDays[_ldi2];
+      if (ld2.d.calls >= 50 && (ld2.d.active_hours || 0) >= 2) ivs.push(Math.round(__rptDayTotal(ld2.d) / 0.9));
+    }
     if(ivs.length>=2){
       ivs.sort(function(a,b){return a-b;});
       var med=ivs[Math.floor(ivs.length/2)];
@@ -3294,6 +3305,14 @@ function copyReport(){
 
 // ── User Profile Charts ──────────────────────────────────────────────────
 var _userCharts = { versions: null, entrypoints: null, releaseStability: null };
+function __disposeUserEchartsChart(which) {
+  var ch = _userCharts[which];
+  if (!ch) return;
+  if (typeof ch.dispose === "function") {
+    ch.dispose();
+  }
+  _userCharts[which] = null;
+}
 var __releaseStabilityData = null;
 var __userVersionSort = "anomalies"; // anomalies | newest | calls
 var __userVersionFilter = null; // null = all, [] = none selected
@@ -3321,13 +3340,15 @@ var __versionHealthMetrics = [
 function __stackedHBarXMax(datasets) {
   if (!datasets?.length) return undefined;
   var len = 0;
-  for (var ds of datasets) {
-    var d = ds.data;
+  for (var _dsi = 0; _dsi < datasets.length; _dsi++) {
+    var ds0 = datasets[_dsi];
+    var d = ds0.data;
     if (d && d.length > len) len = d.length;
   }
   if (!len) return undefined;
   var sums = new Array(len).fill(0);
-  for (var ds of datasets) {
+  for (var _dsi2 = 0; _dsi2 < datasets.length; _dsi2++) {
+    var ds = datasets[_dsi2];
     var row = ds.data || [];
     for (var j = 0; j < len; j++) sums[j] += Number(row[j]) || 0;
   }
@@ -3601,13 +3622,10 @@ function renderVersionHealthChart(sortedVers, stats, allVers) {
   var blurbV = document.getElementById("user-version-blurb");
   if (blurbV) blurbV.textContent = t("userVersionHealthBlurb");
   if (!elV || !allVers.length || !sortedVers.length) {
-    if (_userCharts.versions) { if (typeof _userCharts.versions.dispose === 'function') _userCharts.versions.dispose(); _userCharts.versions = null; }
+    __disposeUserEchartsChart("versions");
     return;
   }
-  if (_userCharts.versions) {
-    if (typeof _userCharts.versions.dispose === 'function') _userCharts.versions.dispose();
-    _userCharts.versions = null;
-  }
+  __disposeUserEchartsChart("versions");
 
   var datasets = [];
   for (var m of __versionHealthMetrics) {
@@ -3637,13 +3655,10 @@ function renderEntrypointsChart(sortedVers, stats) {
   var blurbE = document.getElementById("user-entrypoint-blurb");
   if (blurbE) blurbE.textContent = t("userEntrypointBlurb");
   if (!elE || !sortedVers.length) {
-    if (_userCharts.entrypoints) { if (typeof _userCharts.entrypoints.dispose === 'function') _userCharts.entrypoints.dispose(); _userCharts.entrypoints = null; }
+    __disposeUserEchartsChart("entrypoints");
     return;
   }
-  if (_userCharts.entrypoints) {
-    if (typeof _userCharts.entrypoints.dispose === 'function') _userCharts.entrypoints.dispose();
-    _userCharts.entrypoints = null;
-  }
+  __disposeUserEchartsChart("entrypoints");
 
   var allEp = {};
   for (var sv of sortedVers) {
@@ -3875,9 +3890,12 @@ function __budgetSankeyWeights(src) {
 
 function __budgetKpiCardsHtml(days, tot, outputPct, overheadFactor, cacheMissRate, lostSignals) {
   var totalOutageH = 0;
-  for (var d of days) totalOutageH += d.outage_hours || 0;
   var totalTruncated = 0;
-  for (var d of days) totalTruncated += d.session_signals?.truncated || 0;
+  for (var _dbi = 0; _dbi < days.length; _dbi++) {
+    var d = days[_dbi];
+    totalOutageH += d.outage_hours || 0;
+    totalTruncated += d.session_signals?.truncated || 0;
+  }
   var cards = [
     { label: t("budgetCardOutput"), value: outputPct + "%", sub: t("budgetCardOutputSub"), cls: outputPct < 25 ? "warn" : "" },
     { label: t("budgetCardOverhead"), value: overheadFactor + "x", sub: t("budgetCardOverheadSub"), cls: overheadFactor > 4 ? "warn" : "" },
@@ -4354,7 +4372,6 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
   // Convert [From, To, Weight] rows to ECharts sankey nodes + links
   var nodeSet = {};
   var links = [];
-  var nodeColors = { '#94a3b8': 0, '#22c55e': 1, '#3b82f6': 2, '#22d3ee': 3, '#f59e0b': 4, '#f87171': 5, '#a855f7': 6, '#8b5cf6': 7 };
   var palette = ['#94a3b8', '#22c55e', '#3b82f6', '#22d3ee', '#f59e0b', '#f87171', '#a855f7', '#8b5cf6'];
   for (var ri = 0; ri < rows.length; ri++) {
     var from = rows[ri][0], to = rows[ri][1], weight = rows[ri][2];
@@ -4880,6 +4897,10 @@ function renderProxyTokenChart(data) {
   }, true);
 }
 
+function __fmtMsShort(v) {
+  return v >= 1000 ? (v / 1000).toFixed(1) + "s" : Math.round(v) + "ms";
+}
+
 function renderProxyLatencyChart(data) {
   if (typeof echarts === "undefined") return;
   var proxyDays = data.proxy?.proxy_days || [];
@@ -4897,7 +4918,6 @@ function renderProxyLatencyChart(data) {
   var el = document.getElementById("c-proxy-latency");
   if (!el) return;
   if (!_proxyCharts.latency) _proxyCharts.latency = echarts.init(el, null, { renderer: 'canvas' });
-  function fmtMs(v) { return v >= 1000 ? (v/1000).toFixed(1) + "s" : Math.round(v) + "ms"; }
   _proxyCharts.latency.setOption({
     animation: false,
     grid: { left: 60, right: 16, top: 36, bottom: 30 },
@@ -4905,12 +4925,12 @@ function renderProxyLatencyChart(data) {
     tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
       formatter: function(params) {
         var lines = [params[0].axisValueLabel];
-        for (var pi = 0; pi < params.length; pi++) lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + fmtMs(params[pi].value));
+        for (var pi = 0; pi < params.length; pi++) lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + __fmtMsShort(params[pi].value));
         return lines.join('<br>');
       }
     },
     xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
-    yAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8', formatter: function(v) { return fmtMs(v); } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8', formatter: function(v) { return __fmtMsShort(v); } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
     series: [
       { name: t("proxyDSAvgLatency"), type: 'line', data: avg, smooth: 0.3, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#3b82f6', width: 2 }, itemStyle: { color: '#3b82f6' }, areaStyle: { color: 'rgba(59,130,246,0.15)' } },
       { name: t("proxyDSMinLatency"), type: 'line', data: mn, smooth: 0.3, symbol: 'circle', symbolSize: 4, lineStyle: { color: '#22c55e', width: 1, type: [4, 2] }, itemStyle: { color: '#22c55e' } }
@@ -5018,7 +5038,6 @@ function renderProxyModelChart(data) {
 
   chartShellSetLoading("c-proxy-models", false);
   if (!_proxyCharts.models) _proxyCharts.models = echarts.init(el, null, { renderer: 'canvas' });
-  function fmtMs(v) { return v >= 1000 ? (v/1000).toFixed(1) + "s" : Math.round(v) + "ms"; }
   _proxyCharts.models.setOption({
     animation: false,
     grid: { left: 50, right: 60, top: 36, bottom: 30 },
@@ -5028,7 +5047,7 @@ function renderProxyModelChart(data) {
         var lines = [params[0].axisValueLabel];
         for (var pi = 0; pi < params.length; pi++) {
           var p = params[pi];
-          lines.push(p.marker + ' ' + p.seriesName + ': ' + (p.seriesType === 'line' ? fmtMs(p.value) : p.value));
+          lines.push(p.marker + ' ' + p.seriesName + ': ' + (p.seriesType === 'line' ? __fmtMsShort(p.value) : p.value));
         }
         return lines.join('<br>');
       }
@@ -5036,7 +5055,7 @@ function renderProxyModelChart(data) {
     xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
     yAxis: [
       { type: 'value', min: 0, position: 'left', name: 'Requests', nameTextStyle: { color: '#94a3b8', fontSize: 10 }, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
-      { type: 'value', min: 0, position: 'right', name: 'Latency', nameTextStyle: { color: '#f59e0b', fontSize: 10 }, axisLabel: { color: '#f59e0b', formatter: function(v) { return fmtMs(v); } }, splitLine: { show: false } }
+      { type: 'value', min: 0, position: 'right', name: 'Latency', nameTextStyle: { color: '#f59e0b', fontSize: 10 }, axisLabel: { color: '#f59e0b', formatter: function(v) { return __fmtMsShort(v); } }, splitLine: { show: false } }
     ],
     series: series
   }, true);
@@ -5151,12 +5170,11 @@ function renderProxyHourlyLatency(data) {
 
   chartShellSetLoading("c-proxy-hourly-latency", false);
   if (!_proxyCharts.hourlyLatency) _proxyCharts.hourlyLatency = echarts.init(el, null, { renderer: 'canvas' });
-  function fmtMs(v) { return v >= 1000 ? (v/1000).toFixed(1) + "s" : Math.round(v) + "ms"; }
-  var yOpts = { type: 'value', min: 0, axisLabel: { color: '#94a3b8', formatter: function(v) { return fmtMs(v); } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } };
+  var yOpts = { type: 'value', min: 0, axisLabel: { color: '#94a3b8', formatter: function(v) { return __fmtMsShort(v); } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } };
   if (ld.yCap) yOpts.max = ld.yCap;
   var maxSeries = { name: t("proxyDSMaxLatency"), type: 'bar', data: ld.maxData, barGap: '-100%', z: 1, itemStyle: { color: 'rgba(239,68,68,0.25)', borderRadius: [2, 2, 0, 0] } };
   if (ld.yCap) {
-    maxSeries.markLine = { silent: true, symbol: 'none', data: [{ yAxis: ld.yCap, lineStyle: { color: '#ef4444', type: 'dashed', width: 1 }, label: { show: true, position: 'insideEndTop', color: '#ef4444', fontSize: 9, formatter: 'outlier cap ' + fmtMs(ld.yCap) } }] };
+    maxSeries.markLine = { silent: true, symbol: 'none', data: [{ yAxis: ld.yCap, lineStyle: { color: '#ef4444', type: 'dashed', width: 1 }, label: { show: true, position: 'insideEndTop', color: '#ef4444', fontSize: 9, formatter: 'outlier cap ' + __fmtMsShort(ld.yCap) } }] };
   }
   _proxyCharts.hourlyLatency.setOption({
     animation: false,
@@ -5165,7 +5183,7 @@ function renderProxyHourlyLatency(data) {
     tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
       formatter: function(params) {
         var lines = [params[0].axisValueLabel + ':00'];
-        for (var pi = 0; pi < params.length; pi++) lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + fmtMs(params[pi].value));
+        for (var pi = 0; pi < params.length; pi++) lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + __fmtMsShort(params[pi].value));
         return lines.join('<br>');
       }
     },
@@ -7135,6 +7153,9 @@ function formatDevCacheTs(iso) {
   if (isNaN(d.getTime())) return "\u2014";
   return d.toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
 }
+function __devSetMutedTextColor(el) {
+  if (el) el.style.color = "#64748b";
+}
 function applyDevCacheFromStatus(info) {
   var jEl = document.getElementById("dev-jsonl-cache-at");
   var pEl = document.getElementById("dev-proxy-cache-at");
@@ -7234,7 +7255,7 @@ function applyDevCacheFromStatus(info) {
           }
           st.textContent = "synced " + new Date().toLocaleTimeString();
           st.style.color = "#22c55e";
-          setTimeout(function () { st.style.color = "#64748b"; }, 3000);
+          setTimeout(__devSetMutedTextColor, 3000, st);
           pullDevNavCacheStatus();
           setTimeout(pullDevNavCacheStatus, 400);
           setTimeout(pullDevNavCacheStatus, 2500);
@@ -7304,7 +7325,7 @@ function applyDevCacheFromStatus(info) {
               stB.textContent =
                 "total " + out.total_s.toFixed(2) + "s (pass1 " + out.pass1_s.toFixed(2) + "s) — see server log";
               stB.style.color = "#22c55e";
-              setTimeout(function () { stB.style.color = "#64748b"; }, 5000);
+              setTimeout(__devSetMutedTextColor, 5000, stB);
             } catch (eB) {
               stB.textContent = "bench parse error";
               stB.style.color = "#ef4444";
@@ -7317,9 +7338,7 @@ function applyDevCacheFromStatus(info) {
           bq.send(JSON.stringify({ days_back: nd }));
         });
       })();
-      if (typeof window !== "undefined" && window.CacheFilesExplorer && window.CacheFilesExplorer.wireOpenButton) {
-        window.CacheFilesExplorer.wireOpenButton("dev-cache-files-open");
-      }
+      window.CacheFilesExplorer?.wireOpenButton?.("dev-cache-files-open");
       var devPoll = setInterval(function () {
         if (!document.getElementById("dev-overlay")) {
           clearInterval(devPoll);
@@ -7808,7 +7827,6 @@ function renderWasteCurve(session) {
       }
     }
     // Waste = rebuild cost + lost safe headroom (tokens you paid to build context but can't use)
-    var lastTurnCost = n > 1 ? cumTotal[n - 1] - cumTotal[n - 2] : cumTotal[0];
     var contextInvestment = cumTotal[n - 1] - (n * cumTotal[0]); // tokens above baseline = context you built
     infoLines.push("\u26a0 Forced End \u2192 " + _nextGapMin + "min \u2192 cold restart");
     infoLines.push("\u274c Context lost: " + fmt(contextInvestment));
@@ -8267,6 +8285,24 @@ function renderEfficiencyTimeline(stData) {
 var _butterflyMode = "cache";
 var _butterflyDays = null;
 
+/** Linear regression helper: returns { data: [...], slope: number } */
+function __econLinReg(vals) {
+  var n = vals.length;
+  if (n < 2) return { data: vals.slice(), slope: 0 };
+  var sx = 0, sy = 0, sxy = 0, sxx = 0;
+  for (var k = 0; k < n; k++) {
+    sx += k;
+    sy += vals[k];
+    sxy += k * vals[k];
+    sxx += k * k;
+  }
+  var sl = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+  var ic = (sy - sl * sx) / n;
+  var line = [];
+  for (var j = 0; j < n; j++) line.push(Math.round((ic + sl * j) * 100) / 100);
+  return { data: line, slope: sl };
+}
+
 function renderMonthlyButterfly(days, mode) {
   if (typeof echarts === "undefined") return;
   var el = document.getElementById("chart-shell-econ-waste-month");
@@ -8280,19 +8316,6 @@ function renderMonthlyButterfly(days, mode) {
 
   // Update blurb text
   var blurbEl = document.getElementById("econ-waste-month-blurb");
-
-  // Linear regression helper: returns { data: [...], slope: number }
-  function linReg(vals) {
-    var n = vals.length;
-    if (n < 2) return { data: vals.slice(), slope: 0 };
-    var sx = 0, sy = 0, sxy = 0, sxx = 0;
-    for (var k = 0; k < n; k++) { sx += k; sy += vals[k]; sxy += k * vals[k]; sxx += k * k; }
-    var sl = (n * sxy - sx * sy) / (n * sxx - sx * sx);
-    var ic = (sy - sl * sx) / n;
-    var line = [];
-    for (var j = 0; j < n; j++) line.push(Math.round((ic + sl * j) * 100) / 100);
-    return { data: line, slope: sl };
-  }
 
   for (var i = 0; i < days.length; i++) {
     xData.push(days[i].date.slice(5));
@@ -8315,11 +8338,11 @@ function renderMonthlyButterfly(days, mode) {
 
     var cacheTrend = (function () {
       var n = ratioData.length;
-      if (n < 3) return linReg(ratioData);
+      if (n < 3) return __econLinReg(ratioData);
       var s1=0,s2=0,s3=0,s4=0,sy=0,s1y=0,s2y=0;
       for(var i=0;i<n;i++){var t2=i*i;s1+=i;s2+=t2;s3+=t2*i;s4+=t2*t2;sy+=ratioData[i];s1y+=i*ratioData[i];s2y+=t2*ratioData[i];}
       var det=n*(s2*s4-s3*s3)-s1*(s1*s4-s3*s2)+s2*(s1*s3-s2*s2);
-      if(Math.abs(det)<1e-10) return linReg(ratioData);
+      if(Math.abs(det)<1e-10) return __econLinReg(ratioData);
       var qc=(sy*(s2*s4-s3*s3)-s1*(s1y*s4-s2y*s3)+s2*(s1y*s3-s2y*s2))/det;
       var qb=(n*(s1y*s4-s2y*s3)-sy*(s1*s4-s3*s2)+s2*(s1*s2y-s1y*s2))/det;
       var qa=(n*(s2*s2y-s3*s1y)-s1*(s1*s2y-s1y*s2)+sy*(s1*s3-s2*s2))/det;
@@ -8409,8 +8432,8 @@ function renderMonthlyButterfly(days, mode) {
     var upNorm = upRaw.map(function (v) { return Math.round(v / maxUp * 1000) / 1000; });
     var downNorm = downRaw.map(function (v) { return -Math.round(v / maxDown * 1000) / 1000; });
 
-    var upTrend = linReg(upNorm);
-    var downTrend = linReg(downNorm);
+    var upTrend = __econLinReg(upNorm);
+    var downTrend = __econLinReg(downNorm);
 
     option = {
       tooltip: {
@@ -8645,8 +8668,7 @@ function renderBudgetDrain(stData, qdData) {
   var totalRebuild = 0;
   var forcedCount = 0;
   var turnCounter = 0;
-  var sessionColors = ["rgba(59,130,246,0.10)", "rgba(34,197,94,0.10)", "rgba(250,204,21,0.10)", "rgba(168,85,247,0.10)", "rgba(236,72,153,0.10)"];
-  var sessionSpans = []; // {firstTurn, lastTurn, label, forced, color}
+  var sessionSpans = [];
   var rebuildMarkers = []; // {turn, cost} for graphic overlay
   var cacheRebuildData = []; // [turn, cacheCreationPct] for rebuild overlay series
 
@@ -9039,11 +9061,11 @@ function renderBudgetDrain(stData, qdData) {
         }
         if (dayTokTotal > 0) {
           var tIdx = 0;
-          for (var s3i = 0; s3i < ss3.length; s3i++) {
-            var t3 = ss3[s3i].turns || [];
-            for (var t3i = 0; t3i < t3.length; t3i++) {
-              if (dateKey && t3[t3i].ts && t3[t3i].ts.slice(0, 10) !== dateKey) continue;
-              cumTok += (t3[t3i].cache_read || 0) + (t3[t3i].cache_creation || 0) + (t3[t3i].output || 0);
+          for (var s3j = 0; s3j < ss3.length; s3j++) {
+            var t3b = ss3[s3j].turns || [];
+            for (var t3jb = 0; t3jb < t3b.length; t3jb++) {
+              if (dateKey && t3b[t3jb].ts && t3b[t3jb].ts.slice(0, 10) !== dateKey) continue;
+              cumTok += (t3b[t3jb].cache_read || 0) + (t3b[t3jb].cache_creation || 0) + (t3b[t3jb].output || 0);
               tIdx++;
               if (tIdx % 5 === 0 || tIdx === 1) {
                 tokVis.push([tIdx, Math.round(cumTok / dayTokTotal * cq2 * 10) / 10]);
@@ -9061,7 +9083,6 @@ function renderBudgetDrain(stData, qdData) {
         var gap2 = Math.round((cq2 - cqi2) * 10) / 10;
         var ratio2 = cq2 > 0 ? Math.round((cq2 - cqi2) / cq2 * 100) : 0;
         var nOh2 = ohPairs2.filter(function (p) { return p.delta >= 0.03; }).length;
-        var tokOhPct = dayTokTotal > 0 ? Math.round((1 - cqi2 / cq2) * 3.5 * 10) / 10 : 0;
         var blurb2 = document.getElementById("econ-overhead-blurb");
         if (blurb2) blurb2.textContent = tr("econOverheadSummary", { actual: Math.round(cq2), ideal: Math.round(cqi2), ratio: ratio2, gap: gap2, events: nOh2 });
       }
@@ -9185,22 +9206,17 @@ function renderEconOverhead(qdData, stData) {
   if (hasJsonl) {
     var sessions = stData.sessions.slice().sort(function (a, b) { return a.first_ts < b.first_ts ? -1 : 1; });
     // Day total for normalization
-    for (var si = 0; si < sessions.length; si++) {
-      var turns = sessions[si].turns || [];
-      for (var ti = 0; ti < turns.length; ti++) {
-        tokDayTotal += (turns[ti].cache_read || 0) + (turns[ti].cache_creation || 0) + (turns[ti].output || 0);
+    for (var siA = 0; siA < sessions.length; siA++) {
+      var turnsA = sessions[siA].turns || [];
+      for (var tiA = 0; tiA < turnsA.length; tiA++) {
+        tokDayTotal += (turnsA[tiA].cache_read || 0) + (turnsA[tiA].cache_creation || 0) + (turnsA[tiA].output || 0);
       }
     }
 
     var tokIdx = 0;
-    for (var si = 0; si < sessions.length; si++) {
-      var turns = sessions[si].turns || [];
+    for (var siB = 0; siB < sessions.length; siB++) {
+      var turns = sessions[siB].turns || [];
       var warmupDone = false, prevCR = 0, maxCR = 0, inRebuild = false, rebuildN = 0;
-      var forced = false;
-      if (si > 0) {
-        var gapMs = new Date(sessions[si].first_ts).getTime() - new Date(sessions[si - 1].last_ts).getTime();
-        forced = gapMs >= 0 && gapMs <= 300000;
-      }
       for (var ti = 0; ti < turns.length; ti++) {
         var T = turns[ti];
         var cc = T.cache_creation || 0, cr = T.cache_read || 0, out = T.output || 0;

@@ -71,10 +71,13 @@ function parseArgs(args) {
     includeSidechain: false,
     dryRun: false
   };
-  for (let i = 0; i < args.length; i++) {
+  var i = 0;
+  while (i < args.length) {
     const a = args[i];
     if (a === '--out' && i + 1 < args.length) {
-      out.outDir = args[++i];
+      out.outDir = args[i + 1];
+      i += 2;
+      continue;
     } else if (a.startsWith('--out=')) {
       out.outDir = a.slice(6);
     } else if (a === '--include-sidechain') {
@@ -89,6 +92,7 @@ function parseArgs(args) {
       printHelp();
       process.exit(64);
     }
+    i++;
   }
   return out;
 }
