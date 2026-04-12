@@ -19,8 +19,116 @@
 
   var _initialized = false;
   var _prefs = null;
+  var _wtreeDragGhost = null;
+  var _wtreeDragSrc = null;
+  var _wtreeDropState = null;
+  var _sidebarEventsBound = false;
+  var _sidebarRestoreScheduled = false;
+
+  function wtreeNextSectionLi(li) {
+    if (!li || !li.parentNode) return null;
+    var n = li.nextSibling;
+    while (n) {
+      if (n.nodeType === 1 && n.matches && n.matches('li.widget-tree-item[data-section]')) return n;
+      n = n.nextSibling;
+    }
+    return null;
+  }
+
+  function wtreePrevSectionLi(li) {
+    if (!li || !li.parentNode) return null;
+    var n = li.previousSibling;
+    while (n) {
+      if (n.nodeType === 1 && n.matches && n.matches('li.widget-tree-item[data-section]')) return n;
+      n = n.previousSibling;
+    }
+    return null;
+  }
+
+  function clearWtreeDropUi(ul) {
+    if (!ul) return;
+    var marks = ul.querySelectorAll(
+      '.widget-tree-item--drop-before,.widget-tree-item--drop-after,.widget-tree-item--drop-gap-up,.widget-tree-item--drop-gap-down'
+    );
+    for (var mi = 0; mi < marks.length; mi++) {
+      marks[mi].classList.remove(
+        'widget-tree-item--drop-before',
+        'widget-tree-item--drop-after',
+        'widget-tree-item--drop-gap-up',
+        'widget-tree-item--drop-gap-down'
+      );
+    }
+  }
+
+  function wtreeFindDropState(ul, clientY, dragSrc) {
+    var arr = [];
+    var items = ul.querySelectorAll(':scope > li.widget-tree-item[data-section]');
+    for (var i = 0; i < items.length; i++) arr.push(items[i]);
+    if (!arr.length) return null;
+    var slot = arr.length;
+    for (var j = 0; j < arr.length; j++) {
+      var r = arr[j].getBoundingClientRect();
+      var mid = r.top + r.height * 0.5;
+      if (clientY < mid) {
+        slot = j;
+        break;
+      }
+    }
+    var fromIdx = -1;
+    for (var k = 0; k < arr.length; k++) {
+      if (arr[k] === dragSrc) {
+        fromIdx = k;
+        break;
+      }
+    }
+    if (fromIdx < 0) return null;
+    if (slot === fromIdx || slot === fromIdx + 1) return { noop: true };
+    var insertBeforeEl = slot < arr.length ? arr[slot] : null;
+    return { noop: false, insertBefore: insertBeforeEl };
+  }
+
+  function applyWtreeDropUi(ul, state, dragSrc) {
+    clearWtreeDropUi(ul);
+    if (!state || state.noop || !dragSrc) return;
+    if (state.insertBefore) {
+      state.insertBefore.classList.add('widget-tree-item--drop-before');
+      var prevEl = wtreePrevSectionLi(state.insertBefore);
+      if (prevEl && prevEl !== dragSrc) prevEl.classList.add('widget-tree-item--drop-gap-up');
+    } else {
+      var lastEl = (function () {
+        var it = ul.querySelectorAll(':scope > li.widget-tree-item[data-section]');
+        return it.length ? it[it.length - 1] : null;
+      })();
+      if (lastEl) {
+        lastEl.classList.add('widget-tree-item--drop-after');
+        var nextEl = wtreeNextSectionLi(lastEl);
+        if (nextEl && nextEl !== dragSrc) nextEl.classList.add('widget-tree-item--drop-gap-down');
+      }
+    }
+  }
 
   // ── Preferences (localStorage) ──────────────────────────────────
+
+  function normalizePrefsShape(p) {
+    if (!p || typeof p !== 'object') return p;
+    if (!Array.isArray(p.hiddenSections)) p.hiddenSections = [];
+    if (!Array.isArray(p.hiddenCharts)) p.hiddenCharts = [];
+    return p;
+  }
+
+  /** Re-read hiddenSections / hiddenCharts from localStorage so the sidebar matches saved prefs. */
+  function syncVisibilityPrefsFromLocalStorage() {
+    if (!_prefs) return;
+    try {
+      var raw = localStorage.getItem(PREFS_KEY);
+      if (!raw) return;
+      var o = JSON.parse(raw);
+      if (!o || o.v !== PREFS_VERSION) return;
+      normalizePrefsShape(o);
+      if (Array.isArray(o.hiddenCharts)) _prefs.hiddenCharts = o.hiddenCharts.slice();
+      if (Array.isArray(o.hiddenSections)) _prefs.hiddenSections = o.hiddenSections.slice();
+    } catch (e) {}
+  }
 
   function loadPrefs() {
     // Primary: localStorage
@@ -28,7 +136,7 @@
       var raw = localStorage.getItem(PREFS_KEY);
       if (raw) {
         var p = JSON.parse(raw);
-        if (p && p.v === PREFS_VERSION) return p;
+        if (p && p.v === PREFS_VERSION) return normalizePrefsShape(p);
       }
     } catch (e) {}
     // Fallback: server (sync XHR, only when localStorage empty)
@@ -40,7 +148,7 @@
         var sp = JSON.parse(xhr.responseText);
         if (sp && sp.v === PREFS_VERSION) {
           try { localStorage.setItem(PREFS_KEY, JSON.stringify(sp)); } catch (e2) {}
-          return sp;
+          return normalizePrefsShape(sp);
         }
       }
     } catch (e) { /* server unreachable */ }
@@ -104,12 +212,45 @@
 
   function isSectionVisible(sectionId) {
     if (!_prefs) return true;
-    return _prefs.hiddenSections.indexOf(sectionId) === -1;
+    var hs = _prefs.hiddenSections;
+    if (!Array.isArray(hs)) hs = [];
+    var reg = getRegistry();
+    var secDef = reg && reg.findSection ? reg.findSection(sectionId) : null;
+    if (secDef && secDef.parentSection) {
+      if (hs.indexOf(sectionId) !== -1) return false;
+      return isSectionVisible(secDef.parentSection);
+    }
+    if (hs.indexOf(sectionId) !== -1) return false;
+    if (_prefs.widgets && _prefs.widgets.length) {
+      var wi;
+      for (wi = 0; wi < _prefs.widgets.length; wi++) {
+        if (_prefs.widgets[wi].id === sectionId) return true;
+      }
+      return false;
+    }
+    return true;
   }
 
   function isChartVisible(chartId) {
     if (!_prefs) return true;
-    return _prefs.hiddenCharts.indexOf(chartId) === -1;
+    var reg = getRegistry();
+    var secId = null;
+    if (reg && reg.sections) {
+      for (var sxi = 0; sxi < reg.sections.length; sxi++) {
+        var charts = reg.sections[sxi].charts || [];
+        for (var cxi = 0; cxi < charts.length; cxi++) {
+          if (charts[cxi].id === chartId) {
+            secId = reg.sections[sxi].id;
+            break;
+          }
+        }
+        if (secId) break;
+      }
+    }
+    if (secId && !isSectionVisible(secId)) return false;
+    var h = _prefs.hiddenCharts;
+    if (!Array.isArray(h)) return true;
+    return h.indexOf(chartId) === -1;
   }
 
   function getWidgetSpan(sectionId) {
@@ -118,6 +259,58 @@
       if (_prefs.widgets[i].id === sectionId) return _prefs.widgets[i].span;
     }
     return null;
+  }
+
+  /** When v2 widgets[] drives the grid, _prefs.order must match or sidebar and page diverge. */
+  function syncPrefsOrderFromWidgets() {
+    if (!_prefs || !_prefs.widgets || !_prefs.widgets.length) return false;
+    var ids = [];
+    for (var i = 0; i < _prefs.widgets.length; i++) ids.push(_prefs.widgets[i].id);
+    var changed = false;
+    if (!_prefs.order || _prefs.order.length !== ids.length) changed = true;
+    else {
+      for (var c = 0; c < ids.length; c++) {
+        if (_prefs.order[c] !== ids[c]) {
+          changed = true;
+          break;
+        }
+      }
+    }
+    if (changed) {
+      _prefs.order = ids;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Sidebar drag only lists reorderable sections; keep non-reorderable widget rows
+   * (e.g. anthropic-status) in their relative tail positions.
+   */
+  function syncPrefsWidgetsFromDraggableOrder(orderedIds) {
+    if (!_prefs || !_prefs.widgets || !_prefs.widgets.length) return false;
+    var inDrag = {};
+    for (var di = 0; di < orderedIds.length; di++) inDrag[orderedIds[di]] = true;
+    var before = _prefs.widgets;
+    var extras = [];
+    for (var j = 0; j < before.length; j++) {
+      if (!inDrag[before[j].id]) extras.push({ id: before[j].id, span: before[j].span });
+    }
+    var newW = [];
+    for (var oi = 0; oi < orderedIds.length; oi++) {
+      var oid = orderedIds[oi];
+      var span = 12;
+      for (var k = 0; k < before.length; k++) {
+        if (before[k].id === oid) {
+          span = before[k].span;
+          break;
+        }
+      }
+      newW.push({ id: oid, span: span });
+    }
+    for (var e = 0; e < extras.length; e++) newW.push(extras[e]);
+    _prefs.widgets = newW;
+    return true;
   }
 
   // ── Visibility ──────────────────────────────────────────────────
@@ -243,18 +436,49 @@
     }
   }
 
+  /** Keep hiddenSections aligned with widgets[] so JSON and sidebar checkboxes match the grid. */
+  function reconcileHiddenSectionsWithWidgets() {
+    if (!_prefs || !_prefs.widgets || !_prefs.widgets.length) return false;
+    var reg = getRegistry();
+    if (!reg) return false;
+    var inW = {};
+    for (var ii = 0; ii < _prefs.widgets.length; ii++) inW[_prefs.widgets[ii].id] = true;
+    var next = [];
+    for (var jj = 0; jj < reg.sections.length; jj++) {
+      var s = reg.sections[jj];
+      if (s.reorderable === false || s.parentSection) continue;
+      if (!inW[s.id]) next.push(s.id);
+    }
+    next.sort();
+    var cur = (_prefs.hiddenSections || []).slice().sort();
+    if (cur.length !== next.length) {
+      _prefs.hiddenSections = next;
+      return true;
+    }
+    for (var kk = 0; kk < next.length; kk++) {
+      if (cur[kk] !== next[kk]) {
+        _prefs.hiddenSections = next;
+        return true;
+      }
+    }
+    return false;
+  }
+
   // ── Init ────────────────────────────────────────────────────────
 
   function init() {
     if (_initialized) return;
     _initialized = true;
     _prefs = loadPrefs();
+    if (migrateHiddenChartsLegacy()) savePrefs();
     // Migrate prefs to v2 if needed
     if (!_prefs.widgets && _prefs.order) {
       var migrated = migrateTemplateV1toV2({ order: _prefs.order, hiddenSections: _prefs.hiddenSections });
       _prefs.widgets = migrated.widgets;
     }
     if (_prefs.widgets && _prefs.widgets.length) {
+      if (syncPrefsOrderFromWidgets()) savePrefs();
+      if (reconcileHiddenSectionsWithWidgets()) savePrefs();
       applyGridLayout();
     } else {
       applyVisibility();
@@ -268,6 +492,7 @@
 
   function setVisibility(id, visible) {
     if (!_prefs) _prefs = defaultPrefs();
+    if (!Array.isArray(_prefs.hiddenSections)) _prefs.hiddenSections = [];
     var idx = _prefs.hiddenSections.indexOf(id);
     if (visible && idx >= 0) {
       _prefs.hiddenSections.splice(idx, 1);
@@ -278,12 +503,20 @@
     if (_prefs.widgets) {
       if (!visible) {
         _prefs.widgets = _prefs.widgets.filter(function (w) { return w.id !== id; });
+        if (_prefs.order) {
+          var oix = _prefs.order.indexOf(id);
+          if (oix >= 0) _prefs.order.splice(oix, 1);
+        }
       } else {
         var found = false;
         for (var wi = 0; wi < _prefs.widgets.length; wi++) {
           if (_prefs.widgets[wi].id === id) { found = true; break; }
         }
-        if (!found) _prefs.widgets.push({ id: id, span: 12 });
+        if (!found) {
+          _prefs.widgets.push({ id: id, span: 12 });
+          if (!_prefs.order) _prefs.order = [];
+          if (_prefs.order.indexOf(id) === -1) _prefs.order.push(id);
+        }
       }
     }
     savePrefs();
@@ -293,6 +526,7 @@
 
   function setChartVisibility(chartId, visible) {
     if (!_prefs) _prefs = defaultPrefs();
+    if (!Array.isArray(_prefs.hiddenCharts)) _prefs.hiddenCharts = [];
     var idx = _prefs.hiddenCharts.indexOf(chartId);
     if (visible && idx >= 0) {
       _prefs.hiddenCharts.splice(idx, 1);
@@ -303,33 +537,106 @@
     applyChartVisibility(chartId, visible);
   }
 
+  /** One DOM host (canvas / KPI grid) may map to several registry charts — OR visibility. */
+  function syncCanvasGroupVisibility(canvasId) {
+    if (!canvasId) return;
+    var reg = getRegistry();
+    if (!reg) return;
+    var show = false;
+    for (var si = 0; si < reg.sections.length; si++) {
+      var charts = reg.sections[si].charts || [];
+      for (var ci = 0; ci < charts.length; ci++) {
+        var ch = charts[ci];
+        if (ch.canvasId === canvasId && isChartVisible(ch.id)) {
+          show = true;
+          break;
+        }
+      }
+      if (show) break;
+    }
+    var el = document.getElementById(canvasId);
+    if (!el) return;
+    if (el.classList.contains('grid') && el.id === 'cards') {
+      el.style.display = show ? '' : 'none';
+      return;
+    }
+    var box = el.closest('.chart-box');
+    if (box) {
+      box.style.display = show ? '' : 'none';
+      return;
+    }
+    el.style.display = show ? '' : 'none';
+  }
+
   function applyChartVisibility(chartId, visible) {
     var reg = getRegistry();
     if (!reg) return;
     var chartDef = reg.findChart(chartId);
     if (!chartDef) return;
-    // Hide the chart container (the .chart-box parent of the canvas)
-    var el = document.getElementById(chartDef.canvasId);
-    if (!el) return;
-    var box = el.closest('.chart-box') || el.parentNode;
-    if (box) box.style.display = visible ? '' : 'none';
+    syncCanvasGroupVisibility(chartDef.canvasId);
+  }
+
+  function migrateHiddenChartsLegacy() {
+    if (!_prefs) return false;
+    if (!Array.isArray(_prefs.hiddenCharts)) _prefs.hiddenCharts = [];
+    if (!_prefs.hiddenCharts.length) return false;
+    var mapLegacyToCanon = {
+      'token-hourly': 'ts-c1',
+      'token-daily': 'ts-c1',
+      'cache-ratio-hourly': 'ts-c2',
+      'cache-ratio-daily': 'ts-c2',
+      'api-events-hourly': 'ts-c3',
+      'api-events-daily': 'ts-c3',
+      'signals-hourly': 'ts-c4',
+      'signals-daily': 'ts-c4',
+      'token-hosts': 'ts-hosts'
+    };
+    var set = {};
+    var changed = false;
+    for (var i = 0; i < _prefs.hiddenCharts.length; i++) {
+      var id = _prefs.hiddenCharts[i];
+      var c = mapLegacyToCanon[id];
+      if (c) {
+        set[c] = true;
+        changed = true;
+      } else {
+        set[id] = true;
+      }
+    }
+    if (!changed) return false;
+    var out = [];
+    for (var k in set) {
+      if (set[k]) out.push(k);
+    }
+    _prefs.hiddenCharts = out;
+    return true;
   }
 
   function applyAllChartVisibility() {
     var reg = getRegistry();
     if (!reg) return;
+    var seen = {};
     for (var si = 0; si < reg.sections.length; si++) {
       var charts = reg.sections[si].charts || [];
       for (var ci = 0; ci < charts.length; ci++) {
-        var ch = charts[ci];
-        applyChartVisibility(ch.id, isChartVisible(ch.id));
+        var cid = charts[ci].canvasId;
+        if (!cid || seen[cid]) continue;
+        seen[cid] = true;
+        syncCanvasGroupVisibility(cid);
       }
     }
   }
 
   function setOrder(orderedIds) {
     if (!_prefs) _prefs = defaultPrefs();
-    _prefs.order = orderedIds;
+    var list = orderedIds.slice();
+    _prefs.order = list;
+    if (_prefs.widgets && _prefs.widgets.length) {
+      syncPrefsWidgetsFromDraggableOrder(list);
+      savePrefs();
+      applyGridLayout();
+      return;
+    }
     savePrefs();
     applyOrder();
   }
@@ -356,6 +663,7 @@
   function toggleSidebar(force) {
     var sb = document.getElementById('sidebar');
     if (!sb) return;
+    if (typeof force === 'boolean' && force === _sidebarOpen) return;
     _sidebarOpen = typeof force === 'boolean' ? force : !_sidebarOpen;
     sb.classList.toggle('is-open', _sidebarOpen);
     document.body.classList.toggle('sidebar-open', _sidebarOpen);
@@ -384,6 +692,8 @@
   }
 
   function bindSidebarEvents() {
+    if (_sidebarEventsBound) return;
+    _sidebarEventsBound = true;
     var btn = document.getElementById('settings-nav-btn');
     if (btn) btn.addEventListener('click', function () { toggleSidebar(); });
     var close = document.getElementById('sidebar-close');
@@ -392,9 +702,10 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && _sidebarOpen) toggleSidebar(false);
     });
-    // Restore sidebar state
+    // Restore sidebar state (once per page — initFull runs on every data refresh)
     try {
-      if (localStorage.getItem('cud_sidebar_open') === '1') {
+      if (localStorage.getItem('cud_sidebar_open') === '1' && !_sidebarRestoreScheduled) {
+        _sidebarRestoreScheduled = true;
         setTimeout(function () { toggleSidebar(true); }, 100);
       }
     } catch (e) {}
@@ -405,6 +716,7 @@
   function renderWidgetTree() {
     var body = document.getElementById('sidebar-layout-body');
     if (!body) return;
+    syncVisibilityPrefsFromLocalStorage();
     var reg = getRegistry();
     if (!reg) return;
     var sections = getSortedSections();
@@ -415,11 +727,19 @@
       var secVis = isSectionVisible(sec.id);
       var hasCharts = sec.charts && sec.charts.length > 0;
       var spanVal = getWidgetSpan(sec.id);
+      var spanDisp = spanVal || 12;
       html += '<li class="widget-tree-item" data-section="' + sec.id + '" draggable="true">';
       html += '<span class="widget-tree-drag" title="Drag to reorder">&#x2630;</span>';
       html += '<input type="checkbox" class="widget-tree-check" data-type="section" data-id="' + sec.id + '"' + (secVis ? ' checked' : '') + '>';
       html += '<span class="widget-tree-label">' + _t(sec.titleKey) + '</span>';
-      html += '<span class="widget-tree-span" title="Grid span">' + (spanVal || 12) + '/12</span>';
+      if (spanDisp !== 12) {
+        html +=
+          '<span class="widget-tree-span" title="' +
+          escT(_t('settingsLayoutGridSpanTitle')) +
+          '">' +
+          spanDisp +
+          '/12</span>';
+      }
       html += '<button type="button" class="widget-tree-expand" data-expand="' + sec.id + '"' + (hasCharts ? '' : ' style="visibility:hidden"') + '>&#x25B6;</button>';
       html += '</li>';
       if (hasCharts) {
@@ -438,64 +758,122 @@
     html += '</ul>';
     body.innerHTML = html;
 
-    // Delegated events
-    body.addEventListener('change', function (e) {
-      var cb = e.target;
-      if (!cb.classList.contains('widget-tree-check')) return;
-      var type = cb.dataset.type;
-      var id = cb.dataset.id;
-      if (type === 'section') setVisibility(id, cb.checked);
-      else if (type === 'chart') setChartVisibility(id, cb.checked);
-    });
-    body.addEventListener('click', function (e) {
-      var btn = e.target.closest('.widget-tree-expand');
-      if (!btn) return;
-      var secId = btn.dataset.expand;
-      var charts = body.querySelector('[data-charts-for="' + secId + '"]');
-      if (!charts) return;
-      var open = charts.style.display !== 'none';
-      charts.style.display = open ? 'none' : '';
-      btn.style.transform = open ? '' : 'rotate(90deg)';
-    });
+    // Delegated events (once per sidebar body — survives re-renders)
+    if (!body.dataset.wtreeChangeBound) {
+      body.dataset.wtreeChangeBound = '1';
+      body.addEventListener('change', function (e) {
+        var cb = e.target;
+        if (!cb.classList.contains('widget-tree-check')) return;
+        var type = cb.dataset.type;
+        var id = cb.dataset.id;
+        if (type === 'section') setVisibility(id, cb.checked);
+        else if (type === 'chart') setChartVisibility(id, cb.checked);
+      });
+      body.addEventListener('click', function (e) {
+        var btn = e.target.closest('.widget-tree-expand');
+        if (!btn) return;
+        var secId = btn.dataset.expand;
+        var charts = body.querySelector('[data-charts-for="' + secId + '"]');
+        if (!charts) return;
+        var open = charts.style.display !== 'none';
+        charts.style.display = open ? 'none' : '';
+        btn.style.transform = open ? '' : 'rotate(90deg)';
+      });
+    }
 
-    // Drag & Drop for section reorder
-    var dragSrc = null;
-    body.addEventListener('dragstart', function (e) {
-      var item = e.target.closest('.widget-tree-item[data-section]');
-      if (!item) { e.preventDefault(); return; }
-      dragSrc = item;
-      item.classList.add('is-dragging');
-      e.dataTransfer.effectAllowed = 'move';
-    });
-    body.addEventListener('dragover', function (e) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-    });
-    body.addEventListener('drop', function (e) {
-      e.preventDefault();
-      var target = e.target.closest('.widget-tree-item[data-section]');
-      if (!target || !dragSrc || target === dragSrc) return;
-      var ul = body.querySelector('.widget-tree');
-      if (!ul) return;
-      // Move dragSrc before or after target
-      var items = ul.querySelectorAll('.widget-tree-item[data-section]');
-      var dragIdx = -1, targetIdx = -1;
-      for (var i = 0; i < items.length; i++) {
-        if (items[i] === dragSrc) dragIdx = i;
-        if (items[i] === target) targetIdx = i;
-      }
-      if (dragIdx < targetIdx) target.parentNode.insertBefore(dragSrc, target.nextSibling);
-      else target.parentNode.insertBefore(dragSrc, target);
-      // Update prefs order
-      var newItems = ul.querySelectorAll('.widget-tree-item[data-section]');
-      var newOrder = [];
-      for (var j = 0; j < newItems.length; j++) newOrder.push(newItems[j].dataset.section);
-      setOrder(newOrder);
-    });
-    body.addEventListener('dragend', function () {
-      if (dragSrc) dragSrc.classList.remove('is-dragging');
-      dragSrc = null;
-    });
+    // Drag & Drop for section reorder (once per sidebar body)
+    if (!body.dataset.wtreeDndBound) {
+      body.dataset.wtreeDndBound = '1';
+      body.addEventListener('dragstart', function (e) {
+        var item = e.target.closest('.widget-tree-item[data-section]');
+        if (!item) { e.preventDefault(); return; }
+        _wtreeDragSrc = item;
+        _wtreeDropState = null;
+        item.classList.add('is-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        if (_wtreeDragGhost && _wtreeDragGhost.parentNode) {
+          _wtreeDragGhost.parentNode.removeChild(_wtreeDragGhost);
+        }
+        _wtreeDragGhost = null;
+        try {
+          var ghost = item.cloneNode(true);
+          ghost.classList.add('widget-tree-drag-ghost');
+          ghost.removeAttribute('draggable');
+          var ghostCtrls = ghost.querySelectorAll('input,button');
+          for (var gix = 0; gix < ghostCtrls.length; gix++) {
+            ghostCtrls[gix].parentNode.removeChild(ghostCtrls[gix]);
+          }
+          document.body.appendChild(ghost);
+          var r = item.getBoundingClientRect();
+          var ox = e.clientX - r.left;
+          var oy = e.clientY - r.top;
+          e.dataTransfer.setDragImage(ghost, ox, oy);
+          _wtreeDragGhost = ghost;
+        } catch (eGhost) {
+          _wtreeDragGhost = null;
+        }
+      });
+      body.addEventListener('dragover', function (e) {
+        if (!_wtreeDragSrc) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        var ul = body.querySelector('.widget-tree');
+        if (!ul) return;
+        var ulRect = ul.getBoundingClientRect();
+        if (
+          e.clientX < ulRect.left ||
+          e.clientX > ulRect.right ||
+          e.clientY < ulRect.top ||
+          e.clientY > ulRect.bottom
+        ) {
+          clearWtreeDropUi(ul);
+          _wtreeDropState = null;
+          return;
+        }
+        var st = wtreeFindDropState(ul, e.clientY, _wtreeDragSrc);
+        _wtreeDropState = st;
+        if (!st || st.noop) {
+          clearWtreeDropUi(ul);
+          return;
+        }
+        applyWtreeDropUi(ul, st, _wtreeDragSrc);
+      });
+      body.addEventListener('dragleave', function (e) {
+        if (!_wtreeDragSrc) return;
+        var ul = body.querySelector('.widget-tree');
+        if (!ul) return;
+        var rel = e.relatedTarget;
+        if (rel && ul.contains(rel)) return;
+        clearWtreeDropUi(ul);
+        _wtreeDropState = null;
+      });
+      body.addEventListener('drop', function (e) {
+        e.preventDefault();
+        var ul = body.querySelector('.widget-tree');
+        if (!ul || !_wtreeDragSrc) return;
+        clearWtreeDropUi(ul);
+        var st = _wtreeDropState;
+        _wtreeDropState = null;
+        if (!st || st.noop) return;
+        if (st.insertBefore) ul.insertBefore(_wtreeDragSrc, st.insertBefore);
+        else ul.appendChild(_wtreeDragSrc);
+        var newItems = ul.querySelectorAll(':scope > li.widget-tree-item[data-section]');
+        var newOrder = [];
+        for (var j = 0; j < newItems.length; j++) newOrder.push(newItems[j].dataset.section);
+        setOrder(newOrder);
+      });
+      body.addEventListener('dragend', function () {
+        var ul = body.querySelector('.widget-tree');
+        if (ul) clearWtreeDropUi(ul);
+        if (_wtreeDragSrc) _wtreeDragSrc.classList.remove('is-dragging');
+        _wtreeDragSrc = null;
+        _wtreeDropState = null;
+        if (_wtreeDragGhost && _wtreeDragGhost.parentNode) {
+          _wtreeDragGhost.parentNode.removeChild(_wtreeDragGhost);
+        }
+        _wtreeDragGhost = null;
+      });
+    }
 
     // Reset button
     var resetBtn = document.getElementById('sidebar-layout-reset');
@@ -506,6 +884,12 @@
         renderWidgetTree();
       });
     }
+    var editBtnLbl = document.getElementById('sidebar-layout-edit');
+    if (editBtnLbl) {
+      editBtnLbl.textContent = _t('settingsEditLayout');
+      editBtnLbl.classList.remove('is-active');
+    }
+    applyAllChartVisibility();
   }
 
   // ── (Stats section removed — User Profile stays as dashboard section) ──
@@ -774,6 +1158,7 @@
     _prefs.order = order;
     _prefs.hiddenSections = hidden;
     _prefs.hiddenCharts = (tpl.hiddenCharts || []).slice();
+    migrateHiddenChartsLegacy();
     _prefs.widgets = t2.widgets.slice();
     savePrefs();
     setActiveTemplateName(tpl.name);
@@ -1631,7 +2016,7 @@
             try {
               var imported = JSON.parse(ev.target.result);
               if (imported && imported.v === PREFS_VERSION) {
-                _prefs = imported;
+                _prefs = normalizePrefsShape(imported);
                 savePrefs();
                 applyVisibility();
                 applyOrder();
@@ -1678,6 +2063,7 @@
       'sidebar-tools-title': 'settingsToolsTitle',
       'sidebar-open-explorer': 'settingsOpenExplorer',
       'sidebar-export-title': 'settingsExportTitle',
+      'sidebar-layout-edit': 'settingsEditLayout',
       'sidebar-layout-reset': 'settingsResetLayout',
       'sidebar-export-jsonl': 'settingsExportJsonl',
       'sidebar-export-template': 'settingsExportTemplate',
@@ -1706,6 +2092,32 @@
     }
     // Bind template builder (modal buttons + sidebar button)
     bindTemplateBuilder();
+    // Edit layout: Bearbeiten -> Speichern while editing; Save persists and exits edit mode
+    var editBtn = document.getElementById('sidebar-layout-edit');
+    if (editBtn && !editBtn.dataset.bound) {
+      editBtn.dataset.bound = '1';
+      editBtn.addEventListener('click', function () {
+        var tree = document.querySelector('.widget-tree');
+        if (!tree) return;
+        var wasEdit = tree.classList.contains('widget-tree--edit');
+        if (wasEdit) {
+          savePrefs();
+          tree.classList.remove('widget-tree--edit');
+          editBtn.classList.remove('is-active');
+          editBtn.textContent = _t('settingsEditLayout');
+        } else {
+          tree.classList.add('widget-tree--edit');
+          editBtn.classList.add('is-active');
+          editBtn.textContent = _t('settingsSaveLayout');
+        }
+      });
+    }
+    var editBtnAfterTitles = document.getElementById('sidebar-layout-edit');
+    var treeAfterTitles = document.querySelector('.widget-tree');
+    if (editBtnAfterTitles && treeAfterTitles && treeAfterTitles.classList.contains('widget-tree--edit')) {
+      editBtnAfterTitles.textContent = _t('settingsSaveLayout');
+      editBtnAfterTitles.classList.add('is-active');
+    }
     // Version — set immediately from inline global
     var verEl = document.getElementById('sidebar-version');
     if (verEl && global.__APP_VERSION) {

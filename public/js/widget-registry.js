@@ -20,7 +20,7 @@
  *
  * Usage:
  *   window.__widgetRegistry.sections  — all section definitions
- *   window.__widgetRegistry.findChart("token-hourly")  — lookup by chart ID
+ *   window.__widgetRegistry.findChart("ts-c1")  — lookup by chart ID (token stats main chart)
  *   window.__widgetRegistry.findSection("proxy")  — lookup by section ID
  *   window.__widgetRegistry.getSectionsSorted()  — sections by order
  *   window.__widgetRegistry.getChartsSorted("proxy")  — charts in section by order
@@ -121,17 +121,17 @@
         requires: ['usage'],
         charts: [
           {
-            id: 'token-hourly',
-            titleKey: 'chartTokenHourly',
-            type: 'bar-stacked',
-            engine: 'echarts',
-            canvasId: 'c1',
-            size: { cols: 1, minHeight: 260 },
-            renderFn: 'renderTokenStats_c1_hourly'
+            id: 'ts-kpis',
+            titleKey: 'tokenStatsKpiCards',
+            type: 'cards',
+            engine: 'html',
+            canvasId: 'cards',
+            size: { cols: 1, minHeight: 0 },
+            renderFn: 'renderTokenStatsSection'
           },
           {
-            id: 'token-daily',
-            titleKey: 'chartTokenDaily',
+            id: 'ts-c1',
+            titleKey: 'tokenStatsChartC1',
             type: 'bar-stacked',
             engine: 'echarts',
             canvasId: 'c1',
@@ -139,26 +139,8 @@
             renderFn: 'renderTokenStats_c1_daily'
           },
           {
-            id: 'token-hosts',
-            titleKey: 'chartTokenHosts',
-            type: 'bar-stacked',
-            engine: 'echarts',
-            canvasId: 'c1-hosts',
-            size: { cols: 1, minHeight: 260 },
-            renderFn: 'renderTokenStats_c1hosts'
-          },
-          {
-            id: 'cache-ratio-hourly',
-            titleKey: 'chartCacheRatioHourly',
-            type: 'line',
-            engine: 'echarts',
-            canvasId: 'c2',
-            size: { cols: 1, minHeight: 260 },
-            renderFn: 'renderTokenStats_c2_hourly'
-          },
-          {
-            id: 'cache-ratio-daily',
-            titleKey: 'chartCacheRatioDaily',
+            id: 'ts-c2',
+            titleKey: 'tokenStatsChartC2',
             type: 'line',
             engine: 'echarts',
             canvasId: 'c2',
@@ -166,17 +148,8 @@
             renderFn: 'renderTokenStats_c2_daily'
           },
           {
-            id: 'api-events-hourly',
-            titleKey: 'chartApiEventsHourly',
-            type: 'bar',
-            engine: 'echarts',
-            canvasId: 'c3',
-            size: { cols: 1, minHeight: 260 },
-            renderFn: 'renderTokenStats_c3_hourly'
-          },
-          {
-            id: 'api-events-daily',
-            titleKey: 'chartApiEventsDaily',
+            id: 'ts-c3',
+            titleKey: 'tokenStatsChartC3',
             type: 'bar',
             engine: 'echarts',
             canvasId: 'c3',
@@ -184,8 +157,8 @@
             renderFn: 'renderTokenStats_c3_daily'
           },
           {
-            id: 'signals-hourly',
-            titleKey: 'chartSignalsHourly',
+            id: 'ts-c4',
+            titleKey: 'tokenStatsChartC4',
             type: 'bar-stacked',
             engine: 'echarts',
             canvasId: 'c4',
@@ -193,13 +166,13 @@
             renderFn: 'renderTokenStats_c4_hourly'
           },
           {
-            id: 'signals-daily',
-            titleKey: 'chartSignalsDaily',
-            type: 'bar',
+            id: 'ts-hosts',
+            titleKey: 'chartTokenHosts',
+            type: 'bar-stacked',
             engine: 'echarts',
-            canvasId: 'c4',
+            canvasId: 'c1-hosts',
             size: { cols: 1, minHeight: 260 },
-            renderFn: 'renderTokenStats_c4_daily'
+            renderFn: 'renderTokenStats_c1hosts'
           }
         ]
       },

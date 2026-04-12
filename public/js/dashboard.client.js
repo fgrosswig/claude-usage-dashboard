@@ -2094,6 +2094,9 @@ function renderDashboardCore(data) {
       renderForensicSection(__sectionCtx, __tsResult);
     }
   }
+  if (window.__widgetDispatcher && window.__widgetDispatcher.applyAllChartVisibility) {
+    window.__widgetDispatcher.applyAllChartVisibility();
+  }
 }
 
 // (renderTimelineChart entfernt)
