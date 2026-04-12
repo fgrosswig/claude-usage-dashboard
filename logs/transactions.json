@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-199",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "2500809",
+      "commit_full": "2500809097ac82b09f9f59342148c62fcbcdb809",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(widgets): registry v2 layer1 visible order tags",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/js/widget-registry.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-198",
       "timestamp": "2026-04-12",
       "session": "auto",
