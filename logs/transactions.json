@@ -2,6 +2,48 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-204",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "635b3c6",
+      "commit_full": "635b3c655f00612a9ea36edfa33551dc826929f7",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ui): sidebar polish — height sync, i18n keys, chart visibility, cleanup",
+      "detail": "- Sidebar-head height dynamically matches top-bar (JS measurement)\n- Language + Plan hidden from top-bar (moved to sidebar Settings)\n- Removed duplicate lang label in sidebar clone\n- Added 9 missing section title i18n keys (DE/EN/KO)\n- Chart-level visibility: applyChartVisibility hides/shows .chart-box\n- Removed dead stats/filter migration code from dispatcher\n- Removed filter + stats sections from sidebar HTML\n- Sidebar title as h1 matching top-bar-title styling\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-203",
       "timestamp": "2026-04-12",
       "session": "auto",
