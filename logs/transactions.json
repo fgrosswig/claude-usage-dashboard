@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-177",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "476ff2e",
+      "commit_full": "476ff2e9934b2a14f4e49d14a4fbb4abea41aa3c",
+      "status": "ABGESCHLOSSEN",
+      "description": "perf(session-turns): single JSONL pass for 7d batch + faster DEV remote",
+      "detail": "- /api/debug/proxy-logs: one pass1 over JSONL for last 7 days instead of 7 full scans\n\n- DEV full: serve any cached date (incl. today from piggyback); public /api/session-turns first, debug fallback on 404\n\n- Remote GET timeout (default 180s, CLAUDE_USAGE_SESSION_TURNS_REMOTE_TIMEOUT_MS) and 502 retries\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-176",
       "timestamp": "2026-04-12",
       "session": "auto",
