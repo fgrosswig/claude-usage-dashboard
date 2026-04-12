@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-197",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "73223ba",
+      "commit_full": "73223ba93e9ec4a07141eb55feba4cbc5971b7a7",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(econ): Q5 carryover from prior proxy day and budget drain fixes",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-196",
       "timestamp": "2026-04-12",
       "session": "auto",
