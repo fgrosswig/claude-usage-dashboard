@@ -4262,7 +4262,7 @@ var server = http.createServer(function (req, res) {
     res.end(JSON.stringify({ ok: true, files: listCf }));
   } else if (pathname === '/api/debug/cache-file-view') {
     var corsView = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
-    if (!__devMode) {
+    if (!__devMode && process.env.DEBUG_API !== '1') {
       res.writeHead(403, corsView);
       res.end(JSON.stringify({ ok: false, error: 'dev_only' }));
       return;
@@ -4299,6 +4299,25 @@ var server = http.createServer(function (req, res) {
         return;
       }
       var target = path.resolve(rawPath);
+
+      // DEV_MODE: proxy view to remote if file doesn't exist locally
+      var _localFileExists = false;
+      try { _localFileExists = fs.statSync(target).isFile(); } catch (_eL) {}
+      if (!_localFileExists && __devSource && __devMode) {
+        var pBody = JSON.stringify({ path_abs: rawPath });
+        var pUrl = new URL(__devSource.replace(/\/$/, '') + '/api/debug/cache-file-view');
+        var pOpts = { method: 'POST', hostname: pUrl.hostname, port: pUrl.port, path: pUrl.pathname, headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(pBody) }, timeout: 15000 };
+        var pProto = pUrl.protocol === 'https:' ? require('https') : require('http');
+        var pReq = pProto.request(pOpts, function (pResp) {
+          var pData = '';
+          pResp.on('data', function (ch) { pData += ch; });
+          pResp.on('end', function () { res.writeHead(pResp.statusCode, corsView); res.end(pData); });
+        });
+        pReq.on('error', function (pErr) { res.writeHead(502, corsView); res.end(JSON.stringify({ ok: false, error: 'remote_proxy_failed' })); });
+        pReq.end(pBody);
+        return;
+      }
+
       if (!debugPathAllowedForRead(target)) {
         res.writeHead(403, corsView);
         res.end(JSON.stringify({ ok: false, error: 'path_not_allowed' }));
