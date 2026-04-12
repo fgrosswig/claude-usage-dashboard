@@ -65,7 +65,8 @@
       v: PREFS_VERSION,
       order: [],
       hiddenSections: [],
-      hiddenCharts: []
+      hiddenCharts: [],
+      widgets: null
     };
   }
 
@@ -109,6 +110,14 @@
   function isChartVisible(chartId) {
     if (!_prefs) return true;
     return _prefs.hiddenCharts.indexOf(chartId) === -1;
+  }
+
+  function getWidgetSpan(sectionId) {
+    if (!_prefs || !_prefs.widgets) return null;
+    for (var i = 0; i < _prefs.widgets.length; i++) {
+      if (_prefs.widgets[i].id === sectionId) return _prefs.widgets[i].span;
+    }
+    return null;
   }
 
   // ── Visibility ──────────────────────────────────────────────────
@@ -240,9 +249,18 @@
     if (_initialized) return;
     _initialized = true;
     _prefs = loadPrefs();
-    applyVisibility();
+    // Migrate prefs to v2 if needed
+    if (!_prefs.widgets && _prefs.order) {
+      var migrated = migrateTemplateV1toV2({ order: _prefs.order, hiddenSections: _prefs.hiddenSections });
+      _prefs.widgets = migrated.widgets;
+    }
+    if (_prefs.widgets && _prefs.widgets.length) {
+      applyGridLayout();
+    } else {
+      applyVisibility();
+      applyOrder();
+    }
     applyAllChartVisibility();
-    applyOrder();
     bindDisclosureToggles();
   }
 
@@ -256,8 +274,21 @@
     } else if (!visible && idx === -1) {
       _prefs.hiddenSections.push(id);
     }
+    // Sync v2 widgets array
+    if (_prefs.widgets) {
+      if (!visible) {
+        _prefs.widgets = _prefs.widgets.filter(function (w) { return w.id !== id; });
+      } else {
+        var found = false;
+        for (var wi = 0; wi < _prefs.widgets.length; wi++) {
+          if (_prefs.widgets[wi].id === id) { found = true; break; }
+        }
+        if (!found) _prefs.widgets.push({ id: id, span: 12 });
+      }
+    }
     savePrefs();
-    applyVisibility();
+    if (_prefs.widgets && _prefs.widgets.length) applyGridLayout();
+    else applyVisibility();
   }
 
   function setChartVisibility(chartId, visible) {
@@ -382,10 +413,12 @@
       if (sec.reorderable === false) continue;
       var secVis = isSectionVisible(sec.id);
       var hasCharts = sec.charts && sec.charts.length > 0;
+      var spanVal = getWidgetSpan(sec.id);
       html += '<li class="widget-tree-item" data-section="' + sec.id + '" draggable="true">';
       html += '<span class="widget-tree-drag" title="Drag to reorder">&#x2630;</span>';
       html += '<input type="checkbox" class="widget-tree-check" data-type="section" data-id="' + sec.id + '"' + (secVis ? ' checked' : '') + '>';
       html += '<span class="widget-tree-label">' + _t(sec.titleKey) + '</span>';
+      if (spanVal && secVis) html += '<span class="widget-tree-span" title="Grid span">' + spanVal + '/12</span>';
       if (hasCharts) {
         html += '<button type="button" class="widget-tree-expand" data-expand="' + sec.id + '">&#x25BC;</button>';
       }
@@ -626,36 +659,82 @@
   var TEMPLATES_KEY = 'cud_templates';
   var ACTIVE_TPL_KEY = 'cud_active_template';
 
+  // All section IDs in default order
+  var ALL_SECTION_IDS = ['health', 'token-stats', 'forensic', 'user-profile', 'budget', 'proxy', 'anthropic-status', 'economic', 'efficiency-range'];
+
   var BUILTIN_TEMPLATES = [
     {
       name: 'Full',
       builtin: true,
-      order: [],
-      hiddenSections: [],
-      hiddenCharts: []
+      version: 2,
+      widgets: [
+        { id: 'health', span: 12 },
+        { id: 'token-stats', span: 12 },
+        { id: 'forensic', span: 12 },
+        { id: 'user-profile', span: 12 },
+        { id: 'budget', span: 12 },
+        { id: 'proxy', span: 12 },
+        { id: 'anthropic-status', span: 12 },
+        { id: 'economic', span: 12 },
+        { id: 'efficiency-range', span: 12 }
+      ]
     },
     {
       name: 'Performance',
       builtin: true,
-      order: ['token-stats', 'forensic', 'economic', 'efficiency-range'],
-      hiddenSections: ['health', 'budget', 'proxy', 'user-profile', 'anthropic-status'],
-      hiddenCharts: []
+      version: 2,
+      widgets: [
+        { id: 'token-stats', span: 12 },
+        { id: 'forensic', span: 12 },
+        { id: 'economic', span: 12 },
+        { id: 'efficiency-range', span: 12 }
+      ]
     },
     {
       name: 'Cost',
       builtin: true,
-      order: ['budget', 'economic', 'proxy', 'efficiency-range'],
-      hiddenSections: ['health', 'token-stats', 'forensic', 'user-profile', 'anthropic-status'],
-      hiddenCharts: []
+      version: 2,
+      widgets: [
+        { id: 'budget', span: 6 },
+        { id: 'proxy', span: 6 },
+        { id: 'economic', span: 12 },
+        { id: 'efficiency-range', span: 12 }
+      ]
     },
     {
-      name: 'Minimal',
+      name: 'Compact',
       builtin: true,
-      order: ['health', 'token-stats', 'budget'],
-      hiddenSections: ['forensic', 'proxy', 'user-profile', 'anthropic-status', 'economic', 'efficiency-range'],
-      hiddenCharts: []
+      version: 2,
+      widgets: [
+        { id: 'health', span: 4 },
+        { id: 'token-stats', span: 4 },
+        { id: 'budget', span: 4 },
+        { id: 'forensic', span: 6 },
+        { id: 'proxy', span: 6 }
+      ]
     }
   ];
+
+  /** Migrate v1 template (order/hiddenSections) to v2 (widgets[]) */
+  function migrateTemplateV1toV2(tpl) {
+    if (tpl.version === 2) return tpl;
+    var order = tpl.order && tpl.order.length ? tpl.order : ALL_SECTION_IDS;
+    var hidden = tpl.hiddenSections || [];
+    var widgets = [];
+    for (var i = 0; i < order.length; i++) {
+      if (hidden.indexOf(order[i]) === -1) {
+        widgets.push({ id: order[i], span: 12 });
+      }
+    }
+    // Add any sections not in order and not hidden
+    for (var j = 0; j < ALL_SECTION_IDS.length; j++) {
+      var sid = ALL_SECTION_IDS[j];
+      if (order.indexOf(sid) === -1 && hidden.indexOf(sid) === -1) {
+        widgets.push({ id: sid, span: 12 });
+      }
+    }
+    return { name: tpl.name, builtin: tpl.builtin || false, version: 2, widgets: widgets };
+  }
 
   function loadTemplates() {
     try {
@@ -682,16 +761,84 @@
   }
 
   function applyTemplate(tpl) {
+    var t2 = migrateTemplateV1toV2(tpl);
     if (!_prefs) _prefs = defaultPrefs();
-    _prefs.order = (tpl.order || []).slice();
-    _prefs.hiddenSections = (tpl.hiddenSections || []).slice();
+    // Derive v1 fields from v2 for backward compat
+    var order = [];
+    var widgetIds = {};
+    for (var i = 0; i < t2.widgets.length; i++) {
+      order.push(t2.widgets[i].id);
+      widgetIds[t2.widgets[i].id] = true;
+    }
+    var hidden = [];
+    for (var j = 0; j < ALL_SECTION_IDS.length; j++) {
+      if (!widgetIds[ALL_SECTION_IDS[j]]) hidden.push(ALL_SECTION_IDS[j]);
+    }
+    _prefs.order = order;
+    _prefs.hiddenSections = hidden;
     _prefs.hiddenCharts = (tpl.hiddenCharts || []).slice();
+    _prefs.widgets = t2.widgets.slice();
     savePrefs();
     setActiveTemplateName(tpl.name);
-    applyVisibility();
+    applyGridLayout();
     applyAllChartVisibility();
-    applyOrder();
     renderWidgetTree();
+  }
+
+  /** Render sections into a 12-column CSS grid based on widgets[] */
+  function applyGridLayout() {
+    var widgets = _prefs && _prefs.widgets;
+    if (!widgets || !widgets.length) {
+      // Fallback: use v1 order/visibility
+      applyVisibility();
+      applyOrder();
+      return;
+    }
+    var reg = getRegistry();
+    if (!reg) return;
+
+    var gridEl = document.getElementById('layout-grid');
+    if (!gridEl) return;
+
+    // Track which sections are placed
+    var placed = {};
+
+    // Move sections into grid in widget order
+    for (var i = 0; i < widgets.length; i++) {
+      var w = widgets[i];
+      var sec = reg.findSection(w.id);
+      if (!sec || !sec.domId) continue;
+      var el = document.getElementById(sec.domId);
+      if (!el) continue;
+
+      el.setAttribute('data-span', String(w.span || 12));
+      el.style.display = '';
+      gridEl.appendChild(el);
+      placed[w.id] = true;
+
+      // Move companions too
+      if (sec.companionIds) {
+        for (var ci = 0; ci < sec.companionIds.length; ci++) {
+          var comp = document.getElementById(sec.companionIds[ci]);
+          if (comp) {
+            comp.setAttribute('data-span', String(w.span || 12));
+            comp.style.display = '';
+            gridEl.appendChild(comp);
+          }
+        }
+      }
+    }
+
+    // Hide sections not in the template
+    for (var si = 0; si < reg.sections.length; si++) {
+      var s = reg.sections[si];
+      if (!s.domId || placed[s.id]) continue;
+      var hEl = document.getElementById(s.domId);
+      if (hEl) hEl.style.display = 'none';
+    }
+
+    // Resize all ECharts after layout shift
+    setTimeout(function () { resizeAll(); }, 200);
   }
 
   function renderTemplatesSection() {

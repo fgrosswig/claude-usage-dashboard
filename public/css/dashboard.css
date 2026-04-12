@@ -686,6 +686,17 @@ tr:hover td{background:#334155}
 #us-health-body .health-collapse{border:none;background:transparent}
 #us-health-body .health-collapse-inner{padding:0}
 
+/* ── Layout Grid (12-column, auto-flow) ──────────────────────────── */
+.layout-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px;padding:0 0 16px}
+.layout-grid>[data-span]{grid-column:span var(--span,12)}
+.layout-grid>[data-span="1"]{--span:1}.layout-grid>[data-span="2"]{--span:2}
+.layout-grid>[data-span="3"]{--span:3}.layout-grid>[data-span="4"]{--span:4}
+.layout-grid>[data-span="5"]{--span:5}.layout-grid>[data-span="6"]{--span:6}
+.layout-grid>[data-span="7"]{--span:7}.layout-grid>[data-span="8"]{--span:8}
+.layout-grid>[data-span="9"]{--span:9}.layout-grid>[data-span="10"]{--span:10}
+.layout-grid>[data-span="11"]{--span:11}.layout-grid>[data-span="12"]{--span:12}
+@media(max-width:900px){.layout-grid>[data-span]{--span:12}}
+
 /* ── Korean term tooltip (ko locale only) ─────────────────────────── */
 .tt{border-bottom:1px dotted rgba(148,163,184,.6);cursor:help}
 #tt-pop{position:fixed;pointer-events:none;opacity:0;transition:opacity .12s;z-index:99999;background:rgba(15,23,42,.96);color:#e2e8f0;font-size:.72rem;line-height:1.4;padding:5px 10px;border-radius:6px;border:1px solid rgba(71,85,105,.6);width:max-content;max-width:90vw}
@@ -737,6 +748,7 @@ details.sidebar-section[open]>.sidebar-section-title::before{transform:rotate(90
 .widget-tree-drag:active{cursor:grabbing}
 .widget-tree-check{accent-color:#3b82f6;flex-shrink:0}
 .widget-tree-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.widget-tree-span{font-size:.6rem;color:#64748b;background:#1e293b;border:1px solid #334155;border-radius:3px;padding:1px 4px;margin-left:4px;white-space:nowrap}
 .widget-tree-expand{background:none;border:none;color:#475569;cursor:pointer;font-size:.65rem;padding:2px 4px;flex-shrink:0}
 .widget-tree-expand:hover{color:#94a3b8}
 .widget-tree-charts{list-style:none;margin:0;padding:2px 0 4px 28px}
