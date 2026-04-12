@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-205",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "78dec92",
+      "commit_full": "78dec92855e935458a6f87608cce6eafe04926b0",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(api): server-side layout persistence + localStorage sync",
+      "detail": "GET /api/layout — load saved layout from ~/.claude/usage-dashboard-layout.json\nPUT /api/layout — save layout JSON to server\n\nSync strategy:\n- localStorage is primary (instant, offline-capable)\n- Server is backup: every savePrefs() also PUTs to server (fire-and-forget)\n- On first load when localStorage is empty, falls back to server GET\n- Server data backfills localStorage for future instant loads\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-204",
       "timestamp": "2026-04-12",
       "session": "auto",
