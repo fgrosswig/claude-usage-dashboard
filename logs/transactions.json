@@ -2,6 +2,33 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-210",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "767e209",
+      "commit_full": "767e209150d16f058f867d567fcb699b92f7a6b8",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(grid): 12-column layout grid engine with v2 template format",
+      "detail": "- CSS Grid: .layout-grid with repeat(12, 1fr), data-span attribute controls grid-column span\n- v2 template format: widgets[] array with id + span (1-12) instead of order/hiddenSections\n- 4 built-in templates: Full(12), Performance(12), Cost(6+6), Compact(4+4+4)\n- Migration: v1 templates auto-converted to v2 via migrateTemplateV1toV2()\n- applyGridLayout(): moves section DOM elements into grid container with correct spans\n- Widget tree shows span badges (e.g. \"6/12\") next to section names\n- setVisibility() syncs _prefs.widgets on check/uncheck\n- Responsive: all spans collapse to 12 below 900px\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-209",
       "timestamp": "2026-04-12",
       "session": "auto",
