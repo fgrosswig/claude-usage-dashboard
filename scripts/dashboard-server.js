@@ -3348,6 +3348,12 @@ function refreshProxyCache() {
 var __devSource = (process.env.DEV_PROXY_SOURCE || '').trim();
 var __devMode = (process.env.DEV_MODE || '').trim().toLowerCase(); // "proxy" | "full"
 var __devProxyPending = !!__devSource && (__devMode === 'proxy' || __devMode === 'full');
+/** Outgoing DEV fetch to remote /api/session-turns (ms). Default 180s so reverse proxies stay below client abort. */
+var SESSION_TURNS_REMOTE_TIMEOUT_MS = (function () {
+  var ev = String(process.env.CLAUDE_USAGE_SESSION_TURNS_REMOTE_TIMEOUT_MS || '').trim();
+  var n = parseInt(ev, 10);
+  return !isNaN(n) && n >= 30000 ? n : 180000;
+})();
 
 function devFetchRemoteUsage(cb, retryCount) {
   if (!__devSource) return cb();
@@ -3494,7 +3500,7 @@ function getSessionTurnsCached(dateKey) {
     serviceLog.info('session-turns', 'date=' + dateKey + ' fingerprint HIT (' + fpMs + 'ms stat)');
     return cached.result;
   }
-  var result = buildSessionTurnsForDate(dateKey);
+  var result = buildSessionTurnsForDateWithCollected(dateKey, collected.tagged);
   var totalMs = Date.now() - t0;
   var sessions = result && result.sessions ? result.sessions.length : 0;
   var turns = result && result.total_turns ? result.total_turns : 0;
@@ -3503,18 +3509,19 @@ function getSessionTurnsCached(dateKey) {
   return result;
 }
 
-function buildSessionTurnsForDate(dateKey) {
-  var crypto = require('node:crypto');
-  var collected = collectTaggedJsonlFiles();
-  var files = collected.tagged;
-
-  // Compute adjacent day keys for edge-session detection
-  var d = new Date(dateKey + 'T00:00:00Z');
-  var prevDay = new Date(d.getTime() - 86400000).toISOString().slice(0, 10);
-  var nextDay = new Date(d.getTime() + 86400000).toISOString().slice(0, 10);
-
-  // Pass 1: collect all turns for dateKey + adjacent days, grouped by sessionId
-  var allSessions = Object.create(null); // sid -> [{ts, day, ...}]
+/** Single JSONL pass: union of (dateKey, prev, next) for every date in dateKeys. */
+function pass1CollectSessionsForDayWindowFromFiles(dateKeys, files) {
+  var allowedDays = Object.create(null);
+  for (var di = 0; di < dateKeys.length; di++) {
+    var dk = dateKeys[di];
+    var d = new Date(dk + 'T00:00:00Z');
+    var prevDay = new Date(d.getTime() - 86400000).toISOString().slice(0, 10);
+    var nextDay = new Date(d.getTime() + 86400000).toISOString().slice(0, 10);
+    allowedDays[dk] = true;
+    allowedDays[prevDay] = true;
+    allowedDays[nextDay] = true;
+  }
+  var allSessions = Object.create(null);
   for (var fi = 0; fi < files.length; fi++) {
     var file = files[fi];
     try {
@@ -3527,7 +3534,7 @@ function buildSessionTurnsForDate(dateKey) {
         var ts = rec.timestamp;
         if (!ts || typeof ts !== 'string' || ts.length < 19) return;
         var turnDay = ts.slice(0, 10);
-        if (turnDay !== dateKey && turnDay !== prevDay && turnDay !== nextDay) return;
+        if (!allowedDays[turnDay]) return;
         var msg = rec.message || {};
         var usage = msg.usage;
         if (!usage) return;
@@ -3551,8 +3558,11 @@ function buildSessionTurnsForDate(dateKey) {
       });
     } catch (_e) { /* skip unreadable files */ }
   }
+  return allSessions;
+}
 
-  // Pass 2: select sessions that have at least one turn on dateKey
+function finalizeSessionTurnsForDate(dateKey, allSessions) {
+  var crypto = require('node:crypto');
   var sessions = Object.create(null);
   var totalParsed = 0;
   var sids = Object.keys(allSessions);
@@ -3575,11 +3585,10 @@ function buildSessionTurnsForDate(dateKey) {
     var turns = sessions[sid];
     turns.sort(function (a, b) { return a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0; });
 
-    // Determine edge flags
     var firstDay = turns[0].day;
     var lastDay = turns[turns.length - 1].day;
-    var edgeStart = firstDay < dateKey;   // session started on previous day
-    var edgeEnd = lastDay > dateKey;      // session continues into next day
+    var edgeStart = firstDay < dateKey;
+    var edgeEnd = lastDay > dateKey;
 
     var mapped = [];
     for (var ti = 0; ti < turns.length; ti++) {
@@ -3604,12 +3613,57 @@ function buildSessionTurnsForDate(dateKey) {
       total_all: turns.reduce(function (s, t) { return s + t.input + t.output + t.cache_read + t.cache_creation; }, 0),
       turns: mapped
     };
-    if (edgeStart) entry.edge_start = true;  // started on previous day
-    if (edgeEnd) entry.edge_end = true;      // continues into next day
+    if (edgeStart) entry.edge_start = true;
+    if (edgeEnd) entry.edge_end = true;
     result.push(entry);
   }
   result.sort(function (a, b) { return b.total_all - a.total_all; });
   return { date: dateKey, session_count: result.length, total_turns: totalParsed, sessions: result };
+}
+
+function buildSessionTurnsForDateWithCollected(dateKey, tagged) {
+  var allSessions = pass1CollectSessionsForDayWindowFromFiles([dateKey], tagged);
+  return finalizeSessionTurnsForDate(dateKey, allSessions);
+}
+
+/** One JSONL scan for multiple calendar days; fills _sessionTurnsCache (unless NO_CACHE). */
+function populateSessionTurnsCacheForDates(dateKeys, collectedTagged, fp) {
+  var noCache = process.env.CLAUDE_USAGE_NO_CACHE === '1' || process.env.CLAUDE_USAGE_NO_CACHE === 'true';
+  var allSessions = pass1CollectSessionsForDayWindowFromFiles(dateKeys, collectedTagged);
+  var stByDate = {};
+  for (var i = 0; i < dateKeys.length; i++) {
+    var dk = dateKeys[i];
+    var result = finalizeSessionTurnsForDate(dk, allSessions);
+    stByDate[dk] = result;
+    if (!noCache) _sessionTurnsCache[dk] = { result: result, fingerprint: fp };
+  }
+  return stByDate;
+}
+
+/**
+ * DEV_MODE=full: GET remote session-turns (public API first, then /api/debug if 404).
+ * cb(err, statusCode, body, elapsedMs) — body string; err set on network/timeout.
+ */
+function devProxyFetchRemoteSessionTurns(remoteBase, dateStr, useDebugPath, timeoutMs, cb) {
+  var pathPart = useDebugPath ? '/api/debug/session-turns?date=' : '/api/session-turns?date=';
+  var stRemoteUrl = remoteBase.replace(/\/$/, '') + pathPart + encodeURIComponent(dateStr);
+  var stT0r = Date.now();
+  serviceLog.info('session-turns', 'REMOTE → ' + stRemoteUrl);
+  var stProto = stRemoteUrl.startsWith('https') ? require('https') : require('http');
+  var stReq = stProto.get(stRemoteUrl, { timeout: timeoutMs }, function (stResp) {
+    var stBody = '';
+    stResp.on('data', function (ch) { stBody += ch; });
+    stResp.on('end', function () {
+      cb(null, stResp.statusCode, stBody, Date.now() - stT0r);
+    });
+  });
+  stReq.on('timeout', function () {
+    stReq.destroy();
+    cb(new Error('remote_session_turns_timeout'), 0, '', Date.now() - stT0r);
+  });
+  stReq.on('error', function (stErr) {
+    cb(stErr, 0, '', Date.now() - stT0r);
+  });
 }
 
 var server = http.createServer(function (req, res) {
@@ -3743,11 +3797,15 @@ var server = http.createServer(function (req, res) {
         );
       }
     }
-    var stByDate = {};
+    var collectedSt = collectTaggedJsonlFiles();
+    var fpSt = buildTaggedJsonlFingerprintSync(collectedSt.tagged);
+    var stDates = [];
     for (var stDi = 0; stDi < 7; stDi++) {
-      var stD = new Date(Date.now() - stDi * 86400000).toISOString().slice(0, 10);
-      stByDate[stD] = getSessionTurnsCached(stD);
+      stDates.push(new Date(Date.now() - stDi * 86400000).toISOString().slice(0, 10));
     }
+    var stBatchT0 = Date.now();
+    var stByDate = populateSessionTurnsCacheForDates(stDates, collectedSt.tagged, fpSt);
+    serviceLog.info('session-turns', 'debug/proxy-logs batch 7d → ' + (Date.now() - stBatchT0) + 'ms');
     res.end(JSON.stringify({ usage: cachedData, files: proxyNdjsonExport, session_turns: stByDate }));
   } else if (pathname === '/api/debug/sync-proxy-logs' && __devMode && __devSource) {
     // Manual trigger: re-fetch data from remote
@@ -3917,39 +3975,52 @@ var server = http.createServer(function (req, res) {
     var stUrl = new URL(req.url, 'http://localhost');
     var stDate = stUrl.searchParams.get('date') || new Date().toISOString().slice(0, 10);
     if (__devMode === 'full' && __devSource) {
-      var stCached = _sessionTurnsCache[stDate];
-      var stToday = new Date().toISOString().slice(0, 10);
-      if (stCached && stDate < stToday) {
-        serviceLog.info('session-turns', 'DEV local cache HIT date=' + stDate + ' (0ms)');
+      var stCachedDev = _sessionTurnsCache[stDate];
+      if (stCachedDev) {
+        serviceLog.info('session-turns', 'DEV local cache HIT date=' + stDate + ' (0ms, fp=' + String(stCachedDev.fingerprint) + ')');
         res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
-        res.end(JSON.stringify(stCached.result));
+        res.end(JSON.stringify(stCachedDev.result));
         return;
       }
-      var stRemoteUrl = __devSource.replace(/\/$/, '') + '/api/debug/session-turns?date=' + encodeURIComponent(stDate);
-      var stT0r = Date.now();
-      serviceLog.info('session-turns', 'REMOTE proxy → ' + stRemoteUrl);
-      var stProto = stRemoteUrl.startsWith('https') ? require('https') : require('http');
-      stProto.get(stRemoteUrl, function (stResp) {
-        var stBody = '';
-        stResp.on('data', function (ch) { stBody += ch; });
-        stResp.on('end', function () {
-          var stMs = Date.now() - stT0r;
-          serviceLog.info('session-turns', 'REMOTE date=' + stDate + ' → ' + stMs + 'ms (' + stResp.statusCode + ')');
-          if (stResp.statusCode === 200) {
-            try {
-              var stParsed = JSON.parse(stBody);
-              _sessionTurnsCache[stDate] = { result: stParsed, fingerprint: 'remote' };
-              serviceLog.info('session-turns', 'DEV cached date=' + stDate + ' (' + (stParsed.sessions ? stParsed.sessions.length : 0) + ' sessions)');
-            } catch (e) {}
+      var stBaseDev = __devSource.replace(/\/$/, '');
+      var stRetryDelayMs = 5000;
+      var stMaxRetries = 2;
+      function devSessionTurnsRespond(stCode, stBody, stErr) {
+        if (stErr) {
+          res.writeHead(502, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+          res.end(JSON.stringify({ error: 'remote_fetch_failed', message: stErr.message || String(stErr) }));
+          return;
+        }
+        if (stCode === 200 && stBody) {
+          try {
+            var stParsedR = JSON.parse(stBody);
+            _sessionTurnsCache[stDate] = { result: stParsedR, fingerprint: 'remote' };
+            serviceLog.info('session-turns', 'DEV cached date=' + stDate + ' (' + (stParsedR.sessions ? stParsedR.sessions.length : 0) + ' sessions)');
+          } catch (eR) { /* pass through body */ }
+        }
+        res.writeHead(stCode || 200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
+        res.end(stBody || JSON.stringify({ error: 'remote_empty' }));
+      }
+      function runRemoteSessionTurns(useDebugPath, retryNum) {
+        devProxyFetchRemoteSessionTurns(stBaseDev, stDate, useDebugPath, SESSION_TURNS_REMOTE_TIMEOUT_MS, function (stErr, stCode, stBody, stMs) {
+          serviceLog.info(
+            'session-turns',
+            'REMOTE date=' + stDate + ' try=' + (retryNum + 1) + ' → ' + stMs + 'ms (' + (stErr ? (stErr.message || 'err') : String(stCode)) + ')' + (useDebugPath ? ' [debug]' : '')
+          );
+          if (!stErr && stCode === 404 && !useDebugPath) {
+            runRemoteSessionTurns(true, 0);
+            return;
           }
-          res.writeHead(stResp.statusCode || 200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
-          res.end(stBody);
+          var stRetryable = !!stErr || (stCode >= 500 && stCode < 600);
+          if (stRetryable && retryNum < stMaxRetries) {
+            serviceLog.warn('session-turns', 'REMOTE retry ' + (retryNum + 2) + '/' + (stMaxRetries + 1) + ' in ' + (stRetryDelayMs / 1000) + 's');
+            setTimeout(function () { runRemoteSessionTurns(useDebugPath, retryNum + 1); }, stRetryDelayMs);
+            return;
+          }
+          devSessionTurnsRespond(stCode, stBody, stErr);
         });
-      }).on('error', function (stErr) {
-        serviceLog.warn('session-turns', 'REMOTE error: ' + (stErr.message || stErr));
-        res.writeHead(502, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'remote_fetch_failed', message: stErr.message }));
-      });
+      }
+      runRemoteSessionTurns(false, 0);
     } else {
       var stT0 = Date.now();
       var stResult = getSessionTurnsCached(stDate);
