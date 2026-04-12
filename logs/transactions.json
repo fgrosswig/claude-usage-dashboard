@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-202",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "1d7a1e7",
+      "commit_full": "1d7a1e747cb9221bb67a6ba3fffd92c0fe908cb1",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(ui): sidebar stats section with user profile charts",
+      "detail": "Stats section in sidebar renders mini versions of:\n- Version distribution (horizontal bar)\n- Entrypoint distribution (horizontal bar)\n- Release stability (stacked good/bad bar)\n\nCharts are lazy-rendered on details toggle open.\nUses own ECharts instances (sb-user-*), independent from\nmain dashboard user-profile charts.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-201",
       "timestamp": "2026-04-12",
       "session": "auto",
