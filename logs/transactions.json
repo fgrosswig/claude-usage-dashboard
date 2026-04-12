@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-189",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "23c43f4",
+      "commit_full": "23c43f4cd511d6f5dcea471af61d3656ea0b6c18",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dev): one server log block for session-turns benchmark report",
+      "detail": "Emit formatBenchmarkReport as a single serviceLog.info line instead of one timestamp per row.\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-188",
       "timestamp": "2026-04-12",
       "session": "auto",
