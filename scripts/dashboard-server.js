@@ -2810,6 +2810,7 @@ function runScanAndBroadcast() {
       refreshProxyCache();
       if (__proxyCache.data) cachedData.proxy = __proxyCache.data;
       cachedData.release_stability = buildReleaseStabilityData();
+      __lastJsonlScanCompletedAt = data.generated || new Date().toISOString();
       scanOk = true;
     } catch (e) {
       serviceLog.error('scan', 'parse failed: ' + (e && e.message ? e.message : String(e)));
@@ -3017,6 +3018,8 @@ function primeDashboardAndScheduleFirstScan() {
 // cache health from actual Anthropic headers) that JSONL session logs do not have.
 
 var __proxyCache = { data: null, generated: null };
+/** ISO time of last successful usage JSONL aggregate (full or skip-identical). */
+var __lastJsonlScanCompletedAt = null;
 
 function emptyProxyDayBucket() {
   return {
@@ -3845,6 +3848,34 @@ var server = http.createServer(function (req, res) {
     }
     res.writeHead(200, corsSync);
     res.end(JSON.stringify({ ok: true, message: 'sync_started', mode: __devMode }));
+  } else if (pathname === '/api/debug/rebuild-jsonl-cache' && req.method === 'POST') {
+    var corsJr = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+    if (!__devMode) {
+      res.writeHead(403, corsJr);
+      res.end(JSON.stringify({ ok: false, error: 'dev_only' }));
+      return;
+    }
+    __lastScanJsonlFingerprint = '';
+    serviceLog.info('dev', 'POST /api/debug/rebuild-jsonl-cache — forcing full JSONL rescan');
+    runScanAndBroadcast();
+    res.writeHead(200, corsJr);
+    res.end(JSON.stringify({ ok: true, message: 'jsonl_rescan_started' }));
+  } else if (pathname === '/api/debug/rebuild-proxy-cache' && req.method === 'POST') {
+    var corsPr = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+    if (!__devMode) {
+      res.writeHead(403, corsPr);
+      res.end(JSON.stringify({ ok: false, error: 'dev_only' }));
+      return;
+    }
+    serviceLog.info('dev', 'POST /api/debug/rebuild-proxy-cache');
+    refreshProxyCache();
+    if (__proxyCache.data && cachedData) {
+      cachedData.proxy = __proxyCache.data;
+      cachedData.generated = new Date().toISOString();
+      broadcastSse();
+    }
+    res.writeHead(200, corsPr);
+    res.end(JSON.stringify({ ok: true, message: 'proxy_cache_refreshed', proxy_cache_at: __proxyCache.generated }));
   } else if (pathname === '/api/debug/status') {
     // Debug status: expose dev mode info to the frontend
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
@@ -3853,7 +3884,10 @@ var server = http.createServer(function (req, res) {
       dev_proxy_source: __devSource || null,
       refresh_sec: REFRESH_SEC,
       version: __appVersion,
-      claude_data_sync_enabled: !!getClaudeUsageSyncToken()
+      claude_data_sync_enabled: !!getClaudeUsageSyncToken(),
+      jsonl_cache_at: __lastJsonlScanCompletedAt,
+      proxy_cache_at: __proxyCache.generated,
+      scanning: !!(cachedData && cachedData.scanning)
     }));
   } else if (pathname === '/api/debug/cache-reset' && req.method === 'POST' && process.env.DEBUG_API === '1') {
     // Loescht Day-Cache + Today-Index und triggert Full-Rescan

@@ -1,3 +1,17 @@
+.dev-overlay-bar{position:fixed;top:0;left:0;right:0;z-index:9999;background:#1e293b;border-bottom:2px solid #f59e0b;padding:6px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-size:.8rem;color:#f59e0b}
+.dev-overlay-bar .dev-overlay-brand{font-weight:700}
+.dev-overlay-bar .dev-overlay-muted{color:#94a3b8}
+.dev-overlay-spacer{flex:1;min-width:6px}
+.dev-cache-row{display:inline-flex;flex-wrap:wrap;align-items:center;gap:10px;margin-left:auto}
+.dev-cache-sep{color:#64748b;font-size:.75rem;user-select:none}
+.dev-cache-block{display:inline-flex;align-items:center;gap:6px}
+.dev-cache-rebuild-btn{background:#334155;color:#e2e8f0;border:1px solid #475569;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:.68rem;font-family:inherit;line-height:1.2}
+.dev-cache-rebuild-btn:hover{background:#475569}
+.dev-cache-rebuild-btn:disabled{opacity:.55;cursor:wait}
+.dev-cache-meta{color:#64748b;font-size:.65rem;white-space:nowrap}
+.dev-sync-now-btn{background:#f59e0b;color:#0f172a;border-color:#d97706;font-weight:600}
+.dev-sync-now-btn:hover{background:#fbbf24}
+
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background:#0f172a;color:#e2e8f0;padding:20px;padding-top:16px}
 h1{font-size:1.5rem;margin-bottom:4px;color:#f8fafc}

@@ -6942,6 +6942,22 @@ function inlineMd(s) {
 }
 
 // ── Dev Mode Overlay ─────────────────────────────────────────────────────
+function formatDevCacheTs(iso) {
+  if (!iso) return "\u2014";
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return "\u2014";
+  return d.toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+}
+function applyDevCacheFromStatus(info) {
+  var jEl = document.getElementById("dev-jsonl-cache-at");
+  var pEl = document.getElementById("dev-proxy-cache-at");
+  if (jEl) {
+    var jt = "last Cache: " + formatDevCacheTs(info.jsonl_cache_at);
+    if (info.scanning) jt += " (scanning\u2026)";
+    jEl.textContent = jt;
+  }
+  if (pEl) pEl.textContent = "last Cache: " + formatDevCacheTs(info.proxy_cache_at);
+}
 (function () {
   var xhr = new XMLHttpRequest();
   xhr.open("GET", "/api/debug/status", true);
@@ -7009,13 +7025,28 @@ function inlineMd(s) {
       var modeLabel = info.dev_mode === "full" ? "FULL" : "PROXY";
       var bar = document.createElement("div");
       bar.id = "dev-overlay";
-      bar.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;background:#1e293b;border-bottom:2px solid #f59e0b;padding:6px 16px;display:flex;align-items:center;gap:12px;font-size:.8rem;color:#f59e0b";
-      bar.innerHTML = '<span style="font-weight:700">DEV ' + modeLabel + '</span>' +
-        '<span style="color:#94a3b8">Source: ' + escHtml(info.dev_proxy_source || "") + '</span>' +
-        '<span id="dev-last-sync" style="color:#94a3b8">Sync: ' + info.refresh_sec + 's</span>' +
-        '<button id="dev-sync-btn" style="background:#f59e0b;color:#0f172a;border:none;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:.75rem;font-weight:600">Sync Now</button>' +
-        '<span id="dev-sync-status" style="color:#64748b;font-size:.7rem"></span>';
+      bar.className = "dev-overlay-bar";
+      bar.innerHTML =
+        '<span class="dev-overlay-brand">DEV ' + modeLabel + "</span>" +
+        '<span class="dev-overlay-muted">Source: ' + escHtml(info.dev_proxy_source || "") + "</span>" +
+        '<span id="dev-last-sync" class="dev-overlay-muted">Sync: ' + info.refresh_sec + "s</span>" +
+        '<button type="button" id="dev-sync-btn" class="dev-cache-rebuild-btn dev-sync-now-btn">Sync Now</button>' +
+        '<span id="dev-sync-status" class="dev-cache-meta"></span>' +
+        '<span class="dev-overlay-spacer"></span>' +
+        '<div class="dev-cache-row">' +
+        '<span class="dev-cache-sep">|</span>' +
+        '<span class="dev-cache-block">' +
+        '<button type="button" id="dev-rebuild-jsonl" class="dev-cache-rebuild-btn">JSONL Cache rebuild</button>' +
+        '<span id="dev-jsonl-cache-at" class="dev-cache-meta">last Cache: \u2014</span>' +
+        "</span>" +
+        '<span class="dev-cache-sep">|</span>' +
+        '<span class="dev-cache-block">' +
+        '<button type="button" id="dev-rebuild-proxy" class="dev-cache-rebuild-btn">PROXY Cache rebuild</button>' +
+        '<span id="dev-proxy-cache-at" class="dev-cache-meta">last Cache: \u2014</span>' +
+        "</span>" +
+        "</div>";
       document.body.prepend(bar);
+      applyDevCacheFromStatus(info);
       var devH = bar.offsetHeight;
       document.body.style.paddingTop = devH + "px";
       document.documentElement.style.setProperty("--dev-bar-h", devH + "px");
@@ -7028,6 +7059,60 @@ function inlineMd(s) {
         sx.onerror = function () { st.textContent = "sync failed"; };
         sx.send();
       });
+      function postDevRebuild(url, btnId) {
+        var btn = document.getElementById(btnId);
+        if (!btn) return;
+        btn.addEventListener("click", function () {
+          btn.disabled = true;
+          var rq = new XMLHttpRequest();
+          rq.open("POST", url, true);
+          rq.onload = function () {
+            btn.disabled = false;
+            var st2 = document.getElementById("dev-sync-status");
+            if (rq.status !== 200) {
+              if (st2) st2.textContent = (btnId === "dev-rebuild-jsonl" ? "JSONL" : "PROXY") + " rebuild failed";
+              return;
+            }
+            function pullStatusSoon() {
+              var px = new XMLHttpRequest();
+              px.open("GET", "/api/debug/status", true);
+              px.onload = function () {
+                if (px.status !== 200) return;
+                try {
+                  var inf2 = JSON.parse(px.responseText);
+                  applyDevCacheFromStatus(inf2);
+                } catch (e3) {}
+              };
+              px.send();
+            }
+            try {
+              setTimeout(pullStatusSoon, 400);
+              setTimeout(pullStatusSoon, 2500);
+            } catch (e4) {}
+            if (st2) st2.textContent = (btnId === "dev-rebuild-jsonl" ? "JSONL" : "PROXY") + " rebuild started";
+          };
+          rq.onerror = function () { btn.disabled = false; };
+          rq.send();
+        });
+      }
+      postDevRebuild("/api/debug/rebuild-jsonl-cache", "dev-rebuild-jsonl");
+      postDevRebuild("/api/debug/rebuild-proxy-cache", "dev-rebuild-proxy");
+      var devPoll = setInterval(function () {
+        if (!document.getElementById("dev-overlay")) {
+          clearInterval(devPoll);
+          return;
+        }
+        var px = new XMLHttpRequest();
+        px.open("GET", "/api/debug/status", true);
+        px.onload = function () {
+          if (px.status !== 200) return;
+          try {
+            var inf3 = JSON.parse(px.responseText);
+            applyDevCacheFromStatus(inf3);
+          } catch (e5) {}
+        };
+        px.send();
+      }, 20000);
     } catch (e) {}
   };
   xhr.send();
