@@ -569,5 +569,10 @@
   "settingsLangLabel": "언어",
   "settingsPlanLabel": "플랜",
   "settingsDayLabel": "날짜",
-  "settingsHostLabel": "호스트 필터"
+  "settingsHostLabel": "호스트 필터",
+  "settingsTemplateBuiltin": "기본 제공",
+  "settingsTemplateApply": "적용",
+  "settingsTemplateDelete": "삭제",
+  "settingsTemplateSaveCurrent": "현재 레이아웃 저장",
+  "settingsTemplateNamePrompt": "템플릿 이름:"
 }

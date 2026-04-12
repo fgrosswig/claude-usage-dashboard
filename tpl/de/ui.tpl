@@ -569,5 +569,10 @@
   "settingsLangLabel": "Sprache",
   "settingsPlanLabel": "Plan",
   "settingsDayLabel": "Tag",
-  "settingsHostLabel": "Host-Filter"
+  "settingsHostLabel": "Host-Filter",
+  "settingsTemplateBuiltin": "Standard",
+  "settingsTemplateApply": "Anwenden",
+  "settingsTemplateDelete": "Loeschen",
+  "settingsTemplateSaveCurrent": "Aktuelles Layout speichern",
+  "settingsTemplateNamePrompt": "Name fuer das Template:"
 }

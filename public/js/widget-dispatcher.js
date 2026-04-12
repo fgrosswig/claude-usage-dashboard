@@ -294,7 +294,17 @@
       // Resize charts after layout shift
       setTimeout(function () { resizeAll(); }, 250);
     }
+    // Hide/show original top-bar filters (moved to sidebar)
+    toggleOriginalFilters(!_sidebarOpen);
     try { localStorage.setItem('cud_sidebar_open', _sidebarOpen ? '1' : '0'); } catch (e) {}
+  }
+
+  function toggleOriginalFilters(show) {
+    var ids = ['lang-switch-wrap', 'plan-switch-wrap', 'day-picker-row'];
+    for (var i = 0; i < ids.length; i++) {
+      var el = document.getElementById(ids[i]);
+      if (el) el.style.display = show ? '' : 'none';
+    }
   }
 
   function bindSidebarEvents() {
@@ -564,11 +574,159 @@
 
   // ── Templates Section ───────────────────────────────────────────
 
+  // ── Template System ──────────────────────────────────────────────
+
+  var TEMPLATES_KEY = 'cud_templates';
+  var ACTIVE_TPL_KEY = 'cud_active_template';
+
+  var BUILTIN_TEMPLATES = [
+    {
+      name: 'Full',
+      builtin: true,
+      order: [],
+      hiddenSections: [],
+      hiddenCharts: []
+    },
+    {
+      name: 'Performance',
+      builtin: true,
+      order: ['token-stats', 'forensic', 'economic', 'efficiency-range'],
+      hiddenSections: ['health', 'budget', 'proxy', 'user-profile', 'anthropic-status'],
+      hiddenCharts: []
+    },
+    {
+      name: 'Cost',
+      builtin: true,
+      order: ['budget', 'economic', 'proxy', 'efficiency-range'],
+      hiddenSections: ['health', 'token-stats', 'forensic', 'user-profile', 'anthropic-status'],
+      hiddenCharts: []
+    },
+    {
+      name: 'Minimal',
+      builtin: true,
+      order: ['health', 'token-stats', 'budget'],
+      hiddenSections: ['forensic', 'proxy', 'user-profile', 'anthropic-status', 'economic', 'efficiency-range'],
+      hiddenCharts: []
+    }
+  ];
+
+  function loadTemplates() {
+    try {
+      var raw = localStorage.getItem(TEMPLATES_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return [];
+  }
+
+  function saveTemplates(list) {
+    try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list)); } catch (e) {}
+  }
+
+  function getActiveTemplateName() {
+    try { return localStorage.getItem(ACTIVE_TPL_KEY) || ''; } catch (e) { return ''; }
+  }
+
+  function setActiveTemplateName(name) {
+    try { localStorage.setItem(ACTIVE_TPL_KEY, name); } catch (e) {}
+  }
+
+  function getAllTemplates() {
+    return BUILTIN_TEMPLATES.concat(loadTemplates());
+  }
+
+  function applyTemplate(tpl) {
+    if (!_prefs) _prefs = defaultPrefs();
+    _prefs.order = (tpl.order || []).slice();
+    _prefs.hiddenSections = (tpl.hiddenSections || []).slice();
+    _prefs.hiddenCharts = (tpl.hiddenCharts || []).slice();
+    savePrefs();
+    setActiveTemplateName(tpl.name);
+    applyVisibility();
+    applyOrder();
+    renderWidgetTree();
+  }
+
   function renderTemplatesSection() {
     var body = document.getElementById('sidebar-templates-body');
-    if (!body || body.dataset.filled) return;
-    body.dataset.filled = '1';
-    body.innerHTML = '<p style="font-size:.72rem;color:#64748b;padding:4px 0">' + _t('settingsTemplatesHint') + '</p>';
+    if (!body) return;
+    var all = getAllTemplates();
+    var activeName = getActiveTemplateName();
+
+    var html = '';
+    for (var i = 0; i < all.length; i++) {
+      var tpl = all[i];
+      var isActive = tpl.name === activeName;
+      html += '<div class="template-item' + (isActive ? ' is-active' : '') + '" data-tpl-idx="' + i + '">';
+      html += '<span class="template-item-name">' + escT(tpl.name) + (tpl.builtin ? ' <span style="color:#475569;font-size:.6rem">(' + _t('settingsTemplateBuiltin') + ')</span>' : '') + '</span>';
+      html += '<span class="template-item-actions">';
+      html += '<button type="button" data-tpl-action="apply" data-tpl-idx="' + i + '" title="' + _t('settingsTemplateApply') + '">&#x25B6;</button>';
+      if (!tpl.builtin) {
+        html += '<button type="button" data-tpl-action="delete" data-tpl-idx="' + i + '" title="' + _t('settingsTemplateDelete') + '">&#x2715;</button>';
+      }
+      html += '</span></div>';
+    }
+    html += '<div style="margin-top:10px;display:flex;gap:6px">';
+    html += '<button type="button" class="sidebar-btn-sm" id="tpl-save-current">' + _t('settingsTemplateSaveCurrent') + '</button>';
+    html += '</div>';
+    body.innerHTML = html;
+
+    // Delegated click handler
+    if (!body.dataset.bound) {
+      body.dataset.bound = '1';
+      body.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-tpl-action]');
+        if (!btn) return;
+        var action = btn.dataset.tplAction;
+        var idx = parseInt(btn.dataset.tplIdx, 10);
+        var all2 = getAllTemplates();
+        if (idx < 0 || idx >= all2.length) return;
+
+        if (action === 'apply') {
+          applyTemplate(all2[idx]);
+          renderTemplatesSection();
+        } else if (action === 'delete') {
+          var userTpls = loadTemplates();
+          var builtinCount = BUILTIN_TEMPLATES.length;
+          var userIdx = idx - builtinCount;
+          if (userIdx >= 0 && userIdx < userTpls.length) {
+            userTpls.splice(userIdx, 1);
+            saveTemplates(userTpls);
+            if (getActiveTemplateName() === all2[idx].name) setActiveTemplateName('');
+            renderTemplatesSection();
+          }
+        }
+      });
+    }
+
+    // Save current layout as template
+    var saveBtn = document.getElementById('tpl-save-current');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', function () {
+        var name = prompt(_t('settingsTemplateNamePrompt'));
+        if (!name || !name.trim()) return;
+        name = name.trim();
+        var userTpls = loadTemplates();
+        // Overwrite if same name exists
+        var found = false;
+        for (var j = 0; j < userTpls.length; j++) {
+          if (userTpls[j].name === name) {
+            userTpls[j] = { name: name, order: (_prefs.order || []).slice(), hiddenSections: (_prefs.hiddenSections || []).slice(), hiddenCharts: (_prefs.hiddenCharts || []).slice() };
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          userTpls.push({ name: name, order: (_prefs.order || []).slice(), hiddenSections: (_prefs.hiddenSections || []).slice(), hiddenCharts: (_prefs.hiddenCharts || []).slice() });
+        }
+        saveTemplates(userTpls);
+        setActiveTemplateName(name);
+        renderTemplatesSection();
+      });
+    }
+  }
+
+  function escT(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   // ── Export Section ──────────────────────────────────────────────
