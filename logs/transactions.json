@@ -2,6 +2,53 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-200",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "3edb6bf",
+      "commit_full": "3edb6bf879fe2850baf6558c90f5a48abec0a9c6",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(widgets): registry-driven dispatcher + section extraction (Phase A)",
+      "detail": "Widget Dispatcher (widget-dispatcher.js):\n- Registry-driven render dispatch, unified resize, visibility control\n- Section reorder via DOM insertBefore, localStorage persistence\n- Disclosure toggle auto-binding from registry metadata\n\nSection Extraction (dashboard-sections.js):\n- renderTokenStatsSection(ctx): cards, c1-c4, c1hosts, host table\n- renderForensicSection(ctx, tsResult): forensic cards + 3 charts\n- ~680 lines extracted from renderDashboardCore inline code\n\nRegistry v3 (widget-registry.js):\n- New fields: domId, sectionRenderFn, companionIds, reorderable\n- Sections mapped to DOM <details> elements for dispatcher control\n\nServer-side:\n- Asset routes for registry, dispatcher, sections JS files\n- Mtime cache entries for hot-reload in getDashboardHtml()\n\nRefs: Gitea #166 Phase 2b, Vikunja CUD-3\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard-sections.js",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-registry.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-http.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-199",
       "timestamp": "2026-04-12",
       "session": "auto",
