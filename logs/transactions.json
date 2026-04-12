@@ -2,6 +2,53 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-223",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "8346fb1",
+      "commit_full": "8346fb1e96708844589fccfd454589e7dcf2c0b6",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ui): anthropic scatter host, bar chrome, scoped status canvas visibility refs #216",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-222",
       "timestamp": "2026-04-12",
       "session": "auto",
