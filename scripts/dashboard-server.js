@@ -41,6 +41,7 @@ var buildTaggedJsonlFingerprintSync = usageScanRoots.buildTaggedJsonlFingerprint
 var collectTaggedJsonlFilesAsync = usageScanRoots.collectTaggedJsonlFilesAsync;
 var forEachJsonlLineSync = usageScanRoots.forEachJsonlLineSync;
 var sessionTurnsCore = require('./session-turns-core');
+var benchmarkSessionTurns = require('./benchmark-session-turns');
 var getProxyLogDir = usageScanRoots.getProxyLogDir;
 var collectProxyNdjsonFiles = usageScanRoots.collectProxyNdjsonFiles;
 var serviceLog = require('./service-logger');
@@ -3568,6 +3569,42 @@ function populateSessionTurnsCacheForDates(dateKeys, collectedTagged, fp) {
   return stByDate;
 }
 
+/** POST body JSON, max size (bytes). cb(err, obj) — err message payload_too_large for 413. */
+function readJsonBodyMax(req, maxBytes, cb) {
+  var chunks = [];
+  var total = 0;
+  req.on('data', function (chunk) {
+    total += chunk.length;
+    if (total > maxBytes) {
+      try {
+        req.destroy();
+      } catch (eD) {}
+      cb(new Error('payload_too_large'));
+      return;
+    }
+    chunks.push(chunk);
+  });
+  req.on('end', function () {
+    try {
+      var raw = Buffer.concat(chunks).toString('utf8').trim();
+      if (!raw) return cb(null, {});
+      cb(null, JSON.parse(raw));
+    } catch (eParse) {
+      cb(eParse);
+    }
+  });
+  req.on('error', function (e) {
+    cb(e);
+  });
+}
+
+function logBenchmarkReportLines(reportText) {
+  var lines = reportText.split('\n');
+  for (var li = 0; li < lines.length; li++) {
+    if (lines[li].length) serviceLog.info('session-turns-bench', lines[li]);
+  }
+}
+
 /**
  * DEV_MODE=full: GET remote session-turns via /api/debug/session-turns only.
  * (Public /api/session-turns is often behind SSO e.g. Authelia; debug is typically bypassed.)
@@ -3776,6 +3813,74 @@ var server = http.createServer(function (req, res) {
     }
     res.writeHead(200, corsPr);
     res.end(JSON.stringify({ ok: true, message: 'proxy_cache_refreshed', proxy_cache_at: __proxyCache.generated }));
+  } else if (pathname === '/api/debug/benchmark-session-turns') {
+    var corsBench = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+    if (!__devMode) {
+      res.writeHead(403, corsBench);
+      res.end(JSON.stringify({ ok: false, error: 'dev_only' }));
+      return;
+    }
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      });
+      res.end();
+      return;
+    }
+    if (req.method !== 'POST') {
+      res.writeHead(405, Object.assign({ Allow: 'POST, OPTIONS' }, corsBench));
+      res.end(JSON.stringify({ ok: false, error: 'method_not_allowed' }));
+      return;
+    }
+    readJsonBodyMax(req, 4096, function (errRead, body) {
+      if (errRead && String(errRead.message || errRead) === 'payload_too_large') {
+        res.writeHead(413, corsBench);
+        res.end(JSON.stringify({ ok: false, error: 'payload_too_large' }));
+        return;
+      }
+      if (errRead) {
+        res.writeHead(400, corsBench);
+        res.end(JSON.stringify({ ok: false, error: 'invalid_json' }));
+        return;
+      }
+      var n = body && body.days_back != null ? parseInt(body.days_back, 10) : 8;
+      if (isNaN(n) || n < 1) n = 8;
+      if (n > 31) n = 31;
+      var dateKeys = benchmarkSessionTurns.resolveDateKeys(n, '');
+      serviceLog.info('session-turns-bench', 'POST /api/debug/benchmark-session-turns start days_back=' + n);
+      var last = benchmarkSessionTurns.runOnce(dateKeys);
+      var modeLine = '  mode:          POST /api/debug/benchmark-session-turns days_back=' + n + '\n';
+      var report = benchmarkSessionTurns.formatBenchmarkReport(process.cwd(), last, dateKeys, modeLine, 1, []);
+      logBenchmarkReportLines(report);
+      var byDay = [];
+      for (var bi = 0; bi < dateKeys.length; bi++) {
+        var dk0 = dateKeys[bi];
+        var rr = last.results[dk0];
+        byDay.push({ date: dk0, session_count: rr.session_count, total_turns: rr.total_turns });
+      }
+      serviceLog.info(
+        'session-turns-bench',
+        'POST /api/debug/benchmark-session-turns done total_s=' + last.total_s.toFixed(3)
+      );
+      res.writeHead(200, corsBench);
+      res.end(
+        JSON.stringify({
+          ok: true,
+          days_back: n,
+          paths_s: last.paths_s,
+          pass1_s: last.pass1_s,
+          finalize_s: last.finalize_s,
+          total_s: last.total_s,
+          jsonl_files: last.jsonl_files,
+          raw_session_ids: last.raw_session_ids,
+          allowed_turn_days: last.allowed_turn_days,
+          by_day: byDay
+        })
+      );
+    });
+    return;
   } else if (pathname === '/api/debug/status') {
     // Debug status: expose dev mode info to the frontend
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });

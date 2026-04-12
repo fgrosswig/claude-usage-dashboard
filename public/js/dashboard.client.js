@@ -7036,6 +7036,13 @@ function applyDevCacheFromStatus(info) {
         '<div class="dev-cache-row">' +
         '<span class="dev-cache-sep">|</span>' +
         '<span class="dev-cache-block">' +
+        '<button type="button" id="dev-bench-btn" class="dev-cache-rebuild-btn">Benchmark</button>' +
+        '<label class="dev-bench-days-wrap"><span class="dev-cache-meta">Tage</span> ' +
+        '<input type="number" id="dev-bench-days" class="dev-bench-days-input" min="1" max="31" value="8" /></label>' +
+        '<span id="dev-bench-status" class="dev-cache-meta"></span>' +
+        "</span>" +
+        '<span class="dev-cache-sep">|</span>' +
+        '<span class="dev-cache-block">' +
         '<button type="button" id="dev-rebuild-jsonl" class="dev-cache-rebuild-btn">JSONL Cache rebuild</button>' +
         '<span id="dev-jsonl-cache-at" class="dev-cache-meta">last Cache: \u2014</span>' +
         "</span>" +
@@ -7112,6 +7119,52 @@ function applyDevCacheFromStatus(info) {
       }
       postDevRebuild("/api/debug/rebuild-jsonl-cache", "dev-rebuild-jsonl");
       postDevRebuild("/api/debug/rebuild-proxy-cache", "dev-rebuild-proxy");
+      (function wireDevSessionTurnsBench() {
+        var btnB = document.getElementById("dev-bench-btn");
+        var inpD = document.getElementById("dev-bench-days");
+        var stB = document.getElementById("dev-bench-status");
+        if (!btnB || !inpD) return;
+        btnB.addEventListener("click", function () {
+          var nd = parseInt(String(inpD.value || "8"), 10);
+          if (isNaN(nd) || nd < 1) nd = 8;
+          if (nd > 31) nd = 31;
+          inpD.value = String(nd);
+          btnB.disabled = true;
+          if (stB) stB.textContent = "running…";
+          var bq = new XMLHttpRequest();
+          bq.open("POST", "/api/debug/benchmark-session-turns", true);
+          bq.setRequestHeader("Content-Type", "application/json");
+          bq.onload = function () {
+            btnB.disabled = false;
+            if (!stB) return;
+            if (bq.status !== 200) {
+              stB.textContent = "bench failed (" + bq.status + ")";
+              stB.style.color = "#ef4444";
+              return;
+            }
+            try {
+              var out = JSON.parse(bq.responseText);
+              if (!out.ok) {
+                stB.textContent = "bench error";
+                stB.style.color = "#ef4444";
+                return;
+              }
+              stB.textContent =
+                "total " + out.total_s.toFixed(2) + "s (pass1 " + out.pass1_s.toFixed(2) + "s) — see server log";
+              stB.style.color = "#22c55e";
+              setTimeout(function () { stB.style.color = "#64748b"; }, 5000);
+            } catch (eB) {
+              stB.textContent = "bench parse error";
+              stB.style.color = "#ef4444";
+            }
+          };
+          bq.onerror = function () {
+            btnB.disabled = false;
+            if (stB) stB.textContent = "bench network error";
+          };
+          bq.send(JSON.stringify({ days_back: nd }));
+        });
+      })();
       var devPoll = setInterval(function () {
         if (!document.getElementById("dev-overlay")) {
           clearInterval(devPoll);

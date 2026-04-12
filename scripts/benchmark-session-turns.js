@@ -161,6 +161,58 @@ function runOnce(dateKeys) {
   };
 }
 
+/** Multi-line report (CLI + dashboard server log). */
+function formatBenchmarkReport(repoDir, last, dateKeys, modeLine, iterations, totals) {
+  var span = chronologicalMinMax(dateKeys);
+  var lines = [];
+  lines.push('benchmark-session-turns.js');
+  if (repoDir) lines.push('  repo:          ' + repoDir);
+  lines.push(modeLine.replace(/\n$/, ''));
+  lines.push(
+    '  date keys:     ' +
+      dateKeys.length +
+      '  [newest-first: ' +
+      formatDateKeyList(dateKeys) +
+      ']'
+  );
+  lines.push('  UTC span:      ' + span.min + ' .. ' + span.max + ' (chronological)');
+  lines.push('  pass1 filter:  ' + last.allowed_turn_days + ' distinct turn-days (prev+day+next per key)');
+  lines.push('  jsonl files:   ' + last.jsonl_files);
+  lines.push('  last run:');
+  lines.push('    collect+fp:     ' + padNum8(last.paths_s.toFixed(3)) + ' s');
+  lines.push('    pass1 (read):   ' + padNum8(last.pass1_s.toFixed(3)) + ' s');
+  lines.push('    finalize:       ' + padNum8(last.finalize_s.toFixed(3)) + ' s');
+  lines.push('    total:          ' + padNum8(last.total_s.toFixed(3)) + ' s');
+  lines.push('  raw sid keys:  ' + last.raw_session_ids);
+  lines.push(
+    '  note: pass1 always walks every .jsonl line; day filter width follows date keys (prev+day+next).'
+  );
+  lines.push(
+    '  vs Python warm-cache: same per-day counts; Python pass1 is usually slower (stdlib json vs V8).'
+  );
+  var iters = iterations || 1;
+  if (iters > 1 && totals && totals.length) {
+    var sum = 0;
+    for (var ti = 0; ti < totals.length; ti++) sum += totals[ti];
+    var avg = sum / totals.length;
+    var mn = totals[0];
+    var mx = totals[0];
+    for (var tj = 1; tj < totals.length; tj++) {
+      if (totals[tj] < mn) mn = totals[tj];
+      if (totals[tj] > mx) mx = totals[tj];
+    }
+    lines.push(
+      '  iterations=' + iters + ' total_s: min=' + mn.toFixed(3) + ' avg=' + avg.toFixed(3) + ' max=' + mx.toFixed(3)
+    );
+  }
+  for (var di = 0; di < dateKeys.length; di++) {
+    var dk2 = dateKeys[di];
+    var r = last.results[dk2];
+    lines.push('  ' + dk2 + '  sessions=' + r.session_count + ' total_turns=' + r.total_turns);
+  }
+  return lines.join('\n');
+}
+
 function main() {
   var argv = process.argv.slice(2);
   if (argv.indexOf('--help') >= 0 || argv.indexOf('-h') >= 0) {
@@ -179,7 +231,6 @@ function main() {
   }
   var opts = parseArgs(argv);
   var dateKeys = resolveDateKeys(opts.daysBack, opts.datesCsv);
-  var span = chronologicalMinMax(dateKeys);
   var iters = Math.max(1, parseInt(opts.iterations, 10) || 1);
   var totals = [];
   var last = null;
@@ -191,68 +242,20 @@ function main() {
     opts.datesCsv && String(opts.datesCsv).trim()
       ? '  mode:          --dates (explicit keys)\n'
       : '  mode:          --days-back=' + opts.daysBack + ' (UTC calendar days, today first)\n';
-  process.stdout.write(
-    'benchmark-session-turns.js\n' +
-      '  repo:          ' +
-      process.cwd() +
-      '\n' +
-      modeLine +
-      '  date keys:     ' +
-      dateKeys.length +
-      '  [newest-first: ' +
-      formatDateKeyList(dateKeys) +
-      ']\n' +
-      '  UTC span:      ' +
-      span.min +
-      ' .. ' +
-      span.max +
-      ' (chronological)\n' +
-      '  pass1 filter:  ' +
-      last.allowed_turn_days +
-      ' distinct turn-days (prev+day+next per key)\n' +
-      '  jsonl files:   ' +
-      last.jsonl_files +
-      '\n' +
-      '  last run:\n' +
-      '    collect+fp:     ' +
-      padNum8(last.paths_s.toFixed(3)) +
-      ' s\n' +
-      '    pass1 (read):   ' +
-      padNum8(last.pass1_s.toFixed(3)) +
-      ' s\n' +
-      '    finalize:       ' +
-      padNum8(last.finalize_s.toFixed(3)) +
-      ' s\n' +
-      '    total:          ' +
-      padNum8(last.total_s.toFixed(3)) +
-      ' s\n' +
-      '  raw sid keys:  ' +
-      last.raw_session_ids +
-      '\n' +
-      '  note: pass1 always walks every .jsonl line; day filter width follows date keys (prev+day+next).\n' +
-      '  vs Python warm-cache: same per-day counts; Python pass1 is usually slower (stdlib json vs V8).\n'
-  );
-  if (iters > 1) {
-    var sum = 0;
-    for (var ti = 0; ti < totals.length; ti++) sum += totals[ti];
-    var avg = sum / totals.length;
-    var mn = totals[0];
-    var mx = totals[0];
-    for (var tj = 1; tj < totals.length; tj++) {
-      if (totals[tj] < mn) mn = totals[tj];
-      if (totals[tj] > mx) mx = totals[tj];
-    }
-    process.stdout.write(
-      '  iterations=' + iters + ' total_s: min=' + mn.toFixed(3) + ' avg=' + avg.toFixed(3) + ' max=' + mx.toFixed(3) + '\n'
-    );
-  }
-  for (var di = 0; di < dateKeys.length; di++) {
-    var dk2 = dateKeys[di];
-    var r = last.results[dk2];
-    process.stdout.write(
-      '  ' + dk2 + '  sessions=' + r.session_count + ' total_turns=' + r.total_turns + '\n'
-    );
-  }
+  process.stdout.write(formatBenchmarkReport(process.cwd(), last, dateKeys, modeLine, iters, totals) + '\n');
 }
 
-main();
+module.exports = {
+  resolveDateKeys: resolveDateKeys,
+  runOnce: runOnce,
+  countAllowedTurnDays: countAllowedTurnDays,
+  chronologicalMinMax: chronologicalMinMax,
+  formatDateKeyList: formatDateKeyList,
+  formatBenchmarkReport: formatBenchmarkReport,
+  stripOuterQuotes: stripOuterQuotes,
+  parseArgs: parseArgs
+};
+
+if (require.main === module) {
+  main();
+}
