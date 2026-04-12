@@ -2,6 +2,33 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-182",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "5bb80b3",
+      "commit_full": "5bb80b35c0e4a451ca91a804fccb088afd22322f",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(dev): banner JSONL/PROXY cache rebuild + last timestamps",
+      "detail": "- Track __lastJsonlScanCompletedAt; extend /api/debug/status with jsonl_cache_at, proxy_cache_at, scanning\n\n- POST /api/debug/rebuild-jsonl-cache|rebuild-proxy-cache (DEV_MODE only)\n\n- Dev overlay: buttons, CSS classes, status poll 20s\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-181",
       "timestamp": "2026-04-12",
       "session": "auto",
