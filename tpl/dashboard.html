@@ -448,7 +448,7 @@
 <div class="anthropic-modal-body" id="release-modal-body" style="padding:16px 20px"></div>
 </div>
 </div>
-<script>globalThis.__I18N_BUNDLES=__I18N_PLACEHOLDER__;</script>
+<script>globalThis.__I18N_BUNDLES=__I18N_PLACEHOLDER__;globalThis.__APP_VERSION="__APP_VERSION__";</script>
 <script defer src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" crossorigin="anonymous"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js" crossorigin="anonymous"></script>
 <script defer src="/assets/widget-registry.js"></script>
@@ -484,12 +484,43 @@
 <div class="sidebar-setting-row" id="sidebar-plan-slot"></div>
 </div>
 </details>
+<!-- DEV (only visible in DEV_MODE) -->
+<div class="sidebar-dev" id="sidebar-dev" style="display:none">
+<div class="sidebar-dev-header"><span class="sidebar-dev-badge" id="sidebar-dev-badge">DEV</span><span class="sidebar-dev-source" id="sidebar-dev-source"></span></div>
+<div class="sidebar-dev-group">
+<div class="sidebar-dev-label">Server</div>
+<div class="sidebar-dev-row">
+<button type="button" class="sidebar-btn-sm" id="sidebar-dev-sync">Sync Now</button>
+<span class="sidebar-dev-meta" id="sidebar-dev-sync-status"></span>
+</div>
+<div class="sidebar-dev-meta" id="sidebar-dev-last-sync"></div>
+</div>
+<div class="sidebar-dev-group">
+<div class="sidebar-dev-label">Benchmark</div>
+<div class="sidebar-dev-row">
+<input type="number" class="sidebar-dev-input" id="sidebar-dev-bench-days" min="1" max="31" value="8">
+<span class="sidebar-dev-meta">Tage</span>
+<button type="button" class="sidebar-btn-sm" id="sidebar-dev-bench">Run</button>
+<span class="sidebar-dev-meta" id="sidebar-dev-bench-status"></span>
+</div>
+</div>
+<div class="sidebar-dev-group">
+<div class="sidebar-dev-label">Cache System</div>
+<div class="sidebar-dev-row">
+<button type="button" class="sidebar-btn-sm" id="sidebar-dev-rebuild-jsonl">JSONL rebuild</button>
+<span class="sidebar-dev-meta" id="sidebar-dev-jsonl-at"></span>
+</div>
+<div class="sidebar-dev-row">
+<button type="button" class="sidebar-btn-sm" id="sidebar-dev-rebuild-proxy">PROXY rebuild</button>
+<span class="sidebar-dev-meta" id="sidebar-dev-proxy-at"></span>
+</div>
+</div>
+</div>
 <!-- Tools -->
-<details class="sidebar-section" id="sidebar-tools">
+<details class="sidebar-section" id="sidebar-tools" open>
 <summary class="sidebar-section-title" id="sidebar-tools-title"></summary>
 <div class="sidebar-section-body" id="sidebar-tools-body">
 <button type="button" class="sidebar-btn" id="sidebar-open-explorer"></button>
-<button type="button" class="sidebar-btn" id="sidebar-open-releases"></button>
 </div>
 </details>
 <!-- Export -->
@@ -503,8 +534,10 @@
 </details>
 </div>
 <div class="sidebar-footer">
-<hr class="sidebar-hr">
 <span class="sidebar-version" id="sidebar-version"></span>
+<hr class="sidebar-hr">
+<button type="button" class="sidebar-btn-sm" id="sidebar-release-btn">Release Notes</button>
+<a href="https://github.com/fgrosswig/claude-usage-dashboard" target="_blank" rel="noopener" class="sidebar-github-link" id="sidebar-github-link">GitHub</a>
 </div>
 </aside>
 </body>

@@ -194,12 +194,6 @@
   // ── Render Dispatch ─────────────────────────────────────────────
 
   function dispatchRender(data, days) {
-    // Update sidebar version footer
-    var verEl = document.getElementById('sidebar-version');
-    if (verEl && data) {
-      var v = data.server_version || data.app_version || '';
-      if (v) verEl.textContent = 'v' + v;
-    }
     var sections = getSortedSections();
     for (var si = 0; si < sections.length; si++) {
       var sec = sections[si];
@@ -346,6 +340,7 @@
       renderWidgetTree();
       renderSettingsSection();
       renderTemplatesSection();
+      initDevSection();
       bindToolsSection();
       renderExportSection();
       // Resize charts after layout shift
@@ -783,20 +778,122 @@
 
   // ── Export Section ──────────────────────────────────────────────
 
+  // ── DEV Section (only in DEV_MODE) ──────────────────────────────
+
+  function initDevSection() {
+    var devPanel = document.getElementById('sidebar-dev');
+    if (!devPanel) return;
+    // Check if dev mode is active (dev-overlay exists = dev bar was created)
+    var devBar = document.getElementById('dev-overlay');
+    if (!devBar) return;
+    devPanel.style.display = '';
+
+    // Source
+    var srcEl = document.getElementById('sidebar-dev-source');
+    if (srcEl) {
+      var origSrc = devBar.querySelector('.dev-overlay-muted');
+      if (origSrc) srcEl.textContent = origSrc.textContent;
+    }
+
+    // Badge
+    var badge = document.getElementById('sidebar-dev-badge');
+    if (badge) {
+      var origBrand = devBar.querySelector('.dev-overlay-brand');
+      if (origBrand) badge.textContent = origBrand.textContent;
+    }
+
+    // Sync button
+    var syncBtn = document.getElementById('sidebar-dev-sync');
+    if (syncBtn && !syncBtn.dataset.bound) {
+      syncBtn.dataset.bound = '1';
+      syncBtn.addEventListener('click', function () {
+        var origSync = document.getElementById('dev-sync-btn');
+        if (origSync) origSync.click();
+        var st = document.getElementById('sidebar-dev-sync-status');
+        if (st) st.textContent = 'syncing...';
+        setTimeout(function () { pullSidebarDevStatus(); }, 2000);
+        setTimeout(function () { pullSidebarDevStatus(); }, 5000);
+      });
+    }
+
+    // Benchmark button
+    var benchBtn = document.getElementById('sidebar-dev-bench');
+    if (benchBtn && !benchBtn.dataset.bound) {
+      benchBtn.dataset.bound = '1';
+      benchBtn.addEventListener('click', function () {
+        var days = parseInt(document.getElementById('sidebar-dev-bench-days').value || '8', 10);
+        if (isNaN(days) || days < 1) days = 8;
+        if (days > 31) days = 31;
+        var st = document.getElementById('sidebar-dev-bench-status');
+        if (st) st.textContent = 'running...';
+        benchBtn.disabled = true;
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/debug/benchmark-session-turns', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.onload = function () {
+          benchBtn.disabled = false;
+          if (!st) return;
+          if (xhr.status !== 200) { st.textContent = 'failed'; return; }
+          try {
+            var out = JSON.parse(xhr.responseText);
+            st.textContent = out.total_s.toFixed(2) + 's';
+            st.style.color = '#22c55e';
+          } catch (e) { st.textContent = 'error'; }
+        };
+        xhr.onerror = function () { benchBtn.disabled = false; };
+        xhr.send(JSON.stringify({ days_back: days }));
+      });
+    }
+
+    // Cache rebuild buttons
+    function wireRebuild(btnId, url, metaId) {
+      var btn = document.getElementById(btnId);
+      if (!btn || btn.dataset.bound) return;
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', function () {
+        btn.disabled = true;
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', url, true);
+        xhr.onload = function () {
+          btn.disabled = false;
+          setTimeout(function () { pullSidebarDevStatus(); }, 1000);
+          setTimeout(function () { pullSidebarDevStatus(); }, 4000);
+        };
+        xhr.onerror = function () { btn.disabled = false; };
+        xhr.send();
+      });
+    }
+    wireRebuild('sidebar-dev-rebuild-jsonl', '/api/debug/rebuild-jsonl-cache', 'sidebar-dev-jsonl-at');
+    wireRebuild('sidebar-dev-rebuild-proxy', '/api/debug/rebuild-proxy-cache', 'sidebar-dev-proxy-at');
+
+    // Initial status pull
+    pullSidebarDevStatus();
+  }
+
+  function pullSidebarDevStatus() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/debug/status', true);
+    xhr.onload = function () {
+      if (xhr.status !== 200) return;
+      try {
+        var info = JSON.parse(xhr.responseText);
+        var jsonlAt = document.getElementById('sidebar-dev-jsonl-at');
+        var proxyAt = document.getElementById('sidebar-dev-proxy-at');
+        var lastSync = document.getElementById('sidebar-dev-last-sync');
+        if (jsonlAt && info.jsonl_cache_at) jsonlAt.textContent = 'last: ' + new Date(info.jsonl_cache_at).toLocaleTimeString();
+        if (proxyAt && info.proxy_cache_at) proxyAt.textContent = 'last: ' + new Date(info.proxy_cache_at).toLocaleTimeString();
+        if (lastSync && info.last_remote_sync) lastSync.textContent = 'Last sync: ' + new Date(info.last_remote_sync).toLocaleTimeString();
+      } catch (e) {}
+    };
+    xhr.send();
+  }
+
   function bindToolsSection() {
     var explorerBtn = document.getElementById('sidebar-open-explorer');
     if (explorerBtn && !explorerBtn.dataset.bound) {
       explorerBtn.dataset.bound = '1';
       explorerBtn.addEventListener('click', function () {
         var origBtn = document.getElementById('dev-cache-files-open') || document.getElementById('live-cache-files-open');
-        if (origBtn) origBtn.click();
-      });
-    }
-    var releasesBtn = document.getElementById('sidebar-open-releases');
-    if (releasesBtn && !releasesBtn.dataset.bound) {
-      releasesBtn.dataset.bound = '1';
-      releasesBtn.addEventListener('click', function () {
-        var origBtn = document.getElementById('live-rel-expand-btn');
         if (origBtn) origBtn.click();
       });
     }
@@ -894,7 +991,6 @@
       'sidebar-settings-title': 'settingsSettingsTitle',
       'sidebar-tools-title': 'settingsToolsTitle',
       'sidebar-open-explorer': 'settingsOpenExplorer',
-      'sidebar-open-releases': 'settingsOpenReleases',
       'sidebar-export-title': 'settingsExportTitle',
       'sidebar-layout-reset': 'settingsResetLayout',
       'sidebar-export-jsonl': 'settingsExportJsonl',
@@ -908,6 +1004,20 @@
         if (el.tagName === 'BUTTON' && id === 'settings-nav-btn') el.title = _t(titles[id]);
         else el.textContent = _t(titles[id]);
       }
+    }
+    // Version — set immediately from inline global
+    var verEl = document.getElementById('sidebar-version');
+    if (verEl && global.__APP_VERSION) {
+      verEl.textContent = global.__APP_VERSION;
+    }
+    // Release Notes button
+    var relBtn = document.getElementById('sidebar-release-btn');
+    if (relBtn && !relBtn.dataset.bound) {
+      relBtn.dataset.bound = '1';
+      relBtn.addEventListener('click', function () {
+        var origBtn = document.getElementById('live-rel-expand-btn');
+        if (origBtn) origBtn.click();
+      });
     }
   }
 

@@ -692,8 +692,23 @@ details.sidebar-section[open]>.sidebar-section-title::before{transform:rotate(90
 .template-item-actions button:hover{color:#e2e8f0}
 
 
-.sidebar-footer{flex-shrink:0;padding:0 12px 10px}
-.sidebar-hr{border:none;border-top:1px solid #334155;margin:0 0 8px}
+.sidebar-footer{flex-shrink:0;padding:0 12px 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sidebar-hr{border:none;border-top:1px solid #334155;margin:0 0 8px;width:100%}
 .sidebar-version{font-size:.65rem;color:#475569}
+.sidebar-github-link{font-size:.65rem;color:#3b82f6;text-decoration:none}
+.sidebar-github-link:hover{color:#60a5fa;text-decoration:underline}
+
+/* DEV section in sidebar */
+.sidebar-dev{border-left:3px solid #f59e0b;margin:0;padding:10px 12px;background:rgba(245,158,11,.06);border-bottom:1px solid #334155}
+.sidebar-dev-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.sidebar-dev-badge{background:#f59e0b;color:#0f172a;font-size:.65rem;font-weight:700;padding:2px 6px;border-radius:3px;letter-spacing:.04em}
+.sidebar-dev-source{font-size:.62rem;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sidebar-dev-group{margin-bottom:8px}
+.sidebar-dev-group:last-child{margin-bottom:0}
+.sidebar-dev-label{font-size:.65rem;font-weight:600;color:#f59e0b;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.sidebar-dev-row{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.sidebar-dev-meta{font-size:.62rem;color:#64748b}
+.sidebar-dev-input{width:40px;background:#1e293b;border:1px solid #475569;color:#e2e8f0;padding:2px 4px;border-radius:3px;font-size:.68rem;text-align:center}
+.sidebar-branch{font-size:.6rem;color:#334155;font-family:monospace;width:100%}
 
 @media(max-width:768px){.sidebar{width:280px}body.sidebar-open{padding-left:0}}

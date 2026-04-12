@@ -2692,6 +2692,23 @@ function jsonForInlineI18nScript() {
   return c.inlineJson;
 }
 
+var __appVersionCache = '';
+function getAppVersion() {
+  if (__appVersionCache) return __appVersionCache;
+  try {
+    var execSync = require('child_process').execSync;
+    __appVersionCache = execSync('git describe --tags --abbrev=7', { encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+  } catch (e) {
+    try {
+      __appVersionCache = execSync('git rev-parse --short=7 HEAD', { encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+      __appVersionCache = 'dev-' + __appVersionCache;
+    } catch (e2) {
+      __appVersionCache = 'dev';
+    }
+  }
+  return __appVersionCache;
+}
+
 function getDashboardHtml() {
   var c = __i18nPageCache;
   var mde = getUiTplMtimeMs('de');
@@ -2721,7 +2738,9 @@ function getDashboardHtml() {
   }
   buildI18nBundles();
   var shell = fs.readFileSync(DASHBOARD_TPL_FILE, 'utf8');
-  c.fullHtml = shell.replace('__I18N_PLACEHOLDER__', jsonForInlineI18nScript());
+  c.fullHtml = shell
+    .replace('__I18N_PLACEHOLDER__', jsonForInlineI18nScript())
+    .replace('__APP_VERSION__', getAppVersion());
   c.mdashboard = md;
   c.mcss = mc;
   c.mjs = mj;
