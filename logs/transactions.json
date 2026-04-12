@@ -2,6 +2,38 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-179",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "4a67aa1",
+      "commit_full": "4a67aa11898dad1ae26b50e0023b4ce3311fc7de",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(session-turns): optional disk cache + Python warmup script",
+      "detail": "- CLAUDE_USAGE_SESSION_TURNS_CACHE_DIR: skip JSONL rebuild when fingerprint matches\n\n- session-turns-warm-cache.py + print-jsonl-paths.js (paths + fingerprint from Node)\n\n- Move buildTaggedJsonlFingerprintSync to usage-scan-roots for reuse\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/print-jsonl-paths.js",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "scripts/session-turns-warm-cache.py",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "scripts/usage-scan-roots.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-178",
       "timestamp": "2026-04-12",
       "session": "auto",
