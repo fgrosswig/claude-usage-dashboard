@@ -610,8 +610,7 @@
       'token-stats-kpi-all-out',
       'token-stats-kpi-all-cache',
       'token-stats-kpi-session-signals',
-      'token-stats-kpi-hosts',
-      'token-stats-daily-detail'
+      'token-stats-kpi-hosts'
     ];
     var changedTs = false;
     if (_prefs.hiddenCharts.indexOf('ts-kpis') !== -1) {
