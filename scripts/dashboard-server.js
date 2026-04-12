@@ -3641,12 +3641,12 @@ function populateSessionTurnsCacheForDates(dateKeys, collectedTagged, fp) {
 }
 
 /**
- * DEV_MODE=full: GET remote session-turns (public API first, then /api/debug if 404).
+ * DEV_MODE=full: GET remote session-turns via /api/debug/session-turns only.
+ * (Public /api/session-turns is often behind SSO e.g. Authelia; debug is typically bypassed.)
  * cb(err, statusCode, body, elapsedMs) — body string; err set on network/timeout.
  */
-function devProxyFetchRemoteSessionTurns(remoteBase, dateStr, useDebugPath, timeoutMs, cb) {
-  var pathPart = useDebugPath ? '/api/debug/session-turns?date=' : '/api/session-turns?date=';
-  var stRemoteUrl = remoteBase.replace(/\/$/, '') + pathPart + encodeURIComponent(dateStr);
+function devProxyFetchRemoteSessionTurns(remoteBase, dateStr, timeoutMs, cb) {
+  var stRemoteUrl = remoteBase.replace(/\/$/, '') + '/api/debug/session-turns?date=' + encodeURIComponent(dateStr);
   var stT0r = Date.now();
   serviceLog.info('session-turns', 'REMOTE → ' + stRemoteUrl);
   var stProto = stRemoteUrl.startsWith('https') ? require('https') : require('http');
@@ -4001,26 +4001,22 @@ var server = http.createServer(function (req, res) {
         res.writeHead(stCode || 200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
         res.end(stBody || JSON.stringify({ error: 'remote_empty' }));
       }
-      function runRemoteSessionTurns(useDebugPath, retryNum) {
-        devProxyFetchRemoteSessionTurns(stBaseDev, stDate, useDebugPath, SESSION_TURNS_REMOTE_TIMEOUT_MS, function (stErr, stCode, stBody, stMs) {
+      function runRemoteSessionTurns(retryNum) {
+        devProxyFetchRemoteSessionTurns(stBaseDev, stDate, SESSION_TURNS_REMOTE_TIMEOUT_MS, function (stErr, stCode, stBody, stMs) {
           serviceLog.info(
             'session-turns',
-            'REMOTE date=' + stDate + ' try=' + (retryNum + 1) + ' → ' + stMs + 'ms (' + (stErr ? (stErr.message || 'err') : String(stCode)) + ')' + (useDebugPath ? ' [debug]' : '')
+            'REMOTE date=' + stDate + ' try=' + (retryNum + 1) + ' → ' + stMs + 'ms (' + (stErr ? (stErr.message || 'err') : String(stCode)) + ')'
           );
-          if (!stErr && stCode === 404 && !useDebugPath) {
-            runRemoteSessionTurns(true, 0);
-            return;
-          }
           var stRetryable = !!stErr || (stCode >= 500 && stCode < 600);
           if (stRetryable && retryNum < stMaxRetries) {
             serviceLog.warn('session-turns', 'REMOTE retry ' + (retryNum + 2) + '/' + (stMaxRetries + 1) + ' in ' + (stRetryDelayMs / 1000) + 's');
-            setTimeout(function () { runRemoteSessionTurns(useDebugPath, retryNum + 1); }, stRetryDelayMs);
+            setTimeout(function () { runRemoteSessionTurns(retryNum + 1); }, stRetryDelayMs);
             return;
           }
           devSessionTurnsRespond(stCode, stBody, stErr);
         });
       }
-      runRemoteSessionTurns(false, 0);
+      runRemoteSessionTurns(0);
     } else {
       var stT0 = Date.now();
       var stResult = getSessionTurnsCached(stDate);
