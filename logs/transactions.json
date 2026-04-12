@@ -2,6 +2,48 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-225",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "3468946",
+      "commit_full": "34689461f61e2c0cfb2d0a315dc87aa40b1f3b85",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dashboard): popup chart titles, HTML fallbacks, health hidden hints, cluster CSS refs #216",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-224",
       "timestamp": "2026-04-12",
       "session": "auto",
