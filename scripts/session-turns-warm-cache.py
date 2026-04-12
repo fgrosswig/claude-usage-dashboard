@@ -17,7 +17,10 @@ Benchmark (no writes):
   python3 scripts/session-turns-warm-cache.py --benchmark --days-back 8
   python3 scripts/session-turns-warm-cache.py --benchmark --iterations 3 --days-back 3
 
-See getSessionTurnsCached / pass1CollectSessionsForDayWindowFromFiles in dashboard-server.js.
+Node (same logic as dashboard; collect+fingerprint from usage-scan-roots):
+  node scripts/benchmark-session-turns.js --days-back=8
+
+See scripts/session-turns-core.js and getSessionTurnsCached in dashboard-server.js.
 """
 from __future__ import annotations
 

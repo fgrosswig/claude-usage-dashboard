@@ -40,6 +40,7 @@ var collectTaggedJsonlFiles = usageScanRoots.collectTaggedJsonlFiles;
 var buildTaggedJsonlFingerprintSync = usageScanRoots.buildTaggedJsonlFingerprintSync;
 var collectTaggedJsonlFilesAsync = usageScanRoots.collectTaggedJsonlFilesAsync;
 var forEachJsonlLineSync = usageScanRoots.forEachJsonlLineSync;
+var sessionTurnsCore = require('./session-turns-core');
 var getProxyLogDir = usageScanRoots.getProxyLogDir;
 var collectProxyNdjsonFiles = usageScanRoots.collectProxyNdjsonFiles;
 var serviceLog = require('./service-logger');
@@ -3542,129 +3543,25 @@ function getSessionTurnsCached(dateKey) {
 
 /** Single JSONL pass: union of (dateKey, prev, next) for every date in dateKeys. */
 function pass1CollectSessionsForDayWindowFromFiles(dateKeys, files) {
-  var allowedDays = Object.create(null);
-  for (var di = 0; di < dateKeys.length; di++) {
-    var dk = dateKeys[di];
-    var d = new Date(dk + 'T00:00:00Z');
-    var prevDay = new Date(d.getTime() - 86400000).toISOString().slice(0, 10);
-    var nextDay = new Date(d.getTime() + 86400000).toISOString().slice(0, 10);
-    allowedDays[dk] = true;
-    allowedDays[prevDay] = true;
-    allowedDays[nextDay] = true;
-  }
-  var allSessions = Object.create(null);
-  for (var fi = 0; fi < files.length; fi++) {
-    var file = files[fi];
-    try {
-      forEachJsonlLineSync(file.path, function (line) {
-        if (!line) return;
-        var rec;
-        try { rec = JSON.parse(line); } catch (_e) { return; }
-        if (rec.type !== 'assistant') return;
-        if (rec.isSidechain) return;
-        var ts = rec.timestamp;
-        if (!ts || typeof ts !== 'string' || ts.length < 19) return;
-        var turnDay = ts.slice(0, 10);
-        if (!allowedDays[turnDay]) return;
-        var msg = rec.message || {};
-        var usage = msg.usage;
-        if (!usage) return;
-        var input = usage.input_tokens || 0;
-        var output = usage.output_tokens || 0;
-        var cacheRead = usage.cache_read_input_tokens || 0;
-        var cacheCreation = usage.cache_creation_input_tokens || 0;
-        if (input + output + cacheRead + cacheCreation === 0) return;
-        var sid = rec.sessionId;
-        if (!sid) return;
-        if (!allSessions[sid]) allSessions[sid] = [];
-        allSessions[sid].push({
-          ts: ts,
-          day: turnDay,
-          input: input,
-          output: output,
-          cache_read: cacheRead,
-          cache_creation: cacheCreation,
-          model: (msg.model || 'unknown').replace(/-\d{8}$/, '')
-        });
-      });
-    } catch (_e) { /* skip unreadable files */ }
-  }
-  return allSessions;
+  return sessionTurnsCore.pass1CollectSessionsForDayWindowFromFiles(dateKeys, files, forEachJsonlLineSync);
 }
 
 function finalizeSessionTurnsForDate(dateKey, allSessions) {
-  var crypto = require('node:crypto');
-  var sessions = Object.create(null);
-  var totalParsed = 0;
-  var sids = Object.keys(allSessions);
-  for (var si = 0; si < sids.length; si++) {
-    var sid = sids[si];
-    var turns = allSessions[sid];
-    var hasDateKey = false;
-    for (var ti = 0; ti < turns.length; ti++) {
-      if (turns[ti].day === dateKey) { hasDateKey = true; break; }
-    }
-    if (!hasDateKey) continue;
-    sessions[sid] = turns;
-    totalParsed += turns.length;
-  }
-
-  var result = [];
-  var resultSids = Object.keys(sessions);
-  for (var ri = 0; ri < resultSids.length; ri++) {
-    var sid = resultSids[ri];
-    var turns = sessions[sid];
-    turns.sort(function (a, b) { return a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0; });
-
-    var firstDay = turns[0].day;
-    var lastDay = turns[turns.length - 1].day;
-    var edgeStart = firstDay < dateKey;
-    var edgeEnd = lastDay > dateKey;
-
-    var mapped = [];
-    for (var ti = 0; ti < turns.length; ti++) {
-      mapped.push({
-        index: ti,
-        ts: turns[ti].ts,
-        input: turns[ti].input,
-        output: turns[ti].output,
-        cache_read: turns[ti].cache_read,
-        cache_creation: turns[ti].cache_creation,
-        model: turns[ti].model
-      });
-    }
-    var hash = crypto.createHash('sha256').update(sid).digest('hex').slice(0, 12);
-    var entry = {
-      session_id_hash: hash,
-      turn_count: mapped.length,
-      first_ts: turns[0].ts,
-      last_ts: turns[turns.length - 1].ts,
-      total_output: turns.reduce(function (s, t) { return s + t.output; }, 0),
-      total_cache_read: turns.reduce(function (s, t) { return s + t.cache_read; }, 0),
-      total_all: turns.reduce(function (s, t) { return s + t.input + t.output + t.cache_read + t.cache_creation; }, 0),
-      turns: mapped
-    };
-    if (edgeStart) entry.edge_start = true;
-    if (edgeEnd) entry.edge_end = true;
-    result.push(entry);
-  }
-  result.sort(function (a, b) { return b.total_all - a.total_all; });
-  return { date: dateKey, session_count: result.length, total_turns: totalParsed, sessions: result };
+  return sessionTurnsCore.finalizeSessionTurnsForDate(dateKey, allSessions);
 }
 
 function buildSessionTurnsForDateWithCollected(dateKey, tagged) {
-  var allSessions = pass1CollectSessionsForDayWindowFromFiles([dateKey], tagged);
-  return finalizeSessionTurnsForDate(dateKey, allSessions);
+  return sessionTurnsCore.buildSessionTurnsForDateWithCollected(dateKey, tagged, forEachJsonlLineSync);
 }
 
 /** One JSONL scan for multiple calendar days; fills _sessionTurnsCache (unless NO_CACHE). */
 function populateSessionTurnsCacheForDates(dateKeys, collectedTagged, fp) {
   var noCache = process.env.CLAUDE_USAGE_NO_CACHE === '1' || process.env.CLAUDE_USAGE_NO_CACHE === 'true';
-  var allSessions = pass1CollectSessionsForDayWindowFromFiles(dateKeys, collectedTagged);
+  var allSessions = sessionTurnsCore.pass1CollectSessionsForDayWindowFromFiles(dateKeys, collectedTagged, forEachJsonlLineSync);
   var stByDate = {};
   for (var i = 0; i < dateKeys.length; i++) {
     var dk = dateKeys[i];
-    var result = finalizeSessionTurnsForDate(dk, allSessions);
+    var result = sessionTurnsCore.finalizeSessionTurnsForDate(dk, allSessions);
     stByDate[dk] = result;
     if (!noCache) _sessionTurnsCache[dk] = { result: result, fingerprint: fp };
   }
