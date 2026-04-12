@@ -2,6 +2,58 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-216",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "e9232fb",
+      "commit_full": "e9232fb5758e142ad50beff7ee88dea0cd8f6b76",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(widgets): modular chips, sidebar groups, sectionWidgets refs #216",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard-sections.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-registry.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-215",
       "timestamp": "2026-04-12",
       "session": "auto",
