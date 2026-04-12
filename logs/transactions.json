@@ -2,6 +2,68 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-194",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "7ebf5ff",
+      "commit_full": "7ebf5ff9e2ec688d2059412a52cd400fed956443",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(ui): live JSONL chart and cache explorer module refs #213",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/cache-files-explorer.js",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-http.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/extract-dashboard-assets.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-193",
       "timestamp": "2026-04-12",
       "session": "auto",
