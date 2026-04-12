@@ -661,7 +661,8 @@
   var ACTIVE_TPL_KEY = 'cud_active_template';
 
   // All section IDs in default order
-  var ALL_SECTION_IDS = ['health', 'token-stats', 'forensic', 'user-profile', 'budget', 'proxy', 'anthropic-status', 'economic', 'efficiency-range'];
+  // Only top-level sections (efficiency-range is nested inside economic)
+  var ALL_SECTION_IDS = ['health', 'token-stats', 'forensic', 'user-profile', 'budget', 'proxy', 'anthropic-status', 'economic'];
 
   var BUILTIN_TEMPLATES = [
     {
@@ -677,7 +678,6 @@
         { id: 'proxy', span: 12 },
         { id: 'anthropic-status', span: 12 },
         { id: 'economic', span: 12 },
-        { id: 'efficiency-range', span: 12 }
       ]
     },
     {
@@ -687,8 +687,7 @@
       widgets: [
         { id: 'token-stats', span: 12 },
         { id: 'forensic', span: 12 },
-        { id: 'economic', span: 12 },
-        { id: 'efficiency-range', span: 12 }
+        { id: 'economic', span: 12 }
       ]
     },
     {
@@ -698,8 +697,7 @@
       widgets: [
         { id: 'budget', span: 6 },
         { id: 'proxy', span: 6 },
-        { id: 'economic', span: 12 },
-        { id: 'efficiency-range', span: 12 }
+        { id: 'economic', span: 12 }
       ]
     },
     {
@@ -790,7 +788,6 @@
   function applyGridLayout() {
     var widgets = _prefs && _prefs.widgets;
     if (!widgets || !widgets.length) {
-      // Fallback: use v1 order/visibility
       applyVisibility();
       applyOrder();
       return;
@@ -801,7 +798,16 @@
     var gridEl = document.getElementById('layout-grid');
     if (!gridEl) return;
 
-    // Track which sections are placed
+    // Collect all direct children that are NOT sections (table, day-picker, etc.)
+    var nonSectionNodes = [];
+    var children = gridEl.children;
+    for (var ni = children.length - 1; ni >= 0; ni--) {
+      var child = children[ni];
+      if (!child.id || !child.id.match(/-collapse$/)) {
+        nonSectionNodes.push(child);
+      }
+    }
+
     var placed = {};
 
     // Move sections into grid in widget order
@@ -809,6 +815,8 @@
       var w = widgets[i];
       var sec = reg.findSection(w.id);
       if (!sec || !sec.domId) continue;
+      // Skip nested sections — they stay inside their parent
+      if (sec.parentSection) continue;
       var el = document.getElementById(sec.domId);
       if (!el) continue;
 
@@ -816,8 +824,12 @@
       el.style.display = '';
       gridEl.appendChild(el);
       placed[w.id] = true;
+      // If this section has child sections, mark them as placed too
+      for (var cs = 0; cs < reg.sections.length; cs++) {
+        if (reg.sections[cs].parentSection === w.id) placed[reg.sections[cs].id] = true;
+      }
 
-      // Move companions too
+      // Move companions after their section
       if (sec.companionIds) {
         for (var ci = 0; ci < sec.companionIds.length; ci++) {
           var comp = document.getElementById(sec.companionIds[ci]);
@@ -830,10 +842,17 @@
       }
     }
 
-    // Hide sections not in the template
+    // Append non-section elements at the end (table, day-picker, etc.)
+    for (var ri = nonSectionNodes.length - 1; ri >= 0; ri--) {
+      var node = nonSectionNodes[ri];
+      node.setAttribute('data-span', '12');
+      gridEl.appendChild(node);
+    }
+
+    // Hide sections not in the template (skip nested)
     for (var si = 0; si < reg.sections.length; si++) {
       var s = reg.sections[si];
-      if (!s.domId || placed[s.id]) continue;
+      if (!s.domId || placed[s.id] || s.parentSection) continue;
       var hEl = document.getElementById(s.domId);
       if (hEl) hEl.style.display = 'none';
     }
