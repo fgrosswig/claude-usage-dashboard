@@ -2,6 +2,33 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-190",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "7ba0126",
+      "commit_full": "7ba01264c76aa8d3a5beb3a24cc461ef5d192250",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(dev): cache file browser modal with DataTables CDN",
+      "detail": "Add GET /api/debug/cache-files and POST /api/debug/cache-file-view (DEV_MODE, path allowlist, size cap). Dev bar opens modal listing JSONL, ~/.claude caches, proxy NDJSON, session-turns disk; DataTables 2.2 from cdn.datatables.net; preview via Ansehen.\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-189",
       "timestamp": "2026-04-12",
       "session": "auto",
