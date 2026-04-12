@@ -8,16 +8,86 @@
  *
  * engine: "chartjs" = legacy, "echarts" = migrated, "google" = Google Charts
  *
+ * Layer 1 (registry v2): every section and chart gets
+ *   visible (boolean), order (number), tags (string[])
+ * via normalizeWidgetRegistryLayer1() — defaults can be overridden on literals later.
+ *
  * Usage:
  *   window.__widgetRegistry.sections  — all section definitions
  *   window.__widgetRegistry.findChart("token-hourly")  — lookup by chart ID
  *   window.__widgetRegistry.findSection("proxy")  — lookup by section ID
+ *   window.__widgetRegistry.getSectionsSorted()  — sections by order
+ *   window.__widgetRegistry.getChartsSorted("proxy")  — charts in section by order
  */
 'use strict';
 
 (function () {
+  /**
+   * Assigns visible, order, tags to each section/chart if missing.
+   * Section order follows SECTION_ORDER; chart order is a global sequence (gaps of 10).
+   */
+  function normalizeWidgetRegistryLayer1(reg) {
+    var sectionOrderIds = [
+      'health',
+      'token-stats',
+      'forensic',
+      'user-profile',
+      'budget',
+      'proxy',
+      'anthropic-status',
+      'economic',
+      'efficiency-range'
+    ];
+    var sectionTagsById = {
+      health: ['overview'],
+      'token-stats': ['usage', 'tokens', 'performance'],
+      forensic: ['usage', 'forensics'],
+      'user-profile': ['usage', 'profile'],
+      budget: ['cost', 'budget'],
+      proxy: ['proxy', 'performance'],
+      'anthropic-status': ['status', 'reliability'],
+      economic: ['cost', 'sessions'],
+      'efficiency-range': ['performance', 'range']
+    };
+    var chartTagOverrides = {
+      'proxy-hourly-latency': ['proxy', 'latency'],
+      'proxy-latency': ['proxy', 'latency'],
+      'econ-budget-drain': ['cost', 'budget', 'sessions'],
+      'eff-heatmap': ['performance', 'proxy']
+    };
+    var orderPos = {};
+    for (var oi = 0; oi < sectionOrderIds.length; oi++) {
+      orderPos[sectionOrderIds[oi]] = (oi + 1) * 10;
+    }
+    var globalChartOrder = 0;
+    for (var si = 0; si < reg.sections.length; si++) {
+      var sec = reg.sections[si];
+      if (sec.visible === undefined) sec.visible = true;
+      if (sec.order === undefined) {
+        sec.order = orderPos[sec.id] != null ? orderPos[sec.id] : (si + 1) * 100;
+      }
+      if (sec.tags === undefined) {
+        sec.tags = (sectionTagsById[sec.id] || []).slice();
+      }
+      var charts = sec.charts || [];
+      for (var ci = 0; ci < charts.length; ci++) {
+        var ch = charts[ci];
+        if (ch.visible === undefined) ch.visible = true;
+        if (ch.order === undefined) {
+          globalChartOrder += 10;
+          ch.order = globalChartOrder;
+        }
+        if (ch.tags === undefined) {
+          ch.tags = chartTagOverrides[ch.id]
+            ? chartTagOverrides[ch.id].slice()
+            : sec.tags.slice();
+        }
+      }
+    }
+  }
+
   var registry = {
-    version: 1,
+    version: 2,
     sections: [
       // ── Health Score ────────────────────────────────────────────
       {
@@ -471,6 +541,28 @@
       return null;
     },
 
+    getSectionsSorted: function () {
+      var out = this.sections.slice();
+      out.sort(function (a, b) {
+        return (a.order || 0) - (b.order || 0);
+      });
+      return out;
+    },
+
+    /**
+     * @param {string|object} sectionOrId  section id or section object from findSection
+     * @returns {object[]} chart defs sorted by order (mutates nothing)
+     */
+    getChartsSorted: function (sectionOrId) {
+      var sec = typeof sectionOrId === 'string' ? this.findSection(sectionOrId) : sectionOrId;
+      if (!sec || !sec.charts) return [];
+      var arr = sec.charts.slice();
+      arr.sort(function (a, b) {
+        return (a.order || 0) - (b.order || 0);
+      });
+      return arr;
+    },
+
     allCharts: function () {
       var result = [];
       for (var si = 0; si < this.sections.length; si++) {
@@ -490,13 +582,26 @@
       for (var i = 0; i < all.length; i++) {
         engines[all[i].engine] = (engines[all[i].engine] || 0) + 1;
       }
+      var visibleSections = 0;
+      var visibleCharts = 0;
+      for (var sj = 0; sj < this.sections.length; sj++) {
+        if (this.sections[sj].visible !== false) visibleSections++;
+        var chs = this.sections[sj].charts || [];
+        for (var cj = 0; cj < chs.length; cj++) {
+          if (chs[cj].visible !== false) visibleCharts++;
+        }
+      }
       return {
+        version: this.version,
         sections: this.sections.length,
         charts: all.length,
+        visibleSections: visibleSections,
+        visibleCharts: visibleCharts,
         engines: engines
       };
     }
   };
 
+  normalizeWidgetRegistryLayer1(registry);
   window.__widgetRegistry = registry;
 })();
