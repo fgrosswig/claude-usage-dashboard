@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-246",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "65dfefb",
+      "commit_full": "65dfefb83fce714f0e5088fb8bca997fc6738ba9",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(explorer): collapsible JSON tree viewer in file preview",
+      "detail": "Parses JSON content into interactive tree with colored types\n(string=green, number=blue, bool=amber, null=gray, key=purple).\nNodes are collapsible (▶/▼), lazy-loaded on expand, max 500\nentries per level. Falls back to raw text for non-JSON files.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/cache-files-explorer.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-245",
       "timestamp": "2026-04-12",
       "session": "auto",
