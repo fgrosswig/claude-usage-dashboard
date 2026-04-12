@@ -600,7 +600,7 @@
   "tbUnused": "Verfuegbare Widgets",
   "tbSave": "Speichern",
   "tbAddRow": "+ Zeile hinzufuegen",
-  "tbWidgets": "Widgets",
+  "tbWidgets": "Sektionen",
   "settingsUserSettings": "Benutzer-Einstellungen",
   "userSettingsTitle": "Benutzer-Einstellungen",
   "usLangTitle": "Sprache",

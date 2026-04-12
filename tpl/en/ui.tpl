@@ -600,7 +600,7 @@
   "tbUnused": "Available Widgets",
   "tbSave": "Save",
   "tbAddRow": "+ Add Row",
-  "tbWidgets": "Widgets",
+  "tbWidgets": "Sections",
   "settingsUserSettings": "User Settings",
   "userSettingsTitle": "User Settings",
   "usLangTitle": "Language",

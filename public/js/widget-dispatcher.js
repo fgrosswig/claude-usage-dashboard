@@ -1296,6 +1296,7 @@
     }
 
     renderBuilderRows();
+    bindPreviewResize();
     overlay.classList.add('is-open');
     document.body.style.overflow = 'hidden';
   }
@@ -1338,12 +1339,60 @@
       var w = _tbWidgets[i];
       var sec = reg.findSection(w.id);
       var name = sec ? _t(sec.titleKey) : w.id;
-      html += '<div class="tb-preview-cell" style="grid-column:span ' + (w.span || 12) + '">';
+      html += '<div class="tb-preview-cell" data-pidx="' + i + '" style="grid-column:span ' + (w.span || 12) + '">';
       html += '<span class="tb-preview-name">' + name + '</span>';
       html += '<span class="tb-preview-span">' + (w.span || 12) + '</span>';
+      html += '<span class="tb-resize-handle" data-pidx="' + i + '"></span>';
       html += '</div>';
     }
     preview.innerHTML = html;
+    // Sync select dropdowns in widget list
+    var selects = container.querySelectorAll('.tb-span-select');
+    for (var si = 0; si < selects.length; si++) {
+      var idx = parseInt(selects[si].dataset.idx, 10);
+      if (_tbWidgets[idx]) selects[si].value = String(_tbWidgets[idx].span);
+    }
+  }
+
+  function bindPreviewResize() {
+    var container = document.getElementById('tb-rows');
+    if (!container || container.dataset.resizeBound) return;
+    container.dataset.resizeBound = '1';
+    var _resizeIdx = -1;
+    var _resizeStartX = 0;
+    var _resizeStartSpan = 0;
+    var _colWidth = 0;
+
+    container.addEventListener('mousedown', function (e) {
+      var handle = e.target.closest('.tb-resize-handle');
+      if (!handle) return;
+      e.preventDefault();
+      _resizeIdx = parseInt(handle.dataset.pidx, 10);
+      _resizeStartX = e.clientX;
+      _resizeStartSpan = _tbWidgets[_resizeIdx] ? _tbWidgets[_resizeIdx].span : 12;
+      // Calculate 1 grid column width from the preview container
+      var grid = container.querySelector('.tb-preview-grid');
+      if (grid) _colWidth = grid.offsetWidth / 12;
+      document.body.classList.add('tb-resizing');
+    });
+
+    window.addEventListener('mousemove', function (e) {
+      if (_resizeIdx < 0 || !_colWidth) return;
+      var dx = e.clientX - _resizeStartX;
+      var colDelta = Math.round(dx / _colWidth);
+      var newSpan = Math.max(1, Math.min(12, _resizeStartSpan + colDelta));
+      if (_tbWidgets[_resizeIdx] && _tbWidgets[_resizeIdx].span !== newSpan) {
+        _tbWidgets[_resizeIdx].span = newSpan;
+        updateBuilderPreview();
+      }
+    });
+
+    window.addEventListener('mouseup', function () {
+      if (_resizeIdx >= 0) {
+        _resizeIdx = -1;
+        document.body.classList.remove('tb-resizing');
+      }
+    });
   }
 
   function renderBuilderRows() {
