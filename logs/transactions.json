@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-234",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "d6c6d71",
+      "commit_full": "d6c6d710df292447da61f172ba58c1d7b954453f",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(layout): accept string v, migrate empty widgets[], sync LS visibility refs #216",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-233",
       "timestamp": "2026-04-12",
       "session": "auto",
