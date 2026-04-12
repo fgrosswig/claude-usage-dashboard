@@ -7043,6 +7043,10 @@ function applyDevCacheFromStatus(info) {
         "</span>" +
         '<span class="dev-cache-sep">|</span>' +
         '<span class="dev-cache-block">' +
+        '<button type="button" id="dev-cache-files-open" class="dev-cache-rebuild-btn">Cache-Dateien</button>' +
+        "</span>" +
+        '<span class="dev-cache-sep">|</span>' +
+        '<span class="dev-cache-block">' +
         '<button type="button" id="dev-rebuild-jsonl" class="dev-cache-rebuild-btn">JSONL Cache rebuild</button>' +
         '<span id="dev-jsonl-cache-at" class="dev-cache-meta">last Cache: \u2014</span>' +
         "</span>" +
@@ -7164,6 +7168,245 @@ function applyDevCacheFromStatus(info) {
           };
           bq.send(JSON.stringify({ days_back: nd }));
         });
+      })();
+      (function wireDevCacheFilesModal() {
+        var openBtn = document.getElementById("dev-cache-files-open");
+        if (!openBtn) return;
+        var cacheModalEl = null;
+        var dtInstance = null;
+        var dtCssOnce = false;
+        var dtJsLoading = false;
+        var dtJsWaiters = [];
+        function destroyDt() {
+          if (!dtInstance) return;
+          try {
+            dtInstance.destroy();
+          } catch (eDt) {}
+          dtInstance = null;
+        }
+        function setLoadStatus(text) {
+          var s = document.getElementById("dev-cache-files-load-status");
+          if (s) s.textContent = text || "";
+        }
+        function ensureModal() {
+          if (cacheModalEl) return cacheModalEl;
+          var wrap = document.createElement("div");
+          wrap.id = "dev-cache-files-modal";
+          wrap.className = "dev-cache-files-modal";
+          wrap.style.display = "none";
+          wrap.setAttribute("aria-hidden", "true");
+          wrap.innerHTML =
+            '<div class="dev-cache-files-modal-backdrop" id="dev-cache-files-backdrop"></div>' +
+            '<div class="dev-cache-files-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="dev-cache-files-title">' +
+            '<div class="dev-cache-files-modal-head">' +
+            '<span id="dev-cache-files-title" class="dev-cache-files-modal-title">Cache-Dateien</span>' +
+            '<span id="dev-cache-files-load-status" class="dev-cache-meta"></span>' +
+            '<button type="button" class="dev-cache-rebuild-btn" id="dev-cache-files-close">Schliessen</button>' +
+            "</div>" +
+            '<p class="dev-cache-files-modal-hint">JSONL, ~/.claude Caches, Proxy-NDJSON, Session-Turns Disk-Cache. Tabelle: ' +
+            '<a href="https://datatables.net/" target="_blank" rel="noopener">DataTables</a> (CDN).</p>' +
+            '<div class="dev-cache-files-table-wrap">' +
+            '<table id="dev-cache-files-table" class="dev-cache-files-dt stripe hover" style="width:100%">' +
+            "<thead><tr><th>Kind</th><th>Label</th><th>Pfad</th><th>Bytes</th><th>Geaendert</th><th>Aktion</th></tr></thead><tbody></tbody>" +
+            "</table></div>" +
+            '<div id="dev-cache-file-preview" class="dev-cache-file-preview" style="display:none">' +
+            '<div class="dev-cache-file-preview-head">' +
+            '<span id="dev-cache-preview-title" class="dev-cache-meta"></span>' +
+            '<button type="button" class="dev-cache-rebuild-btn" id="dev-cache-preview-close">Preview zu</button>' +
+            "</div>" +
+            '<pre id="dev-cache-preview-body" class="dev-cache-preview-pre"></pre>' +
+            "</div>" +
+            "</div>";
+          document.body.appendChild(wrap);
+          cacheModalEl = wrap;
+          document.getElementById("dev-cache-files-backdrop").addEventListener("click", closeModal);
+          document.getElementById("dev-cache-files-close").addEventListener("click", closeModal);
+          document.getElementById("dev-cache-preview-close").addEventListener("click", function () {
+            var pr = document.getElementById("dev-cache-file-preview");
+            if (pr) pr.style.display = "none";
+          });
+          cacheModalEl.addEventListener("click", function (ev) {
+            var t = ev.target;
+            if (!t || t.nodeName !== "BUTTON") return;
+            if ((" " + t.className + " ").indexOf(" dev-cache-view-btn ") < 0) return;
+            var enc = t.getAttribute("data-path-enc");
+            if (!enc) return;
+            var pAbs = decodeURIComponent(enc);
+            var pre = document.getElementById("dev-cache-preview-body");
+            var title = document.getElementById("dev-cache-preview-title");
+            var pr = document.getElementById("dev-cache-file-preview");
+            if (!pre || !pr) return;
+            pre.textContent = "Lade …";
+            pr.style.display = "block";
+            if (title) title.textContent = pAbs;
+            var rq = new XMLHttpRequest();
+            rq.open("POST", "/api/debug/cache-file-view", true);
+            rq.setRequestHeader("Content-Type", "application/json");
+            rq.onload = function () {
+              if (rq.status !== 200) {
+                pre.textContent = "HTTP " + rq.status;
+                return;
+              }
+              try {
+                var o = JSON.parse(rq.responseText);
+                if (!o.ok) {
+                  pre.textContent = o.error || "error";
+                  return;
+                }
+                if (title) title.textContent = (o.path_ui || "") + (o.truncated ? " (gekuerzt)" : "");
+                pre.textContent = o.content || "";
+              } catch (eZ) {
+                pre.textContent = "parse error";
+              }
+            };
+            rq.onerror = function () {
+              pre.textContent = "network error";
+            };
+            rq.send(JSON.stringify({ path_abs: pAbs }));
+          });
+          document.addEventListener("keydown", function (evK) {
+            if (!cacheModalEl || cacheModalEl.style.display === "none") return;
+            if (evK.keyCode === 27) closeModal();
+          });
+          return cacheModalEl;
+        }
+        function closeModal() {
+          if (!cacheModalEl) return;
+          destroyDt();
+          var tb = document.querySelector("#dev-cache-files-table tbody");
+          if (tb) tb.innerHTML = "";
+          cacheModalEl.style.display = "none";
+          cacheModalEl.setAttribute("aria-hidden", "true");
+          document.body.style.overflow = "";
+          setLoadStatus("");
+          var pr2 = document.getElementById("dev-cache-file-preview");
+          if (pr2) pr2.style.display = "none";
+        }
+        function formatBytes(n) {
+          if (n >= 1048576) return (n / 1048576).toFixed(2) + " MiB";
+          if (n >= 1024) return (n / 1024).toFixed(1) + " KiB";
+          return String(n) + " B";
+        }
+        function appendFileRow(tbody, f) {
+          var tr = document.createElement("tr");
+          function tdText(txt) {
+            var x = document.createElement("td");
+            x.textContent = txt;
+            return x;
+          }
+          tr.appendChild(tdText(f.kind || ""));
+          tr.appendChild(tdText(f.label || ""));
+          var tdPath = document.createElement("td");
+          tdPath.className = "dev-cache-path-cell";
+          tdPath.title = f.path_ui || "";
+          tdPath.textContent = f.path_ui || "";
+          tr.appendChild(tdPath);
+          var tdSz = document.createElement("td");
+          tdSz.setAttribute("data-order", String(f.size != null ? f.size : 0));
+          tdSz.textContent = formatBytes(f.size || 0);
+          tr.appendChild(tdSz);
+          var tdMt = document.createElement("td");
+          tdMt.setAttribute("data-order", String(f.mtime_ms != null ? f.mtime_ms : 0));
+          tdMt.textContent = new Date(f.mtime_ms || 0).toLocaleString();
+          tr.appendChild(tdMt);
+          var tdAct = document.createElement("td");
+          var bt = document.createElement("button");
+          bt.type = "button";
+          bt.className = "dev-cache-rebuild-btn dev-cache-view-btn";
+          bt.textContent = "Ansehen";
+          bt.setAttribute("data-path-enc", encodeURIComponent(f.path_abs));
+          tdAct.appendChild(bt);
+          tr.appendChild(tdAct);
+          tbody.appendChild(tr);
+        }
+        function flushDtWaiters(err) {
+          var w = dtJsWaiters.slice();
+          dtJsWaiters.length = 0;
+          for (var wi = 0; wi < w.length; wi++) w[wi](err);
+        }
+        function loadDataTablesScripts(cb) {
+          if (window.DataTable) {
+            cb(null);
+            return;
+          }
+          dtJsWaiters.push(cb);
+          if (dtJsLoading) return;
+          dtJsLoading = true;
+          if (!dtCssOnce) {
+            var lk = document.createElement("link");
+            lk.rel = "stylesheet";
+            lk.href = "https://cdn.datatables.net/2.2.2/css/dataTables.dataTables.min.css";
+            document.head.appendChild(lk);
+            dtCssOnce = true;
+          }
+          var sc = document.createElement("script");
+          sc.src = "https://cdn.datatables.net/2.2.2/js/dataTables.min.js";
+          sc.onload = function () {
+            dtJsLoading = false;
+            flushDtWaiters(null);
+          };
+          sc.onerror = function () {
+            dtJsLoading = false;
+            flushDtWaiters(new Error("datatables_cdn"));
+          };
+          document.head.appendChild(sc);
+        }
+        function openModal() {
+          ensureModal();
+          cacheModalEl.style.display = "flex";
+          cacheModalEl.setAttribute("aria-hidden", "false");
+          document.body.style.overflow = "hidden";
+          destroyDt();
+          var tbody = document.querySelector("#dev-cache-files-table tbody");
+          if (tbody) tbody.innerHTML = "";
+          setLoadStatus("Lade …");
+          var pr = document.getElementById("dev-cache-file-preview");
+          if (pr) pr.style.display = "none";
+          var xhr = new XMLHttpRequest();
+          xhr.open("GET", "/api/debug/cache-files", true);
+          xhr.onload = function () {
+            destroyDt();
+            if (!tbody) return;
+            tbody.innerHTML = "";
+            if (xhr.status !== 200) {
+              setLoadStatus("Fehler " + xhr.status);
+              return;
+            }
+            var data;
+            try {
+              data = JSON.parse(xhr.responseText);
+            } catch (eP) {
+              setLoadStatus("JSON Fehler");
+              return;
+            }
+            if (!data.ok || !data.files) {
+              setLoadStatus("Keine Daten");
+              return;
+            }
+            var files = data.files;
+            setLoadStatus(String(files.length) + " Dateien");
+            for (var i = 0; i < files.length; i++) appendFileRow(tbody, files[i]);
+            loadDataTablesScripts(function (errL) {
+              if (errL) {
+                setLoadStatus(String(files.length) + " Dateien (ohne DataTables)");
+                return;
+              }
+              try {
+                dtInstance = new window.DataTable("#dev-cache-files-table", {
+                  pageLength: 25,
+                  order: [[0, "asc"]]
+                });
+              } catch (eT) {
+                setLoadStatus(String(files.length) + " Dateien (DataTables Init fehlgeschlagen)");
+              }
+            });
+          };
+          xhr.onerror = function () {
+            setLoadStatus("Netzwerkfehler");
+          };
+          xhr.send();
+        }
+        openBtn.addEventListener("click", openModal);
       })();
       var devPoll = setInterval(function () {
         if (!document.getElementById("dev-overlay")) {

@@ -3603,6 +3603,122 @@ function logBenchmarkReportBlock(reportText) {
   serviceLog.info('session-turns-bench', reportText);
 }
 
+var DEBUG_CACHE_FILE_VIEW_MAX_BYTES = 786432;
+
+function isPathUnderDirectory(fileAbs, dirAbs) {
+  var f = path.resolve(fileAbs);
+  var d = path.resolve(dirAbs);
+  if (f === d) return true;
+  return f.indexOf(d + path.sep) === 0;
+}
+
+function debugPathAllowedForRead(absPath) {
+  var abs = path.resolve(absPath);
+  try {
+    var collected = collectTaggedJsonlFiles();
+    for (var i = 0; i < collected.tagged.length; i++) {
+      if (path.resolve(collected.tagged[i].path) === abs) return true;
+    }
+  } catch (e0) {}
+  if (path.resolve(USAGE_DAY_CACHE_FILE) === abs) return true;
+  if (path.resolve(JSONL_TODAY_INDEX_FILE) === abs) return true;
+  if (path.resolve(RELEASES_CACHE) === abs) return true;
+  if (path.resolve(OUTAGE_DISK_CACHE) === abs) return true;
+  if (path.resolve(MARKETPLACE_CACHE) === abs) return true;
+  try {
+    var proxyPaths = collectProxyNdjsonFiles();
+    for (var pi = 0; pi < proxyPaths.length; pi++) {
+      if (path.resolve(proxyPaths[pi]) === abs) return true;
+    }
+  } catch (e1) {}
+  var stDir = resolveSessionTurnsCacheDir();
+  if (stDir && isPathUnderDirectory(abs, stDir)) {
+    var bn = path.basename(abs);
+    if (bn.indexOf('..') >= 0) return false;
+    if (bn.length > 5 && bn.slice(-5) === '.json') return true;
+  }
+  return false;
+}
+
+function collectDebugCacheFilesPayload() {
+  var out = [];
+  var collected = collectTaggedJsonlFiles();
+  for (var fi = 0; fi < collected.tagged.length; fi++) {
+    var t = collected.tagged[fi];
+    try {
+      var st = fs.statSync(t.path);
+      out.push({
+        kind: 'jsonl',
+        label: t.label || '',
+        path_abs: path.resolve(t.path),
+        path_ui: displayPathForUi(t.path),
+        size: st.size,
+        mtime_ms: Math.floor(st.mtimeMs)
+      });
+    } catch (e1) {}
+  }
+  function pushKnown(kind, p) {
+    try {
+      var st2 = fs.statSync(p);
+      out.push({
+        kind: kind,
+        label: '',
+        path_abs: path.resolve(p),
+        path_ui: displayPathForUi(p),
+        size: st2.size,
+        mtime_ms: Math.floor(st2.mtimeMs)
+      });
+    } catch (e2) {}
+  }
+  pushKnown('day_cache', USAGE_DAY_CACHE_FILE);
+  pushKnown('jsonl_today_index', JSONL_TODAY_INDEX_FILE);
+  pushKnown('releases_disk', RELEASES_CACHE);
+  pushKnown('outages_disk', OUTAGE_DISK_CACHE);
+  pushKnown('marketplace_disk', MARKETPLACE_CACHE);
+  try {
+    var pxs = collectProxyNdjsonFiles();
+    for (var pxi = 0; pxi < pxs.length; pxi++) {
+      try {
+        var stp = fs.statSync(pxs[pxi]);
+        out.push({
+          kind: 'proxy_ndjson',
+          label: path.basename(pxs[pxi]),
+          path_abs: path.resolve(pxs[pxi]),
+          path_ui: displayPathForUi(pxs[pxi]),
+          size: stp.size,
+          mtime_ms: Math.floor(stp.mtimeMs)
+        });
+      } catch (e3) {}
+    }
+  } catch (e4) {}
+  var stDir = resolveSessionTurnsCacheDir();
+  if (stDir) {
+    try {
+      var names = fs.readdirSync(stDir);
+      for (var ni = 0; ni < names.length; ni++) {
+        if (names[ni].length < 6 || names[ni].slice(-5) !== '.json') continue;
+        var fp = path.join(stDir, names[ni]);
+        try {
+          var st3 = fs.statSync(fp);
+          out.push({
+            kind: 'session_turns_disk',
+            label: names[ni],
+            path_abs: path.resolve(fp),
+            path_ui: displayPathForUi(fp),
+            size: st3.size,
+            mtime_ms: Math.floor(st3.mtimeMs)
+          });
+        } catch (e5) {}
+      }
+    } catch (e6) {}
+  }
+  out.sort(function (a, b) {
+    if (a.kind !== b.kind) return a.kind < b.kind ? -1 : 1;
+    return a.path_ui < b.path_ui ? -1 : a.path_ui > b.path_ui ? 1 : 0;
+  });
+  return out;
+}
+
 /**
  * DEV_MODE=full: GET remote session-turns via /api/debug/session-turns only.
  * (Public /api/session-turns is often behind SSO e.g. Authelia; debug is typically bypassed.)
@@ -3877,6 +3993,91 @@ var server = http.createServer(function (req, res) {
           by_day: byDay
         })
       );
+    });
+    return;
+  } else if (pathname === '/api/debug/cache-files' && req.method === 'GET') {
+    var corsCf = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+    if (!__devMode) {
+      res.writeHead(403, corsCf);
+      res.end(JSON.stringify({ ok: false, error: 'dev_only' }));
+      return;
+    }
+    var listCf = collectDebugCacheFilesPayload();
+    res.writeHead(200, corsCf);
+    res.end(JSON.stringify({ ok: true, files: listCf }));
+  } else if (pathname === '/api/debug/cache-file-view') {
+    var corsView = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+    if (!__devMode) {
+      res.writeHead(403, corsView);
+      res.end(JSON.stringify({ ok: false, error: 'dev_only' }));
+      return;
+    }
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      });
+      res.end();
+      return;
+    }
+    if (req.method !== 'POST') {
+      res.writeHead(405, Object.assign({ Allow: 'POST, OPTIONS' }, corsView));
+      res.end(JSON.stringify({ ok: false, error: 'method_not_allowed' }));
+      return;
+    }
+    readJsonBodyMax(req, 65536, function (errV, bodyV) {
+      if (errV && String(errV.message || errV) === 'payload_too_large') {
+        res.writeHead(413, corsView);
+        res.end(JSON.stringify({ ok: false, error: 'payload_too_large' }));
+        return;
+      }
+      if (errV) {
+        res.writeHead(400, corsView);
+        res.end(JSON.stringify({ ok: false, error: 'invalid_json' }));
+        return;
+      }
+      var rawPath = bodyV && (bodyV.path_abs || bodyV.path);
+      if (!rawPath || typeof rawPath !== 'string') {
+        res.writeHead(400, corsView);
+        res.end(JSON.stringify({ ok: false, error: 'missing_path' }));
+        return;
+      }
+      var target = path.resolve(rawPath);
+      if (!debugPathAllowedForRead(target)) {
+        res.writeHead(403, corsView);
+        res.end(JSON.stringify({ ok: false, error: 'path_not_allowed' }));
+        return;
+      }
+      try {
+        var stv = fs.statSync(target);
+        if (!stv.isFile()) {
+          res.writeHead(400, corsView);
+          res.end(JSON.stringify({ ok: false, error: 'not_a_file' }));
+          return;
+        }
+        var buf = fs.readFileSync(target);
+        var truncated = buf.length > DEBUG_CACHE_FILE_VIEW_MAX_BYTES;
+        var slice = truncated ? buf.subarray(0, DEBUG_CACHE_FILE_VIEW_MAX_BYTES) : buf;
+        var text = slice.toString('utf8');
+        if (truncated) {
+          text += '\n... [truncated, file_bytes=' + buf.length + ' show_max=' + DEBUG_CACHE_FILE_VIEW_MAX_BYTES + ']';
+        }
+        serviceLog.info('dev', 'cache-file-view ' + displayPathForUi(target) + ' bytes=' + buf.length + (truncated ? ' truncated=1' : ''));
+        res.writeHead(200, corsView);
+        res.end(
+          JSON.stringify({
+            ok: true,
+            path_ui: displayPathForUi(target),
+            size: buf.length,
+            truncated: truncated,
+            content: text
+          })
+        );
+      } catch (eV) {
+        res.writeHead(500, corsView);
+        res.end(JSON.stringify({ ok: false, error: 'read_failed', detail: String(eV && eV.message ? eV.message : eV) }));
+      }
     });
     return;
   } else if (pathname === '/api/debug/status') {
