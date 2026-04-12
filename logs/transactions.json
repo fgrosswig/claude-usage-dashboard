@@ -2,6 +2,43 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-221",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "4720cf3",
+      "commit_full": "4720cf3b1049ef670e7dcfe1a939314c42a7553e",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(sidebar): master checkbox per widget group + leaf sync refs #216",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-220",
       "timestamp": "2026-04-12",
       "session": "auto",
