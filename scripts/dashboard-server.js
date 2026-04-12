@@ -3732,6 +3732,7 @@ function debugPathAllowedForRead(absPath) {
   if (path.resolve(RELEASES_CACHE) === abs) return true;
   if (path.resolve(OUTAGE_DISK_CACHE) === abs) return true;
   if (path.resolve(MARKETPLACE_CACHE) === abs) return true;
+  if (path.resolve(extractCache.CACHE_FILE) === abs) return true;
   try {
     var proxyPaths = collectProxyNdjsonFiles();
     if (debugProxyNdjsonMatchesAbs(abs, proxyPaths)) return true;
