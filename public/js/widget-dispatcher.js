@@ -875,6 +875,7 @@
       var spanVal = getWidgetSpan(sec.id);
       var spanDisp = spanVal || 12;
       html += '<li class="widget-tree-item" data-section="' + sec.id + '" draggable="true">';
+      html += '<div class="widget-tree-head">';
       html += '<span class="widget-tree-drag" title="Drag to reorder">&#x2630;</span>';
       html += '<input type="checkbox" class="widget-tree-check" data-type="section" data-id="' + sec.id + '"' + (secVis ? ' checked' : '') + '>';
       html += '<span class="widget-tree-label">' + _t(sec.titleKey) + '</span>';
@@ -887,10 +888,11 @@
           '/12</span>';
       }
       html += '<button type="button" class="widget-tree-expand" data-expand="' + sec.id + '"' + (hasCharts ? '' : ' style="visibility:hidden"') + '>&#x25B6;</button>';
-      html += '</li>';
+      html += '</div>';
       if (hasCharts) {
         html += buildSectionChartsTreeHtml(sec);
       }
+      html += '</li>';
     }
     html += '</ul>';
     body.innerHTML = html;

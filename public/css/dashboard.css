@@ -793,6 +793,9 @@ details.sidebar-section[open]>.sidebar-section-title::before{transform:rotate(90
 /* Widget Tree (Layout section) */
 .widget-tree{list-style:none;margin:0;padding:0}
 .widget-tree-item{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:.78rem;color:#cbd5e1}
+/* Top-level section rows: <ul><li data-section> must only contain <li> children — charts live inside the section <li> */
+.widget-tree > li.widget-tree-item[data-section]{flex-direction:column;align-items:stretch;gap:0}
+.widget-tree-head{display:flex;align-items:center;gap:8px;width:100%;flex-shrink:0}
 .widget-tree-item.is-dragging{opacity:.85;background:#1e293b;border:1px solid #3b82f6;border-radius:6px;padding:5px 8px;box-shadow:0 4px 12px rgba(59,130,246,.3);transform:scale(1.02)}
 .widget-tree--edit .widget-tree-item[data-section]{background:#1e293b;border:1px solid #475569;border-radius:6px;padding:5px 8px;margin-bottom:4px;cursor:grab;transition:border-color .15s,box-shadow .15s}
 .widget-tree--edit .widget-tree-item[data-section]:hover{border-color:#3b82f6;box-shadow:0 2px 8px rgba(59,130,246,.2)}
