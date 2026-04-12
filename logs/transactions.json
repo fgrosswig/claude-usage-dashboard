@@ -2,6 +2,58 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-215",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "aeb351d",
+      "commit_full": "aeb351df2a941ae1c65796551c1eff27434deaa8",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(sidebar): prefs sync, chart visibility, layout refresh guard refs #166",
+      "detail": "- Guard bindSidebarEvents and skip redundant toggleSidebar to avoid 180s refresh resetting layout edit\n\n- Align hiddenSections with widgets[], normalize prefs; isChartVisible respects parent section\n\n- Sync visibility from localStorage before widget tree; reapply chart visibility after render\n\n- Token stats chart registry (ts-kpis, ts-c1-c4, ts-hosts); grid span badge only when not full width\n\n- i18n: layout grid span hint, save layout strings; tighten layout-grid spacing\n\n- dashboard.html: remove inline margin on daily chart box\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-registry.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-214",
       "timestamp": "2026-04-12",
       "session": "auto",
