@@ -194,6 +194,12 @@
   // ── Render Dispatch ─────────────────────────────────────────────
 
   function dispatchRender(data, days) {
+    // Update sidebar version footer
+    var verEl = document.getElementById('sidebar-version');
+    if (verEl && data) {
+      var v = data.server_version || data.app_version || '';
+      if (v) verEl.textContent = 'v' + v;
+    }
     var sections = getSortedSections();
     for (var si = 0; si < sections.length; si++) {
       var sec = sections[si];
@@ -340,6 +346,7 @@
       renderWidgetTree();
       renderSettingsSection();
       renderTemplatesSection();
+      bindToolsSection();
       renderExportSection();
       // Resize charts after layout shift
       setTimeout(function () { resizeAll(); }, 250);
@@ -776,6 +783,25 @@
 
   // ── Export Section ──────────────────────────────────────────────
 
+  function bindToolsSection() {
+    var explorerBtn = document.getElementById('sidebar-open-explorer');
+    if (explorerBtn && !explorerBtn.dataset.bound) {
+      explorerBtn.dataset.bound = '1';
+      explorerBtn.addEventListener('click', function () {
+        var origBtn = document.getElementById('dev-cache-files-open') || document.getElementById('live-cache-files-open');
+        if (origBtn) origBtn.click();
+      });
+    }
+    var releasesBtn = document.getElementById('sidebar-open-releases');
+    if (releasesBtn && !releasesBtn.dataset.bound) {
+      releasesBtn.dataset.bound = '1';
+      releasesBtn.addEventListener('click', function () {
+        var origBtn = document.getElementById('live-rel-expand-btn');
+        if (origBtn) origBtn.click();
+      });
+    }
+  }
+
   function renderExportSection() {
     // Export buttons are already in HTML, just add click handlers
     var jsonlBtn = document.getElementById('sidebar-export-jsonl');
@@ -866,6 +892,9 @@
       'sidebar-layout-title': 'settingsLayoutTitle',
       'sidebar-templates-title': 'settingsTemplatesTitle',
       'sidebar-settings-title': 'settingsSettingsTitle',
+      'sidebar-tools-title': 'settingsToolsTitle',
+      'sidebar-open-explorer': 'settingsOpenExplorer',
+      'sidebar-open-releases': 'settingsOpenReleases',
       'sidebar-export-title': 'settingsExportTitle',
       'sidebar-layout-reset': 'settingsResetLayout',
       'sidebar-export-jsonl': 'settingsExportJsonl',

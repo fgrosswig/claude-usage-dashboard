@@ -692,4 +692,8 @@ details.sidebar-section[open]>.sidebar-section-title::before{transform:rotate(90
 .template-item-actions button:hover{color:#e2e8f0}
 
 
+.sidebar-footer{flex-shrink:0;padding:0 12px 10px}
+.sidebar-hr{border:none;border-top:1px solid #334155;margin:0 0 8px}
+.sidebar-version{font-size:.65rem;color:#475569}
+
 @media(max-width:768px){.sidebar{width:280px}body.sidebar-open{padding-left:0}}

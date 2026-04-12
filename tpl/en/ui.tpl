@@ -582,5 +582,8 @@
   "settingsTemplateApply": "Apply",
   "settingsTemplateDelete": "Delete",
   "settingsTemplateSaveCurrent": "Save current layout",
-  "settingsTemplateNamePrompt": "Name for the template:"
+  "settingsTemplateNamePrompt": "Name for the template:",
+  "settingsToolsTitle": "Tools",
+  "settingsOpenExplorer": "File Explorer",
+  "settingsOpenReleases": "Release Notes"
 }

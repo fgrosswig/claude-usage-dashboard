@@ -582,5 +582,8 @@
   "settingsTemplateApply": "적용",
   "settingsTemplateDelete": "삭제",
   "settingsTemplateSaveCurrent": "현재 레이아웃 저장",
-  "settingsTemplateNamePrompt": "템플릿 이름:"
+  "settingsTemplateNamePrompt": "템플릿 이름:",
+  "settingsToolsTitle": "도구",
+  "settingsOpenExplorer": "파일 탐색기",
+  "settingsOpenReleases": "릴리스 노트"
 }
