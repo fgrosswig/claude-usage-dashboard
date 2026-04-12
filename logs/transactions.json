@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-180",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "2b6b70c",
+      "commit_full": "2b6b70c73acda88205d602ffba51b956abfb93dc",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(session-turns): --benchmark and single-pass warm write",
+      "detail": "- --benchmark/--iterations: phase timings (node paths+fp, pass1, finalize)\n\n- Warm path uses one timed pipeline then writes (no double JSONL read)\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "scripts/session-turns-warm-cache.py",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-179",
       "timestamp": "2026-04-12",
       "session": "auto",
