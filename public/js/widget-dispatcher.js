@@ -222,6 +222,7 @@
     _initialized = true;
     _prefs = loadPrefs();
     applyVisibility();
+    applyAllChartVisibility();
     applyOrder();
     bindDisclosureToggles();
   }
@@ -249,6 +250,31 @@
       _prefs.hiddenCharts.push(chartId);
     }
     savePrefs();
+    applyChartVisibility(chartId, visible);
+  }
+
+  function applyChartVisibility(chartId, visible) {
+    var reg = getRegistry();
+    if (!reg) return;
+    var chartDef = reg.findChart(chartId);
+    if (!chartDef) return;
+    // Hide the chart container (the .chart-box parent of the canvas)
+    var el = document.getElementById(chartDef.canvasId);
+    if (!el) return;
+    var box = el.closest('.chart-box') || el.parentNode;
+    if (box) box.style.display = visible ? '' : 'none';
+  }
+
+  function applyAllChartVisibility() {
+    var reg = getRegistry();
+    if (!reg) return;
+    for (var si = 0; si < reg.sections.length; si++) {
+      var charts = reg.sections[si].charts || [];
+      for (var ci = 0; ci < charts.length; ci++) {
+        var ch = charts[ci];
+        applyChartVisibility(ch.id, isChartVisible(ch.id));
+      }
+    }
   }
 
   function setOrder(orderedIds) {
@@ -285,26 +311,22 @@
     document.body.classList.toggle('sidebar-open', _sidebarOpen);
     var btn = document.getElementById('settings-nav-btn');
     if (btn) btn.classList.toggle('is-active', _sidebarOpen);
+    // Match sidebar-head height to top-bar
+    var topBar = document.querySelector('.top-bar');
+    var sbHead = document.querySelector('.sidebar-head');
+    if (topBar && sbHead) {
+      sbHead.style.minHeight = topBar.offsetHeight + 'px';
+    }
     if (_sidebarOpen) {
       renderWidgetTree();
       renderSettingsSection();
       renderTemplatesSection();
       renderExportSection();
-      bindStatsToggle();
       // Resize charts after layout shift
       setTimeout(function () { resizeAll(); }, 250);
     }
-    // Hide/show original top-bar filters (moved to sidebar)
-    toggleOriginalFilters(!_sidebarOpen);
+    // Original filters hidden via CSS (body.sidebar-open selector)
     try { localStorage.setItem('cud_sidebar_open', _sidebarOpen ? '1' : '0'); } catch (e) {}
-  }
-
-  function toggleOriginalFilters(show) {
-    var ids = ['lang-switch-wrap', 'plan-switch-wrap', 'day-picker-row'];
-    for (var i = 0; i < ids.length; i++) {
-      var el = document.getElementById(ids[i]);
-      if (el) el.style.display = show ? '' : 'none';
-    }
   }
 
   function bindSidebarEvents() {
@@ -432,9 +454,9 @@
     }
   }
 
-  // ── Stats Section (User Profile Charts in Sidebar) ─────────────
-
-  var _statsCharts = {};
+  // ── (Stats section removed — User Profile stays as dashboard section) ──
+  // placeholder to maintain code structure
+  var _statsRemoved = true;
 
   function renderStatsSection() {
     var body = document.getElementById('sidebar-stats-body');
@@ -544,6 +566,9 @@
         clone.id = 'sidebar-lang-switch';
         clone.style.display = 'flex';
         clone.style.gap = '4px';
+        // Remove the duplicate label span from clone
+        var cloneLabel = clone.querySelector('.lang-switch-label');
+        if (cloneLabel) cloneLabel.remove();
         langSlot.appendChild(clone);
         // Wire cloned buttons
         var btns = clone.querySelectorAll('.lang-btn');
@@ -642,6 +667,7 @@
     savePrefs();
     setActiveTemplateName(tpl.name);
     applyVisibility();
+    applyAllChartVisibility();
     applyOrder();
     renderWidgetTree();
   }
@@ -795,69 +821,18 @@
   // ── i18n helper (safe fallback) ─────────────────────────────────
 
   function _t(key) {
+    // Try dashboard.client.js t() first
     if (typeof global.t === 'function') return global.t(key);
+    // Fallback: read directly from inline i18n bundles
+    var bundles = global.__I18N_BUNDLES;
+    if (bundles) {
+      var lang = document.documentElement.lang || 'en';
+      var o = bundles[lang] || bundles.en || {};
+      if (o[key] !== undefined && o[key] !== '') return o[key];
+      var en = bundles.en || {};
+      if (en[key] !== undefined) return en[key];
+    }
     return key;
-  }
-
-  // ── Move Filters to Sidebar ─────────────────────────────────────
-
-  function migrateFiltersToSidebar() {
-    var daySlot = document.getElementById('sidebar-day-slot');
-    var hostSlot = document.getElementById('sidebar-host-slot');
-    // Move day-picker from main area to sidebar
-    var dayPicker = document.getElementById('day-picker');
-    if (daySlot && dayPicker && !daySlot.dataset.filled) {
-      daySlot.dataset.filled = '1';
-      daySlot.innerHTML = '<label>' + _t('settingsDayLabel') + '</label>';
-      var dayRow = dayPicker.closest('.day-picker-row') || dayPicker.parentNode;
-      // Clone the select into sidebar
-      var dayClone = dayPicker.cloneNode(true);
-      dayClone.id = 'sidebar-day-picker';
-      dayClone.className = '';
-      daySlot.appendChild(dayClone);
-      // Sync: sidebar change → original change
-      dayClone.addEventListener('change', function () {
-        dayPicker.value = this.value;
-        dayPicker.dispatchEvent(new Event('change'));
-      });
-      // Sync: original change → sidebar (for SSE updates)
-      var origObserver = new MutationObserver(function () {
-        dayClone.innerHTML = dayPicker.innerHTML;
-        dayClone.value = dayPicker.value;
-      });
-      origObserver.observe(dayPicker, { childList: true, attributes: true });
-    }
-    // Host filter bar — just note it exists, migration later
-    if (hostSlot && !hostSlot.dataset.filled) {
-      hostSlot.dataset.filled = '1';
-      var hostBar = document.getElementById('forensic-host-filter-bar');
-      if (hostBar) {
-        hostSlot.innerHTML = '<label>' + _t('settingsHostLabel') + '</label>';
-        var hostClone = hostBar.cloneNode(true);
-        hostClone.id = 'sidebar-host-filter';
-        hostSlot.appendChild(hostClone);
-      }
-    }
-  }
-
-  // ── Stats Toggle Binding ─────────────────────────────────────────
-
-  function bindStatsToggle() {
-    var det = document.getElementById('sidebar-stats');
-    if (!det || det.dataset.statsBound) return;
-    det.dataset.statsBound = '1';
-    det.addEventListener('toggle', function () {
-      if (det.open) {
-        renderStatsSection();
-        setTimeout(function () {
-          for (var k in _statsCharts) {
-            if (_statsCharts[k] && typeof _statsCharts[k].resize === 'function') {
-              try { _statsCharts[k].resize(); } catch (e) {}
-            }
-          }
-        }, 60);
-      }
-    });
   }
 
   // ── Enhanced Init ───────────────────────────────────────────────
@@ -869,11 +844,9 @@
     var titleEl = document.getElementById('sidebar-title');
     if (titleEl) titleEl.textContent = _t('settingsTitle');
     var titles = {
-      'sidebar-filter-title': 'settingsFilterTitle',
       'sidebar-layout-title': 'settingsLayoutTitle',
       'sidebar-templates-title': 'settingsTemplatesTitle',
       'sidebar-settings-title': 'settingsSettingsTitle',
-      'sidebar-stats-title': 'settingsStatsTitle',
       'sidebar-export-title': 'settingsExportTitle',
       'sidebar-layout-reset': 'settingsResetLayout',
       'sidebar-export-jsonl': 'settingsExportJsonl',
@@ -888,7 +861,6 @@
         else el.textContent = _t(titles[id]);
       }
     }
-    migrateFiltersToSidebar();
   }
 
   global.__widgetDispatcher = {
@@ -904,6 +876,7 @@
     shouldRender: shouldRender,
     isSectionVisible: isSectionVisible,
     isChartVisible: isChartVisible,
-    renderWidgetTree: renderWidgetTree
+    renderWidgetTree: renderWidgetTree,
+    applyAllChartVisibility: applyAllChartVisibility
   };
 })(typeof window !== 'undefined' ? window : this);
