@@ -18,6 +18,7 @@ var ASSET_ROUTES = {
   '/assets/widget-registry.js': ['public', 'js', 'widget-registry.js'],
   '/assets/widget-dispatcher.js': ['public', 'js', 'widget-dispatcher.js'],
   '/assets/dashboard-sections.js': ['public', 'js', 'dashboard-sections.js'],
+  '/assets/metrics-engine.js': ['public', 'js', 'metrics-engine.js'],
   '/assets/dashboard.client.js': ['public', 'js', 'dashboard.client.js']
 };
 

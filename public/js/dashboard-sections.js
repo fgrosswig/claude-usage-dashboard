@@ -15,6 +15,42 @@
 (function () {
   "use strict";
 
+  /**
+   * Compute shared context for Token Stats charts.
+   * Cached on window.__sectionCtx_tokenStats so standalone chart renderers can use it.
+   * Returns the same forensic values that renderTokenStatsSection returns.
+   */
+  window._computeTokenStatsCtx = function (ctx) {
+    // The monolithic renderTokenStatsSection computes and caches this.
+    // If called before rendering, just store ctx for later.
+    window.__sectionCtx_tokenStats = window.__sectionCtx_tokenStats || { ctx: ctx };
+    return window.__sectionCtx_tokenStats;
+  };
+
+  /**
+   * Standalone chart renderers for Token Stats.
+   * These delegate to the cached ECharts instances that renderTokenStatsSection creates.
+   * On standalone call (when section hasn't rendered), they render from cached ctx.
+   */
+  window.renderTokenStats_c1_daily = function () {
+    // c1 is rendered inline by renderTokenStatsSection; standalone re-render via ctx
+    var sCtx = window.__sectionCtx_tokenStats;
+    if (!sCtx || !sCtx.ctx) return;
+    if (_charts.c1 && typeof _charts.c1.resize === 'function') _charts.c1.resize();
+  };
+  window.renderTokenStats_c2_daily = function () {
+    if (_charts.c2 && typeof _charts.c2.resize === 'function') _charts.c2.resize();
+  };
+  window.renderTokenStats_c3_daily = function () {
+    if (_charts.c3 && typeof _charts.c3.resize === 'function') _charts.c3.resize();
+  };
+  window.renderTokenStats_c4_hourly = function () {
+    if (_charts.c4 && typeof _charts.c4.resize === 'function') _charts.c4.resize();
+  };
+  window.renderTokenStats_c1hosts = function () {
+    if (_charts.c1hosts && typeof _charts.c1hosts.resize === 'function') _charts.c1hosts.resize();
+  };
+
   /* ================================================================
    *  renderTokenStatsSection — Summary cards + charts c1-c4 + host table
    * ================================================================ */
@@ -556,6 +592,14 @@
       }
     }
 
+    // Cache computed context for standalone chart renderers
+    window.__sectionCtx_tokenStats = {
+      ctx: ctx, labels: labels, mainScope: mainScope, hourlyMode: hourlyMode,
+      hourLabs: hourLabs, dayForHourly: dayForHourly, mainHostKey: mainHostKey,
+      c4TimelineHostStack: c4TimelineHostStack, days: days, hLabs: hLabs,
+      multiHost: multiHost, selDay: selDay
+    };
+
     // Expose computed forensic values for renderForensicSection
     return {
       fc: fc,
@@ -570,18 +614,19 @@
   };
 
   /* ================================================================
-   *  renderForensicSection — Forensic summary + cards + charts
+   *  Forensic Section — compute + standalone chart renderers
    * ================================================================ */
-  window.renderForensicSection = function (ctx, tokenStatsResult) {
+
+  /**
+   * Compute shared context for Forensic charts.
+   * Cached on window.__sectionCtx_forensic.
+   */
+  window._computeForensicCtx = function (ctx, tokenStatsResult) {
     var data = ctx.data;
     var days = ctx.days;
     var selDay = ctx.selDay;
     var pick = ctx.pick;
-    var hLabs = ctx.hLabs;
-    var multiHost = ctx.multiHost;
 
-    // Use pre-computed values from renderTokenStatsSection if available,
-    // otherwise recompute
     var fc, fwarn, impl90, forensicHintF, budgetRatio, peak, fhCard, labels;
     if (tokenStatsResult) {
       fc = tokenStatsResult.fc;
@@ -593,7 +638,6 @@
       fhCard = tokenStatsResult.fhCard;
       labels = tokenStatsResult.labels;
     } else {
-      // Fallback: recompute if called standalone
       fhCard = getForensicHostFilterForCharts();
       var hSlicePick = fhCard && selDay.hosts && selDay.hosts[fhCard] ? selDay.hosts[fhCard] : null;
       var emptyHostDay = {
@@ -624,46 +668,7 @@
       labels = days.map(function(d){return d.date.slice(5)});
     }
 
-    // --- Forensic summary line ---
-    var sumEl = document.getElementById("forensic-summary-line");
-    if (sumEl) {
-      var sumLine = tr("forensicSummaryLine", {
-        pick: pick,
-        fc: fc,
-        impl: impl90 > 0 ? fmt(impl90) : "\u2014",
-        bud: String(budgetRatio),
-        peak: peak.date || "\u2014"
-      });
-      if (fhCard) sumLine += tr("forensicSummaryHostSuffix", { host: fhCard });
-      sumEl.textContent = sumLine;
-    }
-
-    // --- Forensic cards ---
-    var fcards = [
-      { wid: "forensic-card-code", label: t("fcForensicDay"), value: fc, sub: forensicHintF, cls: fwarn ? "warn" : "" },
-      { wid: "forensic-card-impl", label: t("fcImpl"), value: impl90 > 0 ? fmt(impl90) : "\u2014", sub: t("fcImplSub"), cls: "" },
-      { wid: "forensic-card-budget", label: t("fcBudget"), value: "~" + budgetRatio + "x", sub: t("fcBudgetSub"), cls: budgetRatio > 10 ? "danger" : "warn" }
-    ];
-    var fch = "";
-    for (var fci = 0; fci < fcards.length; fci++) {
-      var fcrd = fcards[fci];
-      fch +=
-        '<div class="chart-box chart-box--kpi" id="' +
-        fcrd.wid +
-        '"><div class="card ' +
-        fcrd.cls +
-        '"><div class="label">' +
-        escHtml(fcrd.label) +
-        '</div><div class="value">' +
-        escHtml(fcrd.value) +
-        '</div><div class="sub">' +
-        escHtml(fcrd.sub) +
-        "</div></div></div>";
-    }
-    var fcg = document.getElementById("forensic-cards");
-    if (fcg && fcg.innerHTML !== fch) fcg.innerHTML = fch;
-
-    // --- Forensic chart throttle ---
+    // Throttle state
     var spForensic = data.scan_progress;
     var scanInProgForensic =
       data.scanning && spForensic && spForensic.total > 0 && spForensic.done < spForensic.total;
@@ -677,8 +682,23 @@
       else window.__dashForensicSvcPaintUntilMs = 0;
     }
 
-    // --- Forensic Chart (Hit-Limit Bars + Score Line) -- ECharts ---
+    var sCtx = {
+      data: data, days: days, selDay: selDay, pick: pick,
+      fc: fc, fwarn: fwarn, impl90: impl90, forensicHintF: forensicHintF,
+      budgetRatio: budgetRatio, peak: peak, fhCard: fhCard, labels: labels,
+      skipForensicPaint: skipForensicPaint, skipServicePaint: skipServicePaint
+    };
+    window.__sectionCtx_forensic = sCtx;
+    return sCtx;
+  };
+
+  /** Standalone: render Hit-Limit + Forensic Score chart. */
+  window.renderForensic_main = function (sCtx) {
+    sCtx = sCtx || window.__sectionCtx_forensic;
+    if (!sCtx || sCtx.skipForensicPaint) return;
     var fhForensic = getForensicHostFilterForCharts();
+    var days = sCtx.days;
+    var labels = sCtx.labels;
     function hitLimitBarForChart(d) {
       if (!fhForensic) return d.hit_limit || 0;
       var H = d.hosts && d.hosts[fhForensic];
@@ -687,91 +707,95 @@
     function forensicScoreDay(d) {
       return forensicScoreForChartDay(d, days, fhForensic);
     }
-    var elF=document.getElementById("c-forensic");
-    if(elF){
-      try {
-      if (!skipForensicPaint) {
-        if (!_charts.cForensic) _charts.cForensic = echarts.init(elF, null, { renderer: 'canvas' });
-        var fHitData = days.map(hitLimitBarForChart);
-        var fScoreData = days.map(forensicScoreDay);
-        var fHitColors = fHitData.map(function(v) { return v > 0 ? 'rgba(248,113,113,0.55)' : 'rgba(71,85,105,0.35)'; });
-        _charts.cForensic.setOption({
-          animation: false,
-          grid: { left: 50, right: fhForensic ? 20 : 65, top: 40, bottom: 36 },
-          legend: { data: [t("forensicDS_hitLimit"), t("forensicDS_score")], textStyle: { color: '#cbd5e1', fontSize: 11 }, top: 4 },
-          tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 12 } },
-          xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
-          yAxis: [
-            { type: 'value', name: t("forensicAxisCounts"), nameLocation: 'center', nameGap: 35, nameRotate: 90, nameTextStyle: { color: '#94a3b8', fontSize: 11 }, min: 0, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
-            { type: 'value', name: fhForensic ? '' : t("forensicAxisForensic"), nameLocation: 'center', nameGap: 40, nameRotate: 90, nameTextStyle: { color: '#fbbf24', fontSize: 11 }, min: 0, max: 3.5, show: !fhForensic,
-              axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { show: false } }
-          ],
-          series: [
-            { name: t("forensicDS_hitLimit"), type: 'bar', data: fHitData, yAxisIndex: 0,
-              itemStyle: { color: function(p) { return fHitColors[p.dataIndex]; }, borderColor: function(p) { return fHitData[p.dataIndex] > 0 ? '#f87171' : 'transparent'; } } },
-            { name: t("forensicDS_score"), type: 'line', data: fScoreData, yAxisIndex: 1, smooth: 0.25, symbol: 'circle', symbolSize: 8,
-              lineStyle: { color: '#f59e0b', width: 2 }, itemStyle: { color: '#fbbf24' },
-              areaStyle: { color: 'rgba(245,158,11,0.12)' }, show: !fhForensic }
-          ]
-        }, true);
-      }
-      } finally {
-        chartShellSetLoading("c-forensic", false);
-      }
-      // Resize on disclosure toggle (ECharts needs non-zero container)
-      var forensicDisc = elF.closest('.forensic-chart-disclosure');
-      if (forensicDisc && !forensicDisc.dataset.bound) {
-        forensicDisc.dataset.bound = '1';
-        forensicDisc.addEventListener('toggle', function() {
-          if (forensicDisc.open && _charts.cForensic) {
-            setTimeout(function() { _charts.cForensic.resize(); }, 50);
-          }
-        });
-      }
+    var elF = document.getElementById("c-forensic");
+    if (!elF) return;
+    try {
+      if (!_charts.cForensic) _charts.cForensic = echarts.init(elF, null, { renderer: 'canvas' });
+      var fHitData = days.map(hitLimitBarForChart);
+      var fScoreData = days.map(forensicScoreDay);
+      var fHitColors = fHitData.map(function(v) { return v > 0 ? 'rgba(248,113,113,0.55)' : 'rgba(71,85,105,0.35)'; });
+      _charts.cForensic.setOption({
+        animation: false,
+        grid: { left: 50, right: fhForensic ? 20 : 65, top: 40, bottom: 36 },
+        legend: { data: [t("forensicDS_hitLimit"), t("forensicDS_score")], textStyle: { color: '#cbd5e1', fontSize: 11 }, top: 4 },
+        tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 12 } },
+        xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+        yAxis: [
+          { type: 'value', name: t("forensicAxisCounts"), nameLocation: 'center', nameGap: 35, nameRotate: 90, nameTextStyle: { color: '#94a3b8', fontSize: 11 }, min: 0, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+          { type: 'value', name: fhForensic ? '' : t("forensicAxisForensic"), nameLocation: 'center', nameGap: 40, nameRotate: 90, nameTextStyle: { color: '#fbbf24', fontSize: 11 }, min: 0, max: 3.5, show: !fhForensic,
+            axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { show: false } }
+        ],
+        series: [
+          { name: t("forensicDS_hitLimit"), type: 'bar', data: fHitData, yAxisIndex: 0,
+            itemStyle: { color: function(p) { return fHitColors[p.dataIndex]; }, borderColor: function(p) { return fHitData[p.dataIndex] > 0 ? '#f87171' : 'transparent'; } } },
+          { name: t("forensicDS_score"), type: 'line', data: fScoreData, yAxisIndex: 1, smooth: 0.25, symbol: 'circle', symbolSize: 8,
+            lineStyle: { color: '#f59e0b', width: 2 }, itemStyle: { color: '#fbbf24' },
+            areaStyle: { color: 'rgba(245,158,11,0.12)' }, show: !fhForensic }
+        ]
+      }, true);
+    } finally {
+      chartShellSetLoading("c-forensic", false);
     }
-
-    // --- Forensic: Session Signals Stacked + Cache Read Line -- ECharts ---
-    var elSig = document.getElementById("c-forensic-signals");
-    if (elSig) {
-      try {
-        if (!skipForensicPaint) {
-          var sigStack = buildSessionSignalsStackedByDay(days, fhForensic);
-          if (!_charts.cForensicSignals) _charts.cForensicSignals = echarts.init(elSig, null, { renderer: 'canvas' });
-          _charts.cForensicSignals.setOption({
-            animation: false,
-            grid: { left: 60, right: 65, top: 40, bottom: 36 },
-            legend: {
-              data: [t("forensicDS_continueStack"), t("forensicDS_resumeStack"), t("forensicDS_retryStack"), t("forensicDS_interruptStack"), t("forensicDS_outageHoursDay"), t("chartDS_cacheRead")],
-              textStyle: { color: '#cbd5e1', fontSize: 10 }, top: 4, itemWidth: 12, itemHeight: 10
-            },
-            tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 12 } },
-            xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 11, rotate: 45 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.45)' } } },
-            yAxis: [
-              { type: 'value', name: t("forensicSignalsAxisLines"), nameLocation: 'center', nameGap: 42, nameRotate: 90, nameTextStyle: { color: '#94a3b8', fontSize: 11 }, min: 0, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
-              { type: 'value', name: t("forensicSignalsAxisCacheRead"), nameLocation: 'center', nameGap: 48, nameRotate: 90, nameTextStyle: { color: '#a78bfa', fontSize: 11 }, min: 0,
-                axisLabel: { color: '#a78bfa', fontSize: 11, formatter: function(v) { return fmt(v); } }, splitLine: { show: false } }
-            ],
-            series: [
-              { name: t("forensicDS_continueStack"), type: 'bar', stack: 'sig', data: sigStack.cont, itemStyle: { color: 'rgba(59,130,246,0.75)' } },
-              { name: t("forensicDS_resumeStack"), type: 'bar', stack: 'sig', data: sigStack.res, itemStyle: { color: 'rgba(6,182,212,0.7)' } },
-              { name: t("forensicDS_retryStack"), type: 'bar', stack: 'sig', data: sigStack.retry, itemStyle: { color: 'rgba(239,68,68,0.65)' } },
-              { name: t("forensicDS_interruptStack"), type: 'bar', stack: 'sig', data: sigStack.intr, itemStyle: { color: 'rgba(251,191,36,0.55)' } },
-              { name: t("forensicDS_outageHoursDay"), type: 'bar', stack: 'sig', data: sigStack.outageBar, itemStyle: { color: 'rgba(107,114,128,0.35)' } },
-              { name: t("chartDS_cacheRead"), type: 'line', yAxisIndex: 1, data: sigStack.cacheRead, smooth: 0.2, symbol: 'circle', symbolSize: 6,
-                lineStyle: { color: 'rgba(139,92,246,0.95)', width: 2 }, itemStyle: { color: '#8b5cf6' } }
-            ]
-          }, true);
+    var forensicDisc = elF.closest('.forensic-chart-disclosure');
+    if (forensicDisc && !forensicDisc.dataset.bound) {
+      forensicDisc.dataset.bound = '1';
+      forensicDisc.addEventListener('toggle', function() {
+        if (forensicDisc.open && _charts.cForensic) {
+          setTimeout(function() { _charts.cForensic.resize(); }, 50);
         }
-      } finally {
-        chartShellSetLoading("c-forensic-signals", false);
-      }
+      });
     }
+  };
 
-    // --- Service Impact Chart (Work Hours vs Outage + Cache Read) -- ECharts ---
-    var elS=document.getElementById("c-service");
-    if(elS){
-      try {
-      if (!skipServicePaint) {
+  /** Standalone: render Session Signals stacked bar + Cache Read line. */
+  window.renderForensic_signals = function (sCtx) {
+    sCtx = sCtx || window.__sectionCtx_forensic;
+    if (!sCtx || sCtx.skipForensicPaint) return;
+    var fhForensic = getForensicHostFilterForCharts();
+    var labels = sCtx.labels;
+    var elSig = document.getElementById("c-forensic-signals");
+    if (!elSig) return;
+    try {
+      var sigStack = buildSessionSignalsStackedByDay(sCtx.days, fhForensic);
+      if (!_charts.cForensicSignals) _charts.cForensicSignals = echarts.init(elSig, null, { renderer: 'canvas' });
+      _charts.cForensicSignals.setOption({
+        animation: false,
+        grid: { left: 60, right: 65, top: 40, bottom: 36 },
+        legend: {
+          data: [t("forensicDS_continueStack"), t("forensicDS_resumeStack"), t("forensicDS_retryStack"), t("forensicDS_interruptStack"), t("forensicDS_outageHoursDay"), t("chartDS_cacheRead")],
+          textStyle: { color: '#cbd5e1', fontSize: 10 }, top: 4, itemWidth: 12, itemHeight: 10
+        },
+        tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 12 } },
+        xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 11, rotate: 45 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.45)' } } },
+        yAxis: [
+          { type: 'value', name: t("forensicSignalsAxisLines"), nameLocation: 'center', nameGap: 42, nameRotate: 90, nameTextStyle: { color: '#94a3b8', fontSize: 11 }, min: 0, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+          { type: 'value', name: t("forensicSignalsAxisCacheRead"), nameLocation: 'center', nameGap: 48, nameRotate: 90, nameTextStyle: { color: '#a78bfa', fontSize: 11 }, min: 0,
+            axisLabel: { color: '#a78bfa', fontSize: 11, formatter: function(v) { return fmt(v); } }, splitLine: { show: false } }
+        ],
+        series: [
+          { name: t("forensicDS_continueStack"), type: 'bar', stack: 'sig', data: sigStack.cont, itemStyle: { color: 'rgba(59,130,246,0.75)' } },
+          { name: t("forensicDS_resumeStack"), type: 'bar', stack: 'sig', data: sigStack.res, itemStyle: { color: 'rgba(6,182,212,0.7)' } },
+          { name: t("forensicDS_retryStack"), type: 'bar', stack: 'sig', data: sigStack.retry, itemStyle: { color: 'rgba(239,68,68,0.65)' } },
+          { name: t("forensicDS_interruptStack"), type: 'bar', stack: 'sig', data: sigStack.intr, itemStyle: { color: 'rgba(251,191,36,0.55)' } },
+          { name: t("forensicDS_outageHoursDay"), type: 'bar', stack: 'sig', data: sigStack.outageBar, itemStyle: { color: 'rgba(107,114,128,0.35)' } },
+          { name: t("chartDS_cacheRead"), type: 'line', yAxisIndex: 1, data: sigStack.cacheRead, smooth: 0.2, symbol: 'circle', symbolSize: 6,
+            lineStyle: { color: 'rgba(139,92,246,0.95)', width: 2 }, itemStyle: { color: '#8b5cf6' } }
+        ]
+      }, true);
+    } finally {
+      chartShellSetLoading("c-forensic-signals", false);
+    }
+  };
+
+  /** Standalone: render Service Impact chart (work hours vs outage). */
+  window.renderForensic_service = function (sCtx) {
+    sCtx = sCtx || window.__sectionCtx_forensic;
+    if (!sCtx || sCtx.skipServicePaint) return;
+    var days = sCtx.days;
+    var labels = sCtx.labels;
+    var elS = document.getElementById("c-service");
+    if (!elS) return;
+    try {
       var sClean=[],sAffServer=[],sAffClient=[],sOutOnly=[],sCacheRead=[];
       for(var si=0;si<days.length;si++){
         var sd=days[si];
@@ -819,11 +843,61 @@
             areaStyle: { color: 'rgba(139,92,246,0.08)' } }
         ]
       }, true);
-      }
-      } finally {
-        chartShellSetLoading("c-service", false);
-      }
+    } finally {
+      chartShellSetLoading("c-service", false);
     }
+  };
+
+  /* ================================================================
+   *  renderForensicSection — orchestrator (calls standalone renderers)
+   * ================================================================ */
+  window.renderForensicSection = function (ctx, tokenStatsResult) {
+    var sCtx = window._computeForensicCtx(ctx, tokenStatsResult);
+
+    // --- Forensic summary line ---
+    var sumEl = document.getElementById("forensic-summary-line");
+    if (sumEl) {
+      var sumLine = tr("forensicSummaryLine", {
+        pick: sCtx.pick,
+        fc: sCtx.fc,
+        impl: sCtx.impl90 > 0 ? fmt(sCtx.impl90) : "\u2014",
+        bud: String(sCtx.budgetRatio),
+        peak: sCtx.peak.date || "\u2014"
+      });
+      if (sCtx.fhCard) sumLine += tr("forensicSummaryHostSuffix", { host: sCtx.fhCard });
+      sumEl.textContent = sumLine;
+    }
+
+    // --- Forensic cards ---
+    var fcards = [
+      { wid: "forensic-card-code", label: t("fcForensicDay"), value: sCtx.fc, sub: sCtx.forensicHintF, cls: sCtx.fwarn ? "warn" : "" },
+      { wid: "forensic-card-impl", label: t("fcImpl"), value: sCtx.impl90 > 0 ? fmt(sCtx.impl90) : "\u2014", sub: t("fcImplSub"), cls: "" },
+      { wid: "forensic-card-budget", label: t("fcBudget"), value: "~" + sCtx.budgetRatio + "x", sub: t("fcBudgetSub"), cls: sCtx.budgetRatio > 10 ? "danger" : "warn" }
+    ];
+    var fch = "";
+    for (var fci = 0; fci < fcards.length; fci++) {
+      var fcrd = fcards[fci];
+      fch +=
+        '<div class="chart-box chart-box--kpi" id="' +
+        fcrd.wid +
+        '"><div class="card ' +
+        fcrd.cls +
+        '"><div class="label">' +
+        escHtml(fcrd.label) +
+        '</div><div class="value">' +
+        escHtml(fcrd.value) +
+        '</div><div class="sub">' +
+        escHtml(fcrd.sub) +
+        "</div></div></div>";
+    }
+    var fcg = document.getElementById("forensic-cards");
+    if (fcg && fcg.innerHTML !== fch) fcg.innerHTML = fch;
+
+    // --- Render charts via standalone functions ---
+    window.renderForensic_main(sCtx);
+    window.renderForensic_signals(sCtx);
+    window.renderForensic_service(sCtx);
+
     initUpdateSlideoutOnce();
   };
 

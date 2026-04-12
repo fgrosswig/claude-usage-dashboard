@@ -592,10 +592,26 @@
       if (typeof fn !== 'function') continue;
 
       if (sec.dataSource === '/api/session-turns') {
-        // Lazy sections manage their own fetch — just trigger them
         fn(data, days);
       } else {
         fn(data, days);
+      }
+    }
+
+    // Render extracted charts individually (Phase 5: chart-level widgets)
+    var extracted = global.__extractedChartIds;
+    if (extracted && Object.keys(extracted).length) {
+      var reg = getRegistry();
+      if (reg) {
+        for (var ek in extracted) {
+          if (!Object.prototype.hasOwnProperty.call(extracted, ek)) continue;
+          var chartDef = reg.findChart(ek);
+          if (!chartDef || !chartDef.renderFn) continue;
+          var renderFn = global[chartDef.renderFn];
+          if (typeof renderFn === 'function') {
+            try { renderFn(); } catch (eRender) {}
+          }
+        }
       }
     }
   }
@@ -1647,9 +1663,22 @@
     }
   ];
 
+  /** Migrate v2 template to v3 (adds type field, supports chart-level widgets) */
+  function migrateTemplateV2toV3(tpl) {
+    if (tpl.version >= 3) return tpl;
+    var out = { name: tpl.name, builtin: tpl.builtin || false, version: 3, widgets: [] };
+    if (tpl.sectionWidgets) out.sectionWidgets = tpl.sectionWidgets;
+    if (tpl.hiddenCharts) out.hiddenCharts = tpl.hiddenCharts;
+    var w = tpl.widgets || [];
+    for (var i = 0; i < w.length; i++) {
+      out.widgets.push({ id: w[i].id, span: w[i].span || 12, type: w[i].type || 'section' });
+    }
+    return out;
+  }
+
   /** Migrate v1 template (order/hiddenSections) to v2 (widgets[]) */
   function migrateTemplateV1toV2(tpl) {
-    if (tpl.version === 2) return tpl;
+    if (tpl.version === 2 || tpl.version >= 3) return tpl;
     var order = tpl.order && tpl.order.length ? tpl.order : ALL_SECTION_IDS;
     var hidden = tpl.hiddenSections || [];
     var widgets = [];
@@ -1696,13 +1725,17 @@
 
   function applyTemplate(tpl) {
     var t2 = migrateTemplateV1toV2(tpl);
+    var t3 = migrateTemplateV2toV3(t2);
     if (!_prefs) _prefs = defaultPrefs();
-    // Derive v1 fields from v2 for backward compat
+    // Derive v1 fields from v3 for backward compat
     var order = [];
     var widgetIds = {};
-    for (var i = 0; i < t2.widgets.length; i++) {
-      order.push(t2.widgets[i].id);
-      widgetIds[t2.widgets[i].id] = true;
+    for (var i = 0; i < t3.widgets.length; i++) {
+      var wType = t3.widgets[i].type || 'section';
+      if (wType === 'section') {
+        order.push(t3.widgets[i].id);
+        widgetIds[t3.widgets[i].id] = true;
+      }
     }
     var hidden = [];
     for (var j = 0; j < ALL_SECTION_IDS.length; j++) {
@@ -1712,12 +1745,43 @@
     _prefs.hiddenSections = hidden;
     _prefs.hiddenCharts = (tpl.hiddenCharts || []).slice();
     migrateHiddenChartsLegacy();
-    _prefs.widgets = t2.widgets.slice();
+    _prefs.widgets = t3.widgets.slice();
     savePrefs();
     setActiveTemplateName(tpl.name);
     applyGridLayout();
     applyAllChartVisibility();
     renderWidgetTree();
+  }
+
+  /**
+   * Create a standalone wrapper for a chart extracted from its section.
+   * Returns the wrapper DOM element (creates if not exists).
+   */
+  function getOrCreateChartWrapper(chartDef) {
+    var wrapperId = 'widget-' + chartDef.id;
+    var existing = document.getElementById(wrapperId);
+    if (existing) return existing;
+
+    var wrapper = document.createElement('div');
+    wrapper.id = wrapperId;
+    wrapper.className = 'chart-box chart-box--standalone';
+
+    var title = document.createElement('h3');
+    title.textContent = typeof t === 'function' ? t(chartDef.titleKey || chartDef.id) : chartDef.id;
+    wrapper.appendChild(title);
+
+    if (chartDef.engine === 'echarts') {
+      var canvas = document.createElement('div');
+      canvas.id = wrapperId + '-canvas';
+      var h = (chartDef.size && chartDef.size.minHeight) || 260;
+      canvas.style.cssText = 'width:100%;height:' + h + 'px';
+      wrapper.appendChild(canvas);
+    } else {
+      var content = document.createElement('div');
+      content.id = wrapperId + '-content';
+      wrapper.appendChild(content);
+    }
+    return wrapper;
   }
 
   /** Render sections into a 12-column CSS grid based on widgets[] */
@@ -1740,15 +1804,33 @@
     for (var ni = children.length - 1; ni >= 0; ni--) {
       var child = children[ni];
       if (!child.id || !child.id.match(/-collapse$/)) {
+        // Also skip standalone chart wrappers
+        if (child.id && child.id.indexOf('widget-') === 0) continue;
         nonSectionNodes.push(child);
       }
     }
 
     var placed = {};
+    var extractedCharts = {};
 
-    // Move sections into grid in widget order
+    // Move sections and charts into grid in widget order
     for (var i = 0; i < widgets.length; i++) {
       var w = widgets[i];
+      var wType = w.type || 'section';
+
+      if (wType === 'chart') {
+        // Chart-level widget: create standalone wrapper
+        var chartDef = reg.findChart(w.id);
+        if (!chartDef) continue;
+        var wrapper = getOrCreateChartWrapper(chartDef);
+        wrapper.setAttribute('data-span', String(w.span || 6));
+        wrapper.style.display = '';
+        gridEl.appendChild(wrapper);
+        extractedCharts[w.id] = true;
+        continue;
+      }
+
+      // Section-level widget (existing logic)
       var sec = reg.findSection(w.id);
       if (!sec || !sec.domId) continue;
       // Skip nested sections — they stay inside their parent
@@ -1778,6 +1860,9 @@
         }
       }
     }
+
+    // Store extracted chart IDs so section renderers can skip them
+    window.__extractedChartIds = extractedCharts;
 
     // Append non-section elements at the end (table, day-picker, etc.)
     for (var ri = nonSectionNodes.length - 1; ri >= 0; ri--) {
@@ -2345,9 +2430,17 @@
     var html = '<div class="tb-preview"><div class="tb-preview-grid">';
     for (var pi = 0; pi < _tbWidgets.length; pi++) {
       var pw = _tbWidgets[pi];
-      var psec = reg.findSection(pw.id);
-      var pname = psec ? _t(psec.titleKey) : pw.id;
-      html += '<div class="tb-preview-cell" style="grid-column:span ' + (pw.span || 12) + '">';
+      var pwType = pw.type || 'section';
+      var pname;
+      if (pwType === 'chart') {
+        var pch = reg.findChart(pw.id);
+        pname = pch ? _t(pch.titleKey) : pw.id;
+      } else {
+        var psec = reg.findSection(pw.id);
+        pname = psec ? _t(psec.titleKey) : pw.id;
+      }
+      var cellClass = 'tb-preview-cell' + (pwType === 'chart' ? ' tb-preview-cell--chart' : '');
+      html += '<div class="' + cellClass + '" style="grid-column:span ' + (pw.span || 12) + '">';
       html += '<span class="tb-preview-name">' + pname + '</span>';
       html += '<span class="tb-preview-span">' + (pw.span || 12) + '</span>';
       html += '</div>';
@@ -2358,12 +2451,40 @@
     html += '<div class="tb-list-title">' + _t('tbWidgets') + '</div>';
     for (var i = 0; i < _tbWidgets.length; i++) {
       var w = _tbWidgets[i];
-      var sec = reg.findSection(w.id);
-      var name = sec ? _t(sec.titleKey) : w.id;
-      html += '<div class="tb-row" data-idx="' + i + '" draggable="true">';
+      var wType = w.type || 'section';
+      var isChart = wType === 'chart';
+      var name;
+      var secForCharts = null;
+      if (isChart) {
+        var ch = reg.findChart(w.id);
+        name = ch ? _t(ch.titleKey) : w.id;
+      } else {
+        var sec = reg.findSection(w.id);
+        name = sec ? _t(sec.titleKey) : w.id;
+        secForCharts = sec;
+      }
+      var rowClass = 'tb-row' + (isChart ? ' tb-row--chart' : '');
+      html += '<div class="' + rowClass + '" data-idx="' + i + '" draggable="true">';
       html += '<div class="tb-row-header">';
       html += '<span class="tb-row-drag">&#x2630;</span>';
       html += '<span>' + name + '</span>';
+      // For sections: show expand toggle to reveal charts
+      if (!isChart && secForCharts && secForCharts.charts && secForCharts.charts.length) {
+        var echartsCharts = [];
+        for (var eci = 0; eci < secForCharts.charts.length; eci++) {
+          var ech = secForCharts.charts[eci];
+          if (ech.kind !== 'chip' && ech.engine === 'echarts') echartsCharts.push(ech);
+        }
+        if (echartsCharts.length) {
+          html += '<span class="tb-chart-expand" data-sec-id="' + w.id + '" data-idx="' + i + '">';
+          html += '&#x25BC; ' + echartsCharts.length + ' charts';
+          html += '</span>';
+        }
+      }
+      // For charts: show "absorb" button to put back into section
+      if (isChart && w.section) {
+        html += '<button type="button" class="tb-chart-absorb" data-idx="' + i + '" title="Back to section" style="font-size:.65rem;margin-left:4px;padding:1px 6px;border-radius:3px;border:1px solid #475569;background:transparent;color:#94a3b8;cursor:pointer">&#x21A9;</button>';
+      }
       html += '<div class="tb-cell-span">';
       html += '<label>span</label>';
       html += '<select class="tb-span-select" data-idx="' + i + '">';
@@ -2417,6 +2538,70 @@
           var idx = parseInt(rmBtn.dataset.idx, 10);
           _tbWidgets.splice(idx, 1);
           renderBuilderRows();
+          return;
+        }
+        // Chart expand: show extractable charts under a section
+        var expBtn = e.target.closest('.tb-chart-expand');
+        if (expBtn) {
+          var secId = expBtn.dataset.secId;
+          var secIdx = parseInt(expBtn.dataset.idx, 10);
+          var existingList = expBtn.parentElement.parentElement.querySelector('.tb-chart-list');
+          if (existingList) {
+            existingList.remove();
+            return;
+          }
+          var rg = getRegistry();
+          var sc = rg ? rg.findSection(secId) : null;
+          if (!sc || !sc.charts) return;
+          var listDiv = document.createElement('div');
+          listDiv.className = 'tb-chart-list';
+          for (var ci = 0; ci < sc.charts.length; ci++) {
+            var ch = sc.charts[ci];
+            if (ch.kind === 'chip' || ch.engine !== 'echarts') continue;
+            // Check if already extracted
+            var alreadyExtracted = false;
+            for (var ei = 0; ei < _tbWidgets.length; ei++) {
+              if (_tbWidgets[ei].id === ch.id && _tbWidgets[ei].type === 'chart') { alreadyExtracted = true; break; }
+            }
+            var item = document.createElement('div');
+            item.className = 'tb-chart-item';
+            item.innerHTML = '<span>' + _t(ch.titleKey) + '</span>';
+            if (!alreadyExtracted) {
+              var btn = document.createElement('button');
+              btn.type = 'button';
+              btn.textContent = 'Extract';
+              btn.dataset.chartId = ch.id;
+              btn.dataset.secId = secId;
+              btn.dataset.afterIdx = String(secIdx);
+              item.appendChild(btn);
+            } else {
+              var tag = document.createElement('span');
+              tag.style.cssText = 'color:#22c55e;font-size:.65rem';
+              tag.textContent = '(extracted)';
+              item.appendChild(tag);
+            }
+            listDiv.appendChild(item);
+          }
+          expBtn.parentElement.parentElement.appendChild(listDiv);
+          return;
+        }
+        // Extract chart: add as standalone widget after its section
+        var extractBtn = e.target.closest('.tb-chart-item button');
+        if (extractBtn && extractBtn.dataset.chartId) {
+          var chartId = extractBtn.dataset.chartId;
+          var afterIdx = parseInt(extractBtn.dataset.afterIdx, 10);
+          var sectionId = extractBtn.dataset.secId;
+          _tbWidgets.splice(afterIdx + 1, 0, { id: chartId, span: 6, type: 'chart', section: sectionId });
+          renderBuilderRows();
+          return;
+        }
+        // Absorb chart: put back into section (remove from widget list)
+        var absorbBtn = e.target.closest('.tb-chart-absorb');
+        if (absorbBtn) {
+          var absIdx = parseInt(absorbBtn.dataset.idx, 10);
+          _tbWidgets.splice(absIdx, 1);
+          renderBuilderRows();
+          return;
         }
       });
       // Drag & drop reorder
@@ -2464,7 +2649,7 @@
       if (!name || !name.trim()) return;
       name = name.trim();
     }
-    var tpl = { name: name, version: 2, widgets: _tbWidgets.slice() };
+    var tpl = { name: name, version: 3, widgets: _tbWidgets.slice() };
     // Save to user templates
     var userTpls = loadTemplates();
     var found = false;

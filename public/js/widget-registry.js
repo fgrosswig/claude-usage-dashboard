@@ -485,6 +485,33 @@
         ]
       },
 
+      // ── Intelligence / Predictive Metrics ─────────────────────
+      {
+        id: 'intelligence',
+        titleKey: 'sectionIntelligence',
+        domId: 'intelligence-collapse',
+        sectionRenderFn: 'renderIntelligenceSection',
+        reorderable: true,
+        defaultOpen: false,
+        dataSource: '/api/usage',
+        requires: ['usage', 'proxy'],
+        charts: [
+          { id: 'intel-saturation', titleKey: 'intelSaturation', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'intel-saturation', widgetGroup: 'intel-scores', renderFn: 'renderIntelligenceSection' },
+          { id: 'intel-health', titleKey: 'intelHealth', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'intel-health', widgetGroup: 'intel-scores', renderFn: 'renderIntelligenceSection' },
+          { id: 'intel-quota-eta', titleKey: 'intelQuotaEta', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'intel-quota-eta', widgetGroup: 'intel-scores', renderFn: 'renderIntelligenceSection' },
+          { id: 'intel-narrative', titleKey: 'intelNarrative', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'intel-narrative', renderFn: 'renderIntelligenceSection' },
+          {
+            id: 'intel-seasonality',
+            titleKey: 'intelSeasonality',
+            type: 'bar',
+            engine: 'echarts',
+            canvasId: 'c-intel-seasonality',
+            size: { cols: 1, minHeight: 200 },
+            renderFn: 'renderIntel_seasonality'
+          }
+        ]
+      },
+
       // ── Economic Usage (already ECharts) ───────────────────────
       {
         id: 'economic',

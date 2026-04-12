@@ -701,6 +701,37 @@ tr:hover td{background:#334155}
 .layout-grid>[data-span="11"]{--span:11}.layout-grid>[data-span="12"]{--span:12}
 @media(max-width:900px){.layout-grid>[data-span]{--span:12}}
 
+/* ── Intelligence Section ────────────────────────────────────────── */
+.intelligence-inner{padding:0 12px 12px}
+.intelligence-scores{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.intelligence-scores .chart-box--kpi{flex:1 1 140px;min-width:140px}
+.intel-narrative-box{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px 16px;margin-bottom:12px}
+.intel-narrative-line{font-size:.82rem;color:#e2e8f0;padding:3px 0;display:flex;align-items:center;gap:8px}
+.intel-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.intel-dot--green{background:#22c55e}
+.intel-dot--yellow{background:#f59e0b}
+.intel-dot--red{background:#ef4444}
+.intel-rootcause-box{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px 16px;margin-bottom:12px}
+.intel-rootcause-box h4{font-size:.82rem;color:#94a3b8;margin:0 0 8px;font-weight:600}
+.intel-rc-item{font-size:.78rem;color:#cbd5e1;padding:2px 0}
+.intel-rc--high{color:#f87171}
+.intel-rc--medium{color:#fbbf24}
+#c-intel-seasonality{width:100%;height:200px}
+
+/* ── Standalone Chart Wrapper (extracted from section) ───────────── */
+.chart-box--standalone{background:#1e293b;border-radius:10px;padding:16px;border:1px solid #334155;min-height:200px}
+.chart-box--standalone h3{font-size:.9rem;color:#94a3b8;margin:0 0 10px;font-weight:600}
+
+/* ── Template Builder: chart sub-items ───────────────────────────── */
+.tb-row--chart{margin-left:24px;border-left:2px solid rgba(59,130,246,.3);padding-left:8px}
+.tb-preview-cell--chart{background:rgba(34,197,94,.12)!important;border-color:rgba(34,197,94,.3)!important}
+.tb-chart-expand{cursor:pointer;user-select:none;font-size:.7rem;color:#64748b;margin-left:4px}
+.tb-chart-expand:hover{color:#94a3b8}
+.tb-chart-list{margin:4px 0 0 24px;font-size:.75rem}
+.tb-chart-item{display:flex;align-items:center;gap:6px;padding:3px 0;color:#94a3b8}
+.tb-chart-item button{font-size:.65rem;padding:1px 6px;border-radius:3px;border:1px solid #475569;background:transparent;color:#94a3b8;cursor:pointer}
+.tb-chart-item button:hover{background:#334155;color:#e2e8f0}
+
 /* ── Template Builder Modal ───────────────────────────────────────── */
 .tb-header-left{display:flex;align-items:center;gap:12px}
 .tb-header-actions{display:flex;align-items:center;gap:8px}
@@ -803,7 +834,19 @@ details.sidebar-section[open]>.sidebar-section-title::before{transform:rotate(90
 .sidebar-layout-edit.is-active{background:#3b82f6;color:#fff;border-color:#2563eb}
 .widget-tree-drag{cursor:grab;color:#475569;font-size:.85rem;flex-shrink:0;user-select:none}
 .widget-tree-drag:active{cursor:grabbing}
-.widget-tree-check{accent-color:#3b82f6;flex-shrink:0}
+.widget-tree:not(.widget-tree--edit) .widget-tree-drag{display:none}
+.widget-tree:not(.widget-tree--edit) .widget-tree-item[data-section]{cursor:default}
+.widget-tree-check{flex-shrink:0}
+.widget-tree:not(.widget-tree--edit) .widget-tree-check{
+  accent-color:#64748b;
+  opacity:.82;
+  cursor:not-allowed;
+}
+.widget-tree--edit .widget-tree-check{
+  accent-color:#3b82f6;
+  opacity:1;
+  cursor:pointer;
+}
 .widget-tree-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .widget-tree-span{font-size:.6rem;color:#64748b;background:#1e293b;border:1px solid #334155;border-radius:3px;padding:1px 4px;margin-left:4px;white-space:nowrap}
 .widget-tree-expand{background:none;border:none;color:#475569;cursor:pointer;font-size:.65rem;padding:2px 4px;flex-shrink:0;transition:transform .15s ease}
@@ -823,7 +866,13 @@ details.sidebar-section[open]>.sidebar-section-title::before{transform:rotate(90
 .widget-tree-group-head{display:flex;align-items:center;gap:6px;padding:3px 0 2px 0;font-size:.72rem;color:#94a3b8;flex-wrap:nowrap}
 .widget-tree-group-head .widget-tree-check{flex-shrink:0}
 .widget-tree-group-head .widget-tree-expand--group{flex-shrink:0}
-.widget-tree-group-charts{list-style:none;margin:0 0 6px 0;padding:0 0 0 18px;border-left:2px solid rgba(100,116,139,.35)}
+/* Unterliste unter Gruppenkopf: Einzug per margin-left (Eltern-Cluster), padding für Inhalt + Linie */
+.widget-tree-group-charts{
+  list-style:none;
+  margin:0 0 6px 45px;
+  padding:0 0 0 10px;
+  border-left:2px solid rgba(100,116,139,.35);
+}
 .widget-tree-group-charts .widget-tree-item{padding:2px 0}
 /* Spalte wie Drag+Gap der Section-Zeile, damit Gruppen-Checkbox unter Section-Checkbox sitzt */
 .widget-tree-group-spacer{display:inline-block;width:30px;flex-shrink:0}

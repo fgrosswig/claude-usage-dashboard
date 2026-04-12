@@ -1922,6 +1922,7 @@ function renderDashboardCore(data) {
   // Section renders — dispatcher controls order + visibility
   renderProxyAnalysis(data);
   renderBudgetEfficiency(data);
+  renderIntelligenceSection(data);
   renderEconomicSection(data, getFilteredDays(data.days));
   renderUserProfileCharts(getFilteredDays(data.days));
   updateMetaDetailsSummary(data);
@@ -2990,6 +2991,60 @@ function computeAnomalyStats(allVers, stats) {
   return { totalCalls: totalCalls, totalAnomalies: totalAnomalies, anomalyRate: anomalyRate, worstVer: worstVer, worstAnomaly: worstAnomaly };
 }
 
+/**
+ * Compute shared context for User Profile charts.
+ * Cached on window.__sectionCtx_userProfile so standalone chart renderers can use it.
+ */
+function _computeUserProfileCtx(days) {
+  var stats = aggregateVersionStats(days);
+  var allVers = collectAllVersionKeys(stats, days);
+  var top = findLatestDayTopEntries(days);
+  var anom = computeAnomalyStats(allVers, stats);
+
+  var filteredVers = __userVersionFilter
+    ? allVers.filter(function(v) { return __userVersionFilter.includes(v); })
+    : allVers;
+  var sortedVers = sortVersionKeys(filteredVers, stats, __userVersionSort);
+
+  var barPitch = 30;
+  var chartCanvasH = Math.max(240, sortedVers.length * barPitch + 56);
+
+  var sCtx = {
+    days: days,
+    stats: stats,
+    allVers: allVers,
+    top: top,
+    anom: anom,
+    sortedVers: sortedVers,
+    chartCanvasH: chartCanvasH,
+    releaseData: __releaseStabilityData
+  };
+  window.__sectionCtx_userProfile = sCtx;
+  return sCtx;
+}
+window._computeUserProfileCtx = _computeUserProfileCtx;
+
+/** Standalone: render Version Health horizontal bar chart. */
+window.renderUserProfile_versions = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_userProfile;
+  if (!sCtx) return;
+  renderVersionHealthChart(sCtx.sortedVers, sCtx.stats, sCtx.allVers);
+};
+
+/** Standalone: render Entrypoints horizontal bar chart. */
+window.renderUserProfile_entrypoints = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_userProfile;
+  if (!sCtx) return;
+  renderEntrypointsChart(sCtx.sortedVers, sCtx.stats);
+};
+
+/** Standalone: render Release Stability horizontal bar chart. */
+window.renderUserProfile_releaseStability = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_userProfile;
+  if (!sCtx) return;
+  renderReleaseStabilityChart(sCtx.sortedVers, sCtx.releaseData);
+};
+
 function renderUserProfileCharts(days) {
   var sumEl = document.getElementById("user-profile-summary-line");
   if (!sumEl) return;
@@ -2999,46 +3054,36 @@ function renderUserProfileCharts(days) {
     return;
   }
 
-  var stats = aggregateVersionStats(days);
-  var allVers = collectAllVersionKeys(stats, days);
-
-  var top = findLatestDayTopEntries(days);
-  var anom = computeAnomalyStats(allVers, stats);
+  var sCtx = _computeUserProfileCtx(days);
 
   sumEl.textContent = t("userProfileSummary")
-    .replace("{version}", top.topVersion || "?")
-    .replace("{entrypoint}", top.topEntrypoint || "?")
-    .replace("{verCount}", String(allVers.length))
-    .replace("{rate}", String(anom.anomalyRate))
-    .replace("{anomalies}", String(anom.totalAnomalies))
-    .replace("{calls}", String(anom.totalCalls))
-    .replace("{worst}", anom.worstVer || "-")
-    .replace("{worstCount}", String(anom.worstAnomaly));
+    .replace("{version}", sCtx.top.topVersion || "?")
+    .replace("{entrypoint}", sCtx.top.topEntrypoint || "?")
+    .replace("{verCount}", String(sCtx.allVers.length))
+    .replace("{rate}", String(sCtx.anom.anomalyRate))
+    .replace("{anomalies}", String(sCtx.anom.totalAnomalies))
+    .replace("{calls}", String(sCtx.anom.totalCalls))
+    .replace("{worst}", sCtx.anom.worstVer || "-")
+    .replace("{worstCount}", String(sCtx.anom.worstAnomaly));
 
   // Init sort/filter controls
-  initUserVersionControls(stats, days);
+  initUserVersionControls(sCtx.stats, days);
 
-  // Sort + filter (declared here so it's available for both charts)
-  var filteredVers = __userVersionFilter
-    ? allVers.filter(function(v) { return __userVersionFilter.includes(v); })
-    : allVers;
-  var sortedVers = sortVersionKeys(filteredVers, stats, __userVersionSort);
-
-  // Nur der Canvas-Host bekommt die Plot-Höhe — nicht die ganze .chart-box (sonst stimmt ECharts-Layout vs. h3+Blurb nicht).
-  var barPitch = 30;
-  var chartCanvasH = Math.max(240, sortedVers.length * barPitch + 56);
+  // Set canvas heights
   var hosts = document.querySelectorAll("#user-profile-charts .user-chart-canvas-host");
   for (var hEl of hosts) {
-    hEl.style.height = chartCanvasH + "px";
-    hEl.style.minHeight = chartCanvasH + "px";
+    hEl.style.height = sCtx.chartCanvasH + "px";
+    hEl.style.minHeight = sCtx.chartCanvasH + "px";
   }
   for (var bx of document.querySelectorAll("#user-profile-charts .chart-box")) {
     bx.style.height = "";
   }
 
-  renderVersionHealthChart(sortedVers, stats, allVers);
-  renderEntrypointsChart(sortedVers, stats);
-  renderReleaseStabilityChart(sortedVers, __releaseStabilityData);
+  // Render via standalone functions
+  window.renderUserProfile_versions(sCtx);
+  window.renderUserProfile_entrypoints(sCtx);
+  window.renderUserProfile_releaseStability(sCtx);
+
   function __resizeUserProfileChartsAfterLayout() {
     try {
       if (_userCharts.versions && typeof _userCharts.versions.resize === "function") _userCharts.versions.resize();
@@ -3553,6 +3598,67 @@ function __budgetRenderAlert(alertEl, quota) {
   }
 }
 
+/**
+ * Compute shared context for Budget Efficiency charts.
+ * Cached on window.__sectionCtx_budget.
+ */
+function _computeBudgetCtx(data) {
+  var days = getFilteredDays(data.days);
+  var filteredHost = typeof getFilterHost === "function" ? getFilterHost() : "";
+  __budgetFilteredHost = filteredHost;
+
+  var aggBe = __aggregateBudgetDaysForEfficiency(days, filteredHost);
+  var tot = aggBe.tot;
+  var dailyTrend = aggBe.dailyTrend;
+  var m = __budgetMetricsFromTot(tot);
+  var quota = __budgetQuotaFromLatestProxy(data.proxy);
+  var hostTotals = __budgetHostTotalsFromDays(days);
+  var proxyDays = data.proxy?.proxy_days || [];
+  __budgetApplyQuotaToTrend(dailyTrend, __budgetQuotaByDateMap(proxyDays));
+
+  var sCtx = {
+    data: data, days: days, tot: tot, dailyTrend: dailyTrend,
+    m: m, quota: quota, hostTotals: hostTotals, filteredHost: filteredHost
+  };
+  window.__sectionCtx_budget = sCtx;
+  return sCtx;
+}
+window._computeBudgetCtx = _computeBudgetCtx;
+
+/** Standalone: render Budget Sankey chart. */
+window.renderBudget_sankey = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_budget;
+  if (!sCtx) return;
+  renderBudgetWaterfall(sCtx.tot, sCtx.quota, sCtx.filteredHost ? {} : sCtx.hostTotals);
+};
+
+/** Standalone: render Budget Trend chart. */
+window.renderBudget_trend = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_budget;
+  if (!sCtx) return;
+  var el = document.getElementById("c-budget-trend");
+  var h3 = document.getElementById("budget-trend-h3");
+  if (h3) h3.textContent = t("budgetTrendTitle");
+  var blurb = document.getElementById("budget-trend-blurb");
+  if (blurb) blurb.textContent = t("budgetTrendBlurb");
+  __budgetDrawTrendEfficiencyChart(el, sCtx.dailyTrend.map(function(d) { return d.date; }), sCtx.dailyTrend, t);
+};
+
+/** Standalone: render Budget Quota Usage chart. */
+window.renderBudget_quota = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_budget;
+  if (!sCtx) return;
+  var labels = sCtx.dailyTrend.map(function(d) { return d.date; });
+  var el2 = document.getElementById("c-budget-quota");
+  var h32 = document.getElementById("budget-quota-h3");
+  if (h32) h32.textContent = t("budgetQuotaTitle");
+  var blurb2 = document.getElementById("budget-quota-blurb");
+  if (blurb2) blurb2.textContent = t("budgetQuotaBlurb");
+  if (el2 && sCtx.dailyTrend.length) {
+    __budgetDrawQuotaUsageChart(el2, labels, __budgetQuotaTrendDatasets(sCtx.dailyTrend, t));
+  }
+};
+
 function renderBudgetEfficiency(data) {
   var sumEl = document.getElementById("budget-summary-line");
   var cardsEl = document.getElementById("budget-cards");
@@ -3564,34 +3670,21 @@ function renderBudgetEfficiency(data) {
     return;
   }
 
-  // Respect host filter from top bar
-  var filteredHost = typeof getFilterHost === "function" ? getFilterHost() : "";
-  __budgetFilteredHost = filteredHost;
+  var sCtx = _computeBudgetCtx(data);
 
-  var aggBe = __aggregateBudgetDaysForEfficiency(days, filteredHost);
-  var tot = aggBe.tot;
-  var dailyTrend = aggBe.dailyTrend;
-
-  var m = __budgetMetricsFromTot(tot);
-  __budgetFillSummary(sumEl, tot, m);
+  __budgetFillSummary(sumEl, sCtx.tot, sCtx.m);
 
   if (cardsEl) {
-    cardsEl.innerHTML = __budgetKpiCardsHtml(days, tot, m.outputPct, m.overheadFactor, m.cacheMissRate, m.lostSignals);
+    cardsEl.innerHTML = __budgetKpiCardsHtml(sCtx.days, sCtx.tot, sCtx.m.outputPct, sCtx.m.overheadFactor, sCtx.m.cacheMissRate, sCtx.m.lostSignals);
   }
 
-  var quota = __budgetQuotaFromLatestProxy(data.proxy);
-  __budgetRenderFuel(document.getElementById("budget-fuel"), tot, quota);
-  __budgetRenderAlert(document.getElementById("budget-alert"), quota);
+  __budgetRenderFuel(document.getElementById("budget-fuel"), sCtx.tot, sCtx.quota);
+  __budgetRenderAlert(document.getElementById("budget-alert"), sCtx.quota);
 
-  var hostTotals = __budgetHostTotalsFromDays(days);
-
-  // Waterfall Chart — if host filter active, skip multi-host view
-  renderBudgetWaterfall(tot, quota, filteredHost ? {} : hostTotals);
-
-  var proxyDays = data.proxy?.proxy_days || [];
-  __budgetApplyQuotaToTrend(dailyTrend, __budgetQuotaByDateMap(proxyDays));
-
-  renderBudgetTrend(dailyTrend);
+  // Render charts via standalone functions
+  window.renderBudget_sankey(sCtx);
+  window.renderBudget_trend(sCtx);
+  window.renderBudget_quota(sCtx);
 }
 
 // Approximate quota cost weights (relative to output=1)
@@ -4045,25 +4138,150 @@ function __budgetDrawQuotaUsageChart(el2, labels, qDatasets) {
   });
 }
 
+// renderBudgetTrend: kept as backward-compat wrapper (called from __budgetSwitchesWired flow)
 function renderBudgetTrend(dailyTrend) {
-
   var labels = dailyTrend.map(function(d) { return d.date; });
-
-  var el = document.getElementById("c-budget-trend");
-  var h3 = document.getElementById("budget-trend-h3");
-  if (h3) h3.textContent = t("budgetTrendTitle");
-  var blurb = document.getElementById("budget-trend-blurb");
-  if (blurb) blurb.textContent = t("budgetTrendBlurb");
-  __budgetDrawTrendEfficiencyChart(el, labels, dailyTrend, t);
-
+  __budgetDrawTrendEfficiencyChart(document.getElementById("c-budget-trend"), labels, dailyTrend, t);
   var el2 = document.getElementById("c-budget-quota");
-  var h32 = document.getElementById("budget-quota-h3");
-  if (h32) h32.textContent = t("budgetQuotaTitle");
-  var blurb2 = document.getElementById("budget-quota-blurb");
-  if (blurb2) blurb2.textContent = t("budgetQuotaBlurb");
   if (el2 && dailyTrend.length) {
     __budgetDrawQuotaUsageChart(el2, labels, __budgetQuotaTrendDatasets(dailyTrend, t));
   }
+}
+
+// ── Intelligence / Predictive Metrics Section ────────────────────────────
+
+var _intelCharts = { seasonality: null };
+
+function renderIntelligenceSection(data) {
+  var sumEl = document.getElementById('intelligence-summary-line');
+  var scoresEl = document.getElementById('intelligence-scores');
+  var narrativeEl = document.getElementById('intelligence-narrative');
+  var rootCauseEl = document.getElementById('intelligence-rootcause');
+  if (!sumEl) return;
+
+  var engine = window.__metricsEngine;
+  if (!engine) { sumEl.textContent = t('intelNoData'); return; }
+
+  var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+  if (!proxyDays.length) { sumEl.textContent = t('intelNoData'); return; }
+
+  // Compute health indicators (reuse existing function)
+  var indicators = typeof computeHealthIndicators === 'function'
+    ? computeHealthIndicators(data) : null;
+
+  var metrics = engine.computeAll(data, indicators);
+
+  // Summary line
+  sumEl.textContent = tr('intelSummaryLine', {
+    sat: String(metrics.saturation),
+    health: String(metrics.healthScore),
+    q5: String(metrics.quotaETA.pct5h)
+  });
+
+  // Score cards
+  if (scoresEl) {
+    var satCls = metrics.saturation >= 75 ? 'danger' : metrics.saturation >= 40 ? 'warn' : 'ok';
+    var healthCls = metrics.healthScore < 50 ? 'danger' : metrics.healthScore < 75 ? 'warn' : 'ok';
+    var etaVal = metrics.quotaETA.minutesLeft > 0
+      ? (metrics.quotaETA.minutesLeft >= 60
+        ? Math.floor(metrics.quotaETA.minutesLeft / 60) + 'h ' + (metrics.quotaETA.minutesLeft % 60) + 'm'
+        : metrics.quotaETA.minutesLeft + 'm')
+      : '\u2014';
+    var etaCls = metrics.quotaETA.minutesLeft > 0 && metrics.quotaETA.minutesLeft < 60 ? 'warn' : '';
+
+    var cards = [
+      { wid: 'intel-saturation', label: t('intelSaturation'), value: metrics.saturation + '/100', sub: satCls === 'ok' ? 'Low stress' : satCls === 'warn' ? 'Elevated' : 'Critical', cls: satCls },
+      { wid: 'intel-health', label: t('intelHealth'), value: metrics.healthScore + '/100', sub: healthCls === 'ok' ? 'Good' : healthCls === 'warn' ? 'Degraded' : 'Poor', cls: healthCls },
+      { wid: 'intel-quota-eta', label: t('intelQuotaEta'), value: etaVal, sub: metrics.quotaETA.pct5h + '% used' + (metrics.quotaETA.confidence !== 'none' ? ' (' + metrics.quotaETA.confidence + ')' : ''), cls: etaCls }
+    ];
+    var ch = '';
+    for (var ci = 0; ci < cards.length; ci++) {
+      var c = cards[ci];
+      ch += '<div class="chart-box chart-box--kpi" id="' + c.wid + '"><div class="card ' + c.cls + '">' +
+        '<div class="label">' + escHtml(c.label) + '</div>' +
+        '<div class="value">' + escHtml(c.value) + '</div>' +
+        '<div class="sub">' + escHtml(c.sub) + '</div></div></div>';
+    }
+    scoresEl.innerHTML = ch;
+  }
+
+  // Narrative summary
+  if (narrativeEl && metrics.narrative.length) {
+    var nh = '<div class="intel-narrative-box" id="intel-narrative">';
+    for (var ni = 0; ni < metrics.narrative.length; ni++) {
+      var line = metrics.narrative[ni];
+      var dotCls = 'intel-dot';
+      if (line.indexOf('critical') >= 0 || line.indexOf('poor') >= 0 || line.indexOf('high') >= 0) dotCls += ' intel-dot--red';
+      else if (line.indexOf('elevated') >= 0 || line.indexOf('degraded') >= 0) dotCls += ' intel-dot--yellow';
+      else dotCls += ' intel-dot--green';
+      nh += '<div class="intel-narrative-line"><span class="' + dotCls + '"></span> ' + escHtml(line) + '</div>';
+    }
+    nh += '</div>';
+    narrativeEl.innerHTML = nh;
+  }
+
+  // Root cause (only if saturation elevated)
+  if (rootCauseEl) {
+    if (metrics.rootCause.length && metrics.saturation >= 40) {
+      var rh = '<div class="intel-rootcause-box"><h4>' + t('intelRootCauseTitle') + '</h4>';
+      for (var ri = 0; ri < metrics.rootCause.length; ri++) {
+        var rc = metrics.rootCause[ri];
+        var rcCls = rc.severity === 'high' ? 'intel-rc--high' : 'intel-rc--medium';
+        rh += '<div class="intel-rc-item ' + rcCls + '">' + escHtml(rc.factor) + ' <strong>' + escHtml(rc.pct) + '</strong></div>';
+      }
+      rh += '</div>';
+      rootCauseEl.innerHTML = rh;
+    } else {
+      rootCauseEl.innerHTML = '';
+    }
+  }
+
+  // Seasonality chart
+  renderIntelSeasonalityChart(metrics.seasonality);
+}
+
+/** Standalone: render seasonality bar chart. */
+window.renderIntel_seasonality = function (sCtx) {
+  var seasonal = sCtx || (window.__metricsEngine && window.__metricsEngine._lastSeasonality);
+  if (!seasonal) return;
+  renderIntelSeasonalityChart(seasonal);
+};
+
+function renderIntelSeasonalityChart(seasonal) {
+  if (!seasonal || !seasonal.byHour) return;
+  var el = document.getElementById('c-intel-seasonality');
+  if (!el) return;
+
+  if (typeof echarts === 'undefined') return;
+  if (_intelCharts.seasonality) { _intelCharts.seasonality.dispose(); _intelCharts.seasonality = null; }
+
+  _intelCharts.seasonality = echarts.init(el, null, { renderer: 'canvas' });
+
+  var labels = [];
+  var values = [];
+  var latValues = [];
+  for (var h = 0; h < seasonal.byHour.length; h++) {
+    var bh = seasonal.byHour[h];
+    labels.push(String(bh.hour).padStart(2, '0') + ':00');
+    values.push(bh.avgRequests);
+    latValues.push(bh.avgLatencyMs);
+  }
+
+  _intelCharts.seasonality.setOption({
+    animation: false,
+    grid: { left: 40, right: 50, top: 30, bottom: 30 },
+    legend: { data: ['Requests', 'Latency (ms)'], textStyle: { color: '#cbd5e1', fontSize: 10 }, top: 2 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' } },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: [
+      { type: 'value', min: 0, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+      { type: 'value', min: 0, axisLabel: { color: '#f59e0b', fontSize: 10, formatter: function (v) { return v >= 1000 ? (v / 1000).toFixed(1) + 's' : v + 'ms'; } }, splitLine: { show: false } }
+    ],
+    series: [
+      { name: 'Requests', type: 'bar', data: values, itemStyle: { color: function (p) { return p.dataIndex === seasonal.peakHour ? 'rgba(239,68,68,0.7)' : 'rgba(59,130,246,0.6)'; }, borderRadius: [3, 3, 0, 0] } },
+      { name: 'Latency (ms)', type: 'line', yAxisIndex: 1, data: latValues, smooth: 0.3, symbol: 'circle', symbolSize: 4, lineStyle: { color: '#f59e0b', width: 2 }, itemStyle: { color: '#f59e0b' } }
+    ]
+  }, true);
 }
 
 // ── Proxy Analytics Panel ─────────────────────────────────────────────────
@@ -4147,8 +4365,63 @@ function __bindProxyToggleResize() {
   });
 }
 
+/**
+ * Compute shared context for Proxy Analytics charts.
+ * Cached on window.__sectionCtx_proxy.
+ */
+function _computeProxyCtx(data) {
+  var sCtx = { data: data };
+  window.__sectionCtx_proxy = sCtx;
+  return sCtx;
+}
+window._computeProxyCtx = _computeProxyCtx;
+
+/** Standalone: render Proxy Token stacked bar chart. */
+window.renderProxy_tokens = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_proxy;
+  if (!sCtx) return;
+  renderProxyTokenChart(sCtx.data);
+};
+/** Standalone: render Proxy Latency line chart. */
+window.renderProxy_latency = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_proxy;
+  if (!sCtx) return;
+  renderProxyLatencyChart(sCtx.data);
+};
+/** Standalone: render Proxy Hourly bar chart. */
+window.renderProxy_hourly = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_proxy;
+  if (!sCtx) return;
+  renderProxyHourlyHeatmap(sCtx.data);
+};
+/** Standalone: render Proxy Model breakdown chart. */
+window.renderProxy_models = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_proxy;
+  if (!sCtx) return;
+  renderProxyModelChart(sCtx.data);
+};
+/** Standalone: render Proxy Hourly Latency overlay chart. */
+window.renderProxy_hourlyLatency = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_proxy;
+  if (!sCtx) return;
+  renderProxyHourlyLatency(sCtx.data);
+};
+/** Standalone: render Proxy Error Trend chart. */
+window.renderProxy_errorTrend = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_proxy;
+  if (!sCtx) return;
+  renderProxyErrorTrend(sCtx.data);
+};
+/** Standalone: render Proxy Cache Trend chart. */
+window.renderProxy_cacheTrend = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_proxy;
+  if (!sCtx) return;
+  renderProxyCacheTrend(sCtx.data);
+};
+
 function renderProxyAnalysis(data) {
   __bindProxyToggleResize();
+  _computeProxyCtx(data);
   var sumEl = document.getElementById("proxy-summary-line");
   var noteEl = document.getElementById("proxy-note");
   var cardsEl = document.getElementById("proxy-cards");
