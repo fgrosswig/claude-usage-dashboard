@@ -552,5 +552,22 @@
   "econOverheadSummary": "Q5: {actual}% 실제 vs {ideal}% 이상 — {ratio}% Q5 오버헤드 ({gap}%가 {events}개 패널티 이벤트로 손실). 가시적 토큰 오버헤드: ~3.5% — 차이는 숨겨진 비용입니다.",
   "econDrainTitle": "예산 소모 — 일일 세션 영향",
   "econDrainBlurb": "하루 동안의 남은 할당량. 빨간 블록은 강제 재시작으로 인한 리빌드 비용 — 이미 구축된 컨텍스트에 낭비된 토큰입니다.",
-  "econDrainNoProxyLogs": "{date}에 대한 프록시 로그가 없습니다. Q5 상관 패널은 숨겨집니다."
+  "econDrainNoProxyLogs": "{date}에 대한 프록시 로그가 없습니다. Q5 상관 패널은 숨겨집니다.",
+  "settingsTitle": "설정",
+  "settingsBtnTitle": "대시보드 구성",
+  "settingsFilterTitle": "필터",
+  "settingsLayoutTitle": "레이아웃",
+  "settingsTemplatesTitle": "템플릿",
+  "settingsSettingsTitle": "설정",
+  "settingsStatsTitle": "통계",
+  "settingsExportTitle": "내보내기",
+  "settingsResetLayout": "기본값으로 초기화",
+  "settingsExportJsonl": "JSONL 데이터 내보내기",
+  "settingsExportTemplate": "레이아웃 내보내기",
+  "settingsImportTemplate": "레이아웃 가져오기",
+  "settingsTemplatesHint": "템플릿은 향후 버전에서 사용 가능합니다.",
+  "settingsLangLabel": "언어",
+  "settingsPlanLabel": "플랜",
+  "settingsDayLabel": "날짜",
+  "settingsHostLabel": "호스트 필터"
 }

@@ -273,10 +273,353 @@
     return isSectionVisible(sectionId);
   }
 
+  // ── Sidebar UI ───────────────────────────────────────────────
+
+  var _sidebarOpen = false;
+
+  function toggleSidebar(force) {
+    var sb = document.getElementById('sidebar');
+    if (!sb) return;
+    _sidebarOpen = typeof force === 'boolean' ? force : !_sidebarOpen;
+    sb.classList.toggle('is-open', _sidebarOpen);
+    document.body.classList.toggle('sidebar-open', _sidebarOpen);
+    var btn = document.getElementById('settings-nav-btn');
+    if (btn) btn.classList.toggle('is-active', _sidebarOpen);
+    if (_sidebarOpen) {
+      renderWidgetTree();
+      renderSettingsSection();
+      renderTemplatesSection();
+      renderExportSection();
+      // Resize charts after layout shift
+      setTimeout(function () { resizeAll(); }, 250);
+    }
+    try { localStorage.setItem('cud_sidebar_open', _sidebarOpen ? '1' : '0'); } catch (e) {}
+  }
+
+  function bindSidebarEvents() {
+    var btn = document.getElementById('settings-nav-btn');
+    if (btn) btn.addEventListener('click', function () { toggleSidebar(); });
+    var close = document.getElementById('sidebar-close');
+    if (close) close.addEventListener('click', function () { toggleSidebar(false); });
+    // ESC key closes sidebar
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && _sidebarOpen) toggleSidebar(false);
+    });
+    // Restore sidebar state
+    try {
+      if (localStorage.getItem('cud_sidebar_open') === '1') {
+        setTimeout(function () { toggleSidebar(true); }, 100);
+      }
+    } catch (e) {}
+  }
+
+  // ── Widget Tree (Layout section) ────────────────────────────────
+
+  function renderWidgetTree() {
+    var body = document.getElementById('sidebar-layout-body');
+    if (!body) return;
+    var reg = getRegistry();
+    if (!reg) return;
+    var sections = getSortedSections();
+    var html = '<ul class="widget-tree">';
+    for (var si = 0; si < sections.length; si++) {
+      var sec = sections[si];
+      if (sec.reorderable === false) continue;
+      var secVis = isSectionVisible(sec.id);
+      var hasCharts = sec.charts && sec.charts.length > 0;
+      html += '<li class="widget-tree-item" data-section="' + sec.id + '" draggable="true">';
+      html += '<span class="widget-tree-drag" title="Drag to reorder">&#x2630;</span>';
+      html += '<input type="checkbox" class="widget-tree-check" data-type="section" data-id="' + sec.id + '"' + (secVis ? ' checked' : '') + '>';
+      html += '<span class="widget-tree-label">' + _t(sec.titleKey) + '</span>';
+      if (hasCharts) {
+        html += '<button type="button" class="widget-tree-expand" data-expand="' + sec.id + '">&#x25BC;</button>';
+      }
+      html += '</li>';
+      if (hasCharts) {
+        html += '<ul class="widget-tree-charts" data-charts-for="' + sec.id + '" style="display:none">';
+        for (var ci = 0; ci < sec.charts.length; ci++) {
+          var ch = sec.charts[ci];
+          var chVis = isChartVisible(ch.id);
+          html += '<li class="widget-tree-item">';
+          html += '<input type="checkbox" class="widget-tree-check" data-type="chart" data-id="' + ch.id + '"' + (chVis ? ' checked' : '') + '>';
+          html += '<span class="widget-tree-label">' + _t(ch.titleKey) + '</span>';
+          html += '</li>';
+        }
+        html += '</ul>';
+      }
+    }
+    html += '</ul>';
+    body.innerHTML = html;
+
+    // Delegated events
+    body.addEventListener('change', function (e) {
+      var cb = e.target;
+      if (!cb.classList.contains('widget-tree-check')) return;
+      var type = cb.dataset.type;
+      var id = cb.dataset.id;
+      if (type === 'section') setVisibility(id, cb.checked);
+      else if (type === 'chart') setChartVisibility(id, cb.checked);
+    });
+    body.addEventListener('click', function (e) {
+      var btn = e.target.closest('.widget-tree-expand');
+      if (!btn) return;
+      var secId = btn.dataset.expand;
+      var charts = body.querySelector('[data-charts-for="' + secId + '"]');
+      if (!charts) return;
+      var open = charts.style.display !== 'none';
+      charts.style.display = open ? 'none' : '';
+      btn.innerHTML = open ? '&#x25BC;' : '&#x25B2;';
+    });
+
+    // Drag & Drop for section reorder
+    var dragSrc = null;
+    body.addEventListener('dragstart', function (e) {
+      var item = e.target.closest('.widget-tree-item[data-section]');
+      if (!item) { e.preventDefault(); return; }
+      dragSrc = item;
+      item.classList.add('is-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    body.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    });
+    body.addEventListener('drop', function (e) {
+      e.preventDefault();
+      var target = e.target.closest('.widget-tree-item[data-section]');
+      if (!target || !dragSrc || target === dragSrc) return;
+      var ul = body.querySelector('.widget-tree');
+      if (!ul) return;
+      // Move dragSrc before or after target
+      var items = ul.querySelectorAll('.widget-tree-item[data-section]');
+      var dragIdx = -1, targetIdx = -1;
+      for (var i = 0; i < items.length; i++) {
+        if (items[i] === dragSrc) dragIdx = i;
+        if (items[i] === target) targetIdx = i;
+      }
+      if (dragIdx < targetIdx) target.parentNode.insertBefore(dragSrc, target.nextSibling);
+      else target.parentNode.insertBefore(dragSrc, target);
+      // Update prefs order
+      var newItems = ul.querySelectorAll('.widget-tree-item[data-section]');
+      var newOrder = [];
+      for (var j = 0; j < newItems.length; j++) newOrder.push(newItems[j].dataset.section);
+      setOrder(newOrder);
+    });
+    body.addEventListener('dragend', function () {
+      if (dragSrc) dragSrc.classList.remove('is-dragging');
+      dragSrc = null;
+    });
+
+    // Reset button
+    var resetBtn = document.getElementById('sidebar-layout-reset');
+    if (resetBtn && !resetBtn.dataset.bound) {
+      resetBtn.dataset.bound = '1';
+      resetBtn.addEventListener('click', function () {
+        resetPrefs();
+        renderWidgetTree();
+      });
+    }
+  }
+
+  // ── Settings Section (Language + Plan) ──────────────────────────
+
+  function renderSettingsSection() {
+    // Move language buttons into sidebar
+    var langSlot = document.getElementById('sidebar-lang-slot');
+    var planSlot = document.getElementById('sidebar-plan-slot');
+    if (langSlot && !langSlot.dataset.filled) {
+      langSlot.dataset.filled = '1';
+      var origLang = document.getElementById('lang-switch-wrap');
+      if (origLang) {
+        langSlot.innerHTML = '<label>' + _t('settingsLangLabel') + '</label>';
+        var clone = origLang.cloneNode(true);
+        clone.id = 'sidebar-lang-switch';
+        clone.style.display = 'flex';
+        clone.style.gap = '4px';
+        langSlot.appendChild(clone);
+        // Wire cloned buttons
+        var btns = clone.querySelectorAll('.lang-btn');
+        for (var i = 0; i < btns.length; i++) {
+          btns[i].addEventListener('click', function () {
+            var origBtn = document.getElementById('lang-' + this.dataset.lang);
+            if (origBtn) origBtn.click();
+          });
+        }
+      }
+    }
+    if (planSlot && !planSlot.dataset.filled) {
+      planSlot.dataset.filled = '1';
+      var origPlan = document.getElementById('plan-select');
+      if (origPlan) {
+        planSlot.innerHTML = '<label>' + _t('settingsPlanLabel') + '</label>';
+        var planClone = origPlan.cloneNode(true);
+        planClone.id = 'sidebar-plan-select';
+        planSlot.appendChild(planClone);
+        planClone.value = origPlan.value;
+        planClone.addEventListener('change', function () {
+          origPlan.value = this.value;
+          origPlan.dispatchEvent(new Event('change'));
+        });
+      }
+    }
+  }
+
+  // ── Templates Section ───────────────────────────────────────────
+
+  function renderTemplatesSection() {
+    var body = document.getElementById('sidebar-templates-body');
+    if (!body || body.dataset.filled) return;
+    body.dataset.filled = '1';
+    body.innerHTML = '<p style="font-size:.72rem;color:#64748b;padding:4px 0">' + _t('settingsTemplatesHint') + '</p>';
+  }
+
+  // ── Export Section ──────────────────────────────────────────────
+
+  function renderExportSection() {
+    // Export buttons are already in HTML, just add click handlers
+    var jsonlBtn = document.getElementById('sidebar-export-jsonl');
+    if (jsonlBtn && !jsonlBtn.dataset.bound) {
+      jsonlBtn.dataset.bound = '1';
+      jsonlBtn.addEventListener('click', function () {
+        // JSONL export — trigger download of cached data
+        var data = global.__lastUsageData;
+        if (!data) return;
+        var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'claude-usage-' + new Date().toISOString().slice(0, 10) + '.json';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    }
+    var templateExBtn = document.getElementById('sidebar-export-template');
+    if (templateExBtn && !templateExBtn.dataset.bound) {
+      templateExBtn.dataset.bound = '1';
+      templateExBtn.addEventListener('click', function () {
+        var prefs = getPrefs();
+        var blob = new Blob([JSON.stringify(prefs, null, 2)], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'cud-layout-' + new Date().toISOString().slice(0, 10) + '.json';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    }
+    var templateImBtn = document.getElementById('sidebar-import-template');
+    if (templateImBtn && !templateImBtn.dataset.bound) {
+      templateImBtn.dataset.bound = '1';
+      templateImBtn.addEventListener('click', function () {
+        var input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.addEventListener('change', function () {
+          if (!this.files || !this.files[0]) return;
+          var reader = new FileReader();
+          reader.onload = function (ev) {
+            try {
+              var imported = JSON.parse(ev.target.result);
+              if (imported && imported.v === PREFS_VERSION) {
+                _prefs = imported;
+                savePrefs();
+                applyVisibility();
+                applyOrder();
+                renderWidgetTree();
+              }
+            } catch (e) { /* invalid JSON */ }
+          };
+          reader.readAsText(this.files[0]);
+        });
+        input.click();
+      });
+    }
+  }
+
+  // ── i18n helper (safe fallback) ─────────────────────────────────
+
+  function _t(key) {
+    if (typeof global.t === 'function') return global.t(key);
+    return key;
+  }
+
+  // ── Move Filters to Sidebar ─────────────────────────────────────
+
+  function migrateFiltersToSidebar() {
+    var daySlot = document.getElementById('sidebar-day-slot');
+    var hostSlot = document.getElementById('sidebar-host-slot');
+    // Move day-picker from main area to sidebar
+    var dayPicker = document.getElementById('day-picker');
+    if (daySlot && dayPicker && !daySlot.dataset.filled) {
+      daySlot.dataset.filled = '1';
+      daySlot.innerHTML = '<label>' + _t('settingsDayLabel') + '</label>';
+      var dayRow = dayPicker.closest('.day-picker-row') || dayPicker.parentNode;
+      // Clone the select into sidebar
+      var dayClone = dayPicker.cloneNode(true);
+      dayClone.id = 'sidebar-day-picker';
+      dayClone.className = '';
+      daySlot.appendChild(dayClone);
+      // Sync: sidebar change → original change
+      dayClone.addEventListener('change', function () {
+        dayPicker.value = this.value;
+        dayPicker.dispatchEvent(new Event('change'));
+      });
+      // Sync: original change → sidebar (for SSE updates)
+      var origObserver = new MutationObserver(function () {
+        dayClone.innerHTML = dayPicker.innerHTML;
+        dayClone.value = dayPicker.value;
+      });
+      origObserver.observe(dayPicker, { childList: true, attributes: true });
+    }
+    // Host filter bar — just note it exists, migration later
+    if (hostSlot && !hostSlot.dataset.filled) {
+      hostSlot.dataset.filled = '1';
+      var hostBar = document.getElementById('forensic-host-filter-bar');
+      if (hostBar) {
+        hostSlot.innerHTML = '<label>' + _t('settingsHostLabel') + '</label>';
+        var hostClone = hostBar.cloneNode(true);
+        hostClone.id = 'sidebar-host-filter';
+        hostSlot.appendChild(hostClone);
+      }
+    }
+  }
+
+  // ── Enhanced Init ───────────────────────────────────────────────
+
+  function initFull() {
+    init();
+    bindSidebarEvents();
+    // Sidebar title + section titles via i18n (set once DOM is ready)
+    var titleEl = document.getElementById('sidebar-title');
+    if (titleEl) titleEl.textContent = _t('settingsTitle');
+    var titles = {
+      'sidebar-filter-title': 'settingsFilterTitle',
+      'sidebar-layout-title': 'settingsLayoutTitle',
+      'sidebar-templates-title': 'settingsTemplatesTitle',
+      'sidebar-settings-title': 'settingsSettingsTitle',
+      'sidebar-stats-title': 'settingsStatsTitle',
+      'sidebar-export-title': 'settingsExportTitle',
+      'sidebar-layout-reset': 'settingsResetLayout',
+      'sidebar-export-jsonl': 'settingsExportJsonl',
+      'sidebar-export-template': 'settingsExportTemplate',
+      'sidebar-import-template': 'settingsImportTemplate',
+      'settings-nav-btn': 'settingsBtnTitle'
+    };
+    for (var id in titles) {
+      var el = document.getElementById(id);
+      if (el) {
+        if (el.tagName === 'BUTTON' && id === 'settings-nav-btn') el.title = _t(titles[id]);
+        else el.textContent = _t(titles[id]);
+      }
+    }
+    migrateFiltersToSidebar();
+  }
+
   global.__widgetDispatcher = {
-    init: init,
+    init: initFull,
     dispatchRender: dispatchRender,
     resizeAll: resizeAll,
+    toggleSidebar: toggleSidebar,
     setVisibility: setVisibility,
     setChartVisibility: setChartVisibility,
     setOrder: setOrder,
@@ -284,6 +627,7 @@
     resetPrefs: resetPrefs,
     shouldRender: shouldRender,
     isSectionVisible: isSectionVisible,
-    isChartVisible: isChartVisible
+    isChartVisible: isChartVisible,
+    renderWidgetTree: renderWidgetTree
   };
 })(typeof window !== 'undefined' ? window : this);

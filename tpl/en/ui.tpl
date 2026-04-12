@@ -552,5 +552,22 @@
   "econOverheadSummary": "Q5: {actual}% actual vs {ideal}% ideal — {ratio}% Q5 overhead ({gap}% lost to {events} penalty events). Visible token overhead: ~3.5% — the gap is hidden costs.",
   "econDrainTitle": "Budget Drain — Daily Session Impact",
   "econDrainBlurb": "Remaining quota over the day. Red blocks show rebuild cost from forced restarts — tokens wasted on context that was already built.",
-  "econDrainNoProxyLogs": "No proxy logs for {date}. The Q5 correlation panel is hidden."
+  "econDrainNoProxyLogs": "No proxy logs for {date}. The Q5 correlation panel is hidden.",
+  "settingsTitle": "Settings",
+  "settingsBtnTitle": "Configure dashboard",
+  "settingsFilterTitle": "Filters",
+  "settingsLayoutTitle": "Layout",
+  "settingsTemplatesTitle": "Templates",
+  "settingsSettingsTitle": "Settings",
+  "settingsStatsTitle": "Statistics",
+  "settingsExportTitle": "Export",
+  "settingsResetLayout": "Reset to defaults",
+  "settingsExportJsonl": "Export JSONL data",
+  "settingsExportTemplate": "Export layout",
+  "settingsImportTemplate": "Import layout",
+  "settingsTemplatesHint": "Templates will be available in a future version.",
+  "settingsLangLabel": "Language",
+  "settingsPlanLabel": "Plan",
+  "settingsDayLabel": "Date",
+  "settingsHostLabel": "Host filter"
 }
