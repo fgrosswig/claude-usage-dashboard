@@ -1196,11 +1196,12 @@
       var gj = gi + 1;
       while (gj < ordered.length && ordered[gj].widgetGroup === wg) gj++;
       var gdom = wtreeGroupDomId(sec.id, wg);
-      html += '<li class="widget-tree-item widget-tree-item--grouphead">';
+      html += '<li class="widget-tree-group-cluster">';
+      html += '<div class="widget-tree-group-head">';
       html += '<span class="widget-tree-group-spacer"></span>';
       html += '<button type="button" class="widget-tree-expand widget-tree-expand--group" data-wtree-group-id="' + escT(gdom) + '">&#x25B6;</button>';
       html += '<span class="widget-tree-label">' + _t(widgetGroupTitleKey(sec.id, wg)) + '</span>';
-      html += '</li>';
+      html += '</div>';
       html += '<ul class="widget-tree-group-charts" data-wtree-group-ul="' + escT(gdom) + '" style="display:none">';
       for (var k = gi; k < gj; k++) {
         var ch = ordered[k];
@@ -1210,7 +1211,7 @@
         html += '<span class="widget-tree-label">' + _t(ch.titleKey) + '</span>';
         html += '</li>';
       }
-      html += '</ul>';
+      html += '</ul></li>';
       gi = gj;
     }
     html += '</ul>';
