@@ -2,6 +2,38 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-184",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "50ed6b6",
+      "commit_full": "50ed6b66d879cf3b1682d773f3b86591b6dc2010",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(scripts): JS session-turns benchmark and shared core module",
+      "detail": "Extract pass1/finalize into session-turns-core for parity with dashboard-server; add benchmark-session-turns.js for timing next to Python warm-cache --benchmark; document Node command in warm-cache docstring.\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "scripts/benchmark-session-turns.js",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/session-turns-core.js",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "scripts/session-turns-warm-cache.py",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-183",
       "timestamp": "2026-04-12",
       "session": "auto",
