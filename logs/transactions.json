@@ -2,6 +2,33 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-238",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "79bb5e6",
+      "commit_full": "79bb5e6211940dfca3e74d46136a4aa7fc859d7e",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(ui): progress bar in warmup splash loader",
+      "detail": "Gradient-filled progress bar (blue→purple) shows scan completion\npercentage during initial JSONL parse. Updates via SSE scan_progress.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-237",
       "timestamp": "2026-04-12",
       "session": "auto",
