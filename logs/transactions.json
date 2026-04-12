@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-183",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "d10c77a",
+      "commit_full": "d10c77a681716c299f9342c3bea1d3111be78f6b",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dev): sync bar updates cache timestamps + full remote timestamps",
+      "detail": "- devFetchRemoteUsage: refreshProxyCache, __lastJsonlScanCompletedAt after remote merge\n\n- Sync Now: GET /api/debug/status immediately and 400ms/2.5s/8s; shared pullDevNavCacheStatus\n\nMade-with: Cursor",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-182",
       "timestamp": "2026-04-12",
       "session": "auto",
