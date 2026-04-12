@@ -635,6 +635,8 @@
         if (typeof global.renderHealthScore === 'function') global.renderHealthScore(dd);
         if (typeof global.renderKeyFindings === 'function') global.renderKeyFindings(dd);
       }
+      // renderHealthScore / renderKeyFindings replace innerHTML — restores default display; re-sync prefs
+      applyAllChartVisibility();
     }
   }
 
