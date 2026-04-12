@@ -69,8 +69,8 @@
     var q5 = parseFloat(rl['anthropic-ratelimit-unified-5h-utilization'] || 0);
     result.pct5h = Math.round(q5 * 1000) / 10;
 
-    var samples = pd.q5_samples;
-    if (!samples || samples.length < 2) {
+    var samples = Array.isArray(pd.q5_samples) ? pd.q5_samples : [];
+    if (samples.length < 2) {
       // Fallback: estimate from active_hours
       if (pd.active_hours > 0 && q5 > 0) {
         var pctPerHour = (q5 * 100) / pd.active_hours;
