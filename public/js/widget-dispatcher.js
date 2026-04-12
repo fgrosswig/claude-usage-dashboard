@@ -187,11 +187,36 @@
   function getSortedSections() {
     var reg = getRegistry();
     if (!reg) return [];
-    if (_prefs && _prefs.order && _prefs.order.length > 0) {
-      var byId = {};
-      for (var si = 0; si < reg.sections.length; si++) {
-        byId[reg.sections[si].id] = reg.sections[si];
+    var byId = {};
+    for (var s0 = 0; s0 < reg.sections.length; s0++) {
+      byId[reg.sections[s0].id] = reg.sections[s0];
+    }
+    /** v2: widgets[] ist dieselbe Quelle wie applyGridLayout — Sidebar muss gleich sortieren. */
+    if (_prefs && _prefs.widgets && _prefs.widgets.length) {
+      var outW = [];
+      var seenW = {};
+      for (var wi = 0; wi < _prefs.widgets.length; wi++) {
+        var wid = _prefs.widgets[wi].id;
+        var secW = byId[wid];
+        if (!secW || secW.reorderable === false) continue;
+        if (secW.parentSection) continue;
+        outW.push(secW);
+        seenW[wid] = true;
       }
+      var remW = Object.keys(byId).sort(function (a, b) {
+        return (byId[a].order || 0) - (byId[b].order || 0);
+      });
+      for (var rw = 0; rw < remW.length; rw++) {
+        var rid = remW[rw];
+        if (seenW[rid]) continue;
+        var s2 = byId[rid];
+        if (!s2 || s2.reorderable === false) continue;
+        if (s2.parentSection) continue;
+        outW.push(s2);
+      }
+      return outW;
+    }
+    if (_prefs && _prefs.order && _prefs.order.length > 0) {
       var result = [];
       for (var oi = 0; oi < _prefs.order.length; oi++) {
         if (byId[_prefs.order[oi]]) {
