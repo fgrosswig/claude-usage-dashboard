@@ -165,6 +165,7 @@ function setLang(code) {
   document.documentElement.lang = code;
   updateLangButtons();
   applyStaticChrome();
+  invalidateHealthAndFindingsRender();
   if (typeof __lastUsageData !== "undefined" && __lastUsageData) renderDashboard(__lastUsageData, true);
 }
 function t(k) {
@@ -481,20 +482,13 @@ function syncMainChartsScopeUi() {
   }
 }
 function updateLangButtons() {
-  var bde = document.getElementById("lang-de");
-  var ben = document.getElementById("lang-en");
-  var bko = document.getElementById("lang-ko");
-  if (bde) {
-    bde.classList.toggle("active", __lang === "de");
-    bde.setAttribute("aria-pressed", __lang === "de" ? "true" : "false");
-  }
-  if (ben) {
-    ben.classList.toggle("active", __lang === "en");
-    ben.setAttribute("aria-pressed", __lang === "en" ? "true" : "false");
-  }
-  if (bko) {
-    bko.classList.toggle("active", __lang === "ko");
-    bko.setAttribute("aria-pressed", __lang === "ko" ? "true" : "false");
+  var picks = document.querySelectorAll(".lang-switch .lang-btn[data-lang], #us-lang-body .lang-btn[data-lang]");
+  for (var i = 0; i < picks.length; i++) {
+    var b = picks[i];
+    var code = b.getAttribute("data-lang") || "";
+    var on = code === __lang;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
   }
 }
 function apiNote(data, deKey, enKey) {
@@ -729,6 +723,8 @@ function applyStaticChrome() {
   document.title = t("pageTitle");
   var lsw = document.getElementById("lang-switch-wrap");
   if (lsw) lsw.setAttribute("aria-label", t("ariaLangGroup"));
+  var lswSb = document.getElementById("sidebar-lang-switch");
+  if (lswSb) lswSb.setAttribute("aria-label", t("ariaLangGroup"));
   var lsl = document.getElementById("lang-switch-label");
   if (lsl) lsl.textContent = t("langLabel");
   var mh = document.getElementById("main-heading");
@@ -3964,9 +3960,13 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
   }
   var chart = _budgetCharts.waterfall;
   var rc = Math.max(rows.length, 1);
-  var h = Math.max(300, Math.min(780, rc * 22));
-  el.style.height = h + 'px';
-  chart.resize();
+  var winH = typeof window !== "undefined" && window.innerHeight ? window.innerHeight : 800;
+  var byRows = Math.max(160, Math.min(410, rc * 12));
+  var byVh = Math.round(winH * 0.31);
+  var h = Math.max(byRows, Math.min(430, byVh));
+  el.style.width = "100%";
+  el.style.height = h + "px";
+  el.style.minHeight = Math.min(180, byRows) + "px";
   chart.setOption({
     animation: false,
     tooltip: {
@@ -3979,16 +3979,45 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
     series: [{
       type: 'sankey',
       layout: 'none',
+      left: "1%",
+      right: "1%",
+      top: "3%",
+      bottom: "3%",
       emphasis: { focus: 'adjacency' },
-      nodeWidth: 28,
-      nodeGap: 14,
+      nodeWidth: 32,
+      nodeGap: 12,
       layoutIterations: 32,
       label: { color: '#e2e8f0', fontSize: 11 },
-      lineStyle: { color: 'gradient', curveness: 0.5, opacity: 0.25 },
+      lineStyle: { color: 'gradient', curveness: 0.5, opacity: 0.48 },
       data: nodes,
       links: links
     }]
   }, true);
+  try {
+    chart.resize();
+  } catch (eSz0) {}
+  if (typeof requestAnimationFrame === "function") {
+    requestAnimationFrame(function () {
+      try {
+        if (_budgetCharts.waterfall && typeof _budgetCharts.waterfall.resize === "function") {
+          _budgetCharts.waterfall.resize();
+        }
+      } catch (eSz1) {}
+    });
+  }
+}
+
+/** X-Achse Budget-Trend/Quota: ohne Jahr (MM-TT aus YYYY-MM-TT), sonst unveraendert. */
+function __budgetTrendAxisLabel(dateStr) {
+  if (!dateStr || typeof dateStr !== "string") return dateStr == null ? "" : String(dateStr);
+  if (dateStr.length >= 10 && dateStr.charAt(4) === "-" && dateStr.charAt(7) === "-") return dateStr.slice(5, 10);
+  return dateStr;
+}
+
+function __budgetTrendAxisLabelsFromDates(labels) {
+  var out = [];
+  for (var i = 0; i < labels.length; i++) out.push(__budgetTrendAxisLabel(labels[i]));
+  return out;
 }
 
 function __budgetDrawTrendEfficiencyChart(el, labels, dailyTrend, t) {
@@ -3996,16 +4025,19 @@ function __budgetDrawTrendEfficiencyChart(el, labels, dailyTrend, t) {
   if (_budgetCharts.trend) { _budgetCharts.trend.dispose(); _budgetCharts.trend = null; }
   var chart = echarts.init(el, null, { renderer: 'canvas' });
   _budgetCharts.trend = chart;
+  var axisLabs = __budgetTrendAxisLabelsFromDates(labels);
   var outputPctData = dailyTrend.map(function(d) { return d.output_pct; });
   var overheadInvData = dailyTrend.map(function(d) { return d.overhead > 0 ? -Math.min(d.overhead, 100) : 0; });
   var cacheMissData = dailyTrend.map(function(d) { return d.cache_miss_rate; });
   chart.setOption({
     animation: false,
-    grid: { left: 50, right: 20, top: 40, bottom: 40 },
+    grid: { left: 50, right: 20, top: 40, bottom: 34 },
     legend: { data: [t("budgetTrendOutputPct"), t("budgetTrendOverhead"), t("budgetTrendCacheMiss")], textStyle: { color: '#cbd5e1' }, top: 4 },
     tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
       formatter: function(params) {
-        var lines = [params[0].axisValueLabel];
+        var ix = params[0].dataIndex;
+        var head = dailyTrend[ix] && dailyTrend[ix].date ? dailyTrend[ix].date : params[0].axisValueLabel;
+        var lines = [head];
         for (var i = 0; i < params.length; i++) {
           var p = params[i];
           var val = p.value;
@@ -4016,7 +4048,7 @@ function __budgetDrawTrendEfficiencyChart(el, labels, dailyTrend, t) {
         return lines.join('<br>');
       }
     },
-    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', rotate: 45 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
+    xAxis: { type: 'category', data: axisLabs, axisLabel: { color: '#94a3b8', rotate: 45, fontSize: 9 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
     yAxis: { type: 'value', min: -20, max: function(v) { return Math.max(50, v.max + 5); },
       axisLabel: { color: '#94a3b8', formatter: function(v) { return v >= 0 ? v + '%' : Math.abs(v) + 'x'; } },
       splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } }
@@ -4119,13 +4151,16 @@ function __budgetDrawQuotaUsageChart(el2, labels, qDatasets) {
     }
     series.push(s);
   }
+  var axisLabsQ = __budgetTrendAxisLabelsFromDates(labels);
   chart.setOption({
     animation: false,
-    grid: { left: 50, right: 20, top: 40, bottom: 40 },
+    grid: { left: 50, right: 20, top: 40, bottom: 34 },
     legend: { data: legendNames, textStyle: { color: '#cbd5e1' }, top: 4 },
     tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
       formatter: function(params) {
-        var lines = [params[0].axisValueLabel];
+        var ixq = params[0].dataIndex;
+        var headQ = (ixq >= 0 && ixq < labels.length && labels[ixq]) ? labels[ixq] : params[0].axisValueLabel;
+        var lines = [headQ];
         for (var pi = 0; pi < params.length; pi++) {
           if (params[pi].value == null) continue;
           lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + params[pi].value + '%');
@@ -4133,7 +4168,7 @@ function __budgetDrawQuotaUsageChart(el2, labels, qDatasets) {
         return lines.join('<br>');
       }
     },
-    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', rotate: 45 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
+    xAxis: { type: 'category', data: axisLabsQ, axisLabel: { color: '#94a3b8', rotate: 45, fontSize: 9 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
     yAxis: { type: 'value', min: 0, max: 100,
       axisLabel: { color: '#a855f7', formatter: '{value}%' },
       splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } }
@@ -4286,6 +4321,12 @@ function renderIntelSeasonalityChart(seasonal) {
       { name: 'Latency (ms)', type: 'line', yAxisIndex: 1, data: latValues, smooth: 0.3, symbol: 'circle', symbolSize: 4, lineStyle: { color: '#f59e0b', width: 2 }, itemStyle: { color: '#f59e0b' } }
     ]
   }, true);
+  __safeChartResize(_intelCharts.seasonality);
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(function () {
+      __safeChartResize(_intelCharts.seasonality);
+    });
+  }
 }
 
 // ── Proxy Analytics Panel ─────────────────────────────────────────────────
@@ -4345,7 +4386,15 @@ if (__effWin) {
     __effResizeT = setTimeout(function() {
       var disp = window.__widgetDispatcher;
       if (disp) { disp.resizeAll(); }
-      else { __effResizeAll(); __budgetResizeAll(); __mainChartsResizeAll(); __proxyChartsResizeAll(); __userProfileChartsResizeAll(); }
+      else {
+        __effResizeAll();
+        __budgetResizeAll();
+        __mainChartsResizeAll();
+        __proxyChartsResizeAll();
+        __userProfileChartsResizeAll();
+        resizeLiveScannedJsonlChartIfAny();
+        __safeChartResize(_intelCharts.seasonality);
+      }
     }, 120);
   });
 }
@@ -5201,18 +5250,20 @@ function __effHeatmapOption(ed) {
           + "normalized: " + (norm * 100).toFixed(0) + "%";
       }
     },
-    grid: { left: 110, right: 20, top: 8, bottom: 24 },
+    /* Festes grid.left: containLabel sonst bei Resize/Layout schwankend → Zellen wirken ungleich breit */
+    grid: { left: 118, right: 6, top: 6, bottom: 26, containLabel: false },
     xAxis: {
       type: "category",
       data: ed.labels,
-      axisLabel: { color: "#94a3b8", fontSize: 10 },
+      boundaryGap: true,
+      axisLabel: { color: "#94a3b8", fontSize: 10, interval: 0 },
       axisLine: { lineStyle: { color: "#475569" } },
       splitArea: { show: false }
     },
     yAxis: {
       type: "category",
       data: metricLabels,
-      axisLabel: { color: "#cbd5e1", fontSize: 10 },
+      axisLabel: { color: "#cbd5e1", fontSize: 10, width: 102, overflow: "truncate" },
       axisLine: { lineStyle: { color: "#475569" } },
       splitArea: { show: false }
     },
@@ -5260,7 +5311,7 @@ function __effSmallMultipleOption(spec) {
       textStyle: { color: "#e2e8f0", fontSize: 11 },
       formatter: spec.tooltipFormatter
     },
-    grid: { left: 42, right: 10, top: 28, bottom: 22 },
+    grid: { left: 6, right: 6, top: 28, bottom: 22, containLabel: true },
     xAxis: {
       type: "category",
       data: spec.labels,
@@ -5285,6 +5336,18 @@ function __effInitOrSet(key, el, option, notMerge) {
     _effCharts[key] = echarts.init(el, null, { renderer: "canvas" });
   }
   _effCharts[key].setOption(option, { notMerge: !!notMerge, lazyUpdate: false });
+  try {
+    _effCharts[key].resize();
+  } catch (eRs) {}
+  if (typeof requestAnimationFrame === "function") {
+    requestAnimationFrame(function () {
+      try {
+        if (_effCharts[key] && typeof _effCharts[key].resize === "function") {
+          _effCharts[key].resize();
+        }
+      } catch (eRaf) {}
+    });
+  }
 }
 
 function __effConnectCharts() {
@@ -5509,20 +5572,20 @@ function computeHealthIndicators(data) {
   }
 
   return [
-    { id: "quota5h", label: t("healthQuota5h"), value: q5h, display: q5h.toFixed(0) + "%", color: healthColor(q5h, 50, 80), barPct: Math.min(100, q5h) },
-    { id: "thinkingGap", label: t("healthThinkingGap"), value: thinkingGap, display: thinkingGap > 0 ? thinkingGap.toFixed(1) + "x" : "-", color: thinkingGap <= 0 ? "green" : healthColor(thinkingGap, 2, 5), barPct: Math.min(100, thinkingGap * 10) },
-    { id: "cacheHealth", label: t("healthCacheHealth"), value: cacheRatio, display: cacheRatio.toFixed(1) + "%", color: healthColorInverse(cacheRatio, 90, 70), barPct: cacheRatio },
-    { id: "errorRate", label: t("healthErrorRate"), value: errorRate, display: errorRate.toFixed(1) + "%", color: healthColor(errorRate, 3, 10), barPct: Math.min(100, errorRate * 5) },
-    { id: "hitLimits", label: t("healthHitLimits"), value: hitsPerDay, display: String(hitsPerDay), color: healthColor(hitsPerDay, 50, 500), barPct: Math.min(100, hitsPerDay / 10) },
-    { id: "latency", label: t("healthLatency"), value: avgLatS, display: avgLatS >= 1 ? avgLatS.toFixed(1) + "s" : Math.round(avgLatMs) + "ms", color: healthColor(avgLatS, 5, 15), barPct: Math.min(100, avgLatS * 5) },
-    { id: "interrupts", label: t("healthInterrupts"), value: interruptsPerDay, display: String(interruptsPerDay), color: healthColor(interruptsPerDay, 100, 500), barPct: Math.min(100, interruptsPerDay / 10) },
-    { id: "coldStarts", label: t("healthColdStarts"), value: coldStarts, display: String(coldStarts), color: healthColor(coldStarts, 0, 5), barPct: Math.min(100, coldStarts * 10) },
-    { id: "retries", label: t("healthRetries"), value: retriesPerDay, display: String(retriesPerDay), color: healthColor(retriesPerDay, 50, 200), barPct: Math.min(100, retriesPerDay / 5) },
-    { id: "false429", label: t("healthFalse429"), value: false429s, display: String(false429s), color: healthColor(false429s, 0, 1), barPct: Math.min(100, false429s * 50) },
-    { id: "truncations", label: t("healthTruncations"), value: truncPerDay, display: String(truncPerDay), color: healthColor(truncPerDay, 0, 5), barPct: Math.min(100, truncPerDay * 10) },
-    { id: "contextResets", label: t("healthContextResets"), value: contextResets, display: String(contextResets), color: healthColor(contextResets, 0, 3), barPct: Math.min(100, contextResets * 20) },
-    { id: "quotaBench", label: t("healthQuotaBench"), value: tokPerPct, display: tokPerPctM, color: tokPerPct > 0 ? healthColor(tokPerPct / 1000000, 2.1, 3) : "gray", barPct: tokPerPct > 0 ? Math.min(100, tokPerPct / 21000) : 0 },
-    { id: "anomalStops", label: t("healthAnomalStops"), value: anomalStops, display: String(anomalStops), color: healthColor(anomalStops, 0, 10), barPct: Math.min(100, anomalStops * 5) }
+    { id: "quota5h", label: t("healthQuota5h"), sub: t("healthQuota5hSub"), value: q5h, display: q5h.toFixed(0) + "%", color: healthColor(q5h, 50, 80), barPct: Math.min(100, q5h) },
+    { id: "thinkingGap", label: t("healthThinkingGap"), sub: t("healthThinkingGapSub"), value: thinkingGap, display: thinkingGap > 0 ? thinkingGap.toFixed(1) + "x" : "-", color: thinkingGap <= 0 ? "green" : healthColor(thinkingGap, 2, 5), barPct: Math.min(100, thinkingGap * 10) },
+    { id: "cacheHealth", label: t("healthCacheHealth"), sub: t("healthCacheHealthSub"), value: cacheRatio, display: cacheRatio.toFixed(1) + "%", color: healthColorInverse(cacheRatio, 90, 70), barPct: cacheRatio },
+    { id: "errorRate", label: t("healthErrorRate"), sub: t("healthErrorRateSub"), value: errorRate, display: errorRate.toFixed(1) + "%", color: healthColor(errorRate, 3, 10), barPct: Math.min(100, errorRate * 5) },
+    { id: "hitLimits", label: t("healthHitLimits"), sub: t("healthHitLimitsSub"), value: hitsPerDay, display: String(hitsPerDay), color: healthColor(hitsPerDay, 50, 500), barPct: Math.min(100, hitsPerDay / 10) },
+    { id: "latency", label: t("healthLatency"), sub: t("healthLatencySub"), value: avgLatS, display: avgLatS >= 1 ? avgLatS.toFixed(1) + "s" : Math.round(avgLatMs) + "ms", color: healthColor(avgLatS, 5, 15), barPct: Math.min(100, avgLatS * 5) },
+    { id: "interrupts", label: t("healthInterrupts"), sub: t("healthInterruptsSub"), value: interruptsPerDay, display: String(interruptsPerDay), color: healthColor(interruptsPerDay, 100, 500), barPct: Math.min(100, interruptsPerDay / 10) },
+    { id: "coldStarts", label: t("healthColdStarts"), sub: t("healthColdStartsSub"), value: coldStarts, display: String(coldStarts), color: healthColor(coldStarts, 0, 5), barPct: Math.min(100, coldStarts * 10) },
+    { id: "retries", label: t("healthRetries"), sub: t("healthRetriesSub"), value: retriesPerDay, display: String(retriesPerDay), color: healthColor(retriesPerDay, 50, 200), barPct: Math.min(100, retriesPerDay / 5) },
+    { id: "false429", label: t("healthFalse429"), sub: t("healthFalse429Sub"), value: false429s, display: String(false429s), color: healthColor(false429s, 0, 1), barPct: Math.min(100, false429s * 50) },
+    { id: "truncations", label: t("healthTruncations"), sub: t("healthTruncationsSub"), value: truncPerDay, display: String(truncPerDay), color: healthColor(truncPerDay, 0, 5), barPct: Math.min(100, truncPerDay * 10) },
+    { id: "contextResets", label: t("healthContextResets"), sub: t("healthContextResetsSub"), value: contextResets, display: String(contextResets), color: healthColor(contextResets, 0, 3), barPct: Math.min(100, contextResets * 20) },
+    { id: "quotaBench", label: t("healthQuotaBench"), sub: t("healthQuotaBenchSub"), value: tokPerPct, display: tokPerPctM, color: tokPerPct > 0 ? healthColor(tokPerPct / 1000000, 2.1, 3) : "gray", barPct: tokPerPct > 0 ? Math.min(100, tokPerPct / 21000) : 0 },
+    { id: "anomalStops", label: t("healthAnomalStops"), sub: t("healthAnomalStopsSub"), value: anomalStops, display: String(anomalStops), color: healthColor(anomalStops, 0, 10), barPct: Math.min(100, anomalStops * 5) }
   ];
 }
 
@@ -5608,6 +5671,7 @@ function renderHealthScore(data) {
     gh += "<div class=\"health-badge health-badge--" + ind.color + "\">";
     gh += "<div class=\"health-badge-label\">" + escHtml(ind.label) + "</div>";
     gh += "<div class=\"health-badge-value\">" + escHtml(ind.display) + "</div>";
+    gh += "<div class=\"health-badge-sub\">" + escHtml(ind.sub || "") + "</div>";
     gh += "<div class=\"health-badge-bar\"><div class=\"health-badge-bar-fill health-badge-bar-fill--" + ind.color + "\" style=\"width:" + Math.round(ind.barPct) + "%\"></div></div>";
     gh += "</div></div>";
   }
@@ -7020,6 +7084,20 @@ function renderAvailabilityKpis(data) {
     }
   }
 })();
+
+// Registry renderFn targets for Anthropic status charts (widget dispatcher / template preview).
+window.renderStatus_uptime = function () {
+  if (window.__lastUsageData) renderUptimeChart(window.__lastUsageData);
+};
+window.renderStatus_incidents = function () {
+  if (window.__lastUsageData) renderIncidentHistory(window.__lastUsageData);
+};
+window.renderStatus_outageScatter = function () {
+  if (window.__lastUsageData) updateAnthropicPopup(window.__lastUsageData);
+};
+window.renderStatus_outageTimeline = function () {
+  if (window.__lastUsageData) renderOutageTimeline(window.__lastUsageData);
+};
 
 fetchUsageJsonOnce();
 connectUsageStream();

@@ -2,15 +2,100 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-248",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "408d8ec",
+      "commit_full": "408d8ec97d1b7f3ff06a31aea64afcdeddebe341",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(ui): template builder v2, sidebar layout fix, table styling",
+      "detail": "Template Builder v2:\n- Visual 12-column grid canvas with nested sections/charts\n- Widget pool with drag-to-canvas and click-to-add\n- Resize handles for section and chart spans (grid-snapped)\n- Live preview with real ECharts rendering\n- DEV_MODE only (hidden in production)\n- 3-panel layout: chart pool left, canvas center, meta right\n- i18n keys DE/EN/KO\n\nSidebar Layout Fix:\n- Root cause: sidebar auto-restored (100ms) before init() loaded prefs\n- Fix: renderWidgetTree() loads prefs if _prefs is null\n- loadPrefs() simplified: layout file is single source of truth\n- savePrefs() PUT now synchronous\n- syncVisibilityPrefsFromLocalStorage() no longer overwrites widget order\n- getSortedSections() iterates widgets[] directly\n- setVisibility() inserts at registry-order position instead of push\n- Removed dead functions: isTopLevelLayoutPlacementId, getPlacementOrderSectionIdsFromWidgets\n\nOther:\n- Forensic chart legend color fix (hitLimit bar matches legend)\n- Daily detail table: fixed column alignment (nowrap headers)\n- Proxy efficiency charts: box-sizing fix\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard-sections.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-registry.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-247",
+      "timestamp": "2026-04-12",
+      "session": "auto",
+      "commit": "42e6f8f",
+      "commit_full": "42e6f8f532392e3cbea6512a6b59653ad151362a",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(explorer): handle truncated JSON in tree viewer",
+      "detail": "Truncated files (>768KB) have incomplete JSON. Now attempts to\nclose open braces/brackets and parse partial content, showing\na truncation note. Falls back to raw text if repair fails.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/cache-files-explorer.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-246",
       "timestamp": "2026-04-12",
       "session": "auto",
-      "commit": "113fe7b",
-      "commit_full": "113fe7be2c724926c67b8a45afa91647ceacfc82",
+      "commit": "65dfefb",
+      "commit_full": "65dfefb83fce714f0e5088fb8bca997fc6738ba9",
       "status": "ABGESCHLOSSEN",
-      "description": "Merge branch 'feat/widget-dispatcher' into develop",
-      "detail": "# Conflicts:\n#\tlogs/transactions.json",
-      "changes": []
+      "description": "feat(explorer): collapsible JSON tree viewer in file preview",
+      "detail": "Parses JSON content into interactive tree with colored types\n(string=green, number=blue, bool=amber, null=gray, key=purple).\nNodes are collapsible (▶/▼), lazy-loaded on expand, max 500\nentries per level. Falls back to raw text for non-JSON files.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/cache-files-explorer.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
     },
     {
       "id": "TX-245",

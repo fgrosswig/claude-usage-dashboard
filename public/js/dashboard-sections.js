@@ -219,6 +219,8 @@
     var mainHostKey =
       multiHost && fhForMainCharts && hLabs.indexOf(fhForMainCharts) >= 0 ? fhForMainCharts : "";
     var c4TimelineHostStack = multiHost && !mainHostKey;
+    var tokenStatsHostTrioRow = multiHost && !hourlyMode && !mainHostKey;
+    var c3PairGridTop = tokenStatsHostTrioRow ? 36 : 20;
     destroyMainChartIfScopeMismatch(mainScope, "c1");
     destroyMainChartIfScopeMismatch(mainScope, "c2");
     destroyMainChartIfScopeMismatch(mainScope, "c3");
@@ -306,7 +308,7 @@
         var ch1h = document.createElement("div");
         ch1h.className = "chart-box";
         ch1h.id = "chart-host-wrap";
-        ch1h.innerHTML = "<h3></h3><p style=\"font-size:.72rem;color:#94a3b8;margin:4px 0 10px;line-height:1.4\"></p><div id=\"c1-hosts\" style=\"width:100%;min-height:320px\"></div>";
+        ch1h.innerHTML = "<h3></h3><p class=\"token-stats-host-blurb\"></p><div id=\"c1-hosts\" class=\"token-stats-pair-echart\"></div>";
         var pairIns = document.getElementById("charts-host-sub");
         if (pairIns) {
           if (pairIns.firstChild) pairIns.insertBefore(ch1h, pairIns.firstChild);
@@ -321,10 +323,14 @@
         var h3h = chw.querySelector("h3");
         var ph = chw.querySelector("p");
         if (h3h) h3h.textContent = t("chartHostTitle");
-        if (ph) ph.textContent = t("chartHostBlurb");
+        if (ph) {
+          ph.classList.add("token-stats-host-blurb");
+          ph.textContent = t("chartHostBlurb");
+        }
       }
       var hostEl = document.getElementById("c1-hosts");
       if (hostEl) {
+        hostEl.classList.add("token-stats-pair-echart");
         if (!_charts.c1hosts) _charts.c1hosts = echarts.init(hostEl, null, { renderer: 'canvas' });
         var hostSeries = [];
         for (var hli = 0; hli < hLabs.length; hli++) {
@@ -403,10 +409,12 @@
     _charts.c2._dashScope = mainScope;
 
     var elc3 = document.getElementById("c3");
+    if (elc3) elc3.classList.add("token-stats-pair-echart");
     if (elc3 && elc3.previousElementSibling && elc3.previousElementSibling.tagName === "H3") {
       elc3.previousElementSibling.textContent = hourlyMode ? t("chartOutPerHourHourly") : t("chartOutPerHour");
     }
     var elc4 = document.getElementById("c4");
+    if (elc4) elc4.classList.add("token-stats-pair-echart");
     if (elc4 && elc4.previousElementSibling && elc4.previousElementSibling.tagName === "H3") {
       elc4.previousElementSibling.textContent = hourlyMode ? t("chartSubCachePctHourly") : t("chartSubCachePct");
     }
@@ -430,7 +438,7 @@
     }
     _charts.c3.setOption({
       animation: false,
-      grid: { left: 50, right: 16, top: 20, bottom: 30 },
+      grid: { left: 50, right: 16, top: c3PairGridTop, bottom: 30 },
       tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
         formatter: function(params) { return params[0].axisValueLabel + '<br>' + params[0].marker + ' ' + fmt(params[0].value) + '/h'; }
       },
@@ -501,6 +509,13 @@
       }, true);
     }
     _charts.c4._dashScope = mainScope;
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(function () {
+        if (_charts.c1hosts && typeof _charts.c1hosts.resize === "function") _charts.c1hosts.resize();
+        if (_charts.c3 && typeof _charts.c3.resize === "function") _charts.c3.resize();
+        if (_charts.c4 && typeof _charts.c4.resize === "function") _charts.c4.resize();
+      });
+    }
     var crSig = document.getElementById("charts");
     if (crSig) crSig.classList.remove("has-session-row");
 
@@ -521,10 +536,29 @@
     }
 
     // --- Table ---
-    var cols=t("tableCols").split("|");
-    var thead=document.querySelector("#tbl thead tr");
-    thead.innerHTML="";
-    cols.forEach(function(c,ci){var th=document.createElement("th");th.textContent=c;if(ci>0)th.className="num";thead.appendChild(th);});
+    var cols = t("tableCols").split("|");
+    for (var ctrim = cols.length - 1; ctrim >= 0; ctrim--) {
+      if (cols[ctrim] !== "") break;
+      cols.pop();
+    }
+    var thead = document.querySelector("#tbl thead tr");
+    thead.innerHTML = "";
+    cols.forEach(function (c, ci) {
+      var th = document.createElement("th");
+      th.textContent = c;
+      if (ci > 0) th.className = "num";
+      thead.appendChild(th);
+    });
+    var cg = document.getElementById("tbl-colgroup");
+    if (cg && cols.length) {
+      cg.innerHTML = "";
+      var cw = (100 / cols.length).toFixed(5) + "%";
+      for (var cgi = 0; cgi < cols.length; cgi++) {
+        var colEl = document.createElement("col");
+        colEl.style.width = cw;
+        cg.appendChild(colEl);
+      }
+    }
 
     var tbody=document.querySelector("#tbl tbody");
     tbody.innerHTML="";
@@ -555,7 +589,11 @@
         trEl.title = t("dailyDetailFilteredRowTitle");
       }
       var hl=d.hit_limit||0;
-      var vals=[d.date,fmt(d.output),fmt(d.cache_read),d.cache_output_ratio+"x",d.overhead+"x",fmt(d.total),d.calls,d.active_hours,String(hl),d.sub_pct+"%",d.sub_cache_pct+"%",fmt(d.output_per_hour)];
+      var vals = [d.date, fmt(d.output), fmt(d.cache_read), d.cache_output_ratio + "x", d.overhead + "x", fmt(d.total), d.calls, d.active_hours, String(hl), d.sub_pct + "%", d.sub_cache_pct + "%", fmt(d.output_per_hour)];
+      if (vals.length !== cols.length) {
+        while (vals.length < cols.length) vals.push("");
+        while (vals.length > cols.length) vals.pop();
+      }
       vals.forEach(function(v,j){
         var td=document.createElement("td");
         td.textContent=v;
@@ -580,6 +618,10 @@
           trh.dataset.hostLabel = tlab;
           var hhl = hd.hit_limit || 0;
           var hvals = ["  \u2514 " + tlab, fmt(hd.output), fmt(hd.cache_read), hd.cache_output_ratio + "x", hd.overhead + "x", fmt(hd.total), hd.calls, hd.active_hours, String(hhl), hd.sub_pct + "%", hd.sub_cache_pct + "%", fmt(hd.output_per_hour)];
+          if (hvals.length !== cols.length) {
+            while (hvals.length < cols.length) hvals.push("");
+            while (hvals.length > cols.length) hvals.pop();
+          }
           for (var hj = 0; hj < hvals.length; hj++) {
             var tdh = document.createElement("td");
             tdh.textContent = hvals[hj];
@@ -727,7 +769,8 @@
         ],
         series: [
           { name: t("forensicDS_hitLimit"), type: 'bar', data: fHitData, yAxisIndex: 0,
-            itemStyle: { color: function(p) { return fHitColors[p.dataIndex]; }, borderColor: function(p) { return fHitData[p.dataIndex] > 0 ? '#f87171' : 'transparent'; } } },
+            itemStyle: { color: function(p) { return fHitColors[p.dataIndex]; }, borderColor: function(p) { return fHitData[p.dataIndex] > 0 ? '#f87171' : 'transparent'; } },
+            legendHoverLink: true, color: 'rgba(248,113,113,0.55)' },
           { name: t("forensicDS_score"), type: 'line', data: fScoreData, yAxisIndex: 1, smooth: 0.25, symbol: 'circle', symbolSize: 8,
             lineStyle: { color: '#f59e0b', width: 2 }, itemStyle: { color: '#fbbf24' },
             areaStyle: { color: 'rgba(245,158,11,0.12)' }, show: !fhForensic }

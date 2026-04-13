@@ -161,6 +161,7 @@
    * Wichtig: nicht nur hidden* — sonst bleibt widgets[] aus init() stehen, obwohl LS schon die Datei/JSON enthält;
    * getSortedSections() fällt dann auf Registry-Sortierung zurück (wie in deinem DOM: economic zuletzt).
    */
+  /** Sync nur Sichtbarkeit (hidden*) aus localStorage — widgets[]/order bleiben unangetastet. */
   function syncVisibilityPrefsFromLocalStorage() {
     if (!_prefs) return;
     try {
@@ -171,18 +172,6 @@
       if (!tryAcceptPrefsPayload(o)) return;
       if (Array.isArray(o.hiddenCharts)) _prefs.hiddenCharts = o.hiddenCharts.slice();
       if (Array.isArray(o.hiddenSections)) _prefs.hiddenSections = o.hiddenSections.slice();
-      if (Array.isArray(o.widgets) && o.widgets.length) {
-        _prefs.widgets = [];
-        for (var wi = 0; wi < o.widgets.length; wi++) {
-          var w = o.widgets[wi];
-          if (!w || !w.id) continue;
-          _prefs.widgets.push({ id: String(w.id), span: w.span != null ? Number(w.span) : 12 });
-        }
-        syncPrefsOrderFromWidgets();
-      } else if (Array.isArray(o.order) && o.order.length) {
-        _prefs.order = o.order.slice();
-      }
-      if (o.v != null && Number(o.v) === PREFS_VERSION) _prefs.v = PREFS_VERSION;
     } catch (e) {}
   }
 
@@ -196,63 +185,26 @@
       }
     } catch (e) {}
 
-    var storedFileMtime = 0;
-    try {
-      storedFileMtime = parseInt(localStorage.getItem(LAYOUT_FILE_MTIME_KEY) || '0', 10) || 0;
-    } catch (eSt) {}
-
-    var fromApi = null;
-    var apiMtime = 0;
+    // Datei ist Single Source of Truth
     try {
       var xhrGet = new XMLHttpRequest();
       xhrGet.open('GET', '/api/layout', false);
       xhrGet.send();
       if (xhrGet.status === 200 && xhrGet.responseText) {
-        try {
-          var hm = xhrGet.getResponseHeader('X-Layout-Mtime');
-          if (hm) apiMtime = parseInt(hm, 10) || 0;
-        } catch (eH) {}
         var rt = sanitizeLayoutJsonRaw(xhrGet.responseText);
         if (rt && rt !== 'null') {
           var sp = JSON.parse(rt);
-          fromApi = tryAcceptPrefsPayload(sp);
+          if (sp && typeof sp === 'object') {
+            if (sp.v == null) sp.v = PREFS_VERSION;
+            else sp.v = Number(sp.v);
+            normalizePrefsShape(sp);
+            try { localStorage.setItem(PREFS_KEY, JSON.stringify(sp)); } catch (e3) {}
+            return sp;
+          }
         }
       }
-    } catch (e2) { /* offline / kein dashboard-server */ }
-
-    var diskNewerThanTracked = storedFileMtime > 0 && apiMtime > storedFileMtime;
-
-    if (fromApi && prefsHasUsableWidgets(fromApi)) {
-      if (!fromLs || !prefsHasUsableWidgets(fromLs) || diskNewerThanTracked) {
-        try {
-          localStorage.setItem(PREFS_KEY, JSON.stringify(fromApi));
-          if (apiMtime > 0) localStorage.setItem(LAYOUT_FILE_MTIME_KEY, String(apiMtime));
-        } catch (e3) {}
-        return fromApi;
-      }
-    }
-    if (
-      fromApi &&
-      (!fromLs || !prefsHasUsableWidgets(fromLs)) &&
-      Array.isArray(fromApi.order) &&
-      fromApi.order.length &&
-      !prefsHasUsableWidgets(fromApi)
-    ) {
-      try {
-        localStorage.setItem(PREFS_KEY, JSON.stringify(fromApi));
-        if (apiMtime > 0) localStorage.setItem(LAYOUT_FILE_MTIME_KEY, String(apiMtime));
-      } catch (e4) {}
-      return fromApi;
-    }
-    if (fromLs) {
-      try {
-        if (apiMtime > 0) {
-          var stNow = parseInt(localStorage.getItem(LAYOUT_FILE_MTIME_KEY) || '0', 10) || 0;
-          localStorage.setItem(LAYOUT_FILE_MTIME_KEY, String(Math.max(stNow, apiMtime)));
-        }
-      } catch (eB) {}
-      return fromLs;
-    }
+    } catch (e2) {}
+    if (fromLs) return fromLs;
     return defaultPrefs();
   }
 
@@ -260,21 +212,19 @@
     if (!_prefs) return;
     var json = JSON.stringify(_prefs);
     try { localStorage.setItem(PREFS_KEY, json); } catch (e) {}
-    // Optional: PUT /api/layout (fire-and-forget) — gleiches Layout im Backend/Container; LS bleibt die sofort gültige Quelle im Tab.
+    // PUT /api/layout synchron — Datei ist Single Source of Truth, muss vor Reload fertig sein.
     try {
       var xhrPut = new XMLHttpRequest();
-      xhrPut.open('PUT', '/api/layout', true);
+      xhrPut.open('PUT', '/api/layout', false);
       xhrPut.setRequestHeader('Content-Type', 'application/json');
-      xhrPut.onload = function () {
-        if (xhrPut.status === 200) {
-          try {
-            var mPut = xhrPut.getResponseHeader('X-Layout-Mtime');
-            if (mPut) localStorage.setItem(LAYOUT_FILE_MTIME_KEY, mPut);
-          } catch (eM) {}
-        }
-      };
       xhrPut.send(json);
-    } catch (e) { /* offline or error — localStorage is primary */ }
+      if (xhrPut.status === 200) {
+        try {
+          var mPut = xhrPut.getResponseHeader('X-Layout-Mtime');
+          if (mPut) localStorage.setItem(LAYOUT_FILE_MTIME_KEY, mPut);
+        } catch (eM) {}
+      }
+    } catch (e) { /* offline */ }
   }
 
   function defaultPrefs() {
@@ -293,42 +243,6 @@
     return global.__widgetRegistry || null;
   }
 
-  /** Gleiche Zeile wie applyGridLayout: nur echte Top-Level-Layout-<details> mit domId. */
-  function isTopLevelLayoutPlacementId(reg, wid) {
-    if (!reg || !wid) return false;
-    var sec = reg.findSection(wid);
-    if (!sec || !sec.domId) return false;
-    if (sec.parentSection) return false;
-    return true;
-  }
-
-  /**
-   * Reihenfolge der Layout-Zeilen aus widgets[] exakt wie applyGridLayout (appendChild):
-   * nur placement-fähige IDs; bei Duplikaten gewinnt die letzte Position in der JSON-Liste.
-   */
-  function getPlacementOrderSectionIdsFromWidgets() {
-    if (!_prefs || !_prefs.widgets || !_prefs.widgets.length) return [];
-    var reg = getRegistry();
-    if (!reg) return [];
-    var w = _prefs.widgets;
-    var lastOk = {};
-    for (var i = 0; i < w.length; i++) {
-      if (!isTopLevelLayoutPlacementId(reg, w[i].id)) continue;
-      lastOk[w[i].id] = i;
-    }
-    var out = [];
-    var seen = {};
-    for (var j = 0; j < w.length; j++) {
-      var id = w[j].id;
-      if (!isTopLevelLayoutPlacementId(reg, id)) continue;
-      if (lastOk[id] !== j) continue;
-      if (seen[id]) continue;
-      seen[id] = true;
-      out.push(id);
-    }
-    return out;
-  }
-
   function idOccursInWidgetList(widgetsArr, id) {
     if (!widgetsArr || !id) return false;
     for (var z = 0; z < widgetsArr.length; z++) {
@@ -344,19 +258,23 @@
     for (var s0 = 0; s0 < reg.sections.length; s0++) {
       byId[reg.sections[s0].id] = reg.sections[s0];
     }
-    /** v2: Reihenfolge = gespeicherte widgets[] wie applyGridLayout; remW nur für nie in JSON vorkommende Zeilen. */
+    /** v2: Reihenfolge exakt aus widgets[] — gleicher Pfad wie applyGridLayout (appendChild). */
     if (_prefs && _prefs.widgets && _prefs.widgets.length) {
       var outW = [];
       var seenW = {};
-      var placementIds = getPlacementOrderSectionIdsFromWidgets();
-      for (var pi = 0; pi < placementIds.length; pi++) {
-        var pid = placementIds[pi];
-        var secW = byId[pid];
-        if (!secW || secW.reorderable === false) continue;
+      var ww = _prefs.widgets;
+      for (var wi2 = 0; wi2 < ww.length; wi2++) {
+        var wid = ww[wi2].id;
+        if (seenW[wid]) continue;
+        var secW = byId[wid];
+        if (!secW) continue;
+        if (secW.reorderable === false) continue;
         if (secW.parentSection) continue;
+        if (!secW.domId) continue;
+        seenW[wid] = true;
         outW.push(secW);
-        seenW[pid] = true;
       }
+      // Remainder: sections with domId that are not in widgets[] at all
       var remW = Object.keys(byId).sort(function (a, b) {
         return (byId[a].order || 0) - (byId[b].order || 0);
       });
@@ -367,7 +285,7 @@
         if (!s2 || s2.reorderable === false) continue;
         if (s2.parentSection) continue;
         if (!s2.domId) continue;
-        if (idOccursInWidgetList(_prefs.widgets, rid)) continue;
+        if (idOccursInWidgetList(ww, rid)) continue;
         outW.push(s2);
         seenW[rid] = true;
       }
@@ -452,7 +370,12 @@
   function syncPrefsOrderFromWidgets() {
     if (!_prefs || !_prefs.widgets || !_prefs.widgets.length) return false;
     var ids = [];
-    for (var i = 0; i < _prefs.widgets.length; i++) ids.push(_prefs.widgets[i].id);
+    for (var i = 0; i < _prefs.widgets.length; i++) {
+      var wEnt = _prefs.widgets[i];
+      var wT = wEnt.type || 'section';
+      if (wT === 'layout') continue;
+      ids.push(wEnt.id);
+    }
     var changed = false;
     if (!_prefs.order || _prefs.order.length !== ids.length) changed = true;
     else {
@@ -495,7 +418,29 @@
       }
       newW.push({ id: oid, span: span });
     }
-    for (var e = 0; e < extras.length; e++) newW.push(extras[e]);
+    for (var e = 0; e < extras.length; e++) {
+      var extraId = extras[e].id;
+      var afterDragged = null;
+      var foundExtra = false;
+      for (var old = 0; old < before.length; old++) {
+        if (before[old].id === extraId) { foundExtra = true; continue; }
+        if (foundExtra && inDrag[before[old].id]) {
+          afterDragged = before[old].id;
+          break;
+        }
+      }
+      var inserted = false;
+      if (afterDragged) {
+        for (var ni = 0; ni < newW.length; ni++) {
+          if (newW[ni].id === afterDragged) {
+            newW.splice(ni, 0, extras[e]);
+            inserted = true;
+            break;
+          }
+        }
+      }
+      if (!inserted) newW.push(extras[e]);
+    }
     _prefs.widgets = newW;
     return true;
   }
@@ -555,6 +500,19 @@
 
   // ── Unified Resize ──────────────────────────────────────────────
 
+  function resizeChartOnDomId(domId) {
+    var node = document.getElementById(domId);
+    if (!node) return;
+    var inst = echarts.getInstanceByDom(node);
+    if (inst && typeof inst.resize === 'function') {
+      try {
+        inst.resize();
+      } catch (eR) {
+        /* detached */
+      }
+    }
+  }
+
   function resizeAll() {
     var reg = getRegistry();
     if (!reg || typeof echarts === 'undefined') return;
@@ -577,6 +535,20 @@
           try { inst.resize(); } catch (e) { /* detached */ }
         }
       }
+    }
+    /* Nicht in sec.charts: Proxy Effizienz-Trend, Live-JSONL, Sidebar-Stats (ECharts auf eigenem Host-DIV) */
+    var extraDomIds = [
+      'c-proxy-efficiency-heatmap',
+      'c-proxy-efficiency-ratio',
+      'c-proxy-efficiency-vispct',
+      'c-proxy-efficiency-cachemiss',
+      'live-files-chart-host',
+      'sb-user-versions',
+      'sb-user-entrypoints',
+      'sb-user-stability'
+    ];
+    for (var xi = 0; xi < extraDomIds.length; xi++) {
+      resizeChartOnDomId(extraDomIds[xi]);
     }
   }
 
@@ -697,6 +669,7 @@
       if (syncPrefsOrderFromWidgets()) savePrefs();
       if (reconcileHiddenSectionsWithWidgets()) savePrefs();
       applyGridLayout();
+      expandVisibleSectionPanels();
     } else {
       applyVisibility();
       applyOrder();
@@ -725,9 +698,19 @@
         }
       }
       if (!found) {
-        _prefs.widgets.push({ id: id, span: 12 });
-        if (!_prefs.order) _prefs.order = [];
-        if (_prefs.order.indexOf(id) === -1) _prefs.order.push(id);
+        var reg2 = getRegistry();
+        var targetSec = reg2 ? reg2.findSection(id) : null;
+        var targetOrder = targetSec ? (targetSec.order || 999) : 999;
+        var insertIdx = _prefs.widgets.length;
+        for (var fi = 0; fi < _prefs.widgets.length; fi++) {
+          var existSec = reg2 ? reg2.findSection(_prefs.widgets[fi].id) : null;
+          var existOrder = existSec ? (existSec.order || 0) : 0;
+          if (targetOrder < existOrder) {
+            insertIdx = fi;
+            break;
+          }
+        }
+        _prefs.widgets.splice(insertIdx, 0, { id: id, span: 12 });
         syncPrefsOrderFromWidgets();
       }
     }
@@ -1034,7 +1017,6 @@
       renderWidgetTree();
       renderSettingsSection();
       renderTemplatesSection();
-      initDevSection();
       bindToolsSection();
       renderExportSection();
       bindUserSettingsModal();
@@ -1080,6 +1062,7 @@
   function renderWidgetTree() {
     var body = document.getElementById('sidebar-layout-body');
     if (!body) return;
+    if (!_prefs) _prefs = loadPrefs();
     syncVisibilityPrefsFromLocalStorage();
     var reg = getRegistry();
     if (!reg) return;
@@ -1394,6 +1377,14 @@
         ]
       }, true);
     }
+
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(function () {
+        resizeChartOnDomId('sb-user-versions');
+        resizeChartOnDomId('sb-user-entrypoints');
+        resizeChartOnDomId('sb-user-stability');
+      });
+    }
   }
 
   // ── Settings Section (Language + Plan) ──────────────────────────
@@ -1415,6 +1406,8 @@
         var cloneLabel = clone.querySelector('.lang-switch-label');
         if (cloneLabel) cloneLabel.remove();
         langSlot.appendChild(clone);
+        var cloneBtnsForId = clone.querySelectorAll('.lang-btn');
+        for (var ci = 0; ci < cloneBtnsForId.length; ci++) cloneBtnsForId[ci].removeAttribute('id');
         // Wire cloned buttons
         var btns = clone.querySelectorAll('.lang-btn');
         for (var i = 0; i < btns.length; i++) {
@@ -1723,6 +1716,24 @@
     return BUILTIN_TEMPLATES.concat(loadTemplates());
   }
 
+  /** Sichtbare Haupt-Sektionen (<details>) und verschachtelte Chart-Disclosures oeffnen (z. B. nach Vorlagenwechsel). */
+  function expandVisibleSectionPanels() {
+    var reg = getRegistry();
+    if (!reg || !reg.sections) return;
+    for (var si = 0; si < reg.sections.length; si++) {
+      var sec = reg.sections[si];
+      if (!sec.domId) continue;
+      if (!isSectionVisible(sec.id)) continue;
+      var el = document.getElementById(sec.domId);
+      if (!el || el.tagName !== 'DETAILS') continue;
+      el.open = true;
+      var nested = el.querySelectorAll('details');
+      for (var ni = 0; ni < nested.length; ni++) {
+        nested[ni].open = true;
+      }
+    }
+  }
+
   function applyTemplate(tpl) {
     var t2 = migrateTemplateV1toV2(tpl);
     var t3 = migrateTemplateV2toV3(t2);
@@ -1750,7 +1761,11 @@
     setActiveTemplateName(tpl.name);
     applyGridLayout();
     applyAllChartVisibility();
+    expandVisibleSectionPanels();
     renderWidgetTree();
+    setTimeout(function () {
+      resizeAll();
+    }, 280);
   }
 
   /**
@@ -1817,6 +1832,23 @@
     for (var i = 0; i < widgets.length; i++) {
       var w = widgets[i];
       var wType = w.type || 'section';
+
+      if (wType === 'layout') {
+        var nestL = w.nested || [];
+        var ni;
+        for (ni = 0; ni < nestL.length; ni++) {
+          var nw = nestL[ni];
+          if (!nw || !nw.id) continue;
+          var chartDefL = reg.findChart(nw.id);
+          if (!chartDefL) continue;
+          var wrapperL = getOrCreateChartWrapper(chartDefL);
+          wrapperL.setAttribute('data-span', String(nw.span || 6));
+          wrapperL.style.display = '';
+          gridEl.appendChild(wrapperL);
+          extractedCharts[nw.id] = true;
+        }
+        continue;
+      }
 
       if (wType === 'chart') {
         // Chart-level widget: create standalone wrapper
@@ -1967,116 +1999,6 @@
   }
 
   // ── Export Section ──────────────────────────────────────────────
-
-  // ── DEV Section (only in DEV_MODE) ──────────────────────────────
-
-  function initDevSection() {
-    var devPanel = document.getElementById('sidebar-dev');
-    if (!devPanel) return;
-    // Check if dev mode is active (dev-overlay exists = dev bar was created)
-    var devBar = document.getElementById('dev-overlay');
-    if (!devBar) return;
-    devPanel.style.display = '';
-
-    // Source
-    var srcEl = document.getElementById('sidebar-dev-source');
-    if (srcEl) {
-      var origSrc = devBar.querySelector('.dev-overlay-muted');
-      if (origSrc) srcEl.textContent = origSrc.textContent;
-    }
-
-    // Badge
-    var badge = document.getElementById('sidebar-dev-badge');
-    if (badge) {
-      var origBrand = devBar.querySelector('.dev-overlay-brand');
-      if (origBrand) badge.textContent = origBrand.textContent;
-    }
-
-    // Sync button
-    var syncBtn = document.getElementById('sidebar-dev-sync');
-    if (syncBtn && !syncBtn.dataset.bound) {
-      syncBtn.dataset.bound = '1';
-      syncBtn.addEventListener('click', function () {
-        var origSync = document.getElementById('dev-sync-btn');
-        if (origSync) origSync.click();
-        var st = document.getElementById('sidebar-dev-sync-status');
-        if (st) st.textContent = 'syncing...';
-        setTimeout(function () { pullSidebarDevStatus(); }, 2000);
-        setTimeout(function () { pullSidebarDevStatus(); }, 5000);
-      });
-    }
-
-    // Benchmark button
-    var benchBtn = document.getElementById('sidebar-dev-bench');
-    if (benchBtn && !benchBtn.dataset.bound) {
-      benchBtn.dataset.bound = '1';
-      benchBtn.addEventListener('click', function () {
-        var days = parseInt(document.getElementById('sidebar-dev-bench-days').value || '8', 10);
-        if (isNaN(days) || days < 1) days = 8;
-        if (days > 31) days = 31;
-        var st = document.getElementById('sidebar-dev-bench-status');
-        if (st) st.textContent = 'running...';
-        benchBtn.disabled = true;
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/debug/benchmark-session-turns', true);
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.onload = function () {
-          benchBtn.disabled = false;
-          if (!st) return;
-          if (xhr.status !== 200) { st.textContent = 'failed'; return; }
-          try {
-            var out = JSON.parse(xhr.responseText);
-            st.textContent = out.total_s.toFixed(2) + 's';
-            st.style.color = '#22c55e';
-          } catch (e) { st.textContent = 'error'; }
-        };
-        xhr.onerror = function () { benchBtn.disabled = false; };
-        xhr.send(JSON.stringify({ days_back: days }));
-      });
-    }
-
-    // Cache rebuild buttons
-    function wireRebuild(btnId, url, metaId) {
-      var btn = document.getElementById(btnId);
-      if (!btn || btn.dataset.bound) return;
-      btn.dataset.bound = '1';
-      btn.addEventListener('click', function () {
-        btn.disabled = true;
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', url, true);
-        xhr.onload = function () {
-          btn.disabled = false;
-          setTimeout(function () { pullSidebarDevStatus(); }, 1000);
-          setTimeout(function () { pullSidebarDevStatus(); }, 4000);
-        };
-        xhr.onerror = function () { btn.disabled = false; };
-        xhr.send();
-      });
-    }
-    wireRebuild('sidebar-dev-rebuild-jsonl', '/api/debug/rebuild-jsonl-cache', 'sidebar-dev-jsonl-at');
-    wireRebuild('sidebar-dev-rebuild-proxy', '/api/debug/rebuild-proxy-cache', 'sidebar-dev-proxy-at');
-
-    // Initial status pull
-    pullSidebarDevStatus();
-  }
-
-  function pullSidebarDevStatus() {
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', '/api/debug/status', true);
-    xhr.onload = function () {
-      if (xhr.status !== 200) return;
-      try {
-        var info = JSON.parse(xhr.responseText);
-        var jsonlAt = document.getElementById('sidebar-dev-jsonl-at');
-        var proxyAt = document.getElementById('sidebar-dev-proxy-at');
-        var lastSync = document.getElementById('sidebar-dev-last-sync');
-        if (jsonlAt && info.jsonl_cache_at) jsonlAt.textContent = 'last: ' + new Date(info.jsonl_cache_at).toLocaleTimeString();
-        if (proxyAt && info.proxy_cache_at) proxyAt.textContent = 'last: ' + new Date(info.proxy_cache_at).toLocaleTimeString();
-        if (lastSync && info.last_remote_sync) lastSync.textContent = 'Last sync: ' + new Date(info.last_remote_sync).toLocaleTimeString();
-      } catch (e) {}
-    };
-    xhr.send();
-  }
 
   function bindToolsSection() {
     var explorerBtn = document.getElementById('sidebar-open-explorer');
@@ -2297,7 +2219,700 @@
 
   // ── Template Builder ──────────────────────────────────────────────
 
-  var _tbWidgets = []; // working copy: [{id, span}]
+  var _tbWidgets = []; // working copy: [{ id, span, children: [{ id, span } | { type:'block', span, bid }] }]
+  var _tbBlockSeq = 0;
+
+  /** Which canvas sections were expanded (details open); keyed by section id, read before each renderCanvas. */
+  function tbSnapshotSectionOpenState(canvas) {
+    var map = {};
+    if (!canvas) return map;
+    var ds = canvas.querySelectorAll('details.tb-canvas-section[data-section-id]');
+    var di;
+    for (di = 0; di < ds.length; di++) {
+      var sid = ds[di].getAttribute('data-section-id');
+      if (sid) map[sid] = ds[di].open;
+    }
+    return map;
+  }
+
+  function tbIsLayoutBlock(c) {
+    return !!(c && c.type === 'block');
+  }
+
+  function tbNewLayoutBlock(span) {
+    _tbBlockSeq++;
+    var s = parseInt(span, 10) || 12;
+    if (s < 1) s = 1;
+    if (s > 12) s = 12;
+    return { type: 'block', span: s, bid: 'tbblk_' + _tbBlockSeq, children: [] };
+  }
+
+  /** Section-level list (pc < 0) or inner list of layout block at index pc in section.children. */
+  function tbGetChildListByParent(si, pc) {
+    var sec = _tbWidgets[si];
+    if (!sec || !sec.children) return null;
+    if (pc < 0) return sec.children;
+    var b = sec.children[pc];
+    if (!tbIsLayoutBlock(b)) return null;
+    if (!b.children) b.children = [];
+    return b.children;
+  }
+
+  /** Distribute chart rows across scaffold blocks by relative span weight; last block absorbs rounding remainder. */
+  function tbPartitionChartsIntoBlocks(blockSpans, chartRows) {
+    var ids = [];
+    var ri;
+    for (ri = 0; ri < chartRows.length; ri++) {
+      ids.push({ id: chartRows[ri].id, span: chartRows[ri].span || 6 });
+    }
+    var nB = blockSpans.length;
+    if (!nB) return [];
+    var totalW = 0;
+    for (ri = 0; ri < nB; ri++) totalW += blockSpans[ri] || 12;
+    if (totalW <= 0) totalW = nB * 12;
+    var out = [];
+    var idx = 0;
+    for (var bi = 0; bi < nB; bi++) {
+      var cnt = bi === nB - 1 ? ids.length - idx : Math.floor(ids.length * ((blockSpans[bi] || 12) / totalW));
+      if (cnt < 0) cnt = 0;
+      if (bi === nB - 1) {
+        out.push(ids.slice(idx));
+      } else {
+        out.push(ids.slice(idx, idx + cnt));
+        idx += cnt;
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Legacy flat builder rows: [ block, block, chart, chart, … ].
+   * Moves trailing chart siblings into block.children (partition if all blocks empty; else append to last block).
+   */
+  function tbMigrateLooseChartsAfterBlocksIntoNested(children) {
+    if (!children || !children.length) return;
+    var blocks = [];
+    var loose = [];
+    var bi;
+    for (bi = 0; bi < children.length; bi++) {
+      var it = children[bi];
+      if (tbIsLayoutBlock(it)) blocks.push(it);
+      else if (it && it.id) loose.push({ id: it.id, span: it.span || 6 });
+    }
+    if (!blocks.length || !loose.length) return;
+    var allEmpty = true;
+    for (bi = 0; bi < blocks.length; bi++) {
+      if (blocks[bi].children && blocks[bi].children.length) {
+        allEmpty = false;
+        break;
+      }
+    }
+    var spans = [];
+    for (bi = 0; bi < blocks.length; bi++) spans.push(blocks[bi].span || 12);
+    if (allEmpty) {
+      var parts = tbPartitionChartsIntoBlocks(spans, loose);
+      for (bi = 0; bi < blocks.length; bi++) {
+        blocks[bi].children = parts[bi] ? parts[bi].slice() : [];
+      }
+    } else {
+      var lastB = blocks[blocks.length - 1];
+      if (!lastB.children) lastB.children = [];
+      var usedId = {};
+      for (bi = 0; bi < blocks.length; bi++) {
+        var ex = blocks[bi].children || [];
+        var ej;
+        for (ej = 0; ej < ex.length; ej++) {
+          if (ex[ej].id) usedId[ex[ej].id] = true;
+        }
+      }
+      for (var li = 0; li < loose.length; li++) {
+        if (usedId[loose[li].id]) continue;
+        lastB.children.push(loose[li]);
+        usedId[loose[li].id] = true;
+      }
+    }
+    children.length = 0;
+    for (bi = 0; bi < blocks.length; bi++) children.push(blocks[bi]);
+  }
+
+  /** Set on dragstart (pool / canvas section / canvas child), cleared on dragend — dragover cannot read getData reliably. */
+  var _tbDrag = null;
+
+  function tbClearCanvasDropUi() {
+    var c = document.getElementById('tb-canvas');
+    if (!c) return;
+    var marks = c.querySelectorAll(
+      '.tb-canvas-section--drop-before,.tb-canvas-section--drop-after,' +
+        '.tb-canvas-child--drop-before,.tb-canvas-child--drop-after,' +
+        '.tb-canvas-children--drop-append,.tb-canvas-placeholder--drop-here,' +
+        '.tb-canvas-cell--drop-before,.tb-canvas-children--drop,.tb-canvas-block-inner--drop-append'
+    );
+    for (var mi = 0; mi < marks.length; mi++) {
+      marks[mi].classList.remove(
+        'tb-canvas-section--drop-before',
+        'tb-canvas-section--drop-after',
+        'tb-canvas-child--drop-before',
+        'tb-canvas-child--drop-after',
+        'tb-canvas-children--drop-append',
+        'tb-canvas-placeholder--drop-here',
+        'tb-canvas-cell--drop-before',
+        'tb-canvas-children--drop',
+        'tb-canvas-block-inner--drop-append'
+      );
+    }
+  }
+
+  /** Insert before section at index `slot` (0..n); el = that section node or null = append after all. */
+  function tbFindSectionInsertBefore(canvas, clientY) {
+    var secs = canvas.querySelectorAll('.tb-canvas-section');
+    var n = secs.length;
+    if (!n) return { el: null, slot: 0 };
+    var j;
+    for (j = 0; j < n; j++) {
+      var r = secs[j].getBoundingClientRect();
+      var mid = r.top + r.height * 0.35;
+      if (clientY < mid) {
+        return { el: secs[j], slot: j };
+      }
+    }
+    return { el: null, slot: n };
+  }
+
+  /** Highlight section insertion line (Layout-Baum-Stil). fromIdx >= 0 → reorder noop hides bar. */
+  function tbApplySectionDropPreview(canvas, clientY, fromIdx) {
+    var ti = tbFindSectionInsertBefore(canvas, clientY);
+    if (fromIdx >= 0 && (ti.slot === fromIdx || ti.slot === fromIdx + 1)) return;
+    var secs = canvas.querySelectorAll('.tb-canvas-section');
+    if (!secs.length) {
+      var ph = canvas.querySelector('.tb-canvas-placeholder');
+      if (ph) ph.classList.add('tb-canvas-placeholder--drop-here');
+      return;
+    }
+    if (ti.el) ti.el.classList.add('tb-canvas-section--drop-before');
+    else secs[secs.length - 1].classList.add('tb-canvas-section--drop-after');
+  }
+
+  /** Insert before child at slot; el null = append in zone. */
+  function tbFindChildInsertBefore(zone, clientY) {
+    if (!zone) return { el: null, slot: 0 };
+    var kids = [];
+    var zc;
+    for (zc = 0; zc < zone.children.length; zc++) {
+      var el = zone.children[zc];
+      if (el && el.classList && el.classList.contains('tb-canvas-child')) kids.push(el);
+    }
+    var n = kids.length;
+    var i;
+    for (i = 0; i < n; i++) {
+      var r = kids[i].getBoundingClientRect();
+      var mid = r.top + r.height * 0.5;
+      if (clientY < mid) {
+        return { el: kids[i], slot: i };
+      }
+    }
+    return { el: null, slot: n };
+  }
+
+  function tbApplyChildDropPreview(zone, clientY, fromSi, fromPc, fromIx) {
+    if (!zone) return;
+    fromSi = typeof fromSi === 'number' ? fromSi : -1;
+    fromPc = typeof fromPc === 'number' ? fromPc : -1;
+    fromIx = typeof fromIx === 'number' ? fromIx : -1;
+    var toSi = parseInt(zone.dataset.sidx, 10);
+    var inner = zone.classList.contains('tb-canvas-block-inner');
+    var toPc = inner ? parseInt(zone.dataset.pcidx, 10) : -1;
+    var ti = tbFindChildInsertBefore(zone, clientY);
+    if (fromSi >= 0 && fromIx >= 0 && toSi === fromSi) {
+      if (inner && fromPc === toPc) {
+        if (ti.slot === fromIx || ti.slot === fromIx + 1) return;
+      }
+      if (!inner && fromPc < 0 && toPc < 0) {
+        if (ti.slot === fromIx || ti.slot === fromIx + 1) return;
+      }
+    }
+    if (ti.el) ti.el.classList.add('tb-canvas-child--drop-before');
+    else if (inner) zone.classList.add('tb-canvas-block-inner--drop-append');
+    else zone.classList.add('tb-canvas-children--drop-append');
+  }
+
+  /** Default builder span (12ths) from registry widgetGroup — matches dashboard CSS grids (#cards, #forensic-cards, …). */
+  function tbPoolDefaultSpanForChart(reg, chartId) {
+    if (!chartId) return 6;
+    var sid = String(chartId);
+    if (!reg || !reg.findChart) {
+      if (sid.indexOf('health-finding-') === 0) return 2;
+      if (sid.indexOf('health-kpi-') === 0) return 4;
+      if (sid.indexOf('token-stats-kpi-') === 0) return 2;
+      if (sid.indexOf('budget-kpi-') === 0) return 2;
+      if (sid.indexOf('proxy-kpi-') === 0) return 2;
+      if (sid.indexOf('forensic-card-') === 0) return 4;
+      if (sid === 'intel-saturation' || sid === 'intel-health' || sid === 'intel-quota-eta') return 4;
+      return 6;
+    }
+    var d = reg.findChart(chartId);
+    var wg = d && d.widgetGroup;
+    if (wg === 'kernbefunde') return 2;
+    if (wg === 'health-kpis') return 4;
+    if (wg === 'token-stats-kpis') return 2;
+    if (wg === 'budget-kpis') return 2;
+    if (wg === 'proxy-kpis') return 2;
+    if (wg === 'forensic-cards') return 4;
+    if (wg === 'intel-scores') return 4;
+    return 6;
+  }
+
+  /** Registry charts for a section + nested child sections (e.g. efficiency-range under economic), minus hiddenCharts. */
+  function tbVisibleRegistryChartsForSection(sectionId, ignoreHidden) {
+    var reg = getRegistry();
+    if (!reg || !reg.findSection) return [];
+    var hidden = ignoreHidden ? [] : (_prefs && Array.isArray(_prefs.hiddenCharts) ? _prefs.hiddenCharts : []);
+    var parts = [];
+    var sec = reg.findSection(sectionId);
+    if (sec) parts.push(sec);
+    for (var si = 0; si < reg.sections.length; si++) {
+      if (reg.sections[si].parentSection === sectionId) parts.push(reg.sections[si]);
+    }
+    var out = [];
+    for (var pi = 0; pi < parts.length; pi++) {
+      var ordered = getOrderedChartsForSection(parts[pi]);
+      for (var oi = 0; oi < ordered.length; oi++) {
+        var ch = ordered[oi];
+        if (ch.visible === false) continue;
+        if (hidden.indexOf(ch.id) >= 0) continue;
+        out.push({ id: ch.id, span: tbPoolDefaultSpanForChart(reg, ch.id) });
+      }
+    }
+    return out;
+  }
+
+  /** Flat prefs/template widgets[] → nested builder model (sections + all visible chart/chip children). */
+  function tbFlatWidgetsToNestedModel(flatWidgets) {
+    var reg = getRegistry();
+    var result = [];
+    if (!flatWidgets || !flatWidgets.length) return result;
+    for (var i = 0; i < flatWidgets.length; i++) {
+      var w = flatWidgets[i];
+      var wType = w.type || 'section';
+      if (wType === 'chart') {
+        if (w.section) continue;
+        if (result.length) {
+          result[result.length - 1].children.push({ id: w.id, span: w.span || 6 });
+        }
+        continue;
+      }
+      var children = [];
+      var k = i + 1;
+      while (k < flatWidgets.length) {
+        var nx = flatWidgets[k];
+        var nxt = nx.type || 'section';
+        if (nxt === 'section') break;
+        if (nxt === 'layout') {
+          if (nx.section !== w.id) break;
+          var spL = nx.span || 12;
+          if (spL < 1) spL = 1;
+          if (spL > 12) spL = 12;
+          var normNested = [];
+          var nestedIn = nx.nested;
+          if (nestedIn && nestedIn.length) {
+            var ni;
+            for (ni = 0; ni < nestedIn.length; ni++) {
+              var ne = nestedIn[ni];
+              if (ne && ne.id) normNested.push({ id: ne.id, span: ne.span || 6 });
+            }
+          }
+          children.push({ type: 'block', span: spL, bid: nx.bid || nx.id || 'tbblk_r' + k, children: normNested });
+          k++;
+          continue;
+        }
+        if (nxt !== 'chart') break;
+        if (nx.section !== w.id) break;
+        children.push({ id: nx.id, span: nx.span || 6 });
+        k++;
+      }
+      if (!children.length) {
+        children = tbVisibleRegistryChartsForSection(w.id, false);
+      } else {
+        tbMigrateLooseChartsAfterBlocksIntoNested(children);
+      }
+      result.push({ id: w.id, span: w.span || 12, children: children });
+      if (k > i + 1) i = k - 1;
+    }
+    return result;
+  }
+
+  /**
+   * Prefs/widgets[] persist mostly ECharts rows — chips/HTML stay in the registry only.
+   * Reconcile each builder section with tbVisibleRegistryChartsForSection (order + ids),
+   * keeping spans from the flat model when ids match; append flat-only ids at the end.
+   */
+  function tbAugmentBuilderChildrenFromRegistry(nested) {
+    if (!nested || !nested.length) return;
+    for (var wi = 0; wi < nested.length; wi++) {
+      var row = nested[wi];
+      var flatKids = row.children || [];
+      var hasBlock = false;
+      for (var hb = 0; hb < flatKids.length; hb++) {
+        if (tbIsLayoutBlock(flatKids[hb])) {
+          hasBlock = true;
+          break;
+        }
+      }
+      if (hasBlock) {
+        var usedB = {};
+        var spanByIdB = {};
+        var hb;
+        for (hb = 0; hb < flatKids.length; hb++) {
+          var fk0 = flatKids[hb];
+          if (tbIsLayoutBlock(fk0)) {
+            var in0 = fk0.children || [];
+            var hi;
+            for (hi = 0; hi < in0.length; hi++) {
+              if (in0[hi].id) {
+                usedB[in0[hi].id] = true;
+                spanByIdB[in0[hi].id] = in0[hi].span || 6;
+              }
+            }
+          } else if (fk0.id) {
+            usedB[fk0.id] = true;
+            spanByIdB[fk0.id] = fk0.span || 6;
+          }
+        }
+        var fullB = tbVisibleRegistryChartsForSection(row.id, false);
+        var lastBlk = null;
+        for (hb = flatKids.length - 1; hb >= 0; hb--) {
+          if (tbIsLayoutBlock(flatKids[hb])) {
+            lastBlk = flatKids[hb];
+            break;
+          }
+        }
+        if (lastBlk) {
+          if (!lastBlk.children) lastBlk.children = [];
+          for (hb = 0; hb < fullB.length; hb++) {
+            var cidB = fullB[hb].id;
+            if (usedB[cidB]) continue;
+            lastBlk.children.push({ id: cidB, span: spanByIdB[cidB] !== undefined ? spanByIdB[cidB] : 6 });
+            usedB[cidB] = true;
+          }
+        }
+        var newTop = [];
+        for (hb = 0; hb < flatKids.length; hb++) {
+          if (!tbIsLayoutBlock(flatKids[hb]) && flatKids[hb].id) continue;
+          newTop.push(flatKids[hb]);
+        }
+        row.children = newTop;
+        continue;
+      }
+      var full = tbVisibleRegistryChartsForSection(row.id, false);
+      var spanById = {};
+      var fi;
+      for (fi = 0; fi < flatKids.length; fi++) {
+        if (!tbIsLayoutBlock(flatKids[fi]) && flatKids[fi].id) spanById[flatKids[fi].id] = flatKids[fi].span || 6;
+      }
+      var merged = [];
+      var seen = {};
+      for (fi = 0; fi < full.length; fi++) {
+        var cid = full[fi].id;
+        merged.push({ id: cid, span: spanById[cid] !== undefined ? spanById[cid] : 6 });
+        seen[cid] = true;
+      }
+      for (fi = 0; fi < flatKids.length; fi++) {
+        var fk = flatKids[fi];
+        if (tbIsLayoutBlock(fk)) continue;
+        if (!seen[fk.id]) {
+          merged.push({ id: fk.id, span: fk.span || 6 });
+          seen[fk.id] = true;
+        }
+      }
+      row.children = merged;
+    }
+  }
+
+  /** Top-level registry sections (sorted), each with all default-visible widgets (inkl. KPI/HTML). */
+  function tbRegistryDefaultNestedModel() {
+    var reg = getRegistry();
+    if (!reg || typeof reg.getSectionsSorted !== 'function') {
+      return ALL_SECTION_IDS.map(function (id) { return { id: id, span: 12, children: tbVisibleRegistryChartsForSection(id, true) }; });
+    }
+    var secs = reg.getSectionsSorted();
+    var out = [];
+    for (var si = 0; si < secs.length; si++) {
+      var sec = secs[si];
+      if (sec.parentSection) continue;
+      out.push({ id: sec.id, span: 12, children: tbVisibleRegistryChartsForSection(sec.id, true) });
+    }
+    return out;
+  }
+
+  /**
+   * DOM order of #layout-grid (tpl/dashboard.html) + rough inner row widths as 12-col spans.
+   * Each section: layout DIV rows with charts in block.children (incl. chips; efficiency-range merged into economic).
+   * Optional slotChartIds (same length as blocks): per row an array of chart ids in DOM order (only ids present in
+   * tbVisibleRegistryChartsForSection are kept); leftover registry rows append to the last block.
+   * Optional slotWidgetGroups (same length as blocks): string = registry widgetGroup for that row (e.g. #cards KPI grid);
+   * null = fill from remaining charts by span-weight partition across all null slots. slotChartIds wins when set.
+   */
+  var TB_PAGE_SCAFFOLD_PLAN = [
+    {
+      id: 'health',
+      blocks: [12, 12],
+      slotWidgetGroups: ['health-kpis', 'kernbefunde']
+    },
+    {
+      id: 'intelligence',
+      blocks: [12, 12, 12],
+      slotChartIds: [
+        ['intel-saturation', 'intel-health', 'intel-quota-eta'],
+        ['intel-narrative'],
+        ['intel-seasonality']
+      ]
+    },
+    {
+      id: 'forensic',
+      blocks: [12, 12, 6, 6],
+      slotChartIds: [
+        ['forensic-card-code', 'forensic-card-impl', 'forensic-card-budget'],
+        ['forensic-hitlimit'],
+        ['forensic-signals'],
+        ['forensic-service']
+      ]
+    },
+    {
+      id: 'economic',
+      blocks: [4, 8, 12, 12],
+      slotChartIds: [
+        ['econ-cumulative'],
+        ['econ-explosion'],
+        ['econ-budget-drain'],
+        ['eff-efficiency-timeline', 'eff-monthly-butterfly', 'eff-day-comparison']
+      ]
+    },
+    {
+      id: 'token-stats',
+      blocks: [12, 6, 6, 12],
+      slotWidgetGroups: ['token-stats-kpis', null, null, null]
+    },
+    {
+      id: 'user-profile',
+      blocks: [4, 4, 4],
+      slotChartIds: [['user-versions'], ['user-entrypoints'], ['user-release-stability']]
+    },
+    {
+      id: 'budget',
+      blocks: [12, 12, 6, 6],
+      slotChartIds: [
+        [
+          'budget-kpi-output',
+          'budget-kpi-overhead',
+          'budget-kpi-cache-miss',
+          'budget-kpi-lost',
+          'budget-kpi-outage',
+          'budget-kpi-truncated'
+        ],
+        ['budget-sankey'],
+        ['budget-trend'],
+        ['budget-quota']
+      ]
+    },
+    {
+      id: 'proxy',
+      blocks: [12, 4, 4, 4, 6, 6, 6, 6],
+      slotChartIds: [
+        [
+          'proxy-kpi-requests',
+          'proxy-kpi-latency',
+          'proxy-kpi-cache-ratio',
+          'proxy-kpi-models',
+          'proxy-kpi-quota-5h',
+          'proxy-kpi-quota-7d',
+          'proxy-kpi-ttl-tier',
+          'proxy-kpi-peak-hours'
+        ],
+        ['proxy-tokens'],
+        ['proxy-models'],
+        ['proxy-hourly'],
+        ['proxy-latency'],
+        ['proxy-hourly-latency'],
+        ['proxy-error-trend'],
+        ['proxy-cache-trend']
+      ]
+    },
+    {
+      id: 'anthropic-status',
+      blocks: [12, 12, 12, 12],
+      slotChartIds: [
+        ['status-uptime'],
+        ['status-incidents'],
+        ['status-outage-scatter'],
+        ['status-outage-timeline']
+      ]
+    }
+  ];
+
+  /** Inner 12-col spans for scaffold block.children (builder canvas); aligns chip rows with dashboard grids. */
+  function tbScaffoldApplyInnerSpans(sectionId, blockIndex, picked) {
+    if (!picked || !picked.length) return;
+    var n = picked.length;
+    var i;
+    if (sectionId === 'forensic' && blockIndex === 0 && n === 3) {
+      for (i = 0; i < n; i++) picked[i] = { id: picked[i].id, span: 4 };
+    } else if (sectionId === 'intelligence' && blockIndex === 0 && n === 3) {
+      for (i = 0; i < n; i++) picked[i] = { id: picked[i].id, span: 4 };
+    } else if (sectionId === 'budget' && blockIndex === 0 && n >= 6) {
+      for (i = 0; i < n; i++) picked[i] = { id: picked[i].id, span: 2 };
+    } else if (sectionId === 'proxy' && blockIndex === 0) {
+      for (i = 0; i < n; i++) picked[i] = { id: picked[i].id, span: 2 };
+    } else if (sectionId === 'economic' && blockIndex === 3 && n === 3) {
+      for (i = 0; i < n; i++) picked[i] = { id: picked[i].id, span: 4 };
+    } else if (n === 1) {
+      picked[0] = { id: picked[0].id, span: 12 };
+    } else {
+      var each = Math.max(1, Math.floor(12 / n));
+      for (i = 0; i < n; i++) picked[i] = { id: picked[i].id, span: each };
+    }
+  }
+
+  /** Assign registry rows to scaffold blocks; optional slotWidgetGroups on plan entry (see TB_PAGE_SCAFFOLD_PLAN). */
+  function tbFillScaffoldBlockChildren(p, children, regs) {
+    var blocks = p.blocks || [];
+    var reg = getRegistry();
+    var regList = [];
+    var r0;
+    for (r0 = 0; r0 < regs.length; r0++) {
+      regList.push({ id: regs[r0].id, span: regs[r0].span || 6 });
+    }
+    var sci = p.slotChartIds;
+    var bi;
+    if (sci && sci.length === blocks.length) {
+      var regIdSet = {};
+      for (r0 = 0; r0 < regList.length; r0++) {
+        regIdSet[regList[r0].id] = regList[r0];
+      }
+      var placedSci = {};
+      for (bi = 0; bi < children.length; bi++) {
+        var rowIds = sci[bi];
+        var pickedSci = [];
+        var rj;
+        if (rowIds && rowIds.length) {
+          for (rj = 0; rj < rowIds.length; rj++) {
+            var cid = rowIds[rj];
+            var entSci = regIdSet[cid];
+            if (!entSci) continue;
+            pickedSci.push({ id: entSci.id, span: entSci.span || 6 });
+            placedSci[cid] = true;
+          }
+        }
+        tbScaffoldApplyInnerSpans(p.id, bi, pickedSci);
+        children[bi].children = pickedSci;
+      }
+      var orphanSci = [];
+      for (r0 = 0; r0 < regList.length; r0++) {
+        if (!placedSci[regList[r0].id]) orphanSci.push(regList[r0]);
+      }
+      if (orphanSci.length && children.length) {
+        var lastIx = children.length - 1;
+        var mergeSci = (children[lastIx].children || []).slice();
+        var oi;
+        for (oi = 0; oi < orphanSci.length; oi++) {
+          mergeSci.push({ id: orphanSci[oi].id, span: orphanSci[oi].span || 6 });
+        }
+        children[lastIx].children = mergeSci;
+      }
+      return;
+    }
+    var slots = p.slotWidgetGroups;
+    if (slots && slots.length === blocks.length) {
+      var used = {};
+      for (bi = 0; bi < children.length; bi++) {
+        var slotSpec = slots[bi];
+        if (typeof slotSpec === 'string' && slotSpec.length) {
+          var picked = [];
+          var ri;
+          for (ri = 0; ri < regList.length; ri++) {
+            var ent = regList[ri];
+            if (used[ent.id]) continue;
+            var cd = reg && reg.findChart ? reg.findChart(ent.id) : null;
+            var wg = cd && cd.widgetGroup;
+            if (wg === slotSpec) {
+              picked.push({ id: ent.id, span: ent.span });
+              used[ent.id] = true;
+            }
+          }
+          if (slotSpec === 'token-stats-kpis' && picked.length) {
+            for (var ps = 0; ps < picked.length; ps++) {
+              picked[ps] = { id: picked[ps].id, span: 2 };
+            }
+          }
+          if (slotSpec === 'health-kpis' && picked.length) {
+            for (var ph = 0; ph < picked.length; ph++) {
+              picked[ph] = { id: picked[ph].id, span: 4 };
+            }
+          }
+          if (slotSpec === 'kernbefunde' && picked.length) {
+            for (var pk = 0; pk < picked.length; pk++) {
+              picked[pk] = { id: picked[pk].id, span: 2 };
+            }
+          }
+          children[bi].children = picked;
+        }
+      }
+      var remaining = [];
+      for (ri = 0; ri < regList.length; ri++) {
+        var ent2 = regList[ri];
+        if (!used[ent2.id]) remaining.push(ent2);
+      }
+      var nullIndices = [];
+      var nullSpans = [];
+      for (bi = 0; bi < slots.length; bi++) {
+        if (slots[bi] == null || slots[bi] === '') {
+          nullIndices.push(bi);
+          nullSpans.push(blocks[bi] || 12);
+        }
+      }
+      if (remaining.length && nullIndices.length) {
+        var parts = tbPartitionChartsIntoBlocks(nullSpans, remaining);
+        var ni;
+        for (ni = 0; ni < nullIndices.length; ni++) {
+          var bix = nullIndices[ni];
+          var extra = parts[ni] || [];
+          var cur = children[bix].children || [];
+          var mergedList = cur.slice();
+          var ej;
+          for (ej = 0; ej < extra.length; ej++) mergedList.push(extra[ej]);
+          children[bix].children = mergedList;
+        }
+      }
+      return;
+    }
+    var parts0 = tbPartitionChartsIntoBlocks(blocks, regList);
+    for (bi = 0; bi < children.length; bi++) {
+      children[bi].children = parts0[bi] ? parts0[bi].slice() : [];
+    }
+  }
+
+  function tbNestedModelFromPageScaffold() {
+    var reg = getRegistry();
+    var out = [];
+    for (var pi = 0; pi < TB_PAGE_SCAFFOLD_PLAN.length; pi++) {
+      var p = TB_PAGE_SCAFFOLD_PLAN[pi];
+      if (!reg || !reg.findSection || !reg.findSection(p.id)) continue;
+      var children = [];
+      var bi;
+      for (bi = 0; bi < p.blocks.length; bi++) {
+        children.push(tbNewLayoutBlock(p.blocks[bi]));
+      }
+      var regs = tbVisibleRegistryChartsForSection(p.id, true);
+      tbFillScaffoldBlockChildren(p, children, regs);
+      out.push({ id: p.id, span: 12, children: children });
+    }
+    return out;
+  }
+
+  function tbLoadDefaultIntoBuilder() {
+    var overlay = document.getElementById('tb-overlay');
+    if (!overlay) return;
+    _tbWidgets = tbNestedModelFromPageScaffold();
+    renderBuilderRows();
+  }
 
   function openTemplateBuilder(baseTpl) {
     var overlay = document.getElementById('tb-overlay');
@@ -2307,20 +2922,34 @@
     if (titleEl) titleEl.textContent = _t('tbTitle');
     if (nameInput) nameInput.placeholder = _t('tbNamePlaceholder');
 
-    // Init from base template or current prefs
     if (baseTpl && baseTpl.widgets) {
-      _tbWidgets = baseTpl.widgets.map(function (w) { return { id: w.id, span: w.span }; });
+      _tbWidgets = tbFlatWidgetsToNestedModel(baseTpl.widgets);
+      tbAugmentBuilderChildrenFromRegistry(_tbWidgets);
       if (nameInput) nameInput.value = baseTpl.builtin ? '' : (baseTpl.name || '');
     } else if (_prefs && _prefs.widgets) {
-      _tbWidgets = _prefs.widgets.map(function (w) { return { id: w.id, span: w.span }; });
+      _tbWidgets = tbFlatWidgetsToNestedModel(_prefs.widgets);
+      tbAugmentBuilderChildrenFromRegistry(_tbWidgets);
       if (nameInput) nameInput.value = '';
     } else {
-      _tbWidgets = ALL_SECTION_IDS.map(function (id) { return { id: id, span: 12 }; });
+      _tbWidgets = tbNestedModelFromPageScaffold();
       if (nameInput) nameInput.value = '';
     }
 
     renderBuilderRows();
-    bindPreviewResize();
+    bindCanvasEvents();
+    bindPoolEvents();
+    var scSum = document.getElementById('tb-scaffold-summary');
+    var scPre = document.getElementById('tb-scaffold-pipe');
+    if (scSum) scSum.textContent = _t('tbScaffoldSummary');
+    if (scPre) {
+      var sk = tbGetDesktopPageScaffold();
+      scPre.textContent =
+        sk.divGeruestAscii +
+        '\n\n--- pipe ---\n' +
+        sk.fullPipe +
+        '\n\n--- shallow ---\n' +
+        sk.toShallowDivPipe();
+    }
     overlay.classList.add('is-open');
     document.body.style.overflow = 'hidden';
   }
@@ -2351,293 +2980,954 @@
     return avail;
   }
 
-  function updateBuilderPreview() {
-    var container = document.getElementById('tb-rows');
-    if (!container) return;
-    var preview = container.querySelector('.tb-preview-grid');
-    if (!preview) return;
+  // ── Template Builder v2: Nested Grid Canvas + Widget Pool ───────
+  //
+  // Data model: _tbWidgets = [ { id, span, children: [ {id,span} | { type:'block', span, bid, children:[{id,span}] } ] }, ... ]
+  // Sections are containers; layout blocks hold nested chart rows in block.children.
+
+  function tbName(reg, id, type) {
+    if (type === 'chart') {
+      var ch = reg.findChart(id);
+      return ch ? _t(ch.titleKey) : id;
+    }
+    var sec = reg.findSection(id);
+    return sec ? _t(sec.titleKey) : id;
+  }
+
+  /** Same rule as pool: ECharts canvas chart vs KPI/HTML/chip (dashed meta pool); block = layout row. */
+  function tbCanvasChildKind(reg, child) {
+    if (tbIsLayoutBlock(child)) return 'layout';
+    var chartId = child && child.id;
+    if (!reg || typeof reg.findChart !== 'function') return 'meta';
+    var ch = reg.findChart(chartId);
+    if (!ch) return 'meta';
+    if (ch.engine === 'echarts' && ch.kind !== 'chip') return 'chart';
+    return 'meta';
+  }
+
+  function tbGetAllUsedIds() {
+    var used = {};
+    for (var i = 0; i < _tbWidgets.length; i++) {
+      used[_tbWidgets[i].id] = true;
+      var ch = _tbWidgets[i].children || [];
+      for (var ci = 0; ci < ch.length; ci++) {
+        var ent = ch[ci];
+        if (tbIsLayoutBlock(ent)) {
+          var inn = ent.children || [];
+          for (var ii = 0; ii < inn.length; ii++) {
+            if (inn[ii].id) used[inn[ii].id] = true;
+          }
+          continue;
+        }
+        if (ent.id) used[ent.id] = true;
+      }
+    }
+    return used;
+  }
+
+  function renderCanvas() {
+    var canvas = document.getElementById('tb-canvas');
+    if (!canvas) return;
     var reg = getRegistry();
     if (!reg) return;
+    var prevOpen = tbSnapshotSectionOpenState(canvas);
     var html = '';
     for (var i = 0; i < _tbWidgets.length; i++) {
       var w = _tbWidgets[i];
-      var sec = reg.findSection(w.id);
-      var name = sec ? _t(sec.titleKey) : w.id;
-      html += '<div class="tb-preview-cell" data-pidx="' + i + '" style="grid-column:span ' + (w.span || 12) + '">';
-      html += '<span class="tb-preview-name">' + name + '</span>';
-      html += '<span class="tb-preview-span">' + (w.span || 12) + '</span>';
-      html += '<span class="tb-resize-handle" data-pidx="' + i + '"></span>';
+      var isOpen = prevOpen[w.id] === true;
+      html +=
+        '<details class="tb-canvas-section"' +
+        (isOpen ? ' open' : '') +
+        ' data-sidx="' +
+        i +
+        '" data-section-id="' +
+        escT(w.id) +
+        '" draggable="true" style="grid-column:span ' +
+        (w.span || 12) +
+        '">';
+      html += '<summary class="tb-canvas-section-head" title="' + escT(_t('tbSectionToggleTitle')) + '">';
+      html += '<span class="tb-canvas-drag">&#x2630;</span>';
+      html += '<span class="tb-canvas-name">' + tbName(reg, w.id, 'section') + '</span>';
+      html += '<span class="tb-canvas-span">' + (w.span || 12) + '</span>';
+      html += '<button type="button" class="tb-canvas-remove" data-sidx="' + i + '">&times;</button>';
+      html += '<span class="tb-canvas-resize" data-sidx="' + i + '"></span>';
+      html += '</summary>';
+      html += '<div class="tb-canvas-section-body">';
+      html += '<div class="tb-canvas-layout-bar" data-sidx="' + i + '">';
+      for (var spb = 12; spb >= 1; spb--) {
+        html +=
+          '<button type="button" class="tb-canvas-add-block" data-sidx="' +
+          i +
+          '" data-span="' +
+          spb +
+          '" title="' +
+          escT(_t('tbAddLayoutBlockTitle')) +
+          '">' +
+          spb +
+          '</button>';
+      }
       html += '</div>';
+      // Children sub-grid
+      var children = w.children || [];
+      html += '<div class="tb-canvas-children" data-sidx="' + i + '">';
+      for (var ci = 0; ci < children.length; ci++) {
+        var c = children[ci];
+        var ck = tbCanvasChildKind(reg, c);
+        var cspan = c.span || (tbIsLayoutBlock(c) ? 12 : 6);
+        var cname = tbIsLayoutBlock(c) ? _t('tbLayoutBlockLabel') + ' ' + String(cspan) + '/12' : tbName(reg, c.id, 'chart');
+        if (tbIsLayoutBlock(c)) {
+          html += '<div class="tb-canvas-child tb-canvas-child--' + ck + '" data-sidx="' + i + '" data-cidx="' + ci + '" draggable="true" style="grid-column:span ' + cspan + '">';
+          html += '<div class="tb-canvas-layout-row">';
+          html += '<span class="tb-canvas-drag">&#x2630;</span>';
+          html += '<span class="tb-canvas-name">' + cname + '</span>';
+          html += '<span class="tb-canvas-span">' + cspan + '</span>';
+          html += '<button type="button" class="tb-canvas-child-remove" data-sidx="' + i + '" data-cidx="' + ci + '">&times;</button>';
+          html += '<span class="tb-canvas-child-resize" data-sidx="' + i + '" data-cidx="' + ci + '"></span>';
+          html += '</div>';
+          var inners = c.children || [];
+          html +=
+            '<div class="tb-canvas-block-inner" data-sidx="' +
+            i +
+            '" data-pcidx="' +
+            ci +
+            '" data-inner-cols="' +
+            cspan +
+            '" style="grid-template-columns:repeat(' +
+            cspan +
+            ',1fr)">';
+          var ii;
+          for (ii = 0; ii < inners.length; ii++) {
+            var ic = inners[ii];
+            var ick = tbCanvasChildKind(reg, ic);
+            var icspan = ic.span || 6;
+            if (icspan < 1) icspan = 1;
+            if (icspan > cspan) icspan = cspan;
+            var icname = tbName(reg, ic.id, 'chart');
+            html +=
+              '<div class="tb-canvas-child tb-canvas-child--' +
+              ick +
+              '" data-sidx="' +
+              i +
+              '" data-pcidx="' +
+              ci +
+              '" data-icc="' +
+              ii +
+              '" draggable="true" style="grid-column:span ' +
+              icspan +
+              '">';
+            html += '<span class="tb-canvas-drag">&#x2630;</span>';
+            html += '<span class="tb-canvas-name">' + icname + '</span>';
+            html += '<span class="tb-canvas-span">' + icspan + '</span>';
+            html +=
+              '<button type="button" class="tb-canvas-child-remove" data-sidx="' +
+              i +
+              '" data-pcidx="' +
+              ci +
+              '" data-icc="' +
+              ii +
+              '">&times;</button>';
+            html += '<span class="tb-canvas-child-resize" data-sidx="' + i + '" data-pcidx="' + ci + '" data-icc="' + ii + '"></span>';
+            html += '</div>';
+          }
+          if (!inners.length) {
+            html +=
+              '<div class="tb-canvas-child-placeholder tb-canvas-child-placeholder--inner" data-sidx="' +
+              i +
+              '" data-pcidx="' +
+              ci +
+              '">+ Charts hierher ziehen</div>';
+          }
+          html += '</div></div>';
+          continue;
+        }
+        html += '<div class="tb-canvas-child tb-canvas-child--' + ck + '" data-sidx="' + i + '" data-cidx="' + ci + '" draggable="true" style="grid-column:span ' + cspan + '">';
+        html += '<span class="tb-canvas-drag">&#x2630;</span>';
+        html += '<span class="tb-canvas-name">' + cname + '</span>';
+        html += '<span class="tb-canvas-span">' + cspan + '</span>';
+        html += '<button type="button" class="tb-canvas-child-remove" data-sidx="' + i + '" data-cidx="' + ci + '">&times;</button>';
+        html += '<span class="tb-canvas-child-resize" data-sidx="' + i + '" data-cidx="' + ci + '"></span>';
+        html += '</div>';
+      }
+      if (!children.length) {
+        html += '<div class="tb-canvas-child-placeholder" data-sidx="' + i + '">+ Charts hierher ziehen</div>';
+      }
+      html += '</div>';
+      html += '</div>';
+      html += '</details>';
     }
-    preview.innerHTML = html;
-    // Sync select dropdowns in widget list
-    var selects = container.querySelectorAll('.tb-span-select');
-    for (var si = 0; si < selects.length; si++) {
-      var idx = parseInt(selects[si].dataset.idx, 10);
-      if (_tbWidgets[idx]) selects[si].value = String(_tbWidgets[idx].span);
+    if (!_tbWidgets.length) {
+      html += '<div class="tb-canvas-placeholder">' + _t('tbDropHere') + '</div>';
+    }
+    canvas.innerHTML = html;
+  }
+
+  /** ECharts canvas children for template row: nested registry section includes parent charts first. */
+  function tbMetaDefaultChartChildren(reg, gs) {
+    var out = [];
+    var seen = {};
+    function pushFrom(sec) {
+      if (!sec || !sec.charts) return;
+      for (var i = 0; i < sec.charts.length; i++) {
+        var ch = sec.charts[i];
+        if (ch.kind === 'chip' || ch.engine !== 'echarts') continue;
+        if (!seen[ch.id]) {
+          seen[ch.id] = true;
+          out.push({ id: ch.id, span: 6 });
+        }
+      }
+    }
+    if (gs.parentSection) {
+      var par = reg.findSection(gs.parentSection);
+      pushFrom(par);
+    }
+    pushFrom(gs);
+    return out;
+  }
+
+  function renderPool() {
+    var elCharts = document.getElementById('tb-pool-charts');
+    var elMeta = document.getElementById('tb-pool-meta');
+    var elSections = document.getElementById('tb-pool-sections');
+    var headL = document.getElementById('tb-pool-left-head');
+    var headR = document.getElementById('tb-pool-right-head');
+    var labSec = document.getElementById('tb-pool-sections-label');
+    if (!elCharts || !elMeta || !elSections) return;
+    var reg = getRegistry();
+    if (!reg) return;
+    var used = tbGetAllUsedIds();
+
+    if (headL) headL.textContent = _t('tbPoolLeftTitle');
+    if (headR) headR.textContent = _t('tbPoolRightTitle');
+    if (labSec) labSec.textContent = _t('tbPoolSections');
+
+    var htmlSec = '';
+    for (var si = 0; si < reg.sections.length; si++) {
+      var sec = reg.sections[si];
+      if (sec.parentSection) continue;
+      var clsS = 'tb-pool-chip' + (used[sec.id] ? ' is-used' : '');
+      htmlSec += '<div class="' + clsS + '" data-pool-id="' + sec.id + '" data-pool-type="section" draggable="' + (used[sec.id] ? 'false' : 'true') + '">';
+      htmlSec += _t(sec.titleKey);
+      htmlSec += '</div>';
+    }
+    elSections.innerHTML = htmlSec;
+
+    var htmlCharts = '';
+    for (var gi = 0; gi < reg.sections.length; gi++) {
+      var gs = reg.sections[gi];
+      if (!gs.charts || !gs.charts.length) continue;
+      var hasCanvas = false;
+      for (var cj = 0; cj < gs.charts.length; cj++) {
+        var chx = gs.charts[cj];
+        if (chx.engine === 'echarts' && chx.kind !== 'chip') {
+          hasCanvas = true;
+          break;
+        }
+      }
+      if (!hasCanvas) continue;
+      var innerCharts = '';
+      for (var rci = 0; rci < gs.charts.length; rci++) {
+        var rc = gs.charts[rci];
+        var isCanvasChart = rc.engine === 'echarts' && rc.kind !== 'chip';
+        if (!isCanvasChart) continue;
+        if (used[rc.id]) continue;
+        var label = _t(rc.titleKey);
+        innerCharts += '<div class="tb-pool-chip tb-pool-chip--chart" data-pool-id="' + rc.id + '" data-pool-type="chart" data-pool-section="' + gs.id + '" draggable="true">';
+        innerCharts += label;
+        innerCharts += '</div>';
+      }
+      if (!innerCharts) continue;
+      htmlCharts += '<details class="tb-pool-group tb-pool-group--fold">';
+      htmlCharts += '<summary class="tb-pool-group-title">' + _t(gs.titleKey) + '</summary>';
+      htmlCharts += '<div class="tb-pool-chips">';
+      htmlCharts += innerCharts;
+      htmlCharts += '</div></details>';
+    }
+    if (!htmlCharts) htmlCharts = '<div class="tb-pool-empty">' + _t('tbPoolLeftEmpty') + '</div>';
+    elCharts.innerHTML = htmlCharts;
+
+    var htmlMeta = '';
+    for (var gk = 0; gk < reg.sections.length; gk++) {
+      var g2 = reg.sections[gk];
+      if (!g2.charts || !g2.charts.length) continue;
+      var hasMeta = false;
+      for (var ck = 0; ck < g2.charts.length; ck++) {
+        var cx = g2.charts[ck];
+        if (!(cx.engine === 'echarts' && cx.kind !== 'chip')) {
+          hasMeta = true;
+          break;
+        }
+      }
+      if (!hasMeta) continue;
+      var innerMeta = '';
+      for (var rck = 0; rck < g2.charts.length; rck++) {
+        var r2 = g2.charts[rck];
+        var isCv = r2.engine === 'echarts' && r2.kind !== 'chip';
+        if (isCv) continue;
+        if (used[r2.id]) continue;
+        var lab2 = _t(r2.titleKey);
+        var metaSub = r2.kind === 'chip' ? _t('tbPoolChipKindChip') : (r2.type === 'table' ? _t('tbPoolChipKindTable') : _t('tbPoolChipKindOther'));
+        innerMeta += '<div class="tb-pool-chip tb-pool-chip--meta" data-pool-id="' + r2.id + '" data-pool-section="' + g2.id + '" draggable="false" role="button" tabindex="0">';
+        innerMeta += '<span class="tb-pool-meta-main">' + lab2 + '</span><span class="tb-pool-meta-sub">' + metaSub + '</span></div>';
+      }
+      if (!innerMeta) continue;
+      htmlMeta += '<details class="tb-pool-group tb-pool-group--fold">';
+      htmlMeta += '<summary class="tb-pool-group-title">' + _t(g2.titleKey) + '</summary>';
+      htmlMeta += '<div class="tb-pool-chips">';
+      htmlMeta += innerMeta;
+      htmlMeta += '</div></details>';
+    }
+    if (!htmlMeta) htmlMeta = '<div class="tb-pool-empty">' + _t('tbPoolRightEmpty') + '</div>';
+    elMeta.innerHTML = htmlMeta;
+  }
+
+  function renderBuilderRows() {
+    renderCanvas();
+    renderPool();
+    renderGridRuler();
+  }
+
+  function renderGridRuler() {
+    var ruler = document.querySelector('.tb-grid-ruler');
+    if (!ruler || ruler.children.length) return;
+    for (var ri = 0; ri < 12; ri++) {
+      var col = document.createElement('div');
+      col.className = 'tb-grid-ruler-col';
+      col.setAttribute('data-col', String(ri + 1));
+      ruler.appendChild(col);
     }
   }
 
-  function bindPreviewResize() {
-    var container = document.getElementById('tb-rows');
-    if (!container || container.dataset.resizeBound) return;
-    container.dataset.resizeBound = '1';
-    var _resizeIdx = -1;
+  function bindCanvasEvents() {
+    var canvas = document.getElementById('tb-canvas');
+    if (!canvas || canvas.dataset.bound) return;
+    var regCanvas = getRegistry();
+    canvas.dataset.bound = '1';
+    var dropHost = canvas.parentElement && canvas.parentElement.classList.contains('tb-canvas-wrap') ? canvas.parentElement : canvas;
+
+    // Remove section or child
+    canvas.addEventListener('click', function (e) {
+      var addBlk = e.target.closest('.tb-canvas-add-block');
+      if (addBlk) {
+        var sbi = parseInt(addBlk.dataset.sidx, 10);
+        var spb = parseInt(addBlk.dataset.span, 10);
+        if (_tbWidgets[sbi]) {
+          if (!_tbWidgets[sbi].children) _tbWidgets[sbi].children = [];
+          _tbWidgets[sbi].children.push(tbNewLayoutBlock(spb));
+          renderBuilderRows();
+        }
+        return;
+      }
+      var rmChild = e.target.closest('.tb-canvas-child-remove');
+      if (rmChild) {
+        var si = parseInt(rmChild.dataset.sidx, 10);
+        if (rmChild.dataset.pcidx !== undefined && rmChild.dataset.pcidx !== '') {
+          var pcR = parseInt(rmChild.dataset.pcidx, 10);
+          var iccR = parseInt(rmChild.dataset.icc, 10);
+          var blkR = _tbWidgets[si] && _tbWidgets[si].children && _tbWidgets[si].children[pcR];
+          if (blkR && blkR.children && !isNaN(iccR)) {
+            blkR.children.splice(iccR, 1);
+          }
+        } else {
+          var ci = parseInt(rmChild.dataset.cidx, 10);
+          if (_tbWidgets[si] && _tbWidgets[si].children) {
+            _tbWidgets[si].children.splice(ci, 1);
+          }
+        }
+        renderBuilderRows();
+        return;
+      }
+      var rmSec = e.target.closest('.tb-canvas-remove');
+      if (rmSec) {
+        e.stopPropagation();
+        var idx = parseInt(rmSec.dataset.sidx, 10);
+        _tbWidgets.splice(idx, 1);
+        renderBuilderRows();
+      }
+    });
+
+    // Drag canvas child row vs section (child is inside section — must test child first)
+    canvas.addEventListener('dragstart', function (e) {
+      var ch = e.target.closest('.tb-canvas-child');
+      if (ch) {
+        var siD = parseInt(ch.dataset.sidx, 10);
+        var pcD = ch.dataset.pcidx !== undefined && ch.dataset.pcidx !== '' ? parseInt(ch.dataset.pcidx, 10) : -1;
+        var ixD = pcD >= 0 ? parseInt(ch.dataset.icc, 10) : parseInt(ch.dataset.cidx, 10);
+        _tbDrag = { kind: 'tbchild', si: siD, pc: pcD, ix: ixD };
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', 'tbchild:' + siD + ':' + pcD + ':' + ixD);
+        ch.classList.add('is-dragging');
+        return;
+      }
+      var sec = e.target.closest('.tb-canvas-section');
+      if (!sec) return;
+      _tbDrag = { kind: 'section', fromIdx: parseInt(sec.dataset.sidx, 10) };
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', 'section:' + sec.dataset.sidx);
+      sec.classList.add('is-dragging');
+    });
+
+    dropHost.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      var eff = e.dataTransfer.effectAllowed;
+      if (eff === 'move' || eff === 'linkMove') {
+        e.dataTransfer.dropEffect = 'move';
+      } else {
+        e.dataTransfer.dropEffect = 'copy';
+      }
+      if (!dropHost.contains(e.target)) return;
+      tbClearCanvasDropUi();
+      if (!_tbDrag) return;
+
+      if (_tbDrag.kind === 'pool' && _tbDrag.poolType === 'section') {
+        tbApplySectionDropPreview(canvas, e.clientY, -1);
+        return;
+      }
+      if (_tbDrag.kind === 'section') {
+        tbApplySectionDropPreview(canvas, e.clientY, _tbDrag.fromIdx);
+        return;
+      }
+      if (_tbDrag.kind === 'pool' && _tbDrag.poolType === 'chart') {
+        var innerP = e.target.closest('.tb-canvas-block-inner');
+        var cz = e.target.closest('.tb-canvas-children');
+        var sec = e.target.closest('.tb-canvas-section');
+        var zone = innerP || cz || (sec && sec.querySelector('.tb-canvas-children'));
+        if (zone) {
+          tbApplyChildDropPreview(zone, e.clientY, -1, -1, -1);
+        } else {
+          var secs = canvas.querySelectorAll('.tb-canvas-section');
+          if (secs.length) {
+            var lastZ = secs[secs.length - 1].querySelector('.tb-canvas-children');
+            if (lastZ) lastZ.classList.add('tb-canvas-children--drop-append');
+          } else {
+            var ph0 = canvas.querySelector('.tb-canvas-placeholder');
+            if (ph0) ph0.classList.add('tb-canvas-placeholder--drop-here');
+          }
+        }
+        return;
+      }
+      if (_tbDrag.kind === 'tbchild') {
+        var innerZ = e.target.closest('.tb-canvas-block-inner');
+        var cz2 = e.target.closest('.tb-canvas-children');
+        var sec2 = e.target.closest('.tb-canvas-section');
+        var zone2 = innerZ || cz2 || (sec2 && sec2.querySelector('.tb-canvas-children'));
+        if (zone2) {
+          tbApplyChildDropPreview(zone2, e.clientY, _tbDrag.si, _tbDrag.pc, _tbDrag.ix);
+        }
+      }
+    });
+
+    dropHost.addEventListener('dragleave', function (e) {
+      if (!dropHost.contains(e.relatedTarget)) {
+        tbClearCanvasDropUi();
+      }
+    });
+
+    dropHost.addEventListener('drop', function (e) {
+      e.preventDefault();
+      tbClearCanvasDropUi();
+      _tbDrag = null;
+
+      var data = e.dataTransfer.getData('text/plain') || '';
+      var childZone = e.target.closest('.tb-canvas-children');
+      var targetSec = e.target.closest('.tb-canvas-section');
+
+      // Reorder / move a chart or chip row on the canvas (section-level or inside layout block)
+      if (data.indexOf('tbchild:') === 0) {
+        var rest = data.slice(8).split(':');
+        var fromSi = parseInt(rest[0], 10);
+        var fromPc = -1;
+        var fromIx = 0;
+        if (rest.length >= 3) {
+          fromPc = parseInt(rest[1], 10);
+          fromIx = parseInt(rest[2], 10);
+        } else {
+          fromIx = parseInt(rest[1], 10);
+        }
+        var srcList = tbGetChildListByParent(fromSi, fromPc);
+        if (!srcList || fromIx < 0 || fromIx >= srcList.length) {
+          renderBuilderRows();
+          return;
+        }
+        var innerDrop = e.target.closest('.tb-canvas-block-inner');
+        var cz = e.target.closest('.tb-canvas-children');
+        var ts = e.target.closest('.tb-canvas-section');
+        var zone = innerDrop || cz || (ts && ts.querySelector('.tb-canvas-children'));
+        if (!zone) {
+          renderBuilderRows();
+          return;
+        }
+        var toSi = parseInt(zone.dataset.sidx, 10);
+        var toPc = innerDrop ? parseInt(zone.dataset.pcidx, 10) : -1;
+        var ti = tbFindChildInsertBefore(zone, e.clientY);
+        var toIx = ti.slot;
+        if (isNaN(toIx)) toIx = 0;
+        var moved = srcList.splice(fromIx, 1)[0];
+        var tgtList = tbGetChildListByParent(toSi, toPc);
+        if (!tgtList) {
+          srcList.splice(fromIx, 0, moved);
+          renderBuilderRows();
+          return;
+        }
+        if (fromSi === toSi && fromPc === toPc && fromIx < toIx) {
+          toIx--;
+        }
+        if (toIx < 0) toIx = 0;
+        if (toIx > tgtList.length) toIx = tgtList.length;
+        tgtList.splice(toIx, 0, moved);
+        renderBuilderRows();
+        return;
+      }
+
+      // Drop from pool (copy): chart into a section, or add empty section
+      if (data.indexOf('pool:') === 0) {
+        var parts = data.slice(5).split('|');
+        var poolId = parts[0];
+        var poolType = parts[1] || 'section';
+        var poolSectionId = parts[2] || '';
+        if (poolType === 'chart') {
+          var innerPool = e.target.closest('.tb-canvas-block-inner');
+          if (innerPool) {
+            var siIn = parseInt(innerPool.dataset.sidx, 10);
+            var pcIn = parseInt(innerPool.dataset.pcidx, 10);
+            var listIn = tbGetChildListByParent(siIn, pcIn);
+            if (listIn) {
+              var tiIn = tbFindChildInsertBefore(innerPool, e.clientY);
+              var slotIn = tiIn.slot;
+              if (isNaN(slotIn)) slotIn = 0;
+              if (slotIn < 0) slotIn = 0;
+              if (slotIn > listIn.length) slotIn = listIn.length;
+              listIn.splice(slotIn, 0, { id: poolId, span: tbPoolDefaultSpanForChart(regCanvas, poolId) });
+            }
+            renderBuilderRows();
+            return;
+          }
+          var cz2 = e.target.closest('.tb-canvas-children');
+          var ts2 = e.target.closest('.tb-canvas-section');
+          var zone2 = cz2 || (ts2 && ts2.querySelector('.tb-canvas-children'));
+          var sidx = -1;
+          var toCi2 = 0;
+          if (zone2) {
+            sidx = parseInt(zone2.dataset.sidx, 10);
+            var ti2 = tbFindChildInsertBefore(zone2, e.clientY);
+            toCi2 = ti2.slot;
+            if (isNaN(toCi2)) toCi2 = 0;
+          } else if (_tbWidgets.length > 0) {
+            sidx = _tbWidgets.length - 1;
+            var allSecEls = canvas.querySelectorAll('.tb-canvas-section');
+            var lastSecEl = allSecEls.length ? allSecEls[allSecEls.length - 1] : null;
+            var lz = lastSecEl ? lastSecEl.querySelector('.tb-canvas-children') : null;
+            if (lz) {
+              var ti3 = tbFindChildInsertBefore(lz, e.clientY);
+              toCi2 = ti3.slot;
+            } else {
+              toCi2 = _tbWidgets[sidx].children ? _tbWidgets[sidx].children.length : 0;
+            }
+            if (isNaN(toCi2)) toCi2 = 0;
+          }
+          if (sidx >= 0 && _tbWidgets[sidx]) {
+            if (!_tbWidgets[sidx].children) _tbWidgets[sidx].children = [];
+            if (toCi2 < 0) toCi2 = 0;
+            if (toCi2 > _tbWidgets[sidx].children.length) toCi2 = _tbWidgets[sidx].children.length;
+            _tbWidgets[sidx].children.splice(toCi2, 0, { id: poolId, span: tbPoolDefaultSpanForChart(regCanvas, poolId) });
+          } else {
+            var newSecId = poolSectionId || 'custom';
+            _tbWidgets.push({
+              id: newSecId,
+              span: 12,
+              children: [{ id: poolId, span: tbPoolDefaultSpanForChart(regCanvas, poolId) }]
+            });
+          }
+          renderBuilderRows();
+          return;
+        }
+        if (poolType === 'section') {
+          var tiS = tbFindSectionInsertBefore(canvas, e.clientY);
+          var insS = tiS.slot;
+          _tbWidgets.splice(insS, 0, { id: poolId, span: 12, children: [] });
+        }
+        renderBuilderRows();
+        return;
+      }
+
+      // Reorder sections within canvas
+      if (data.indexOf('section:') === 0) {
+        var fromIdx = parseInt(data.slice(8), 10);
+        if (fromIdx < 0 || fromIdx >= _tbWidgets.length) {
+          renderBuilderRows();
+          return;
+        }
+        var tiM = tbFindSectionInsertBefore(canvas, e.clientY);
+        if (tiM.slot === fromIdx || tiM.slot === fromIdx + 1) {
+          renderBuilderRows();
+          return;
+        }
+        var item = _tbWidgets.splice(fromIdx, 1)[0];
+        var insM = tiM.slot;
+        if (fromIdx < insM) insM--;
+        _tbWidgets.splice(insM, 0, item);
+        renderBuilderRows();
+      }
+    });
+
+    canvas.addEventListener('dragend', function () {
+      _tbDrag = null;
+      tbClearCanvasDropUi();
+      var marks = canvas.querySelectorAll('.is-dragging');
+      for (var i = 0; i < marks.length; i++) marks[i].classList.remove('is-dragging');
+    });
+
+    // Resize section
+    var _resizeTarget = null;
     var _resizeStartX = 0;
     var _resizeStartSpan = 0;
     var _colWidth = 0;
 
-    container.addEventListener('mousedown', function (e) {
-      var handle = e.target.closest('.tb-resize-handle');
-      if (!handle) return;
+    canvas.addEventListener('mousedown', function (e) {
+      var handle = e.target.closest('.tb-canvas-resize');
+      var childHandle = e.target.closest('.tb-canvas-child-resize');
+      if (childHandle) {
+        var si = parseInt(childHandle.dataset.sidx, 10);
+        if (childHandle.dataset.pcidx !== undefined && childHandle.dataset.pcidx !== '') {
+          var pcH = parseInt(childHandle.dataset.pcidx, 10);
+          var ixH = parseInt(childHandle.dataset.icc, 10);
+          _resizeTarget = { type: 'childInner', si: si, pc: pcH, ix: ixH, maxSpan: 12 };
+          var blkH = _tbWidgets[si] && _tbWidgets[si].children && _tbWidgets[si].children[pcH];
+          var rowH = blkH && blkH.children && blkH.children[ixH];
+          _resizeStartSpan = rowH ? rowH.span : 6;
+        } else {
+          var ci = parseInt(childHandle.dataset.cidx, 10);
+          _resizeTarget = { type: 'child', si: si, ci: ci };
+          _resizeStartSpan = (_tbWidgets[si] && _tbWidgets[si].children && _tbWidgets[si].children[ci]) ? _tbWidgets[si].children[ci].span : 6;
+        }
+        var childGrid = childHandle.closest('.tb-canvas-block-inner') || childHandle.closest('.tb-canvas-children');
+        var gridCols = 12;
+        if (childGrid && childGrid.classList.contains('tb-canvas-block-inner')) {
+          var icd = parseInt(childGrid.getAttribute('data-inner-cols'), 10);
+          if (!isNaN(icd) && icd >= 1 && icd <= 12) gridCols = icd;
+        }
+        _colWidth = childGrid ? childGrid.offsetWidth / gridCols : canvas.offsetWidth / 12;
+        if (_resizeTarget.type === 'childInner') _resizeTarget.maxSpan = gridCols;
+      } else if (handle) {
+        var idx = parseInt(handle.dataset.sidx, 10);
+        _resizeTarget = { type: 'section', si: idx };
+        _resizeStartSpan = _tbWidgets[idx] ? _tbWidgets[idx].span : 12;
+        _colWidth = canvas.offsetWidth / 12;
+      } else {
+        return;
+      }
       e.preventDefault();
-      _resizeIdx = parseInt(handle.dataset.pidx, 10);
       _resizeStartX = e.clientX;
-      _resizeStartSpan = _tbWidgets[_resizeIdx] ? _tbWidgets[_resizeIdx].span : 12;
-      // Calculate 1 grid column width from the preview container
-      var grid = container.querySelector('.tb-preview-grid');
-      if (grid) _colWidth = grid.offsetWidth / 12;
       document.body.classList.add('tb-resizing');
     });
 
     window.addEventListener('mousemove', function (e) {
-      if (_resizeIdx < 0 || !_colWidth) return;
+      if (!_resizeTarget || !_colWidth) return;
       var dx = e.clientX - _resizeStartX;
       var colDelta = Math.round(dx / _colWidth);
-      var newSpan = Math.max(1, Math.min(12, _resizeStartSpan + colDelta));
-      if (_tbWidgets[_resizeIdx] && _tbWidgets[_resizeIdx].span !== newSpan) {
-        _tbWidgets[_resizeIdx].span = newSpan;
-        updateBuilderPreview();
+      var maxSpanClamp = 12;
+      if (_resizeTarget.type === 'childInner' && _resizeTarget.maxSpan) maxSpanClamp = _resizeTarget.maxSpan;
+      var newSpan = Math.max(1, Math.min(maxSpanClamp, _resizeStartSpan + colDelta));
+      if (_resizeTarget.type === 'section') {
+        if (_tbWidgets[_resizeTarget.si] && _tbWidgets[_resizeTarget.si].span !== newSpan) {
+          _tbWidgets[_resizeTarget.si].span = newSpan;
+          renderCanvas();
+        }
+      } else if (_resizeTarget.type === 'childInner') {
+        var chI = _tbWidgets[_resizeTarget.si] && _tbWidgets[_resizeTarget.si].children;
+        var blkI = chI && chI[_resizeTarget.pc];
+        var rowI = blkI && blkI.children && blkI.children[_resizeTarget.ix];
+        if (rowI && rowI.span !== newSpan) {
+          rowI.span = newSpan;
+          renderCanvas();
+        }
+      } else {
+        var ch = _tbWidgets[_resizeTarget.si] && _tbWidgets[_resizeTarget.si].children;
+        if (ch && ch[_resizeTarget.ci] && ch[_resizeTarget.ci].span !== newSpan) {
+          ch[_resizeTarget.ci].span = newSpan;
+          renderCanvas();
+        }
       }
     });
 
     window.addEventListener('mouseup', function () {
-      if (_resizeIdx >= 0) {
-        _resizeIdx = -1;
+      if (_resizeTarget) {
+        _resizeTarget = null;
         document.body.classList.remove('tb-resizing');
+        renderPool();
       }
     });
   }
 
-  function renderBuilderRows() {
-    var container = document.getElementById('tb-rows');
-    var unusedEl = document.getElementById('tb-unused');
-    if (!container) return;
-    var reg = getRegistry();
-    if (!reg) return;
+  function bindPoolEvents() {
+    var host = document.getElementById('tb-body');
+    if (!host || host.dataset.tbPoolBound) return;
+    host.dataset.tbPoolBound = '1';
 
-    // Grid preview
-    var html = '<div class="tb-preview"><div class="tb-preview-grid">';
-    for (var pi = 0; pi < _tbWidgets.length; pi++) {
-      var pw = _tbWidgets[pi];
-      var pwType = pw.type || 'section';
-      var pname;
-      if (pwType === 'chart') {
-        var pch = reg.findChart(pw.id);
-        pname = pch ? _t(pch.titleKey) : pw.id;
-      } else {
-        var psec = reg.findSection(pw.id);
-        pname = psec ? _t(psec.titleKey) : pw.id;
-      }
-      var cellClass = 'tb-preview-cell' + (pwType === 'chart' ? ' tb-preview-cell--chart' : '');
-      html += '<div class="' + cellClass + '" style="grid-column:span ' + (pw.span || 12) + '">';
-      html += '<span class="tb-preview-name">' + pname + '</span>';
-      html += '<span class="tb-preview-span">' + (pw.span || 12) + '</span>';
-      html += '</div>';
-    }
-    html += '</div></div>';
+    // Click: sections add to canvas, charts add to last section (or first); meta chips add layout section + default charts
+    host.addEventListener('click', function (e) {
+      var chip = e.target.closest('.tb-pool-chip');
+      if (!chip || chip.classList.contains('is-used')) return;
 
-    // Widget list
-    html += '<div class="tb-list-title">' + _t('tbWidgets') + '</div>';
-    for (var i = 0; i < _tbWidgets.length; i++) {
-      var w = _tbWidgets[i];
-      var wType = w.type || 'section';
-      var isChart = wType === 'chart';
-      var name;
-      var secForCharts = null;
-      if (isChart) {
-        var ch = reg.findChart(w.id);
-        name = ch ? _t(ch.titleKey) : w.id;
-      } else {
-        var sec = reg.findSection(w.id);
-        name = sec ? _t(sec.titleKey) : w.id;
-        secForCharts = sec;
-      }
-      var rowClass = 'tb-row' + (isChart ? ' tb-row--chart' : '');
-      html += '<div class="' + rowClass + '" data-idx="' + i + '" draggable="true">';
-      html += '<div class="tb-row-header">';
-      html += '<span class="tb-row-drag">&#x2630;</span>';
-      html += '<span>' + name + '</span>';
-      // For sections: show expand toggle to reveal charts
-      if (!isChart && secForCharts && secForCharts.charts && secForCharts.charts.length) {
-        var echartsCharts = [];
-        for (var eci = 0; eci < secForCharts.charts.length; eci++) {
-          var ech = secForCharts.charts[eci];
-          if (ech.kind !== 'chip' && ech.engine === 'echarts') echartsCharts.push(ech);
-        }
-        if (echartsCharts.length) {
-          html += '<span class="tb-chart-expand" data-sec-id="' + w.id + '" data-idx="' + i + '">';
-          html += '&#x25BC; ' + echartsCharts.length + ' charts';
-          html += '</span>';
-        }
-      }
-      // For charts: show "absorb" button to put back into section
-      if (isChart && w.section) {
-        html += '<button type="button" class="tb-chart-absorb" data-idx="' + i + '" title="Back to section" style="font-size:.65rem;margin-left:4px;padding:1px 6px;border-radius:3px;border:1px solid #475569;background:transparent;color:#94a3b8;cursor:pointer">&#x21A9;</button>';
-      }
-      html += '<div class="tb-cell-span">';
-      html += '<label>span</label>';
-      html += '<select class="tb-span-select" data-idx="' + i + '">';
-      var spanOptions = [3, 4, 6, 8, 12];
-      for (var si = 0; si < spanOptions.length; si++) {
-        var sv = spanOptions[si];
-        html += '<option value="' + sv + '"' + (w.span === sv ? ' selected' : '') + '>' + sv + '/12';
-        if (sv === 4) html += ' (1/3)';
-        else if (sv === 6) html += ' (1/2)';
-        else if (sv === 8) html += ' (2/3)';
-        else if (sv === 12) html += ' (full)';
-        else if (sv === 3) html += ' (1/4)';
-        html += '</option>';
-      }
-      html += '</select>';
-      html += '</div>';
-      html += '<button type="button" class="tb-row-remove" data-idx="' + i + '" title="Remove">&times;</button>';
-      html += '</div>';
-      html += '</div>';
-    }
-    container.innerHTML = html;
-
-    // Available widgets (unused)
-    var avail = getAvailableSections();
-    var uHtml = '';
-    if (avail.length) {
-      uHtml += '<div class="tb-unused-title">' + _t('tbUnused') + '</div>';
-      uHtml += '<div class="tb-unused-chips">';
-      for (var ai = 0; ai < avail.length; ai++) {
-        uHtml += '<button type="button" class="tb-unused-chip" data-id="' + avail[ai].id + '">+ ' + _t(avail[ai].titleKey) + '</button>';
-      }
-      uHtml += '</div>';
-    }
-    if (unusedEl) unusedEl.innerHTML = uHtml;
-
-    // Event delegation
-    if (!container.dataset.bound) {
-      container.dataset.bound = '1';
-      container.addEventListener('change', function (e) {
-        var sel = e.target.closest('.tb-span-select');
-        if (!sel) return;
-        var idx = parseInt(sel.dataset.idx, 10);
-        if (_tbWidgets[idx]) {
-          _tbWidgets[idx].span = parseInt(sel.value, 10);
-          updateBuilderPreview();
-        }
-      });
-      container.addEventListener('click', function (e) {
-        var rmBtn = e.target.closest('.tb-row-remove');
-        if (rmBtn) {
-          var idx = parseInt(rmBtn.dataset.idx, 10);
-          _tbWidgets.splice(idx, 1);
-          renderBuilderRows();
-          return;
-        }
-        // Chart expand: show extractable charts under a section
-        var expBtn = e.target.closest('.tb-chart-expand');
-        if (expBtn) {
-          var secId = expBtn.dataset.secId;
-          var secIdx = parseInt(expBtn.dataset.idx, 10);
-          var existingList = expBtn.parentElement.parentElement.querySelector('.tb-chart-list');
-          if (existingList) {
-            existingList.remove();
-            return;
+      if (chip.classList.contains('tb-pool-chip--meta')) {
+        var poolSec = chip.dataset.poolSection;
+        var regM = getRegistry();
+        if (!poolSec || !regM) return;
+        var gsM = regM.findSection(poolSec);
+        if (!gsM) return;
+        var layoutSecId = gsM.parentSection || poolSec;
+        var newKids = tbMetaDefaultChartChildren(regM, gsM);
+        var wi = -1;
+        for (var wj = 0; wj < _tbWidgets.length; wj++) {
+          if (_tbWidgets[wj].id === layoutSecId) {
+            wi = wj;
+            break;
           }
-          var rg = getRegistry();
-          var sc = rg ? rg.findSection(secId) : null;
-          if (!sc || !sc.charts) return;
-          var listDiv = document.createElement('div');
-          listDiv.className = 'tb-chart-list';
-          for (var ci = 0; ci < sc.charts.length; ci++) {
-            var ch = sc.charts[ci];
-            if (ch.kind === 'chip' || ch.engine !== 'echarts') continue;
-            // Check if already extracted
-            var alreadyExtracted = false;
-            for (var ei = 0; ei < _tbWidgets.length; ei++) {
-              if (_tbWidgets[ei].id === ch.id && _tbWidgets[ei].type === 'chart') { alreadyExtracted = true; break; }
+        }
+        if (wi >= 0) {
+          if (!_tbWidgets[wi].children) _tbWidgets[wi].children = [];
+          var seenC = {};
+          var zk;
+          for (zk = 0; zk < _tbWidgets[wi].children.length; zk++) {
+            var rowEnt = _tbWidgets[wi].children[zk];
+            if (tbIsLayoutBlock(rowEnt)) {
+              var zc = rowEnt.children || [];
+              var zi;
+              for (zi = 0; zi < zc.length; zi++) {
+                if (zc[zi].id) seenC[zc[zi].id] = true;
+              }
+            } else if (rowEnt.id) {
+              seenC[rowEnt.id] = true;
             }
-            var item = document.createElement('div');
-            item.className = 'tb-chart-item';
-            item.innerHTML = '<span>' + _t(ch.titleKey) + '</span>';
-            if (!alreadyExtracted) {
-              var btn = document.createElement('button');
-              btn.type = 'button';
-              btn.textContent = 'Extract';
-              btn.dataset.chartId = ch.id;
-              btn.dataset.secId = secId;
-              btn.dataset.afterIdx = String(secIdx);
-              item.appendChild(btn);
-            } else {
-              var tag = document.createElement('span');
-              tag.style.cssText = 'color:#22c55e;font-size:.65rem';
-              tag.textContent = '(extracted)';
-              item.appendChild(tag);
-            }
-            listDiv.appendChild(item);
           }
-          expBtn.parentElement.parentElement.appendChild(listDiv);
-          return;
+          var lastBlk = null;
+          for (zk = _tbWidgets[wi].children.length - 1; zk >= 0; zk--) {
+            if (tbIsLayoutBlock(_tbWidgets[wi].children[zk])) {
+              lastBlk = _tbWidgets[wi].children[zk];
+              break;
+            }
+          }
+          var targetList = lastBlk ? (lastBlk.children || (lastBlk.children = [])) : _tbWidgets[wi].children;
+          for (var zk2 = 0; zk2 < newKids.length; zk2++) {
+            if (!seenC[newKids[zk2].id]) {
+              targetList.push(newKids[zk2]);
+              seenC[newKids[zk2].id] = true;
+            }
+          }
+        } else {
+          _tbWidgets.push({ id: layoutSecId, span: 12, children: newKids });
         }
-        // Extract chart: add as standalone widget after its section
-        var extractBtn = e.target.closest('.tb-chart-item button');
-        if (extractBtn && extractBtn.dataset.chartId) {
-          var chartId = extractBtn.dataset.chartId;
-          var afterIdx = parseInt(extractBtn.dataset.afterIdx, 10);
-          var sectionId = extractBtn.dataset.secId;
-          _tbWidgets.splice(afterIdx + 1, 0, { id: chartId, span: 6, type: 'chart', section: sectionId });
-          renderBuilderRows();
-          return;
-        }
-        // Absorb chart: put back into section (remove from widget list)
-        var absorbBtn = e.target.closest('.tb-chart-absorb');
-        if (absorbBtn) {
-          var absIdx = parseInt(absorbBtn.dataset.idx, 10);
-          _tbWidgets.splice(absIdx, 1);
-          renderBuilderRows();
-          return;
-        }
-      });
-      // Drag & drop reorder
-      var _dragIdx = -1;
-      container.addEventListener('dragstart', function (e) {
-        var row = e.target.closest('.tb-row');
-        if (!row) return;
-        _dragIdx = parseInt(row.dataset.idx, 10);
-        row.classList.add('is-dragging');
-        e.dataTransfer.effectAllowed = 'move';
-      });
-      container.addEventListener('dragover', function (e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-      });
-      container.addEventListener('drop', function (e) {
-        e.preventDefault();
-        var row = e.target.closest('.tb-row');
-        if (!row || _dragIdx < 0) return;
-        var dropIdx = parseInt(row.dataset.idx, 10);
-        if (_dragIdx === dropIdx) return;
-        var item = _tbWidgets.splice(_dragIdx, 1)[0];
-        _tbWidgets.splice(dropIdx, 0, item);
-        _dragIdx = -1;
         renderBuilderRows();
-      });
-      container.addEventListener('dragend', function () { _dragIdx = -1; });
+        return;
+      }
+
+      var id = chip.dataset.poolId;
+      var type = chip.dataset.poolType || 'section';
+      if (type === 'section') {
+        _tbWidgets.push({ id: id, span: 12, children: [] });
+      } else {
+        var regPoolClick = getRegistry();
+        var dropSp = tbPoolDefaultSpanForChart(regPoolClick, id);
+        // Add chart to last section, or create one
+        if (!_tbWidgets.length) {
+          var secId = chip.dataset.poolSection || 'custom';
+          _tbWidgets.push({ id: secId, span: 12, children: [] });
+        }
+        var last = _tbWidgets[_tbWidgets.length - 1];
+        if (!last.children) last.children = [];
+        var blkLast = null;
+        var qq;
+        for (qq = last.children.length - 1; qq >= 0; qq--) {
+          if (tbIsLayoutBlock(last.children[qq])) {
+            blkLast = last.children[qq];
+            break;
+          }
+        }
+        if (blkLast) {
+          if (!blkLast.children) blkLast.children = [];
+          blkLast.children.push({ id: id, span: dropSp });
+        } else {
+          last.children.push({ id: id, span: dropSp });
+        }
+      }
+      renderBuilderRows();
+    });
+
+    host.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      var meta = e.target.closest('.tb-pool-chip--meta');
+      if (!meta || meta.classList.contains('is-used')) return;
+      e.preventDefault();
+      meta.click();
+    });
+
+    // Drag from pool
+    host.addEventListener('dragstart', function (e) {
+      var chip = e.target.closest('.tb-pool-chip');
+      if (!chip) return;
+      if (chip.classList.contains('is-used') || chip.classList.contains('tb-pool-chip--meta')) {
+        e.preventDefault();
+        return;
+      }
+      _tbDrag = {
+        kind: 'pool',
+        poolId: chip.dataset.poolId,
+        poolType: chip.dataset.poolType || 'section',
+        poolSection: chip.dataset.poolSection || ''
+      };
+      e.dataTransfer.effectAllowed = 'copyMove';
+      e.dataTransfer.setData('text/plain', 'pool:' + chip.dataset.poolId + '|' + (chip.dataset.poolType || 'section') + '|' + (chip.dataset.poolSection || ''));
+    });
+
+    host.addEventListener('dragend', function () {
+      _tbDrag = null;
+      tbClearCanvasDropUi();
+    });
+  }
+
+  /** ECharts canvas chart (not chip / HTML) — gets clone-or-render preview path. */
+  function tbPreviewIsCanvasChart(def) {
+    return !!(def && def.engine === 'echarts' && def.kind !== 'chip');
+  }
+
+  /** KPI / HTML / table: clone live DOM from #canvasId so preview matches dashboard chips. */
+  function tbPreviewCloneHtmlMeta(slot) {
+    var pvEl = document.getElementById(slot.pvId);
+    if (!pvEl || !slot.def) return;
+    var def = slot.def;
+    pvEl.innerHTML = '';
+    pvEl.style.width = '100%';
+    pvEl.style.height = 'auto';
+    pvEl.style.minHeight = '0';
+    var origEl = def.canvasId ? document.getElementById(def.canvasId) : null;
+    if (origEl) {
+      var clone = origEl.cloneNode(true);
+      clone.removeAttribute('id');
+      clone.setAttribute('data-tb-preview-clone', '1');
+      var walk = clone.querySelectorAll('[id]');
+      var wi;
+      for (wi = 0; wi < walk.length; wi++) {
+        walk[wi].removeAttribute('id');
+      }
+      pvEl.appendChild(clone);
+      return;
     }
-    if (unusedEl && !unusedEl.dataset.bound) {
-      unusedEl.dataset.bound = '1';
-      unusedEl.addEventListener('click', function (e) {
-        var chip = e.target.closest('.tb-unused-chip');
-        if (!chip) return;
-        _tbWidgets.push({ id: chip.dataset.id, span: 12 });
-        renderBuilderRows();
-      });
+    pvEl.innerHTML =
+      '<div class="tb-pv-meta-fallback">' + escT(_t('tbPreviewNotRendered')) + '</div>';
+  }
+
+  /** Preview one builder slot: ECharts clone/render or HTML/chip clone. */
+  function tbPreviewRenderSlot(slot) {
+    if (!slot || !slot.def) return;
+    if (tbPreviewIsCanvasChart(slot.def)) {
+      tbPreviewCloneOrRender(slot);
+    } else {
+      tbPreviewCloneHtmlMeta(slot);
+    }
+  }
+
+  /** Preview: clone live ECharts option, or temp-ID-swap and invoke the chart renderFn. */
+  function tbPreviewCloneOrRender(slot) {
+    var pvEl = document.getElementById(slot.pvId);
+    if (!pvEl || typeof echarts === 'undefined') return;
+    var def = slot.def;
+    if (!def || !def.canvasId) return;
+
+    var origEl = document.getElementById(def.canvasId);
+    var origInst = origEl ? echarts.getInstanceByDom(origEl) : null;
+    if (origInst) {
+      try {
+        var ex0 = echarts.getInstanceByDom(pvEl);
+        if (ex0) ex0.dispose();
+        var inst0 = echarts.init(pvEl, null, { renderer: 'canvas' });
+        var opts0 = origInst.getOption();
+        if (opts0) inst0.setOption(opts0, true);
+      } catch (e0) {}
+      return;
+    }
+
+    var rfName = def.renderFn;
+    var rf = rfName && global[rfName];
+    if (typeof rf !== 'function') return;
+
+    var realEl = origEl;
+    var stashed = false;
+    var realOldId = '';
+    if (realEl && realEl !== pvEl) {
+      realOldId = realEl.id;
+      realEl.id = '__tb_pv_stash_' + def.canvasId;
+      stashed = true;
+    }
+    var pvOldId = pvEl.id;
+    pvEl.id = def.canvasId;
+
+    function restoreIds() {
+      pvEl.id = pvOldId;
+      if (stashed && realEl) realEl.id = realOldId;
+    }
+
+    try {
+      try {
+        var ex1 = echarts.getInstanceByDom(pvEl);
+        if (ex1) ex1.dispose();
+      } catch (e1) {}
+
+      if (String(rfName).indexOf('renderProxy_') === 0) {
+        var dataP = global.__lastUsageData;
+        if (dataP && typeof global._computeProxyCtx === 'function') global._computeProxyCtx(dataP);
+        if (global.__sectionCtx_proxy) rf(global.__sectionCtx_proxy);
+      } else if (rfName === 'renderIntel_seasonality') {
+        rf();
+      } else if (String(rfName).indexOf('renderStatus_') === 0) {
+        rf();
+      } else if (String(rfName).indexOf('renderForensic_') === 0) {
+        var fctx = global.__sectionCtx_forensic;
+        if (fctx) rf(fctx);
+      } else if (String(rfName).indexOf('renderUserProfile_') === 0) {
+        var uctx = global.__sectionCtx_userProfile;
+        if (uctx) rf(uctx);
+      } else if (String(rfName).indexOf('renderBudget_') === 0) {
+        var bctx = global.__sectionCtx_budget;
+        if (!bctx && global.__lastUsageData && typeof global._computeBudgetCtx === 'function') {
+          bctx = global._computeBudgetCtx(global.__lastUsageData);
+        }
+        if (bctx) rf(bctx);
+      } else if (
+        rfName === 'renderWasteCurve' ||
+        rfName === 'renderCacheExplosion' ||
+        rfName === 'renderBudgetDrain' ||
+        rfName === 'renderEfficiencyTimeline' ||
+        rfName === 'renderMonthlyButterfly' ||
+        rfName === 'renderDayComparison'
+      ) {
+        var uDataE = global.__lastUsageData;
+        var eDaysE = [];
+        if (uDataE && uDataE.days && uDataE.days.length) {
+          eDaysE =
+            typeof global.getFilteredDays === 'function'
+              ? global.getFilteredDays(uDataE.days)
+              : uDataE.days.slice();
+        }
+        var stEcon = global._econData;
+        if (rfName === 'renderMonthlyButterfly') {
+          rf(eDaysE);
+        } else if (rfName === 'renderDayComparison') {
+          rf(eDaysE);
+        } else if (rfName === 'renderEfficiencyTimeline') {
+          if (stEcon) rf(stEcon);
+        } else if (rfName === 'renderBudgetDrain') {
+          if (stEcon) rf(stEcon, global._econQdData || undefined);
+        } else if (rfName === 'renderWasteCurve' || rfName === 'renderCacheExplosion') {
+          var sessEl = document.getElementById('econ-session-picker');
+          var selV = sessEl ? sessEl.value : '';
+          var sessE = null;
+          if (stEcon && typeof global.findSession === 'function') {
+            sessE = global.findSession(stEcon, selV);
+          }
+          if (sessE) rf(sessE);
+        }
+      }
+    } finally {
+      restoreIds();
     }
   }
 
@@ -2649,8 +3939,39 @@
       if (!name || !name.trim()) return;
       name = name.trim();
     }
-    var tpl = { name: name, version: 3, widgets: _tbWidgets.slice() };
-    // Save to user templates
+    // Flatten nested model back to v3 format (only ECharts canvas rows: chips stay in section DOM / hiddenCharts)
+    var flatW = [];
+    var regSv = getRegistry();
+    for (var fi = 0; fi < _tbWidgets.length; fi++) {
+      var sec = _tbWidgets[fi];
+      flatW.push({ id: sec.id, span: sec.span || 12 });
+      var ch = sec.children || [];
+      for (var ci = 0; ci < ch.length; ci++) {
+        var chEnt = ch[ci];
+        if (tbIsLayoutBlock(chEnt)) {
+          var nestedOut = [];
+          var innSv = chEnt.children || [];
+          var ii;
+          for (ii = 0; ii < innSv.length; ii++) {
+            var idef = regSv && regSv.findChart ? regSv.findChart(innSv[ii].id) : null;
+            if (idef && (idef.kind === 'chip' || idef.engine !== 'echarts')) continue;
+            nestedOut.push({ id: innSv[ii].id, span: innSv[ii].span || 6 });
+          }
+          flatW.push({
+            type: 'layout',
+            span: chEnt.span || 12,
+            section: sec.id,
+            bid: chEnt.bid || chEnt.id || 'tbblk_s' + ci,
+            nested: nestedOut
+          });
+          continue;
+        }
+        var cdef = regSv && regSv.findChart ? regSv.findChart(chEnt.id) : null;
+        if (cdef && (cdef.kind === 'chip' || cdef.engine !== 'echarts')) continue;
+        flatW.push({ id: chEnt.id, span: chEnt.span || 6, type: 'chart', section: sec.id });
+      }
+    }
+    var tpl = { name: name, version: 3, widgets: flatW };
     var userTpls = loadTemplates();
     var found = false;
     for (var i = 0; i < userTpls.length; i++) {
@@ -2662,16 +3983,147 @@
     }
     if (!found) userTpls.push(tpl);
     saveTemplates(userTpls);
-    // Apply immediately
     applyTemplate(tpl);
     renderTemplatesSection();
     closeTemplateBuilder();
   }
 
+  function openBuilderPreview() {
+    var overlay = document.getElementById('tb-preview-overlay');
+    var body = document.getElementById('tb-preview-body');
+    if (!overlay || !body) return;
+    var reg = getRegistry();
+    if (!reg) return;
+
+    // Build DOM with real chart containers
+    var html = '<div class="tb-pv-grid">';
+    var chartSlots = []; // {chartDef, domId} to render after innerHTML
+    for (var i = 0; i < _tbWidgets.length; i++) {
+      var sec = _tbWidgets[i];
+      var secDef = reg.findSection(sec.id);
+      var secName = secDef ? _t(secDef.titleKey) : sec.id;
+      html += '<div class="tb-pv-section" style="grid-column:span ' + (sec.span || 12) + '">';
+      html += '<div class="tb-pv-section-head">' + secName + ' <span style="opacity:.4;font-weight:400">(' + (sec.span || 12) + '/12)</span></div>';
+      html += '<div class="tb-pv-section-body">';
+      var children = sec.children || [];
+      if (children.length) {
+        for (var ci = 0; ci < children.length; ci++) {
+          var c = children[ci];
+          if (tbIsLayoutBlock(c)) {
+            var bspPv = c.span || 12;
+            if (bspPv < 1) bspPv = 1;
+            if (bspPv > 12) bspPv = 12;
+            html +=
+              '<div class="tb-pv-layout" style="grid-column:span ' +
+              bspPv +
+              ';min-width:0;max-width:100%"><div class="tb-pv-layout-inner">' +
+              escT(_t('tbLayoutBlockLabel')) +
+              ' ' +
+              String(bspPv) +
+              '/12</div><div class="tb-pv-layout-charts" data-inner-cols="' +
+              bspPv +
+              '" style="grid-template-columns:repeat(' +
+              bspPv +
+              ',minmax(0,1fr))">';
+            var inPv = c.children || [];
+            var pi;
+            for (pi = 0; pi < inPv.length; pi++) {
+              var icp = inPv[pi];
+              var chDefIn = reg.findChart(icp.id);
+              var chNameIn = chDefIn ? _t(chDefIn.titleKey) : icp.id;
+              var pvIdIn = 'tb-pv-' + sec.id + '-' + icp.id + '-b' + ci + '-' + pi;
+              var isCanvasIn = tbPreviewIsCanvasChart(chDefIn);
+              var icSpPv = icp.span || 6;
+              if (icSpPv < 1) icSpPv = 1;
+              if (icSpPv > bspPv) icSpPv = bspPv;
+              html +=
+                '<div class="tb-pv-chart' +
+                (isCanvasIn ? '' : ' tb-pv-chart--meta') +
+                '" style="grid-column:span ' +
+                icSpPv +
+                '">';
+              html += '<div class="tb-pv-chart-label">' + chNameIn + '</div>';
+              html +=
+                '<div class="tb-pv-chart-container' +
+                (isCanvasIn ? '' : ' tb-pv-chart-container--html') +
+                '" id="' +
+                pvIdIn +
+                '" style="width:100%;' +
+                (isCanvasIn ? 'height:200px' : 'height:auto') +
+                '"></div>';
+              html += '</div>';
+              if (chDefIn) chartSlots.push({ def: chDefIn, pvId: pvIdIn });
+            }
+            html += '</div></div>';
+            continue;
+          }
+          var chDef = reg.findChart(c.id);
+          var chName = chDef ? _t(chDef.titleKey) : c.id;
+          var pvId = 'tb-pv-' + sec.id + '-' + c.id;
+          var isCanvas = tbPreviewIsCanvasChart(chDef);
+          html +=
+            '<div class="tb-pv-chart' +
+            (isCanvas ? '' : ' tb-pv-chart--meta') +
+            '" style="grid-column:span ' +
+            (c.span || 6) +
+            '">';
+          html += '<div class="tb-pv-chart-label">' + chName + '</div>';
+          html +=
+            '<div class="tb-pv-chart-container' +
+            (isCanvas ? '' : ' tb-pv-chart-container--html') +
+            '" id="' +
+            pvId +
+            '" style="width:100%;' +
+            (isCanvas ? 'height:200px' : 'height:auto') +
+            '"></div>';
+          html += '</div>';
+          if (chDef) chartSlots.push({ def: chDef, pvId: pvId });
+        }
+      } else {
+        html += '<div style="grid-column:span 12;text-align:center;color:#475569;font-size:.65rem;padding:12px">(' + _t('tbNoCharts') + ')</div>';
+      }
+      html += '</div></div>';
+    }
+    html += '</div>';
+    body.innerHTML = html;
+    overlay.classList.add('is-open');
+
+    // Render charts after DOM is ready (clone live options or paint via renderFn + temp id swap)
+    setTimeout(function () {
+      for (var si = 0; si < chartSlots.length; si++) {
+        tbPreviewRenderSlot(chartSlots[si]);
+      }
+    }, 150);
+  }
+
+  function closeBuilderPreview() {
+    var overlay = document.getElementById('tb-preview-overlay');
+    var body = document.getElementById('tb-preview-body');
+    if (overlay) overlay.classList.remove('is-open');
+    // Dispose ECharts instances to free memory
+    if (body && typeof echarts !== 'undefined') {
+      var containers = body.querySelectorAll('.tb-pv-chart-container');
+      for (var di = 0; di < containers.length; di++) {
+        var inst = echarts.getInstanceByDom(containers[di]);
+        if (inst) try { inst.dispose(); } catch (e) {}
+      }
+    }
+    // Preview may have repainted via temp canvas id swap — repaint core charts without full-page coalesce.
+    if (typeof global.renderDashboardCore === 'function' && global.__lastUsageData) {
+      try { global.renderDashboardCore(global.__lastUsageData); } catch (eRe) {}
+    }
+  }
+
   function bindTemplateBuilder() {
     var buildBtn = document.getElementById('sidebar-build-template');
-    if (buildBtn && !buildBtn.dataset.bound) {
+    // Template Builder only in DEV_MODE
+    var isDevMode = !!(global.__lastUsageData && global.__lastUsageData.dev_source);
+    if (buildBtn && !isDevMode) {
+      buildBtn.style.display = 'none';
+    }
+    if (buildBtn && isDevMode && !buildBtn.dataset.bound) {
       buildBtn.dataset.bound = '1';
+      buildBtn.style.display = '';
       buildBtn.textContent = _t('tbBuild');
       buildBtn.addEventListener('click', function () { openTemplateBuilder(); });
     }
@@ -2692,21 +4144,31 @@
         if (e.target === overlay) closeTemplateBuilder();
       });
     }
-    var addRowBtn = document.getElementById('tb-add-row');
-    if (addRowBtn && !addRowBtn.dataset.bound) {
-      addRowBtn.dataset.bound = '1';
-      addRowBtn.textContent = _t('tbAddRow');
-      addRowBtn.addEventListener('click', function () {
-        var avail = getAvailableSections();
-        if (!avail.length) {
-          addRowBtn.textContent = _t('tbAddRow') + ' (all used)';
-          setTimeout(function () { addRowBtn.textContent = _t('tbAddRow'); }, 1500);
-          return;
-        }
-        _tbWidgets.push({ id: avail[0].id, span: 12 });
-        renderBuilderRows();
+    var loadDefBtn = document.getElementById('tb-load-default');
+    if (loadDefBtn && !loadDefBtn.dataset.bound) {
+      loadDefBtn.dataset.bound = '1';
+      loadDefBtn.textContent = _t('tbLoadDefault');
+      loadDefBtn.addEventListener('click', tbLoadDefaultIntoBuilder);
+    }
+    var previewBtn = document.getElementById('tb-preview');
+    if (previewBtn && !previewBtn.dataset.bound) {
+      previewBtn.dataset.bound = '1';
+      previewBtn.addEventListener('click', openBuilderPreview);
+    }
+    var pvCloseBtn = document.getElementById('tb-preview-close');
+    if (pvCloseBtn && !pvCloseBtn.dataset.bound) {
+      pvCloseBtn.dataset.bound = '1';
+      pvCloseBtn.addEventListener('click', closeBuilderPreview);
+    }
+    var pvOverlay = document.getElementById('tb-preview-overlay');
+    if (pvOverlay && !pvOverlay.dataset.bound) {
+      pvOverlay.dataset.bound = '1';
+      pvOverlay.addEventListener('click', function (e) {
+        if (e.target === pvOverlay) closeBuilderPreview();
       });
     }
+    bindCanvasEvents();
+    bindPoolEvents();
   }
 
   function renderExportSection() {
@@ -2767,9 +4229,13 @@
                 }
                 savePrefs();
                 applyGridLayout();
+                expandVisibleSectionPanels();
                 applyVisibility();
                 applyAllChartVisibility();
                 renderWidgetTree();
+                setTimeout(function () {
+                  resizeAll();
+                }, 280);
               }
             } catch (e) { /* invalid JSON */ }
           };
@@ -2884,6 +4350,180 @@
     }
   }
 
+  /**
+   * Static model of the real desktop page shell (tpl/dashboard.html + dashboard.css).
+   * Only #layout-grid is a 12-column CSS grid for top-level rows; inner blocks use 2/3-col grids, flex, or auto-fit.
+   * Template builder can use this to document or mirror structure instead of assuming everything is 12-col.
+   */
+  function tbGetDesktopPageScaffold() {
+    var topChromePipe =
+      'body > header.top-bar[flex] | body > div#filter-bar.filter-bar[collapsible]';
+    var layoutRoot = '#layout-grid.layout-grid';
+    var layoutGridPipe =
+      layoutRoot +
+      '[css:grid;12×1fr;gap row/col;children use data-span 1–12;@media max900px → each child span 12]';
+    var sections = [
+      {
+        id: 'health-collapse',
+        tag: 'details',
+        summaryClass: 'health-collapse-summary',
+        innerPipe:
+          'div.health-collapse-inner stacked: (1) div#health-score > div#health-grid[3-col KPI chips; 900→2;520→1] (2) div#key-findings > div#key-findings-grid[responsive 6→4→3→2→1 col; minmax(0,1fr)]'
+      },
+      {
+        id: 'intelligence-collapse',
+        tag: 'details',
+        innerPipe:
+          'div.intelligence-inner > #intelligence-scores[3→2→1 col KPI row] | #intelligence-narrative | #intelligence-rootcause | #intelligence-seasonality'
+      },
+      {
+        id: 'forensic-collapse',
+        tag: 'details',
+        innerPipe:
+          'div.forensic-inner > div#forensic-cards.grid[3→2→1 col minmax(0,1fr)] + div#forensic-charts-stack > (details.forensic-chart-disclosure > …) + div.forensic-charts-pair[grid 2×1fr;720→1col]'
+      },
+      {
+        id: 'economic-collapse',
+        tag: 'details',
+        innerPipe:
+          'div.forensic-inner > div.forensic-charts-stack > flex-rows (inline flex 1:2 waste/explosion) + flex drain + details#econ-range-collapse (inner flex triple charts)'
+      },
+      {
+        id: 'report-modal-overlay',
+        tag: 'div',
+        innerPipe: 'modal overlay (fixed-style panel; not a chart grid)'
+      },
+      { id: 'day-picker-row', tag: 'div', innerPipe: 'row controls' },
+      { id: 'main-charts-scope-wrap', tag: 'div', innerPipe: 'hidden scope chips (display none in css)' },
+      {
+        id: 'token-stats-collapse',
+        tag: 'details',
+        innerPipe:
+          'div.forensic-inner > div#cards.grid[KPI 6→4→3→2→1 col] + div#main-charts-wrap > div#charts.charts[2 or 3 col] + div#charts-host-sub.charts-pair[3 col / 2 if no-host] + div#token-stats-daily-detail.chart-box'
+      },
+      {
+        id: 'user-profile-collapse',
+        tag: 'details',
+        innerPipe: 'div.forensic-inner > div#user-profile-charts.charts.has-session-row[3×1fr responsive]'
+      },
+      {
+        id: 'budget-collapse',
+        tag: 'details',
+        innerPipe:
+          'div.forensic-inner > #budget-cards.grid[6→4→3→2→1 col] + details budget-sankey + div#budget-trend-row.charts[2 col]'
+      },
+      {
+        id: 'proxy-collapse',
+        tag: 'details',
+        innerPipe:
+          'div.forensic-inner.proxy-inner > #proxy-cards.grid[KPI 6→4→3→2→1 col] + div.proxy-charts-grid-3[3 col→2→1] + div.proxy-charts-grid[2 col]×2 rows + chart-box full + efficiency-small-multiples[3 col subgrid]'
+      }
+    ];
+    var childPipe = sections
+      .map(function (s) {
+        return s.tag + '#' + s.id;
+      })
+      .join(' | ');
+    var fullPipe =
+      topChromePipe +
+      ' || ' +
+      layoutGridPipe +
+      ' :: ' +
+      childPipe;
+    var divGeruestAscii = [
+      '+------------------------------------------------------------------+',
+      '| body                                                             |',
+      '+------------------------------------------------------------------+',
+      '  |',
+      '  +-- header.top-bar',
+      '  +-- div#filter-bar',
+      '  +-- div#layout-grid ................ [CSS grid: 12 x 1fr tracks]',
+      '        |',
+      '        +-- details#health-collapse',
+      '        |     +-- div.health-collapse-inner (stacked full-width rows)',
+      '        |           +-- div#health-score',
+      '        |           |     +-- div#health-grid .... [each KPI in own cell; 3 col]',
+      '        |           +-- div#key-findings',
+      '        |                 +-- div#key-findings-grid [each finding in own cell]',
+      '        +-- details#intelligence-collapse',
+      '        |     +-- div.intelligence-inner',
+      '        |           +-- div#intelligence-scores .. [3→2→1 col]',
+      '        |           +-- div#intelligence-narrative',
+      '        |           +-- div#intelligence-rootcause',
+      '        |           +-- div#intelligence-seasonality',
+      '        +-- details#forensic-collapse',
+      '        |     +-- div.forensic-inner',
+      '        |           +-- div#forensic-cards ....... [3→2→1 col; minmax(0,1fr)]',
+      '        |           +-- div#forensic-charts-stack',
+      '        |                 +-- div (flex/pair rows, chart shells)',
+      '        +-- details#economic-collapse',
+      '        |     +-- div.forensic-inner',
+      '        |           +-- div.forensic-charts-stack [flex 1:2 rows etc]',
+      '        +-- div#report-modal-overlay',
+      '        +-- div#day-picker-row',
+      '        +-- div#main-charts-scope-wrap',
+      '        +-- details#token-stats-collapse',
+      '        |     +-- div.forensic-inner',
+      '        |           +-- div#cards ............. [KPI 6→4→3→2→1 col; token-stats-kpis]',
+      '        |           +-- div#main-charts-wrap',
+      '        |           |     +-- div#charts ....... [2-3 col charts]',
+      '        |           |     +-- div#charts-host-sub [charts-pair]',
+      '        |           +-- div#token-stats-daily-detail',
+      '        +-- details#user-profile-collapse',
+      '        |     +-- div.forensic-inner',
+      '        |           +-- div#user-profile-charts [3-col charts row]',
+      '        +-- details#budget-collapse',
+      '        |     +-- div.forensic-inner',
+      '        |           +-- div#budget-cards ....... [6→4→3→2→1 col]',
+      '        |           +-- div#budget-charts / div#budget-trend-row',
+      '        +-- details#proxy-collapse',
+      '              +-- div.forensic-inner.proxy-inner',
+      '                    +-- div#proxy-cards ......... [6→4→3→2→1 col]',
+      '                    +-- div.proxy-charts-grid-3',
+      '                    +-- div.proxy-charts-grid (x2 rows)',
+      '                    +-- div.chart-box (efficiency block)',
+      '                    +-- div.efficiency-small-multiples [3 col]',
+      '+------------------------------------------------------------------+',
+      '| (Modals / slideouts / template builder live outside this tree)  |',
+      '+------------------------------------------------------------------+'
+    ].join('\n');
+    var layoutSpanPalette = [];
+    for (var ps = 12; ps >= 1; ps--) layoutSpanPalette.push(ps);
+    return {
+      version: 1,
+      /** All valid grid-column spans for builder layout rows (12-col CSS grid). */
+      layoutSpanPalette: layoutSpanPalette,
+      divGeruestAscii: divGeruestAscii,
+      topChromePipe: topChromePipe,
+      layoutGrid: {
+        selector: '#layout-grid',
+        className: 'layout-grid',
+        outerGridColumns: 12,
+        cssNote:
+          'grid-template-columns: repeat(12,1fr); children [data-span] use --span; max-width 900px forces span 12 per child'
+      },
+      layoutGridChildrenPipe: childPipe,
+      /** Single-line pipe overview for logs / builder legend */
+      fullPipe: fullPipe,
+      sections: sections,
+      templateBuilderNote:
+        '#tb-canvas uses a uniform 12-col sub-grid per section; the live dashboard mixes grids (2/3/auto-fit) and flex inside each details block.',
+      /** Same row widths as TB_PAGE_SCAFFOLD_PLAN (builder load / Load layout). */
+      scaffoldPlan: TB_PAGE_SCAFFOLD_PLAN,
+      /** Flatten to tag|tag|… for quick copy (top chrome + each layout-grid direct child id) */
+      toShallowDivPipe: function () {
+        return (
+          'header|div#filter-bar|div#layout-grid>' +
+          sections
+            .map(function (s) {
+              return s.tag + '#' + s.id;
+            })
+            .join('|')
+        );
+      }
+    };
+  }
+
   global.__widgetDispatcher = {
     init: initFull,
     dispatchRender: dispatchRender,
@@ -2900,7 +4540,9 @@
     renderWidgetTree: renderWidgetTree,
     applyGridLayout: applyGridLayout,
     applyAllChartVisibility: applyAllChartVisibility,
-    getOrderedChartsForSection: getOrderedChartsForSection
+    getOrderedChartsForSection: getOrderedChartsForSection,
+    getDesktopPageScaffold: tbGetDesktopPageScaffold,
+    buildScaffoldTemplate: tbNestedModelFromPageScaffold
   };
 
   // Bind sidebar toggle immediately (don't wait for data/init)

@@ -4,6 +4,72 @@
  * Referenz: window.CacheFilesExplorer.wireOpenButton("dev-cache-files-open")
  */
 (function (global) {
+
+  // ── JSON Tree Viewer with collapsible nodes ──────────────────────
+  function buildJsonTree(val, depth, startOpen) {
+    if (depth > 20) { var sToo = document.createElement('span'); sToo.className = 'jt-val'; sToo.textContent = '…'; return sToo; }
+    if (val === null) { var sN = document.createElement('span'); sN.className = 'jt-null'; sN.textContent = 'null'; return sN; }
+    if (typeof val === 'boolean') { var sB = document.createElement('span'); sB.className = 'jt-bool'; sB.textContent = String(val); return sB; }
+    if (typeof val === 'number') { var sNu = document.createElement('span'); sNu.className = 'jt-num'; sNu.textContent = String(val); return sNu; }
+    if (typeof val === 'string') { var sS = document.createElement('span'); sS.className = 'jt-str'; sS.textContent = '"' + val.slice(0, 500) + (val.length > 500 ? '…' : '') + '"'; return sS; }
+    var isArr = Array.isArray(val);
+    var keys = isArr ? null : Object.keys(val);
+    var len = isArr ? val.length : keys.length;
+    var wrap = document.createElement('span');
+    wrap.className = 'jt-node';
+    var toggle = document.createElement('span');
+    toggle.className = 'jt-toggle';
+    var open = startOpen && depth < 1;
+    toggle.textContent = open ? '▼' : '▶';
+    var summary = document.createElement('span');
+    summary.className = 'jt-summary';
+    summary.textContent = isArr ? '[' + len + ']' : '{' + len + '}';
+    var children = document.createElement('div');
+    children.className = 'jt-children';
+    children.style.display = open ? '' : 'none';
+    toggle.addEventListener('click', function () {
+      var showing = children.style.display !== 'none';
+      children.style.display = showing ? 'none' : '';
+      toggle.textContent = showing ? '▶' : '▼';
+      // Lazy build children on first open
+      if (!showing && !children.dataset.built) {
+        children.dataset.built = '1';
+        populateChildren(children, val, isArr, keys, depth);
+      }
+    });
+    wrap.appendChild(toggle);
+    wrap.appendChild(summary);
+    wrap.appendChild(children);
+    if (open) { children.dataset.built = '1'; populateChildren(children, val, isArr, keys, depth); }
+    return wrap;
+  }
+
+  function populateChildren(container, val, isArr, keys, depth) {
+    var entries = isArr ? val : keys;
+    var max = Math.min(entries.length, 500);
+    for (var i = 0; i < max; i++) {
+      var row = document.createElement('div');
+      row.className = 'jt-row';
+      var key = document.createElement('span');
+      key.className = 'jt-key';
+      key.textContent = isArr ? '[' + i + ']' : entries[i];
+      row.appendChild(key);
+      var sep = document.createElement('span');
+      sep.className = 'jt-sep';
+      sep.textContent = ': ';
+      row.appendChild(sep);
+      var child = isArr ? val[i] : val[entries[i]];
+      row.appendChild(buildJsonTree(child, depth + 1, false));
+      container.appendChild(row);
+    }
+    if (entries.length > max) {
+      var more = document.createElement('div');
+      more.className = 'jt-row jt-more';
+      more.textContent = '… ' + (entries.length - max) + ' more';
+      container.appendChild(more);
+    }
+  }
+
   var sharedCacheModalEl = null;
   function wireOpenButton(buttonId) {
     var openBtn = document.getElementById(buttonId || "dev-cache-files-open");
@@ -393,7 +459,50 @@
               return;
             }
             if (title) title.textContent = (o.path_ui || "") + (o.truncated ? " (gekuerzt)" : "");
-            pre.textContent = o.content != null ? String(o.content) : "";
+            var raw = o.content != null ? String(o.content) : "";
+            // Try JSON tree view with collapse (skip if truncated — incomplete JSON)
+            var didTree = false;
+            if (!o.truncated) {
+              try {
+                var parsed = JSON.parse(raw);
+                pre.innerHTML = "";
+                pre.appendChild(buildJsonTree(parsed, 0, true));
+                didTree = true;
+              } catch (_ej) {}
+            }
+            if (!didTree) {
+              // Truncated or non-JSON: try to pretty-print what we can
+              try {
+                // Attempt partial JSON: find last complete top-level entry
+                var lastBrace = raw.lastIndexOf('}');
+                if (lastBrace > 0 && raw.trimStart()[0] === '{') {
+                  // Try to close the JSON structure
+                  var attempt = raw.slice(0, lastBrace + 1);
+                  // Count open braces/brackets to close
+                  var openB = 0, openA = 0;
+                  for (var ci = 0; ci < attempt.length; ci++) {
+                    if (attempt[ci] === '{') openB++;
+                    else if (attempt[ci] === '}') openB--;
+                    else if (attempt[ci] === '[') openA++;
+                    else if (attempt[ci] === ']') openA--;
+                  }
+                  var closer = '';
+                  while (openA > 0) { closer += ']'; openA--; }
+                  while (openB > 0) { closer += '}'; openB--; }
+                  var partial = JSON.parse(attempt + closer);
+                  pre.innerHTML = "";
+                  pre.appendChild(buildJsonTree(partial, 0, true));
+                  if (o.truncated) {
+                    var trNote = document.createElement('div');
+                    trNote.className = 'jt-more';
+                    trNote.textContent = '… truncated (' + (o.size / 1024 / 1024).toFixed(1) + ' MB total, showing partial)';
+                    pre.appendChild(trNote);
+                  }
+                  didTree = true;
+                }
+              } catch (_ep) {}
+              if (!didTree) pre.textContent = raw;
+            }
           } catch (eZ) {
             pre.textContent = "parse error: " + String(eZ && eZ.message ? eZ.message : eZ);
           }
