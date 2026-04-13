@@ -2668,15 +2668,6 @@
       slotWidgetGroups: ['health-kpis', 'kernbefunde']
     },
     {
-      id: 'intelligence',
-      blocks: [12, 12, 12],
-      slotChartIds: [
-        ['intel-saturation', 'intel-health', 'intel-quota-eta'],
-        ['intel-narrative'],
-        ['intel-seasonality']
-      ]
-    },
-    {
       id: 'forensic',
       blocks: [12, 12, 6, 6],
       slotChartIds: [
@@ -2725,7 +2716,7 @@
     },
     {
       id: 'proxy',
-      blocks: [12, 4, 4, 4, 6, 6, 6, 6],
+      blocks: [12, 4, 4, 4, 6, 6, 6, 6, 12],
       slotChartIds: [
         [
           'proxy-kpi-requests',
@@ -2735,7 +2726,9 @@
           'proxy-kpi-quota-5h',
           'proxy-kpi-quota-7d',
           'proxy-kpi-ttl-tier',
-          'proxy-kpi-peak-hours'
+          'proxy-kpi-peak-hours',
+          'proxy-kpi-saturation',
+          'proxy-kpi-health'
         ],
         ['proxy-tokens'],
         ['proxy-models'],
@@ -2743,7 +2736,8 @@
         ['proxy-latency'],
         ['proxy-hourly-latency'],
         ['proxy-error-trend'],
-        ['proxy-cache-trend']
+        ['proxy-cache-trend'],
+        ['proxy-ttl-history']
       ]
     },
     {
@@ -4379,12 +4373,6 @@
         summaryClass: 'health-collapse-summary',
         innerPipe:
           'div.health-collapse-inner stacked: (1) div#health-score > div#health-grid[3-col KPI chips; 900→2;520→1] (2) div#key-findings > div#key-findings-grid[responsive 6→4→3→2→1 col; minmax(0,1fr)]'
-      },
-      {
-        id: 'intelligence-collapse',
-        tag: 'details',
-        innerPipe:
-          'div.intelligence-inner > #intelligence-scores[3→2→1 col KPI row] | #intelligence-narrative | #intelligence-rootcause | #intelligence-seasonality'
       },
       {
         id: 'forensic-collapse',
