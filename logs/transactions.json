@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-274",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "b35c06f",
+      "commit_full": "b35c06f63c9c2f30f431036cb4b07a44e9cad358",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(sonar): last 2 S7735 negated conditions in log helpers",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-273",
       "timestamp": "2026-04-13",
       "session": "auto",
