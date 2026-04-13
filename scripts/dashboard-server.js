@@ -617,13 +617,13 @@ function buildByDateFromVersionTimelineItems(items) {
   });
   var groups = [];
   for (var item of items) {
-    var dk = isoToUtcYmd(item.when);
-    if (!dk) continue;
+    var itemDk = isoToUtcYmd(item.when);
+    if (!itemDk) continue;
     if (!groups.length) groups.push([item]);
     else {
       var lastGrp = groups[groups.length - 1];
       var lastDk = isoToUtcYmd(lastGrp[0].when);
-      if (lastDk === dk) lastGrp.push(item);
+      if (lastDk === itemDk) lastGrp.push(item);
       else groups.push([item]);
     }
   }
@@ -631,7 +631,7 @@ function buildByDateFromVersionTimelineItems(items) {
   var byDate = Object.create(null);
   for (var g = 0; g < groups.length; g++) {
     var grp = groups[g];
-    dk = isoToUtcYmd(grp[0].when);
+    var dk = isoToUtcYmd(grp[0].when);
     var prevVer = g > 0 ? groups[g - 1][groups[g - 1].length - 1].ver : null;
     var added = [];
     var hi = [];
@@ -3127,6 +3127,141 @@ function computeQ5Consumption(samples) {
   return { consumed: consumed, tokens: tokens, count: sorted.length };
 }
 
+/** Request counts, duration, status, false-429, hourly volume — one NDJSON line. */
+function proxyNdjsonAccumulateRequestDuration(dd, rec, tsEnd) {
+  dd.requests++;
+  var dur = rec.duration_ms || 0;
+  dd.total_duration_ms += dur;
+  if (dur < dd.min_duration_ms) dd.min_duration_ms = dur;
+  if (dur > dd.max_duration_ms) dd.max_duration_ms = dur;
+
+  var status = rec.upstream_status || 0;
+  dd.status_codes[status] = (dd.status_codes[status] || 0) + 1;
+  if (status >= 400) dd.errors++;
+
+  // B3: False 429 — client-generated rate limit (no cf-ray = not from Anthropic)
+  if (status === 429) {
+    var rah = rec.response_anthropic_headers || {};
+    if (!rah['cf-ray']) dd.false_429s++;
+  }
+
+  if (tsEnd.length >= 13) {
+    var hour = Number.parseInt(tsEnd.slice(11, 13), 10);
+    if (!Number.isNaN(hour) && hour >= 0 && hour <= 23) {
+      dd.hours[hour] = (dd.hours[hour] || 0) + 1;
+    }
+  }
+  return { dur: dur, status: status };
+}
+
+/** Usage tokens, context-reset heuristic, cache health, cold starts, per-hour latency. */
+function proxyNdjsonAccumulateUsageCacheLatency(dd, rec, tsEnd, dur, status, u) {
+  if (u) {
+    dd.input_tokens += (u.input_tokens || 0);
+    dd.output_tokens += (u.output_tokens || 0);
+    dd.cache_read_tokens += (u.cache_read_input_tokens || 0);
+    dd.cache_creation_tokens += (u.cache_creation_input_tokens || 0);
+  }
+
+  // B4: Context Reset heuristic — cache_creation spikes after high cache_read phase
+  if (u && status === 200) {
+    var crt = u.cache_read_input_tokens || 0;
+    var cct = u.cache_creation_input_tokens || 0;
+    if (crt > 100000) dd._prev_cache_read_high = true;
+    if (dd._prev_cache_read_high && cct > 0 && crt < cct) {
+      dd.context_resets++;
+      dd._prev_cache_read_high = false;
+    }
+  }
+
+  var ch = rec.cache_health || 'na';
+  if (dd.cache_health[ch] !== undefined) dd.cache_health[ch]++;
+  else dd.cache_health.na++;
+
+  var crr = rec.cache_read_ratio;
+  if (typeof crr === 'number' && u && status === 200) {
+    dd.cache_ratios.push(crr);
+    if (crr < 0.5) dd.cold_starts++;
+  }
+
+  if (tsEnd.length >= 13 && dur > 0 && status === 200) {
+    var lhour = Number.parseInt(tsEnd.slice(11, 13), 10);
+    if (!Number.isNaN(lhour) && lhour >= 0 && lhour <= 23) {
+      if (!dd.per_hour_latency[lhour]) dd.per_hour_latency[lhour] = { sum: 0, count: 0, max: 0 };
+      dd.per_hour_latency[lhour].sum += dur;
+      dd.per_hour_latency[lhour].count++;
+      if (dur > dd.per_hour_latency[lhour].max) dd.per_hour_latency[lhour].max = dur;
+    }
+  }
+}
+
+/** Models, stop reasons, rate-limit snapshot + q5 samples, cache-fix interop fields. */
+function proxyNdjsonAccumulateModelsRateInterop(dd, rec, tsEnd, u, dur) {
+  var model = rec.request_hints?.model || 'unknown';
+  if (!dd.models[model]) dd.models[model] = { requests: 0, avg_duration_ms: 0, total_duration_ms: 0, output_tokens: 0 };
+  dd.models[model].requests++;
+  dd.models[model].total_duration_ms += dur;
+  if (u) dd.models[model].output_tokens += (u.output_tokens || 0);
+
+  var rh2 = rec.response_hints || {};
+  if (rh2.stop_reason) {
+    if (!dd.stop_reasons) dd.stop_reasons = {};
+    dd.stop_reasons[rh2.stop_reason] = (dd.stop_reasons[rh2.stop_reason] || 0) + 1;
+  }
+
+  var rlh = rec.response_anthropic_headers;
+  if (rlh) {
+    var snap = {};
+    var hasRl = false;
+    for (var rk in rlh) {
+      if (rk.startsWith('anthropic-ratelimit')) {
+        snap[rk] = rlh[rk];
+        hasRl = true;
+      }
+    }
+    if (hasRl) {
+      snap._ts = tsEnd;
+      dd.rate_limit_snapshots = [snap];
+
+      var q5Str = snap['anthropic-ratelimit-unified-5h-utilization'];
+      if (q5Str != null) {
+        var q5Num = Number.parseFloat(q5Str);
+        if (!Number.isNaN(q5Num) && q5Num >= 0) {
+          dd.q5_samples.push({
+            ts: tsEnd,
+            q5: q5Num,
+            tokens: (u?.input_tokens || 0) + (u?.output_tokens || 0),
+            cache_read: u?.cache_read_input_tokens || 0,
+            cache_creation: u?.cache_creation_input_tokens || 0
+          });
+        }
+      }
+    }
+  }
+
+  var ttl = rec.ttl_tier || 'unknown';
+  if (dd.ttl_tiers[ttl] !== undefined) dd.ttl_tiers[ttl]++;
+  else dd.ttl_tiers.unknown++;
+
+  dd.ephemeral_1h_tokens += (rec.ephemeral_1h_input_tokens || 0);
+  dd.ephemeral_5m_tokens += (rec.ephemeral_5m_input_tokens || 0);
+
+  if (rec.peak_hour === true) {
+    dd.peak_hour_requests++;
+  } else if (rec.peak_hour === false) {
+    dd.off_peak_requests++;
+  } else if (tsEnd.length >= 13) {
+    var phDate = new Date(tsEnd);
+    var phUtcH = phDate.getUTCHours();
+    var phUtcD = phDate.getUTCDay();
+    if (phUtcD >= 1 && phUtcD <= 5 && phUtcH >= 13 && phUtcH < 19) dd.peak_hour_requests++;
+    else dd.off_peak_requests++;
+  }
+
+  var src = rec.source || 'proxy';
+  dd.data_sources[src] = (dd.data_sources[src] || 0) + 1;
+}
+
 function parseProxyNdjsonFiles() {
   var files = collectProxyNdjsonFiles();
   var daily = {};
@@ -3148,146 +3283,10 @@ function parseProxyNdjsonFiles() {
         if (!daily[dayKey]) daily[dayKey] = emptyProxyDayBucket();
         var dd = daily[dayKey];
 
-        dd.requests++;
-        var dur = rec.duration_ms || 0;
-        dd.total_duration_ms += dur;
-        if (dur < dd.min_duration_ms) dd.min_duration_ms = dur;
-        if (dur > dd.max_duration_ms) dd.max_duration_ms = dur;
-
-        var status = rec.upstream_status || 0;
-        dd.status_codes[status] = (dd.status_codes[status] || 0) + 1;
-        if (status >= 400) dd.errors++;
-
-        // B3: False 429 — client-generated rate limit (no cf-ray = not from Anthropic)
-        if (status === 429) {
-          var rah = rec.response_anthropic_headers || {};
-          if (!rah['cf-ray']) dd.false_429s++;
-        }
-
-        // Hour tracking
-        if (tsEnd.length >= 13) {
-          var hour = Number.parseInt(tsEnd.slice(11, 13), 10);
-          if (!Number.isNaN(hour) && hour >= 0 && hour <= 23) {
-            dd.hours[hour] = (dd.hours[hour] || 0) + 1;
-          }
-        }
-
-        // Usage from proxy (already extracted from Anthropic response)
+        var durStatus = proxyNdjsonAccumulateRequestDuration(dd, rec, tsEnd);
         var u = rec.usage;
-        if (u) {
-          dd.input_tokens += (u.input_tokens || 0);
-          dd.output_tokens += (u.output_tokens || 0);
-          dd.cache_read_tokens += (u.cache_read_input_tokens || 0);
-          dd.cache_creation_tokens += (u.cache_creation_input_tokens || 0);
-        }
-
-        // B4: Context Reset heuristic — cache_creation spikes after high cache_read phase
-        if (u && status === 200) {
-          var crt = u.cache_read_input_tokens || 0;
-          var cct = u.cache_creation_input_tokens || 0;
-          if (crt > 100000) dd._prev_cache_read_high = true;
-          if (dd._prev_cache_read_high && cct > 0 && crt < cct) {
-            dd.context_resets++;
-            dd._prev_cache_read_high = false;
-          }
-        }
-
-        // Cache health
-        var ch = rec.cache_health || 'na';
-        if (dd.cache_health[ch] !== undefined) dd.cache_health[ch]++;
-        else dd.cache_health.na++;
-
-        // Cold-start detection: cache_read_ratio < 0.5 on a 200 request with usage
-        var crr = rec.cache_read_ratio;
-        if (typeof crr === 'number' && u && status === 200) {
-          dd.cache_ratios.push(crr);
-          if (crr < 0.5) dd.cold_starts++;
-        }
-
-        // Per-hour latency tracking for heatmap
-        if (tsEnd.length >= 13 && dur > 0 && status === 200) {
-          var lhour = Number.parseInt(tsEnd.slice(11, 13), 10);
-          if (!Number.isNaN(lhour) && lhour >= 0 && lhour <= 23) {
-            if (!dd.per_hour_latency[lhour]) dd.per_hour_latency[lhour] = { sum: 0, count: 0, max: 0 };
-            dd.per_hour_latency[lhour].sum += dur;
-            dd.per_hour_latency[lhour].count++;
-            if (dur > dd.per_hour_latency[lhour].max) dd.per_hour_latency[lhour].max = dur;
-          }
-        }
-
-        // Model from request hints
-        var model = rec.request_hints?.model || 'unknown';
-        if (!dd.models[model]) dd.models[model] = { requests: 0, avg_duration_ms: 0, total_duration_ms: 0, output_tokens: 0 };
-        dd.models[model].requests++;
-        dd.models[model].total_duration_ms += dur;
-        if (u) dd.models[model].output_tokens += (u.output_tokens || 0);
-
-        // Stop-reason from proxy (SSE + JSON responses)
-        var rh2 = rec.response_hints || {};
-        if (rh2.stop_reason) {
-          if (!dd.stop_reasons) dd.stop_reasons = {};
-          dd.stop_reasons[rh2.stop_reason] = (dd.stop_reasons[rh2.stop_reason] || 0) + 1;
-        }
-
-        // Rate limit snapshot (keep last per day, not all)
-        var rlh = rec.response_anthropic_headers;
-        if (rlh) {
-          var snap = {};
-          var hasRl = false;
-          for (var rk in rlh) {
-            if (rk.startsWith('anthropic-ratelimit')) {
-              snap[rk] = rlh[rk];
-              hasRl = true;
-            }
-          }
-          if (hasRl) {
-            snap._ts = tsEnd;
-            // Keep only latest snapshot per day (overwrite)
-            dd.rate_limit_snapshots = [snap];
-
-            // Cumulative q5 tracking for tokens-per-pct (see computeQ5Consumption)
-            var q5Str = snap['anthropic-ratelimit-unified-5h-utilization'];
-            if (q5Str != null) {
-              var q5Num = Number.parseFloat(q5Str);
-              if (!Number.isNaN(q5Num) && q5Num >= 0) {
-                dd.q5_samples.push({
-                  ts: tsEnd,
-                  q5: q5Num,
-                  tokens: (u?.input_tokens || 0) + (u?.output_tokens || 0),
-                  cache_read: u?.cache_read_input_tokens || 0,
-                  cache_creation: u?.cache_creation_input_tokens || 0
-                });
-              }
-            }
-          }
-        }
-
-        // ── claude-code-cache-fix interop fields ──────────────────────
-        // TTL tier (from cache-fix interceptor, absent in native proxy)
-        var ttl = rec.ttl_tier || 'unknown';
-        if (dd.ttl_tiers[ttl] !== undefined) dd.ttl_tiers[ttl]++;
-        else dd.ttl_tiers.unknown++;
-
-        // Ephemeral token breakdown by TTL tier
-        dd.ephemeral_1h_tokens += (rec.ephemeral_1h_input_tokens || 0);
-        dd.ephemeral_5m_tokens += (rec.ephemeral_5m_input_tokens || 0);
-
-        // Peak hour (prefer flag from cache-fix, fallback: compute from ts)
-        if (rec.peak_hour === true) {
-          dd.peak_hour_requests++;
-        } else if (rec.peak_hour === false) {
-          dd.off_peak_requests++;
-        } else if (tsEnd.length >= 13) {
-          var phDate = new Date(tsEnd);
-          var phUtcH = phDate.getUTCHours();
-          var phUtcD = phDate.getUTCDay();
-          if (phUtcD >= 1 && phUtcD <= 5 && phUtcH >= 13 && phUtcH < 19) dd.peak_hour_requests++;
-          else dd.off_peak_requests++;
-        }
-
-        // Data source tracking
-        var src = rec.source || 'proxy';
-        dd.data_sources[src] = (dd.data_sources[src] || 0) + 1;
+        proxyNdjsonAccumulateUsageCacheLatency(dd, rec, tsEnd, durStatus.dur, durStatus.status, u);
+        proxyNdjsonAccumulateModelsRateInterop(dd, rec, tsEnd, u, durStatus.dur);
       });
     } catch (e) {
       serviceLog.warn('proxy-parse', 'ndjson read failed ' + file + ': ' + (e.message || e));

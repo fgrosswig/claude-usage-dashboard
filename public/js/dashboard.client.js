@@ -5720,9 +5720,9 @@ function renderHealthScore(data) {
   if (smCircle) { smCircle.style.background = scoreColor; smCircle.textContent = score; }
   if (smText) {
     var sh = "";
-    for (var ind of visInd) {
-      var dc = ind.color === "red" ? "#ef4444" : ind.color === "yellow" ? "#f59e0b" : "#22c55e";
-      sh += '<span class="hs-inline-badge"><span class="hs-inline-dot" style="background:' + dc + '"></span>' + escHtml(ind.label) + ' <strong>' + escHtml(ind.display) + '</strong></span>';
+    for (var inlineInd of visInd) {
+      var dc = inlineInd.color === "red" ? "#ef4444" : inlineInd.color === "yellow" ? "#f59e0b" : "#22c55e";
+      sh += '<span class="hs-inline-badge"><span class="hs-inline-dot" style="background:' + dc + '"></span>' + escHtml(inlineInd.label) + ' <strong>' + escHtml(inlineInd.display) + '</strong></span>';
     }
 
     smText.innerHTML = sh;
@@ -5734,7 +5734,7 @@ function renderHealthScore(data) {
 
   // Grid (one host per KPI for visibility sync)
   var gh = "";
-  for (ind of indicators) {
+  for (var ind of indicators) {
     var hostId = "health-kpi-" + ind.id;
     gh += "<div class=\"chart-box chart-box--kpi\" id=\"" + hostId + "\">";
     gh += "<div class=\"health-badge health-badge--" + ind.color + "\">";

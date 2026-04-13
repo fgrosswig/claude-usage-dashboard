@@ -589,59 +589,83 @@
     }
   }
 
+  /** ECharts that need filtered days, _econData, or session picker (cognitive split from invokeChartRenderFn). */
+  function invokeEconOrUsageChartRender(rfName, rf) {
+    var uDataE = global.__lastUsageData;
+    var eDaysE = [];
+    if (uDataE?.days?.length) {
+      eDaysE = typeof global.getFilteredDays === 'function'
+        ? global.getFilteredDays(uDataE.days) : uDataE.days.slice();
+    }
+    var stEcon = global._econData;
+    if (rfName === 'renderMonthlyButterfly' || rfName === 'renderDayComparison') {
+      rf(eDaysE);
+      return;
+    }
+    if (rfName === 'renderEfficiencyTimeline') {
+      if (stEcon) rf(stEcon);
+      return;
+    }
+    if (rfName === 'renderBudgetDrain') {
+      if (stEcon) rf(stEcon, global._econQdData || undefined);
+      return;
+    }
+    if (rfName === 'renderWasteCurve' || rfName === 'renderCacheExplosion') {
+      var sessEl = document.getElementById('econ-session-picker');
+      var selV = sessEl ? sessEl.value : '';
+      var sessE = null;
+      if (stEcon && typeof global.findSession === 'function') {
+        sessE = global.findSession(stEcon, selV);
+      }
+      if (sessE) rf(sessE);
+    }
+  }
+
   /** Invoke a standalone chart render function with the correct context data. */
   function invokeChartRenderFn(rfName, rf) {
-    if (String(rfName).startsWith('renderProxy_')) {
+    var s = String(rfName);
+    if (s.startsWith('renderProxy_')) {
       var dataP = global.__lastUsageData;
       if (dataP && typeof global._computeProxyCtx === 'function') global._computeProxyCtx(dataP);
       if (global.__sectionCtx_proxy) rf(global.__sectionCtx_proxy);
-    } else if (String(rfName).startsWith('renderForensic_')) {
+      return;
+    }
+    if (s.startsWith('renderForensic_')) {
       var fctx = global.__sectionCtx_forensic;
       if (fctx) rf(fctx);
-    } else if (String(rfName).startsWith('renderUserProfile_')) {
+      return;
+    }
+    if (s.startsWith('renderUserProfile_')) {
       var uctx = global.__sectionCtx_userProfile;
       if (uctx) rf(uctx);
-    } else if (String(rfName).startsWith('renderBudget_')) {
+      return;
+    }
+    if (s.startsWith('renderBudget_')) {
       var bctx = global.__sectionCtx_budget;
       if (!bctx && global.__lastUsageData && typeof global._computeBudgetCtx === 'function') {
         bctx = global._computeBudgetCtx(global.__lastUsageData);
       }
       if (bctx) rf(bctx);
-    } else if (String(rfName).startsWith('renderTokenStats_')) {
+      return;
+    }
+    if (s.startsWith('renderTokenStats_')) {
       var tsctx = global.__sectionCtx_tokenStats;
       if (tsctx) rf(tsctx);
-    } else if (String(rfName).startsWith('renderStatus_')) {
+      return;
+    }
+    if (s.startsWith('renderStatus_')) {
       rf();
-    } else if (
+      return;
+    }
+    if (
       rfName === 'renderWasteCurve' || rfName === 'renderCacheExplosion' ||
       rfName === 'renderBudgetDrain' || rfName === 'renderEfficiencyTimeline' ||
       rfName === 'renderMonthlyButterfly' || rfName === 'renderDayComparison'
     ) {
-      var uDataE = global.__lastUsageData;
-      var eDaysE = [];
-      if (uDataE?.days?.length) {
-        eDaysE = typeof global.getFilteredDays === 'function'
-          ? global.getFilteredDays(uDataE.days) : uDataE.days.slice();
-      }
-      var stEcon = global._econData;
-      if (rfName === 'renderMonthlyButterfly' || rfName === 'renderDayComparison') {
-        rf(eDaysE);
-      } else if (rfName === 'renderEfficiencyTimeline') {
-        if (stEcon) rf(stEcon);
-      } else if (rfName === 'renderBudgetDrain') {
-        if (stEcon) rf(stEcon, global._econQdData || undefined);
-      } else if (rfName === 'renderWasteCurve' || rfName === 'renderCacheExplosion') {
-        var sessEl = document.getElementById('econ-session-picker');
-        var selV = sessEl ? sessEl.value : '';
-        var sessE = null;
-        if (stEcon && typeof global.findSession === 'function') {
-          sessE = global.findSession(stEcon, selV);
-        }
-        if (sessE) rf(sessE);
-      }
-    } else {
-      rf();
+      invokeEconOrUsageChartRender(rfName, rf);
+      return;
     }
+    rf();
   }
 
   // ── Disclosure Toggle Auto-Binding ──────────────────────────────
@@ -2641,8 +2665,8 @@
     for (var row of nested) {
       var flatKids = row.children || [];
       var hasBlock = false;
-      for (var fk of flatKids) {
-        if (tbIsLayoutBlock(fk)) {
+      for (var flatKid of flatKids) {
+        if (tbIsLayoutBlock(flatKid)) {
           hasBlock = true;
           break;
         }
@@ -2706,7 +2730,7 @@
         seen[cid] = true;
       }
       for (fi = 0; fi < flatKids.length; fi++) {
-        fk = flatKids[fi];
+        var fk = flatKids[fi];
         if (tbIsLayoutBlock(fk)) continue;
         if (!seen[fk.id]) {
           merged.push({ id: fk.id, span: fk.span || 6 });
