@@ -2,6 +2,58 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-275",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "867d296",
+      "commit_full": "867d2966da643ca0c0b5c75f12204cf5e0a2e9e3",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(economic): M_real compaction penalty chart, remove Cumulative Usage Curve",
+      "detail": "- Remove econ-cumulative (Cumulative Usage Curve) chart — replaced by\n  enhanced Cache Explosion lower grid\n- Cache Explosion now full width (span 12)\n- Cumulative toggle: Actual cache_read vs Envelope (without loss) with\n  M_real weighted rebuild cost per compaction event\n  Formula: Real_Cost = Drop × (1 + M(t)), M(t) = f(t) / f_avg(t)\n- Burn zone markAreas in cumulative view (per-turn fit vs baseline thresholds)\n- Purple badges at compaction events showing real cost + multiplier\n- Tooltip with full M_real calculation breakdown at compaction turns\n- axisPointer sync between upper and lower chart in both modes\n- replaceMerge for clean series swap between Context Loss / Cumulative\n- Guard renderTokenStatsSection + _computeForensicCtx against undefined selDay\n- Strip deprecated widget IDs (econ-cumulative) from saved prefs + templates\n- i18n: econBtnContextLoss, econBtnCumulative, econSeriesActualCR,\n  econSeriesLostContext, econSeriesWithoutLoss (DE/EN/KO)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard-sections.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-registry.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-274",
       "timestamp": "2026-04-13",
       "session": "auto",
