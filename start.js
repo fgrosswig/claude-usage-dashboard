@@ -10,7 +10,7 @@
  *   node start.js both             → Dashboard + Proxy (zwei Kindprozesse)
  *   node start.js forensics        → Token-Forensik (CLI, scripts/token-forensics.js)
  */
-var path = require('path');
+var path = require('node:path');
 
 var raw = process.argv.slice(2);
 var cmd = 'dashboard';
@@ -85,7 +85,7 @@ if ((cmd === 'both' || cmd === 'all') && (process.env.DEV_MODE || '').trim()) {
 }
 
 if (cmd === 'both' || cmd === 'all') {
-  var cp = require('child_process');
+  var cp = require('node:child_process');
   var spawnOpts = { stdio: 'inherit', cwd: __dirname };
   var dashScript = path.join(__dirname, 'scripts', 'dashboard-server.js');
   var proxyScript = path.join(__dirname, 'scripts', 'anthropic-proxy-cli.js');

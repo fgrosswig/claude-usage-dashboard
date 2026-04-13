@@ -168,7 +168,7 @@ function pass1FromExtractCache(dateKeys, extractCache) {
   var allSessions = Object.create(null);
   var files = extractCache.files || {};
   for (var fp in files) {
-    if (!Object.prototype.hasOwnProperty.call(files, fp)) continue;
+    if (!Object.hasOwn(files, fp)) continue;
     var entry = files[fp];
     var records = entry.records || [];
     for (var r of records) {

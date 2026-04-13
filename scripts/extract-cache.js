@@ -14,8 +14,8 @@
  *   ec.save(cache);                               // persist to disk
  *   var records = ec.getRecordsForFile(cache, f);  // get mini-records
  */
-var fs = require('fs');
-var path = require('path');
+var fs = require('node:fs');
+var path = require('node:path');
 
 var HOME = process.env.HOME || process.env.USERPROFILE || '';
 var CACHE_FILE = path.join(HOME, '.claude', 'usage-dashboard-extract.json');
@@ -24,15 +24,15 @@ var CACHE_VERSION = 1;
 // ── Signal detection (mirrored from dashboard-server.js) ────────────────
 
 function scanLineHitLimit(line) {
-  if (line.indexOf('rate_limit') >= 0) return true;
-  if (line.indexOf('RateLimit') >= 0) return true;
-  if (line.indexOf('rate limit') >= 0) return true;
-  if (line.indexOf('"status":429') >= 0) return true;
-  if (line.indexOf('"status_code":429') >= 0) return true;
-  if (line.indexOf('429') >= 0 && line.indexOf('error') >= 0) return true;
-  if (line.indexOf('overloaded') >= 0) return true;
-  if (line.indexOf('Too Many Requests') >= 0) return true;
-  if (line.indexOf('session') >= 0 && line.indexOf('limit') >= 0) return true;
+  if (line.includes('rate_limit')) return true;
+  if (line.includes('RateLimit')) return true;
+  if (line.includes('rate limit')) return true;
+  if (line.includes('"status":429')) return true;
+  if (line.includes('"status_code":429')) return true;
+  if (line.includes('429') && line.includes('error')) return true;
+  if (line.includes('overloaded')) return true;
+  if (line.includes('Too Many Requests')) return true;
+  if (line.includes('session') && line.includes('limit')) return true;
   return false;
 }
 
@@ -45,9 +45,9 @@ function classifySignals(line, rec) {
   if (/(?:^|[^\w-])--continue(?:[^\w-]|$)/.test(lower) || /["']--continue["']/.test(line)) add('continue');
   if (/(?:^|[^\w-])--resume(?:[^\w-]|$)/.test(lower) || /["']--resume["']/.test(line)) add('resume');
   if (/user_cancel|user_cancelled|user\s*interrupt|interrupted|unterbrochen|stream\s*abort|cancellation|cancelled\s*request/.test(lower)) add('interrupt');
-  if (rec && rec.message && rec.message.stop_reason) {
+  if (rec?.message?.stop_reason) {
     var sr = String(rec.message.stop_reason).toLowerCase();
-    if (sr.indexOf('cancel') >= 0 || sr === 'user_abort') add('interrupt');
+    if (sr.includes('cancel') || sr === 'user_abort') add('interrupt');
   }
   if (/retrying|will\s*retry|retries\s+exhausted|exponential\s*backoff|auto-?retry|retry\s+attempt/.test(lower)) add('retry');
   if (/\b429\b/.test(lower) && /retry|rate|limit|overloaded|throttl|too\s+many/.test(lower)) add('retry');
@@ -56,7 +56,7 @@ function classifySignals(line, rec) {
       var ej = JSON.stringify(rec.error).toLowerCase();
       if (/retry|429|rate|throttl|overloaded/.test(ej)) add('retry');
       if (/interrupt|cancel|abort/.test(ej)) add('interrupt');
-    } catch (e) {}
+    } catch (_ignored) {}
   }
   if (/["']is_truncated["']\s*:\s*true|["']truncated["']\s*:\s*true/.test(line)) add('truncated');
   if (rec && rec.type === 'system' && rec.subtype === 'api_error') add('api_error');
@@ -72,7 +72,7 @@ function normalizeModel(m) {
 
 // ── JSONL line reader (identical to usage-scan-roots.js) ────────────────
 
-var StringDecoder = require('string_decoder').StringDecoder;
+var StringDecoder = require('node:string_decoder').StringDecoder;
 
 function forEachLineSync(filePath, cb) {
   var fd;
@@ -115,8 +115,8 @@ function extractFile(filePath) {
     var ts = rec.timestamp;
     if (!ts || typeof ts !== 'string' || ts.length < 19) { stats.skipped++; return; }
 
-    var usage = rec.message && rec.message.usage;
-    var model = rec.message && rec.message.model;
+    var usage = rec.message?.usage;
+    var model = rec.message?.model;
 
     // For non-assistant or system records: still capture signals
     if (rec.isSidechain) { stats.skipped++; return; }
@@ -135,7 +135,7 @@ function extractFile(filePath) {
       cr: cr,
       cc: cc,
       mod: normalizeModel(model),
-      sr: (rec.message && rec.message.stop_reason) || '',
+      sr: rec.message?.stop_reason || '',
       ver: rec.version || rec.cli_version || rec.claude_code_version || rec.extension_version || '',
       ep: rec.entrypoint || '',
       sig: signals.length ? signals : undefined,
@@ -207,7 +207,7 @@ function sync(cache, taggedFiles) {
       mtimeMs: stat.mtimeMs,
       size: stat.size,
       label: typeof tf === 'string' ? 'local' : (tf.label || 'local'),
-      isSub: fp.indexOf('subagent') >= 0,
+      isSub: fp.includes('subagent'),
       records: extracted.records
     };
     result.miss++;
@@ -216,7 +216,7 @@ function sync(cache, taggedFiles) {
 
   // Remove entries for deleted files
   for (var key in cache.files) {
-    if (!Object.prototype.hasOwnProperty.call(cache.files, key)) continue;
+    if (!Object.hasOwn(cache.files, key)) continue;
     if (!currentPaths[key]) {
       delete cache.files[key];
       result.removed++;
@@ -249,7 +249,7 @@ function getFileMeta(cache, filePath) {
 function getAllRecords(cache) {
   var all = [];
   for (var fp in cache.files) {
-    if (!Object.prototype.hasOwnProperty.call(cache.files, fp)) continue;
+    if (!Object.hasOwn(cache.files, fp)) continue;
     var entry = cache.files[fp];
     var label = entry.label || 'local';
     var isSub = entry.isSub || false;

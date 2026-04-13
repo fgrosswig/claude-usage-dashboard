@@ -138,7 +138,7 @@
       for (var ri = 0; ri < rowsAll.length; ri++) {
         var row = rowsAll[ri];
         var hay = String(row.getAttribute("data-search") || "").toLowerCase();
-        var show = !q || hay.indexOf(q) >= 0;
+        var show = !q || hay.includes(q);
         row.style.display = show ? "" : "none";
       }
       collapseEmptyDetails();
@@ -194,7 +194,7 @@
       return { children: Object.create(null), files: [] };
     }
     function folderSegs(folderUi) {
-      var s = String(folderUi || "").replace(/\\/g, "/").trim();
+      var s = String(folderUi || "").replaceAll("\\", "/").trim();
       if (!s) return ["(?)"];
       var parts = s.split("/");
       var out = [];
@@ -204,7 +204,7 @@
       return out.length ? out : ["(?)"];
     }
     function parentPathUiForTree(f) {
-      var ui = String(f.path_ui || "").replace(/\\/g, "/").trim();
+      var ui = String(f.path_ui || "").replaceAll("\\", "/").trim();
       var fn = String(f.file_name || "").trim();
       if (ui) {
         if (fn) {
@@ -228,10 +228,10 @@
           return "";
         }
       }
-      return String(f.folder_ui || "").replace(/\\/g, "/").trim();
+      return String(f.folder_ui || "").replaceAll("\\", "/").trim();
     }
     function treeSegsForFile(f) {
-      var seg0 = String(f.kind || "cache").replace(/\//g, "_");
+      var seg0 = String(f.kind || "cache").replaceAll("/", "_");
       var parentPath = parentPathUiForTree(f);
       var out = [seg0];
       if (!parentPath) {
@@ -246,7 +246,7 @@
     function countFilesInTree(node) {
       var c = node.files.length;
       for (var k in node.children) {
-        if (Object.prototype.hasOwnProperty.call(node.children, k)) {
+        if (Object.hasOwn(node.children, k)) {
           c += countFilesInTree(node.children[k]);
         }
       }
@@ -390,14 +390,14 @@
           drag.active = true;
           drag.sx = ev.clientX;
           drag.sy = ev.clientY;
-          drag.ox = parseFloat(dlg.style.left) || r.left;
-          drag.oy = parseFloat(dlg.style.top) || r.top;
+          drag.ox = Number.parseFloat(dlg.style.left) || r.left;
+          drag.oy = Number.parseFloat(dlg.style.top) || r.top;
           dlg.classList.add("dev-cache-files-modal-dialog--dragging");
           document.addEventListener("mousemove", onMove);
           document.addEventListener("mouseup", onUp);
           try {
             ev.preventDefault();
-          } catch (eDr) {}
+          } catch (_ignored) {}
         });
       })();
       document.getElementById("dev-cache-files-backdrop").addEventListener("click", closeModal);
@@ -428,7 +428,7 @@
         } else {
           var n = el;
           while (n && n.nodeName !== "BUTTON") n = n.parentElement;
-          if (n && n.className && (" " + n.className + " ").indexOf(" dev-cache-view-btn ") >= 0) btn = n;
+          if (n && n.className && (" " + n.className + " ").includes(" dev-cache-view-btn ")) btn = n;
         }
         if (!btn) return;
         var enc = btn.getAttribute("data-path-enc");
@@ -440,7 +440,7 @@
         if (!pre || !pr) return;
         try {
           ev.preventDefault();
-        } catch (ePe) {}
+        } catch (_ignored) {}
         pr.classList.add("has-file");
         pre.textContent = "Lade …";
         if (title) title.textContent = pAbs;
@@ -504,7 +504,7 @@
               if (!didTree) pre.textContent = raw;
             }
           } catch (eZ) {
-            pre.textContent = "parse error: " + String(eZ && eZ.message ? eZ.message : eZ);
+            pre.textContent = "parse error: " + String(eZ?.message ? eZ.message : eZ);
           }
         };
         rq.onerror = function () {

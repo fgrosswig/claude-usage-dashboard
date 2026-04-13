@@ -3,10 +3,10 @@
  * Gemeinsame Logik: Scan-Wurzeln (~/.claude/projects + CLAUDE_USAGE_EXTRA_BASES),
  * JSONL-Sammeln. Von dashboard-server und token-forensics genutzt.
  */
-var fs = require('fs');
-var path = require('path');
-var os = require('os');
-var StringDecoder = require('string_decoder').StringDecoder;
+var fs = require('node:fs');
+var path = require('node:path');
+var os = require('node:os');
+var StringDecoder = require('node:string_decoder').StringDecoder;
 
 var HOME = process.env.USERPROFILE || process.env.HOME || os.homedir();
 var BASE = path.join(HOME, '.claude', 'projects');
@@ -16,7 +16,7 @@ function expandUserPath(p) {
   p = p.trim();
   if (!p) return '';
   if (p === '~') return HOME;
-  if (p.indexOf('~/') === 0 || p.indexOf('~\\') === 0) return path.join(HOME, p.slice(2));
+  if (p.startsWith('~/') || p.startsWith('~\\')) return path.join(HOME, p.slice(2));
   if (p.charAt(0) === '~' && (p.length === 1 || p.charAt(1) === path.sep)) {
     return path.join(HOME, p.slice(1).replace(/^[\/\\]+/, ''));
   }
@@ -35,7 +35,7 @@ function discoverHostImportDirs(parentDir) {
       if (!/^HOST-/i.test(name)) continue;
       out.push({ path: path.join(absParent, name), label: name });
     }
-  } catch (e) {}
+  } catch (_ignored) {}
   out.sort(function (a, b) {
     return a.label.localeCompare(b.label, undefined, { sensitivity: 'base' });
   });
@@ -102,7 +102,7 @@ function walkJsonl(dir) {
       if (entry.isDirectory()) files = files.concat(walkJsonl(fp));
       else if (entry.name.endsWith('.jsonl')) files.push(fp);
     }
-  } catch (e) {}
+  } catch (_ignored) {}
   return files;
 }
 
@@ -111,8 +111,8 @@ var WALK_JSONL_READDIRS_PER_SLICE = 40;
 (function () {
   var e = process.env.CLAUDE_USAGE_WALK_SLICE;
   if (!e) return;
-  var n = parseInt(e, 10);
-  if (!isNaN(n) && n >= 5 && n <= 500) WALK_JSONL_READDIRS_PER_SLICE = n;
+  var n = Number.parseInt(e, 10);
+  if (!Number.isNaN(n) && n >= 5 && n <= 500) WALK_JSONL_READDIRS_PER_SLICE = n;
 })();
 
 /**
@@ -141,7 +141,7 @@ function walkJsonlYielding(startDir, cb) {
           if (entries[i].isDirectory()) stack.push(fp);
           else if (entries[i].name.endsWith('.jsonl')) files.push(fp);
         }
-      } catch (e2) {}
+      } catch (_ignored) {}
     }
     if (stack.length) setImmediate(pump);
     else cb(files);
@@ -284,7 +284,7 @@ function collectProxyNdjsonFiles() {
         files.push(path.join(logDir, entry.name));
       }
     }
-  } catch (e) {}
+  } catch (_ignored) {}
   files.sort(function (a, b) {
     return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
   });

@@ -33,11 +33,11 @@ function tryParseBenchmarkArg(argv, idx, out) {
   var a = argv[idx];
   var m = a.match(/^--days-back=(\d+)$/);
   if (m) {
-    out.daysBack = parseInt(m[1], 10);
+    out.daysBack = Number.parseInt(m[1], 10);
     return idx + 1;
   }
   if (a === '--days-back' && idx + 1 < argv.length) {
-    out.daysBack = parseInt(argv[idx + 1], 10);
+    out.daysBack = Number.parseInt(argv[idx + 1], 10);
     return idx + 2;
   }
   m = a.match(/^--dates=(.+)$/);
@@ -51,11 +51,11 @@ function tryParseBenchmarkArg(argv, idx, out) {
   }
   m = a.match(/^--iterations=(\d+)$/);
   if (m) {
-    out.iterations = parseInt(m[1], 10);
+    out.iterations = Number.parseInt(m[1], 10);
     return idx + 1;
   }
   if (a === '--iterations' && idx + 1 < argv.length) {
-    out.iterations = parseInt(argv[idx + 1], 10);
+    out.iterations = Number.parseInt(argv[idx + 1], 10);
     return idx + 2;
   }
   return idx + 1;
@@ -79,7 +79,7 @@ function resolveDateKeys(daysBack, datesCsv) {
       })
       .filter(Boolean);
   }
-  var n = Math.max(1, parseInt(daysBack, 10) || 8);
+  var n = Math.max(1, Number.parseInt(daysBack, 10) || 8);
   var out = [];
   for (var i = 0; i < n; i++) {
     var d = new Date();
@@ -215,7 +215,7 @@ function formatBenchmarkReport(repoDir, last, dateKeys, modeLine, iterations, to
 
 function main() {
   var argv = process.argv.slice(2);
-  if (argv.indexOf('--help') >= 0 || argv.indexOf('-h') >= 0) {
+  if (argv.includes('--help') || argv.includes('-h')) {
     process.stdout.write(
       'benchmark-session-turns.js — gleiche Pipeline wie dashboard (collect, fp, pass1, finalize).\n' +
         '\n' +
@@ -231,7 +231,7 @@ function main() {
   }
   var opts = parseArgs(argv);
   var dateKeys = resolveDateKeys(opts.daysBack, opts.datesCsv);
-  var iters = Math.max(1, parseInt(opts.iterations, 10) || 1);
+  var iters = Math.max(1, Number.parseInt(opts.iterations, 10) || 1);
   var totals = [];
   var last = null;
   for (var iter = 0; iter < iters; iter++) {

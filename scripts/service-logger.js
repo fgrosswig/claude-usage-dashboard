@@ -4,8 +4,8 @@
  * CLAUDE_USAGE_LOG_LEVEL=error|warn|info|debug|none (Standard: info)
  * CLAUDE_USAGE_LOG_FILE=Pfad — Append, eine Zeile pro Eintrag (UTF-8)
  */
-var fs = require('fs');
-var path = require('path');
+var fs = require('node:fs');
+var path = require('node:path');
 
 var RANK = { error: 0, warn: 1, info: 2, debug: 3 };
 var maxRank = RANK.info;
@@ -72,13 +72,13 @@ function emit(level, topic, message) {
     '\n';
   try {
     process.stderr.write(line);
-  } catch (e) {}
+  } catch (_ignored) {}
   if (logFilePath) {
     try {
       var dir = path.dirname(logFilePath);
       if (dir && dir !== '.') fs.mkdirSync(dir, { recursive: true });
       fs.appendFileSync(logFilePath, line, 'utf8');
-    } catch (eF) {}
+    } catch (_ignored) {}
   }
 }
 

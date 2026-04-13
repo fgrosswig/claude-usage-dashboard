@@ -4,10 +4,10 @@
  * Nur Unterbäume projects/ und anthropic-proxy-logs/ (keine Pfade mit ..).
  * Extraktion via System-tar (Busybox/GNU tar.exe); keine npm-Abhängigkeit.
  */
-var fs = require('fs');
-var path = require('path');
-var os = require('os');
-var cp = require('child_process');
+var fs = require('node:fs');
+var path = require('node:path');
+var os = require('node:os');
+var cp = require('node:child_process');
 
 function normalizeSlashes(s) {
   return String(s || '')
@@ -18,14 +18,14 @@ function normalizeSlashes(s) {
 
 function stripLeadingDotClaude(rel) {
   var r = normalizeSlashes(rel);
-  if (r.indexOf('.claude/') === 0) return r.slice('.claude/'.length);
+  if (r.startsWith('.claude/')) return r.slice('.claude/'.length);
   return r;
 }
 
 function mapStagingRelToTargetRel(stagingRel) {
   var r = stripLeadingDotClaude(stagingRel);
   r = normalizeSlashes(r);
-  if (r.indexOf('projects/') === 0 || r.indexOf('anthropic-proxy-logs/') === 0) return r;
+  if (r.startsWith('projects/') || r.startsWith('anthropic-proxy-logs/')) return r;
   return null;
 }
 
@@ -78,14 +78,14 @@ function extractTarGzIntoClaudeRoot(tarGzPath, claudeRoot, cb) {
   child.on('error', function (err) {
     try {
       fs.rmSync(staging, { recursive: true, force: true });
-    } catch (e2) {}
+    } catch (_ignored) {}
     cb(err, null);
   });
   child.on('close', function (code) {
     if (code !== 0) {
       try {
         fs.rmSync(staging, { recursive: true, force: true });
-      } catch (e2) {}
+      } catch (_ignored) {}
       cb(new Error('tar exited ' + code), null);
       return;
     }
@@ -96,7 +96,7 @@ function extractTarGzIntoClaudeRoot(tarGzPath, claudeRoot, cb) {
       for (var absFile of files) {
         var rel = path.relative(staging, absFile);
         var targetRel = mapStagingRelToTargetRel(rel);
-        if (!targetRel || targetRel.indexOf('..') >= 0) continue;
+        if (!targetRel || targetRel.includes('..')) continue;
         var dest = path.join(absRoot, targetRel.split('/').join(path.sep));
         var resolved = path.resolve(dest);
         if (resolved !== absRoot && !resolved.startsWith(absRoot + path.sep)) continue;
@@ -107,13 +107,13 @@ function extractTarGzIntoClaudeRoot(tarGzPath, claudeRoot, cb) {
     } catch (e3) {
       try {
         fs.rmSync(staging, { recursive: true, force: true });
-      } catch (e4) {}
+      } catch (_ignored) {}
       cb(e3, null);
       return;
     }
     try {
       fs.rmSync(staging, { recursive: true, force: true });
-    } catch (e5) {}
+    } catch (_ignored) {}
     cb(null, { filesWritten: written });
   });
 }
