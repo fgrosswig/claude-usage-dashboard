@@ -2,15 +2,75 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-260",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "db0b980",
+      "commit_full": "db0b9803edada10d685f930aa70c87635d444401",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(dev): clear layout button logs, sessionStorage reset, restore FQDN badges",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-259",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "ced06c0",
+      "commit_full": "ced06c023ffa59bf77638bf054baeeaa171ec1bc",
+      "status": "ABGESCHLOSSEN",
+      "description": "revert(docs): restore FQDN for SonarQube badge URLs",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "README.en.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "README.ko.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "README.md",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-258",
       "timestamp": "2026-04-13",
       "session": "auto",
-      "commit": "8379f78",
-      "commit_full": "8379f78336112d243e4b07caea67f99130d15ff5",
+      "commit": "f0359ec",
+      "commit_full": "f0359ec336932f0b59667757c27fd6fe4e5c36f7",
       "status": "ABGESCHLOSSEN",
-      "description": "Merge branch 'feat/widget-dispatcher' into develop",
-      "detail": "# Conflicts:\n#\tlogs/transactions.json",
-      "changes": []
+      "description": "fix(docs): use internal SonarQube hostname in badge URLs",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "README.en.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "README.ko.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "README.md",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
     },
     {
       "id": "TX-257",
