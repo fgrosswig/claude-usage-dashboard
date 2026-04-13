@@ -2,6 +2,113 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-266",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "6a9bf0f",
+      "commit_full": "6a9bf0ffa9ab66e879db47d2241e04add4501fea",
+      "status": "ABGESCHLOSSEN",
+      "description": "refactor: fix SonarQube mechanical rules (S6582, S2486, S7773, S7765, S6557, S7781, S6653, S7772, S4138)",
+      "detail": "Optional chaining, empty catch blocks, Number.parseInt, .includes(),\n.startsWith(), .replaceAll(), Object.hasOwn, node: protocol, remaining for...of.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/cache-files-explorer.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard-sections.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/metrics-engine.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/anthropic-proxy-cli.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/anthropic-proxy-core.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/benchmark-session-turns.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/claude-data-ingest.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/claude-data-sync-client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-http.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/extract-cache.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/extract-dashboard-assets.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/service-logger.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/session-turns-core.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/token-forensics.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/usage-scan-roots.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "start.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-265",
       "timestamp": "2026-04-13",
       "session": "auto",
