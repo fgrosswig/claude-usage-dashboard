@@ -7,16 +7,38 @@
 <link rel="stylesheet" href="/assets/dashboard.css">
 </head>
 <body>
+<!-- Warmup Splash -->
+<div class="warmup-overlay" id="warmup-overlay">
+<div class="warmup-card">
+<div class="warmup-anim">
+<div class="warmup-ring"></div>
+<div class="warmup-ring"></div>
+<div class="warmup-ring"></div>
+<div class="warmup-core"></div>
+</div>
+<h2 class="warmup-title" id="warmup-title">Claude Usage Dashboard</h2>
+<p class="warmup-status" id="warmup-status">Scanning token logs…</p>
+<div class="warmup-progress" id="warmup-progress"><div class="warmup-progress-fill" id="warmup-progress-fill"></div></div>
+<p class="warmup-sub" id="warmup-sub"></p>
+<div class="warmup-tokens">
+<span class="warmup-token-dot"></span>
+<span class="warmup-token-dot"></span>
+<span class="warmup-token-dot"></span>
+<span class="warmup-token-dot"></span>
+<span class="warmup-token-dot"></span>
+</div>
+</div>
+</div>
 <header class="top-bar" role="banner">
 <div class="top-bar-cluster">
-<h1 class="top-bar-title" id="main-heading">Claude Code Token Usage</h1>
+<h1 class="top-bar-title" id="main-heading">Claude Usage Dashboard</h1>
+<!-- Hidden originals: Sidebar clones dispatch events back to these -->
+<div style="display:none !important">
 <div class="lang-switch" id="lang-switch-wrap" role="group" aria-label="Language">
-<span id="lang-switch-label" class="lang-switch-label"></span>
 <button type="button" class="lang-btn" id="lang-de" data-lang="de" aria-pressed="false">DE</button>
 <button type="button" class="lang-btn" id="lang-en" data-lang="en" aria-pressed="false">EN</button>
 <button type="button" class="lang-btn" id="lang-ko" data-lang="ko" aria-pressed="false">KO</button>
 </div>
-<div class="plan-switch" id="plan-switch-wrap">
 <select id="plan-select" class="plan-select">
 <option value="max5">MAX 5</option>
 <option value="max20">MAX 20</option>
@@ -25,18 +47,18 @@
 <option value="api">API</option>
 </select>
 </div>
+<button type="button" class="top-bar-filter-btn" id="filter-toggle-btn">Filter</button>
 <div class="live-pop" id="live-pop" tabindex="-1">
 <div class="refresh" id="live-trigger" tabindex="0" role="button" aria-expanded="false" aria-haspopup="true" aria-controls="live-files-panel" title="">
 <span id="live-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:6px;animation:pulse 2s infinite;vertical-align:middle"></span><span id="live-label">Live</span>
 </div>
 <div class="live-files-panel" id="live-files-panel" role="region" aria-label="Gescannte JSONL-Dateien">
-<details class="health-chart-sm" id="live-release-details">
-<summary>Release</summary>
-<div class="live-release-row" id="live-release-row"></div>
-</details>
 <div class="live-panel-section">
+<div class="live-files-toolbar">
 <div class="live-files-head" id="live-files-head">Gescannte JSONL</div>
-<ul id="live-files-list"></ul>
+<button type="button" class="live-files-explorer-btn" id="live-cache-files-open">Cache-Dateien</button>
+</div>
+<div id="live-files-chart-host" class="live-files-chart-host" aria-label="JSONL scan chart"></div>
 <div class="live-files-hint" id="live-files-hint"></div>
 </div>
 <div class="live-panel-section" id="live-outage-section" style="display:none">
@@ -52,20 +74,21 @@
 </div>
 </div>
 
-<div class="top-bar-badge" id="anthropic-badge"><span id="anthropic-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#475569;margin-right:6px"></span><span id="anthropic-label">Anthropic</span><div class="anthropic-popup" id="anthropic-popup">
+<div class="top-bar-badge" id="anthropic-badge" style="margin-left:auto"><span id="anthropic-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#475569;margin-right:6px"></span><span id="anthropic-label">Anthropic</span><div class="anthropic-popup" id="anthropic-popup">
 <button type="button" class="anthropic-popup-expand" id="anthropic-popup-expand" title="Maximize">&#x26F6;</button>
 <div class="health-charts-row">
-<details class="health-chart-sm" id="uptime-chart-details" open><summary class="health-chart-summary"><span id="uptime-chart-title"></span></summary><div class="health-chart-canvas-host"><canvas id="c-uptime-chart"></canvas></div></details>
-<details class="health-chart-sm" id="incident-history-details" open><summary class="health-chart-summary"><span id="incident-history-title"></span></summary><div class="health-chart-canvas-host"><canvas id="c-incident-history"></canvas></div></details>
-<details class="health-chart-sm" id="outage-timeline-details" open><summary class="health-chart-summary"><span id="outage-timeline-title"></span></summary><div class="health-chart-canvas-host"><canvas id="c-outage-timeline"></canvas></div></details></div>
+<details class="health-chart-sm" id="uptime-chart-details" open><summary class="health-chart-summary"><span id="uptime-chart-title">Service Uptime (24h per day)</span></summary><div class="health-chart-canvas-host"><div id="c-uptime-chart" style="width:100%;height:100%"></div></div></details>
+<details class="health-chart-sm" id="outage-timeline-details" open><summary class="health-chart-summary"><span id="outage-timeline-title">Service Quality (24h per day)</span></summary><div class="health-chart-canvas-host"><div id="c-outage-timeline" style="width:100%;height:100%"></div></div></details>
+<details class="health-chart-sm" id="incident-history-details"><summary class="health-chart-summary"><span id="incident-history-title">Incidents &amp; Hit Limits (per day)</span></summary><div class="health-chart-canvas-host"><div id="c-incident-history" style="width:100%;height:100%"></div></div></details>
+<details class="health-chart-sm" id="anthropic-incidents-details"><summary class="health-chart-summary"><span id="anthropic-scatter-chart-title">Outage hours vs incidents (per day)</span></summary><div class="health-chart-canvas-host"><div id="c-anthropic-incidents" style="width:100%;height:100%"></div></div></details></div>
 <details class="avail-kpi-details" id="avail-kpi-details">
-<summary class="avail-kpi-summary" id="avail-kpi-summary"></summary>
+<summary class="avail-kpi-summary" id="avail-kpi-summary">Key Metrics</summary>
 <div class="avail-kpi-panel" id="avail-kpi-panel"></div>
 </details>
 <p id="anthropic-status-line" style="font-size:.72rem;margin-top:6px;color:#94a3b8"></p>
 <div id="anthropic-ext-section" style="margin-top:4px"><h4 style="font-size:.68rem;color:#64748b;margin-bottom:2px" id="anthropic-ext-head"></h4><ul class="anthropic-popup-list" id="anthropic-ext-list" style="font-size:.65rem;color:#64748b"></ul></div>
 </div></div>
-<details class="meta-details" id="meta-details">
+<details class="meta-details" id="meta-details" style="display:none">
 <summary class="meta-details-summary" id="meta-details-summary"></summary>
 <div class="meta-details-inner">
 <div class="subtitle" id="sub-models">Nur <strong>Claude</strong>-Modelle (<code>claude-*</code>) — keine <code>&lt;synthetic&gt;</code>-Zeilen.</div>
@@ -97,6 +120,7 @@
 
 </div>
 </details>
+<button type="button" class="settings-nav-btn" id="settings-nav-btn" title="">&#x2699;</button>
 </div>
 </header>
 <div class="filter-bar" id="filter-bar">
@@ -120,6 +144,7 @@
 <div id="filter-host-container"></div>
 </div>
 </div>
+<div class="layout-grid" id="layout-grid">
 <details class="health-collapse" id="health-collapse">
 <summary class="health-collapse-summary" id="health-collapse-summary">
 <div class="health-total-circle-sm" id="health-circle-sm"></div><span id="health-summary-text"></span></summary>
@@ -127,6 +152,7 @@
 
 <div class="health-score" id="health-score">
 <div class="health-header" id="health-header"></div>
+<p class="health-kpi-all-hidden-hint" id="health-kpi-all-hidden-hint" aria-live="polite"></p>
 <div class="health-grid" id="health-grid"></div>
 </div>
 <div class="key-findings" id="key-findings">
@@ -135,6 +161,7 @@
 </div>
 </div>
 </details>
+
 
 <details class="forensic-details" id="forensic-collapse">
 <summary class="forensic-summary forensic-summary--bar">
@@ -157,43 +184,38 @@
 <div class="grid" id="forensic-cards"></div>
 <div class="forensic-charts-stack" id="forensic-charts-stack">
 <div class="forensic-charts-host-scope">
-<!-- Row 1: Forensic & Hit Limit (full width) -->
-<details class="forensic-chart-disclosure" open>
+<!-- Row 1: Forensic & Hit Limit (full width, collapsible) -->
+<details class="forensic-chart-disclosure">
 <summary class="forensic-chart-summary"><span id="forensic-chart-h3">Forensic &amp; Hit Limit pro Tag</span></summary>
 <div class="forensic-chart-panel">
-<p id="forensic-chart-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"><strong style="color:#ef4444">Rot (Balken)</strong> = Zähler Hit-Limit-Zeilen in JSONL. <strong style="color:#f59e0b">Linie</strong> = Score 3=? · 2=HIT · 1=&lt;&lt;P (Peak-Vergleich, nicht Claude-UI 90%/100%).</p>
+<p id="forensic-chart-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"><strong style="color:#ef4444">Rot (Balken)</strong> = Hit-Limit-Zeilen in JSONL. <strong style="color:#f59e0b">Linie</strong> = Score 3=? · 2=HIT · 1=&lt;&lt;P.</p>
 <div class="chart-shell chart-shell--forensic is-loading" id="chart-shell-forensic">
 <div class="chart-shell-ph" aria-hidden="true"></div>
-<canvas id="c-forensic"></canvas>
+<div id="c-forensic" style="width:100%;height:420px"></div>
 </div>
 </div>
 </details>
 </div>
 <!-- Row 2: Session-Signale + Service Impact (side by side) -->
 <div class="forensic-charts-pair">
-<details class="forensic-chart-disclosure" open>
-<summary class="forensic-chart-summary"><span id="forensic-signals-chart-h3"></span></summary>
-<div class="forensic-chart-panel">
+<div class="chart-box">
+<h3 id="forensic-signals-chart-h3"></h3>
 <p id="forensic-signals-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"></p>
 <div class="chart-shell chart-shell--forensic is-loading" id="chart-shell-forensic-signals">
 <div class="chart-shell-ph" aria-hidden="true"></div>
-<canvas id="c-forensic-signals"></canvas>
+<div id="c-forensic-signals" style="width:100%;height:320px"></div>
 </div>
 </div>
-</details>
-<details class="forensic-chart-disclosure" open>
-<summary class="forensic-chart-summary"><span id="service-chart-h3">Service Impact</span></summary>
-<div class="forensic-chart-panel">
+<div class="chart-box">
+<h3 id="service-chart-h3">Service Impact</h3>
 <p id="service-chart-blurb" style="font-size:.75rem;color:#94a3b8;margin:6px 0 10px;line-height:1.45"></p>
 <div class="service-chart-canvas-wrap" id="service-chart-canvas-wrap">
 <div class="chart-shell chart-shell--service is-loading" id="chart-shell-service">
 <div class="chart-shell-ph" aria-hidden="true"></div>
-<div class="fs-update-overlay" id="fs-update-overlay" aria-hidden="true"></div>
-<canvas id="c-service"></canvas>
+<div id="c-service" style="width:100%;height:320px"></div>
 </div>
 </div>
 </div>
-</details>
 </div>
 </div>
 <p id="thinking-note" style="font-size:.75rem;color:#f59e0b;margin:12px 0 4px;line-height:1.45"></p>
@@ -219,11 +241,6 @@
 <!-- Row 1: Cumulative (1/3) + Cache Explosion (2/3) -->
 <div style="display:flex;gap:12px">
 <div class="forensic-chart-panel" style="flex:1;min-width:0">
-<h4 id="econ-waste-h3" style="font-size:.8rem;color:#e2e8f0;margin:0 0 2px"></h4>
-<p id="econ-waste-blurb" style="font-size:.72rem;color:#94a3b8;margin:0 0 8px;line-height:1.4"></p>
-<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-waste" style="height:300px"></div>
-</div>
-<div class="forensic-chart-panel" style="flex:2;min-width:0">
 <h4 id="econ-explosion-h3" style="font-size:.8rem;color:#e2e8f0;margin:0 0 2px"></h4>
 <p id="econ-explosion-blurb" style="font-size:.72rem;color:#94a3b8;margin:0 0 8px;line-height:1.4"></p>
 <div class="chart-shell chart-shell--forensic" id="chart-shell-econ-explosion" style="height:300px"></div>
@@ -236,17 +253,18 @@
 <p id="econ-drain-blurb" style="font-size:.72rem;color:#94a3b8;margin:0 0 4px;line-height:1.4">Remaining quota over the day. Red blocks show rebuild cost from forced restarts — tokens wasted on context that was already built.</p>
 <p id="econ-overhead-blurb" style="font-size:.72rem;color:#f97316;margin:0 0 8px;line-height:1.4;border-top:1px solid rgba(100,116,139,0.25);padding-top:4px"></p>
 <div class="chart-shell chart-shell--forensic" id="chart-shell-econ-drain" style="height:650px"></div>
+<p id="econ-drain-proxy-msg" class="econ-drain-proxy-msg" hidden></p>
 </div>
 </div>
 <!-- Row 3: Efficiency Range (collapsible) -->
 <hr style="border:none;border-top:1px solid rgba(100,116,139,0.25);margin:18px 0 12px">
 <details id="econ-range-collapse">
 <summary style="cursor:pointer;color:#94a3b8;font-size:.78rem;padding:4px 0;user-select:none">Efficiency — Range</summary>
-<div style="display:flex;gap:12px;margin-top:8px;overflow:hidden;height:380px">
+<div style="display:flex;gap:12px;margin-top:8px">
 <div class="forensic-chart-panel" style="flex:1;min-width:0;overflow:hidden;display:flex;flex-direction:column">
 <h4 id="econ-efficiency-h3" style="font-size:.8rem;color:#e2e8f0;margin:0 0 2px"></h4>
 <p id="econ-efficiency-blurb" style="font-size:.72rem;color:#94a3b8;margin:0 0 8px;line-height:1.4"></p>
-<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-efficiency" style="flex:1;min-height:0"></div>
+<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-efficiency" style="height:300px"></div>
 </div>
 <div class="forensic-chart-panel" style="flex:1;min-width:0;display:flex;flex-direction:column">
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
@@ -257,12 +275,12 @@
 </div>
 </div>
 <p id="econ-waste-month-blurb" style="font-size:.72rem;color:#94a3b8;margin:0 0 8px;line-height:1.4"></p>
-<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-waste-month" style="flex:1;min-height:0"></div>
+<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-waste-month" style="height:300px"></div>
 </div>
 <div class="forensic-chart-panel" style="flex:1;min-width:0;display:flex;flex-direction:column">
 <h4 id="econ-daycompare-h3" style="font-size:.8rem;color:#e2e8f0;margin:0 0 2px"></h4>
 <p id="econ-daycompare-blurb" style="font-size:.72rem;color:#94a3b8;margin:0 0 8px;line-height:1.4"></p>
-<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-daycompare" style="flex:1;min-height:0"></div>
+<div class="chart-shell chart-shell--forensic" id="chart-shell-econ-daycompare" style="height:300px"></div>
 </div>
 </div>
 </details>
@@ -304,7 +322,6 @@
 <div class="forensic-inner">
 <div class="grid" id="cards"></div>
 <div class="main-charts-wrap main-charts-loading" id="main-charts-wrap">
-<div class="main-charts-update-overlay" id="main-charts-update-overlay" aria-hidden="true"></div>
 <div class="main-charts-skeleton" id="main-charts-skeleton" aria-busy="true">
 <p class="main-charts-skel-hint" id="main-charts-skel-hint"></p>
 <div class="charts">
@@ -317,13 +334,17 @@
 </div>
 </div>
 <div class="charts" id="charts">
-<div class="chart-box"><h3></h3><canvas id="c1"></canvas></div>
-<div class="chart-box"><h3></h3><canvas id="c2"></canvas></div>
+<div class="chart-box"><h3></h3><div id="c1" style="width:100%;height:320px"></div></div>
+<div class="chart-box"><h3></h3><div id="c2" style="width:100%;height:320px"></div></div>
 </div>
 <div class="charts-pair no-host-chart" id="charts-host-sub">
-<div class="chart-box"><h3></h3><canvas id="c3"></canvas></div>
-<div class="chart-box"><h3></h3><canvas id="c4"></canvas></div>
+<div class="chart-box"><h3></h3><div id="c3" class="token-stats-pair-echart"></div></div>
+<div class="chart-box"><h3></h3><div id="c4" class="token-stats-pair-echart"></div></div>
 </div>
+</div>
+<div class="chart-box" id="token-stats-daily-detail">
+<h3 id="daily-detail-heading">Tagesdetail</h3>
+<div class="daily-detail-scroll"><table id="tbl" class="daily-detail-table"><colgroup id="tbl-colgroup"></colgroup><thead><tr></tr></thead><tbody></tbody></table></div>
 </div>
 </div>
 </details>
@@ -337,9 +358,9 @@
 <div class="forensic-inner">
 <div class="user-chart-controls"><select id="user-version-sort" class="user-chart-select"></select><div class="user-filter-wrap" id="user-version-filter-wrap"><button type="button" class="user-filter-btn" id="user-version-filter-btn">Versions <span id="user-version-filter-count"></span></button><div class="user-filter-dropdown" id="user-version-filter-dd"></div></div></div>
 <div class="charts has-session-row" id="user-profile-charts">
-<div class="chart-box user-profile-chart-box"><h3 id="user-version-h3"></h3><p class="user-chart-blurb" id="user-version-blurb"></p><div class="user-chart-canvas-host"><canvas id="c-user-versions"></canvas></div></div>
-<div class="chart-box user-profile-chart-box"><h3 id="user-entrypoint-h3"></h3><p class="user-chart-blurb" id="user-entrypoint-blurb"></p><div class="user-chart-canvas-host"><canvas id="c-user-entrypoints"></canvas></div></div>
-<div class="chart-box user-profile-chart-box"><h3 id="user-release-stability-h3"></h3><p class="user-chart-blurb" id="user-release-stability-blurb"></p><div class="user-chart-canvas-host"><canvas id="c-user-release-stability"></canvas></div></div>
+<div class="chart-box user-profile-chart-box"><h3 id="user-version-h3"></h3><p class="user-chart-blurb" id="user-version-blurb"></p><div class="user-chart-canvas-host"><div id="c-user-versions" style="width:100%;height:100%"></div></div></div>
+<div class="chart-box user-profile-chart-box"><h3 id="user-entrypoint-h3"></h3><p class="user-chart-blurb" id="user-entrypoint-blurb"></p><div class="user-chart-canvas-host"><div id="c-user-entrypoints" style="width:100%;height:100%"></div></div></div>
+<div class="chart-box user-profile-chart-box"><h3 id="user-release-stability-h3"></h3><p class="user-chart-blurb" id="user-release-stability-blurb"></p><div class="user-chart-canvas-host"><div id="c-user-release-stability" style="width:100%;height:100%"></div></div></div>
 </div>
 </div>
 </details>
@@ -369,8 +390,8 @@
 </div>
 </details>
 <div class="charts" id="budget-trend-row">
-<div class="chart-box"><h3 id="budget-trend-h3"></h3><p class="user-chart-blurb" id="budget-trend-blurb"></p><canvas id="c-budget-trend"></canvas></div>
-<div class="chart-box"><h3 id="budget-quota-h3"></h3><p class="user-chart-blurb" id="budget-quota-blurb"></p><canvas id="c-budget-quota"></canvas></div>
+<div class="chart-box"><h3 id="budget-trend-h3"></h3><p class="user-chart-blurb" id="budget-trend-blurb"></p><div id="c-budget-trend" style="width:100%;height:260px"></div></div>
+<div class="chart-box"><h3 id="budget-quota-h3"></h3><p class="user-chart-blurb" id="budget-quota-blurb"></p><div id="c-budget-quota" style="width:100%;height:260px"></div></div>
 </div>
 </div>
 </details>
@@ -386,26 +407,29 @@
 <div class="grid" id="proxy-cards"></div>
 <!-- Row 1: Token Cost + Model Breakdown + Hourly Heatmap (3-col) -->
 <div class="proxy-charts-grid-3">
-<div class="chart-box"><h3 id="proxy-token-chart-h3"></h3><p id="proxy-token-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-tokens"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-tokens"></canvas></div></div>
-<div class="chart-box"><h3 id="proxy-model-h3"></h3><p id="proxy-model-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-models"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-models"></canvas></div></div>
-<div class="chart-box"><h3 id="proxy-hourly-h3"></h3><p id="proxy-hourly-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-hourly"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-hourly"></canvas></div></div>
+<div class="chart-box"><h3 id="proxy-token-chart-h3"></h3><p id="proxy-token-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-tokens"><div class="chart-shell-ph" aria-hidden="true"></div><div id="c-proxy-tokens" style="width:100%;height:260px"></div></div></div>
+<div class="chart-box"><h3 id="proxy-model-h3"></h3><p id="proxy-model-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-models"><div class="chart-shell-ph" aria-hidden="true"></div><div id="c-proxy-models" style="width:100%;height:260px"></div></div></div>
+<div class="chart-box"><h3 id="proxy-hourly-h3"></h3><p id="proxy-hourly-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-hourly"><div class="chart-shell-ph" aria-hidden="true"></div><div id="c-proxy-hourly" style="width:100%;height:260px"></div></div></div>
 </div>
 <!-- Row 2: API Latency + Hourly Latency (2-col) -->
 <div class="proxy-charts-grid">
-<div class="chart-box"><h3 id="proxy-latency-chart-h3"></h3><p id="proxy-latency-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-latency"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-latency"></canvas></div></div>
-<div class="chart-box"><h3 id="proxy-hourly-latency-h3"></h3><p id="proxy-hourly-latency-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-hourly-latency"><div class="chart-shell-ph" aria-hidden="true"></div><canvas id="c-proxy-hourly-latency"></canvas></div></div>
+<div class="chart-box"><h3 id="proxy-latency-chart-h3"></h3><p id="proxy-latency-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-latency"><div class="chart-shell-ph" aria-hidden="true"></div><div id="c-proxy-latency" style="width:100%;height:260px"></div></div></div>
+<div class="chart-box"><h3 id="proxy-hourly-latency-h3"></h3><p id="proxy-hourly-latency-blurb" class="user-chart-blurb"></p><div class="chart-shell chart-shell--proxy is-loading" id="chart-shell-proxy-hourly-latency"><div class="chart-shell-ph" aria-hidden="true"></div><div id="c-proxy-hourly-latency" style="width:100%;height:260px"></div></div></div>
 </div>
-<!-- Row 3: Trend Charts (3-col) -->
-<div class="proxy-charts-grid-3">
-<div class="chart-box"><h3 id="proxy-error-trend-h3"></h3><p id="proxy-error-trend-blurb" class="user-chart-blurb"></p><canvas id="c-proxy-error-trend"></canvas></div>
-<div class="chart-box"><h3 id="proxy-cache-trend-h3"></h3><p id="proxy-cache-trend-blurb" class="user-chart-blurb"></p><canvas id="c-proxy-cache-trend"></canvas></div>
+<!-- Row 3: Trend Charts (2-col) -->
+<div class="proxy-charts-grid">
+<div class="chart-box"><h3 id="proxy-error-trend-h3"></h3><p id="proxy-error-trend-blurb" class="user-chart-blurb"></p><div id="c-proxy-error-trend" style="width:100%;height:200px"></div></div>
+<div class="chart-box"><h3 id="proxy-cache-trend-h3"></h3><p id="proxy-cache-trend-blurb" class="user-chart-blurb"></p><div id="c-proxy-cache-trend" style="width:100%;height:200px"></div></div>
+</div>
+<!-- Row 3b: TTL History -->
+<div class="chart-box" style="margin-bottom:16px"><h3 id="proxy-ttl-history-h3"></h3><p id="proxy-ttl-history-blurb" class="user-chart-blurb"></p><div id="c-proxy-ttl-history" style="width:100%;height:200px"></div></div>
+<!-- Row 4: Efficiency Trend (full-width) -->
 <div class="chart-box"><h3 id="proxy-efficiency-trend-h3"></h3><p id="proxy-efficiency-trend-blurb" class="user-chart-blurb"></p>
-<div id="c-proxy-efficiency-heatmap" style="width:100%;height:140px"></div>
-<div class="efficiency-small-multiples" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
-<div id="c-proxy-efficiency-ratio" style="width:100%;height:180px"></div>
-<div id="c-proxy-efficiency-vispct" style="width:100%;height:180px"></div>
-<div id="c-proxy-efficiency-cachemiss" style="width:100%;height:180px"></div>
-</div>
+<div id="c-proxy-efficiency-heatmap" style="width:100%;height:140px;max-width:100%;box-sizing:border-box"></div>
+<div class="efficiency-small-multiples">
+<div id="c-proxy-efficiency-ratio" style="width:100%;max-width:100%;height:180px;box-sizing:border-box"></div>
+<div id="c-proxy-efficiency-vispct" style="width:100%;max-width:100%;height:180px;box-sizing:border-box"></div>
+<div id="c-proxy-efficiency-cachemiss" style="width:100%;max-width:100%;height:180px;box-sizing:border-box"></div>
 </div>
 </div>
 <!-- Info line -->
@@ -416,7 +440,7 @@
 </div>
 </div>
 </details>
-<div class="chart-box" style="margin-bottom:24px"><h3 id="daily-detail-heading">Tagesdetail</h3><div style="overflow-x:auto"><table id="tbl"><thead><tr></tr></thead><tbody></tbody></table></div></div>
+</div><!-- /layout-grid -->
 <div id="update-slideout-backdrop" class="update-sl-backdrop"></div>
 <aside id="update-slideout" class="update-sl" aria-hidden="true">
 <div class="update-sl-head">
@@ -443,11 +467,159 @@
 <div class="anthropic-modal-body" id="release-modal-body" style="padding:16px 20px"></div>
 </div>
 </div>
-<script>globalThis.__I18N_BUNDLES=__I18N_PLACEHOLDER__;</script>
-<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js" integrity="sha384-b0GXujLkk9eYYSmcSfoyZbfyElGAQnDyY0skCHSG6w3JgTMFnz11ggrTAr7seu9f" crossorigin="anonymous"></script>
-<script defer src="https://www.gstatic.com/charts/loader.js"></script>
+<!-- User Settings Modal -->
+<div class="anthropic-modal-overlay" id="user-settings-overlay">
+<div class="anthropic-modal">
+<div class="anthropic-modal-header">
+<span class="anthropic-modal-title" id="user-settings-modal-title">User Settings</span>
+<button type="button" class="anthropic-modal-close" id="user-settings-modal-close">&times;</button>
+</div>
+<div class="anthropic-modal-body" id="user-settings-modal-body" style="padding:16px 20px">
+<!-- Language -->
+<details class="us-section" id="us-lang-section" open>
+<summary id="us-lang-title">Language</summary>
+<div class="us-section-body" id="us-lang-body"></div>
+</details>
+<!-- Plan -->
+<details class="us-section" id="us-plan-section" open>
+<summary id="us-plan-title">Plan</summary>
+<div class="us-section-body" id="us-plan-body"></div>
+</details>
+<!-- User Profile -->
+<details class="us-section" id="us-profile-section" open>
+<summary id="us-profile-title">User Profile</summary>
+<div class="us-section-body" id="us-profile-body"></div>
+</details>
+<!-- GitHub PAT -->
+<details class="us-section" id="us-pat-section" open>
+<summary id="us-pat-title">GitHub PAT</summary>
+<div class="us-section-body" id="us-pat-body"></div>
+</details>
+<!-- VS Marketplace -->
+<details class="us-section" id="us-marketplace-section" open>
+<summary id="us-marketplace-title">VS Marketplace</summary>
+<div class="us-section-body" id="us-marketplace-body"></div>
+</details>
+</div>
+</div>
+</div>
+<!-- Template Builder Modal -->
+<div class="anthropic-modal-overlay" id="tb-overlay">
+<div class="anthropic-modal tb-modal--wide">
+<div class="anthropic-modal-header">
+<div class="tb-header-left">
+<span class="anthropic-modal-title" id="tb-title">Template Builder</span>
+<input type="text" class="tb-name-input" id="tb-name-input" placeholder="Template-Name" maxlength="40">
+</div>
+<div class="tb-header-actions">
+<select class="tb-template-select" id="tb-template-select"></select>
+<button type="button" class="tb-btn tb-btn--load-default" id="tb-load-default"></button>
+<button type="button" class="tb-btn tb-btn--preview" id="tb-preview">Preview</button>
+<button type="button" class="tb-btn tb-btn--save" id="tb-save">Save</button>
+<button type="button" class="anthropic-modal-close" id="tb-close">&times;</button>
+</div>
+</div>
+<div class="anthropic-modal-body tb-body-layout" id="tb-body" style="padding:0">
+<aside class="tb-side tb-side--left" aria-label="">
+<div class="tb-side-head" id="tb-pool-left-head"></div>
+<div class="tb-side-scroll" id="tb-pool-charts"></div>
+</aside>
+<div class="tb-main">
+<div class="tb-sections-strip">
+<span class="tb-sections-strip-label" id="tb-pool-sections-label"></span>
+<div class="tb-sections-strip-chips" id="tb-pool-sections"></div>
+</div>
+<div class="tb-canvas-wrap">
+<div class="tb-grid-ruler"></div>
+<div class="tb-canvas" id="tb-canvas"></div>
+</div>
+</div>
+<aside class="tb-side tb-side--right" aria-label="">
+<div class="tb-side-head" id="tb-pool-right-head"></div>
+<div class="tb-side-scroll" id="tb-pool-meta"></div>
+</aside>
+<details class="tb-scaffold-ref" id="tb-scaffold-details">
+<summary class="tb-scaffold-ref-summary" id="tb-scaffold-summary"></summary>
+<pre class="tb-scaffold-pre" id="tb-scaffold-pipe" translate="no"></pre>
+</details>
+</div>
+</div>
+</div>
+<!-- Template Preview Overlay -->
+<div class="tb-preview-overlay" id="tb-preview-overlay">
+<div class="tb-preview-modal">
+<div class="tb-preview-header">
+<span class="tb-preview-title">Layout Preview</span>
+<button type="button" class="anthropic-modal-close" id="tb-preview-close">&times;</button>
+</div>
+<div class="tb-preview-body" id="tb-preview-body"></div>
+</div>
+</div>
+<script>globalThis.__I18N_BUNDLES=__I18N_PLACEHOLDER__;globalThis.__APP_VERSION="__APP_VERSION__";</script>
 <script defer src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" crossorigin="anonymous"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js" crossorigin="anonymous"></script>
+<script defer src="/assets/widget-registry.js"></script>
+<script defer src="/assets/widget-dispatcher.js"></script>
+<script defer src="/assets/metrics-engine.js"></script>
+<script defer src="/assets/dashboard-sections.js"></script>
+<script defer src="/assets/cache-files-explorer.js"></script>
 <script defer src="/assets/dashboard.client.js"></script>
+<!-- Settings Sidebar (slide-out left) -->
+<aside class="sidebar" id="sidebar" aria-label="Settings">
+<div class="sidebar-head">
+<h1 class="sidebar-title" id="sidebar-title"></h1>
+<button type="button" class="sidebar-close" id="sidebar-close">&times;</button>
+</div>
+<div class="sidebar-scroll">
+<!-- Layout (widget tree) -->
+<details class="sidebar-section" id="sidebar-layout" open>
+<summary class="sidebar-section-title" id="sidebar-layout-title"></summary>
+<div class="sidebar-section-body" id="sidebar-layout-body"></div>
+<div class="sidebar-section-footer">
+<button type="button" class="sidebar-btn-sm sidebar-layout-edit" id="sidebar-layout-edit"></button>
+<button type="button" class="sidebar-btn-sm" id="sidebar-layout-reset"></button>
+<button type="button" class="sidebar-btn-sm" id="sidebar-build-template"></button>
+</div>
+</details>
+<!-- Templates -->
+<details class="sidebar-section" id="sidebar-templates">
+<summary class="sidebar-section-title" id="sidebar-templates-title"></summary>
+<div class="sidebar-section-body" id="sidebar-templates-body"></div>
+</details>
+<!-- Settings (Language, Plan) -->
+<details class="sidebar-section" id="sidebar-settings">
+<summary class="sidebar-section-title" id="sidebar-settings-title"></summary>
+<div class="sidebar-section-body" id="sidebar-settings-body">
+<div class="sidebar-setting-row" id="sidebar-lang-slot"></div>
+<div class="sidebar-setting-row" id="sidebar-plan-slot"></div>
+<div class="sidebar-setting-row" style="margin-top:8px">
+<button type="button" class="sidebar-btn" id="sidebar-open-user-settings"></button>
+</div>
+</div>
+</details>
+<!-- Tools -->
+<details class="sidebar-section" id="sidebar-tools" open>
+<summary class="sidebar-section-title" id="sidebar-tools-title"></summary>
+<div class="sidebar-section-body" id="sidebar-tools-body">
+<button type="button" class="sidebar-btn" id="sidebar-open-explorer"></button>
+</div>
+</details>
+<!-- Export -->
+<details class="sidebar-section" id="sidebar-export">
+<summary class="sidebar-section-title" id="sidebar-export-title"></summary>
+<div class="sidebar-section-body" id="sidebar-export-body">
+<button type="button" class="sidebar-btn" id="sidebar-export-jsonl"></button>
+<button type="button" class="sidebar-btn" id="sidebar-export-template"></button>
+<button type="button" class="sidebar-btn" id="sidebar-import-template"></button>
+</div>
+</details>
+</div>
+<div class="sidebar-footer">
+<span class="sidebar-version" id="sidebar-version"></span>
+<hr class="sidebar-hr">
+<button type="button" class="sidebar-btn-sm" id="sidebar-release-btn">Release Notes</button>
+<a href="https://github.com/fgrosswig/claude-usage-dashboard" target="_blank" rel="noopener" class="sidebar-github-link" id="sidebar-github-link">GitHub</a>
+</div>
+</aside>
 </body>
 </html>

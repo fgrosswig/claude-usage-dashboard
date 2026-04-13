@@ -42,9 +42,16 @@ Proxy-spezifisch siehe [Anthropic Proxy](05-anthropic-proxy.md) und `node … pr
 | Methode | Pfad | `DEBUG_API` | Beschreibung |
 |---------|------|-------------|--------------|
 | **GET** | **`/api/debug/proxy-logs`** | **nötig** | JSON **`{ usage, files }`**: **`usage`** = vollständiger **`cachedData`**-Snapshot (gleiche Struktur wie **`GET /api/usage`**). **`files`** = Array **`{ name, content }`** für alle **`proxy-*.ndjson`** im Proxy-Log-Verzeichnis — nötig, damit **`DEV_MODE=proxy`** echte NDJSON-Dateien ins lokale Temp-Verzeichnis schreiben kann. |
-| **POST** | **`/api/debug/cache-reset`** | **nötig** | Löscht Tages-Cache und JSONL-„Heute“-Index, startet **Voll**-Rescan. Wird von manchen Remote-Dev-Abläufen genutzt. |
+| **POST** | **`/api/debug/cache-reset`** | **nötig** | Löscht Tages-Cache und JSONL-„Heute”-Index, startet **Voll**-Rescan. Wird von manchen Remote-Dev-Abläufen genutzt. |
+| **GET** | **`/api/debug/cache-files`** | **nötig** | Liste aller Cache-Dateien (JSONL, Proxy, Extract-Cache) mit Groesse und mtime. |
+| **GET** | **`/api/debug/cache-file-view`** | **nötig** | Inhalt einer einzelnen Cache-Datei. In DEV_MODE: Proxy zum Remote wenn lokal nicht vorhanden. |
+| **GET** | **`/api/debug/session-turns`** | **nötig** | Session-Turns-Daten (fuer Oekonomische Nutzung). |
 
 **Ohne `DEBUG_API` (immer erreichbar):**
+
+| Methode | Pfad | Beschreibung |
+|---------|------|----------------|
+| **GET/PUT** | **`/api/layout`** | Lesen/Schreiben der Layout-Datei (`~/.claude/usage-dashboard-layout.json`). Steuert Section-Reihenfolge, Sichtbarkeit, Spaltenbreite. Siehe [Kapitel 11](11-widget-system.md). |
 
 | Methode | Pfad | Beschreibung |
 |---------|------|----------------|

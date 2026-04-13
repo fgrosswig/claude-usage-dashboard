@@ -43,8 +43,15 @@
 |--------|------|-------------|------|
 | **GET** | **`/api/debug/proxy-logs`** | **필수** | JSON **`{ usage, files }`**: **`usage`** = 전체 **`cachedData`** 스냅샷(**`GET /api/usage`**와 동일한 구조). **`files`** = 프록시 로그 디렉터리의 모든 **`proxy-*.ndjson`**에 대한 **`{ name, content }`** 배열 — **`DEV_MODE=proxy`**가 실제 NDJSON 파일을 로컬 임시 디렉터리에 기록하는 데 필요합니다. |
 | **POST** | **`/api/debug/cache-reset`** | **필수** | 일별 캐시와 JSONL "오늘" 인덱스를 삭제하고 **전체** 리스캔을 시작합니다. 일부 원격 개발 워크플로에서 사용됩니다. |
+| **GET** | **`/api/debug/cache-files`** | **필수** | 모든 캐시 파일(JSONL, 프록시, Extract-Cache) 목록 (크기 및 mtime 포함). |
+| **GET** | **`/api/debug/cache-file-view`** | **필수** | 단일 캐시 파일 내용. DEV_MODE에서는 로컬에 없으면 원격으로 프록시. |
+| **GET** | **`/api/debug/session-turns`** | **필수** | 세션 턴 데이터 (경제적 사용 섹션용). |
 
 **`DEBUG_API` 없이(항상 접근 가능):**
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| **GET/PUT** | **`/api/layout`** | 레이아웃 파일(`~/.claude/usage-dashboard-layout.json`) 읽기/쓰기. 섹션 순서, 가시성, 열 너비 제어. [11장](11-widget-system.md) 참조. |
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|

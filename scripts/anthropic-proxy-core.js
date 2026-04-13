@@ -5,22 +5,22 @@
  *
  * Not an MITM: clients must set ANTHROPIC_BASE_URL=http://127.0.0.1:<port> (plain HTTP to this proxy).
  */
-var fs = require('fs');
-var http = require('http');
-var https = require('https');
-var path = require('path');
-var os = require('os');
-var crypto = require('crypto');
+var fs = require('node:fs');
+var http = require('node:http');
+var https = require('node:https');
+var path = require('node:path');
+var os = require('node:os');
+var crypto = require('node:crypto');
 
-var DEFAULT_PORT = parseInt(process.env.ANTHROPIC_PROXY_PORT || '8080', 10);
+var DEFAULT_PORT = Number.parseInt(process.env.ANTHROPIC_PROXY_PORT || '8080', 10);
 var DEFAULT_UPSTREAM =
   process.env.ANTHROPIC_PROXY_UPSTREAM || 'https://api.anthropic.com';
-var MAX_BODY = parseInt(process.env.ANTHROPIC_PROXY_MAX_BODY_MB || '32', 10) * 1024 * 1024;
-var MAX_RESPONSE_ACC = parseInt(
+var MAX_BODY = Number.parseInt(process.env.ANTHROPIC_PROXY_MAX_BODY_MB || '32', 10) * 1024 * 1024;
+var MAX_RESPONSE_ACC = Number.parseInt(
   process.env.ANTHROPIC_PROXY_MAX_RESPONSE_MB || '48',
   10
 ) * 1024 * 1024;
-var ALIGN_WINDOW_MS = parseInt(process.env.ANTHROPIC_PROXY_ALIGN_WINDOW_MS || '120000', 10);
+var ALIGN_WINDOW_MS = Number.parseInt(process.env.ANTHROPIC_PROXY_ALIGN_WINDOW_MS || '120000', 10);
 var HOME = process.env.USERPROFILE || process.env.HOME || os.homedir();
 
 function pad2(n) {
@@ -54,7 +54,7 @@ function redactHeaders(h) {
   var out = {};
   if (!h) return out;
   for (var k in h) {
-    if (!Object.prototype.hasOwnProperty.call(h, k)) continue;
+    if (!Object.hasOwn(h, k)) continue;
     var kl = k.toLowerCase();
     var v = h[k];
     if (kl === 'x-api-key' || kl === 'authorization' || kl === 'cookie') {
@@ -73,11 +73,11 @@ function extractAnthropicPolicyHeaders(headers) {
   if (!headers || typeof headers !== 'object') return null;
   var out = {};
   for (var k in headers) {
-    if (!Object.prototype.hasOwnProperty.call(headers, k)) continue;
+    if (!Object.hasOwn(headers, k)) continue;
     var kl = String(k).toLowerCase();
     if (
-      kl.indexOf('anthropic-ratelimit') === 0 ||
-      kl.indexOf('anthropic-') === 0 ||
+      kl.startsWith('anthropic-ratelimit') ||
+      kl.startsWith('anthropic-') ||
       kl === 'request-id' ||
       kl === 'x-request-id' ||
       kl === 'cf-ray'
@@ -90,12 +90,12 @@ function extractAnthropicPolicyHeaders(headers) {
 }
 
 function buildRequestMeta(req, bodyBuf) {
-  var h = req && req.headers ? req.headers : {};
+  var h = req?.headers ? req.headers : {};
   function pick(name) {
     var a = name.toLowerCase();
     var v = null;
     for (var key in h) {
-      if (!Object.prototype.hasOwnProperty.call(h, key)) continue;
+      if (!Object.hasOwn(h, key)) continue;
       if (String(key).toLowerCase() === a) {
         v = h[key];
         break;
@@ -115,12 +115,12 @@ function walkJsonl(dir, acc) {
   acc = acc || [];
   try {
     var entries = fs.readdirSync(dir, { withFileTypes: true });
-    for (var i = 0; i < entries.length; i++) {
-      var fp = path.join(dir, entries[i].name);
-      if (entries[i].isDirectory()) walkJsonl(fp, acc);
-      else if (entries[i].name.endsWith('.jsonl')) acc.push(fp);
+    for (var entry of entries) {
+      var fp = path.join(dir, entry.name);
+      if (entry.isDirectory()) walkJsonl(fp, acc);
+      else if (entry.name.endsWith('.jsonl')) acc.push(fp);
     }
-  } catch (e) {}
+  } catch (error) { /* intentional */ }
   return acc;
 }
 
@@ -129,11 +129,11 @@ function getAlignRoots() {
   var raw = (process.env.ANTHROPIC_PROXY_JSONL_ROOTS || '').trim();
   if (raw) {
     var parts = raw.split(';');
-    for (var i = 0; i < parts.length; i++) {
-      var t = parts[i].trim();
-      if (t) {
-        if (t[0] === '~') t = path.join(HOME, t.slice(1).replace(/^\/|\\+/, ''));
-        roots.push(path.resolve(t));
+    for (var t of parts) {
+      var trimmed = t.trim();
+      if (trimmed) {
+        if (trimmed[0] === '~') trimmed = path.join(HOME, trimmed.slice(1).replace(/^\/|\\+/, ''));
+        roots.push(path.resolve(trimmed));
       }
     }
   }
@@ -164,15 +164,15 @@ function alignToJsonl(proxyEndIso, usage, roots, opts) {
   var windowMs = opts.windowMs != null ? opts.windowMs : ALIGN_WINDOW_MS;
   var tailBytes = opts.tailBytes || 512 * 1024;
   var maxFiles = opts.maxFiles || 48;
-  if (!usage || !roots || !roots.length) return null;
+  if (!usage || !roots?.length) return null;
   var proxyMs = Date.parse(proxyEndIso);
-  if (isNaN(proxyMs)) return null;
+  if (Number.isNaN(proxyMs)) return null;
 
   var tout = usage.output_tokens != null ? usage.output_tokens : 0;
   var tin = usage.input_tokens != null ? usage.input_tokens : 0;
   var files = [];
-  for (var r = 0; r < roots.length; r++) {
-    walkJsonl(roots[r], files);
+  for (var root of roots) {
+    walkJsonl(root, files);
   }
   files.sort(function (a, b) {
     try {
@@ -186,24 +186,23 @@ function alignToJsonl(proxyEndIso, usage, roots, opts) {
   var best = null;
   var bestRank = -1e18;
 
-  for (var fi = 0; fi < files.length; fi++) {
-    var tail = readTailUtf8(files[fi], tailBytes);
+  for (var file of files) {
+    var tail = readTailUtf8(file, tailBytes);
     var lines = tail.split('\n');
-    for (var li = 0; li < lines.length; li++) {
-      var line = lines[li];
-      if (line.indexOf('"usage"') < 0) continue;
+    for (var line of lines) {
+      if (!line.includes('"usage"')) continue;
       var rec;
       try {
         rec = JSON.parse(line);
       } catch (e) {
         continue;
       }
-      var u = rec.message && rec.message.usage;
+      var u = rec.message?.usage;
       if (!u) continue;
       var ts = rec.timestamp || '';
       if (ts.length < 19) continue;
       var tms = Date.parse(ts);
-      if (isNaN(tms)) continue;
+      if (Number.isNaN(tms)) continue;
       var delta = Math.abs(tms - proxyMs);
       if (delta > windowMs) continue;
       var o = u.output_tokens != null ? u.output_tokens : 0;
@@ -211,16 +210,16 @@ function alignToJsonl(proxyEndIso, usage, roots, opts) {
       var tokenMatch =
         o === tout && inp === tin ? 3 : Math.abs(o - tout) + Math.abs(inp - tin) <= 24 ? 2 : 1;
       if (tokenMatch === 1 && delta > 45000) continue;
-      var rank = tokenMatch * 1e12 - delta + (files[fi].indexOf('subagent') >= 0 ? 0.5 : 0);
+      var rank = tokenMatch * 1e12 - delta + (file.includes('subagent') ? 0.5 : 0);
       if (rank > bestRank) {
         bestRank = rank;
         best = {
-          file: files[fi],
+          file: file,
           jsonl_timestamp: ts,
           delta_ms: tms - proxyMs,
           jsonl_output_tokens: o,
           jsonl_input_tokens: inp,
-          is_subagent_path: files[fi].toLowerCase().indexOf('subagent') >= 0,
+          is_subagent_path: file.toLowerCase().includes('subagent'),
           match_strength: tokenMatch === 3 ? 'exact_tokens' : tokenMatch === 2 ? 'near_tokens' : 'time_only'
         };
       }
@@ -231,10 +230,18 @@ function alignToJsonl(proxyEndIso, usage, roots, opts) {
 
 function extractUsageFromJson(obj) {
   if (!obj || typeof obj !== 'object') return null;
-  if (obj.usage && typeof obj.usage === 'object') return obj.usage;
-  if (obj.message && obj.message.usage) return obj.message.usage;
-  if (obj.delta && obj.delta.usage) return obj.delta.usage;
-  return null;
+  var u = null;
+  if (obj.usage && typeof obj.usage === 'object') u = obj.usage;
+  else if (obj.message?.usage) u = obj.message.usage;
+  else if (obj.delta?.usage) u = obj.delta.usage;
+  if (!u) return null;
+  // Promote ephemeral sub-fields from cache_creation (message_start event)
+  var cc = u.cache_creation;
+  if (cc && typeof cc === 'object') {
+    if (cc.ephemeral_1h_input_tokens != null) u.ephemeral_1h_input_tokens = cc.ephemeral_1h_input_tokens;
+    if (cc.ephemeral_5m_input_tokens != null) u.ephemeral_5m_input_tokens = cc.ephemeral_5m_input_tokens;
+  }
+  return u;
 }
 
 function mergeUsage(into, add) {
@@ -244,10 +251,11 @@ function mergeUsage(into, add) {
     'input_tokens',
     'output_tokens',
     'cache_creation_input_tokens',
-    'cache_read_input_tokens'
+    'cache_read_input_tokens',
+    'ephemeral_1h_input_tokens',
+    'ephemeral_5m_input_tokens'
   ];
-  for (var i = 0; i < keys.length; i++) {
-    var k = keys[i];
+  for (var k of keys) {
     if (add[k] != null) into[k] = add[k];
   }
   return into;
@@ -257,12 +265,11 @@ function mergeUsage(into, add) {
 function usageFromBuffer(buf, contentType) {
   var ct = (contentType || '').toLowerCase();
   var usage = null;
-  if (ct.indexOf('text/event-stream') >= 0) {
+  if (ct.includes('text/event-stream')) {
     var s = buf.toString('utf8');
     var lines = s.split(/\r?\n/);
-    for (var i = 0; i < lines.length; i++) {
-      var line = lines[i];
-      if (line.indexOf('data:') !== 0) continue;
+    for (var line of lines) {
+      if (!line.startsWith('data:')) continue;
       var json = line.slice(5).trim();
       if (!json || json === '[DONE]') continue;
       try {
@@ -270,7 +277,7 @@ function usageFromBuffer(buf, contentType) {
         var u = extractUsageFromJson(o);
         usage = mergeUsage(usage, u);
         if (o.type === 'message_delta' && o.usage) usage = mergeUsage(usage, o.usage);
-      } catch (e) {}
+      } catch (error) { /* intentional */ }
     }
     return usage;
   }
@@ -310,14 +317,13 @@ function responseHintsFromBuffer(buf, contentType) {
   var ct = (contentType || '').toLowerCase();
 
   // SSE stream: extract stop_reason + content block counts from streamed events
-  if (ct.indexOf('text/event-stream') >= 0) {
+  if (ct.includes('text/event-stream')) {
     var s = buf.toString('utf8');
     var lines = s.split(/\r?\n/);
     var hints = {};
     var toolUse = 0, toolResult = 0, text = 0;
-    for (var si = 0; si < lines.length; si++) {
-      var sline = lines[si];
-      if (sline.indexOf('data:') !== 0) continue;
+    for (var sline of lines) {
+      if (!sline.startsWith('data:')) continue;
       var sjson = sline.slice(5).trim();
       if (!sjson || sjson === '[DONE]') continue;
       try {
@@ -333,7 +339,7 @@ function responseHintsFromBuffer(buf, contentType) {
           else if (btype === 'tool_result') toolResult++;
           else if (btype === 'text') text++;
         }
-      } catch (e) {}
+      } catch (error) { /* intentional */ }
     }
     if (toolUse) hints.response_tool_use_blocks = toolUse;
     if (toolResult) hints.response_tool_result_blocks = toolResult;
@@ -343,16 +349,15 @@ function responseHintsFromBuffer(buf, contentType) {
   }
 
   // JSON response: parse directly
-  if (ct.indexOf('application/json') < 0) return null;
+  if (!ct.includes('application/json')) return null;
   try {
     var o = JSON.parse(buf.toString('utf8'));
     var jHints = {};
     var content = o.content;
     if (Array.isArray(content)) {
       var jToolUse = 0, jToolResult = 0, jText = 0;
-      for (var i = 0; i < content.length; i++) {
-        var b = content[i];
-        if (!b || !b.type) continue;
+      for (var b of content) {
+        if (!b?.type) continue;
         if (b.type === 'tool_use') jToolUse++;
         else if (b.type === 'tool_result') jToolResult++;
         else if (b.type === 'text') jText++;
@@ -370,7 +375,7 @@ function responseHintsFromBuffer(buf, contentType) {
 }
 
 function summarizeRequestBody(buf, logBodies) {
-  if (!buf || !buf.length) return { has_body: false };
+  if (!buf?.length) return { has_body: false };
   var hints = { has_body: true };
   try {
     var o = JSON.parse(buf.toString('utf8'));
@@ -398,7 +403,7 @@ function buildUpstreamHeaders(req, targetUrl, bodyLen) {
   var out = {};
   var raw = req.headers || {};
   for (var k in raw) {
-    if (!Object.prototype.hasOwnProperty.call(raw, k)) continue;
+    if (!Object.hasOwn(raw, k)) continue;
     var kl = k.toLowerCase();
     if (kl === 'host' || kl === 'connection' || kl === 'proxy-connection') continue;
     if (kl === 'content-length') continue;
@@ -406,7 +411,7 @@ function buildUpstreamHeaders(req, targetUrl, bodyLen) {
   }
   out['Host'] = hostHeader;
   out['Content-Length'] = String(bodyLen);
-  var xf = req.socket && req.socket.remoteAddress;
+  var xf = req.socket?.remoteAddress;
   if (xf) {
     var prev = raw['x-forwarded-for'] || raw['X-Forwarded-For'];
     out['X-Forwarded-For'] = prev ? String(prev) + ', ' + xf : xf;
@@ -432,7 +437,7 @@ module.exports = {
 
     try {
       fs.mkdirSync(logDir, { recursive: true });
-    } catch (e) {}
+    } catch (error) { /* intentional */ }
 
     var targetUrl = new URL(upstreamBase);
 
@@ -485,7 +490,7 @@ module.exports = {
           var outHdrs = {};
           var rh = upRes.headers || {};
           for (var hk in rh) {
-            if (!Object.prototype.hasOwnProperty.call(rh, hk)) continue;
+            if (!Object.hasOwn(rh, hk)) continue;
             if (hopSkip[hk.toLowerCase()]) continue;
             outHdrs[hk] = rh[hk];
           }
@@ -507,7 +512,7 @@ module.exports = {
             var t1 = Date.now();
             var endedIso = new Date(t1).toISOString();
             var bodyBufResp = Buffer.concat(acc);
-            var ct = (upRes.headers && upRes.headers['content-type']) || '';
+            var ct = upRes.headers?.['content-type'] || '';
             var ct0 = Array.isArray(ct) ? ct[0] : ct;
             var usage = usageFromBuffer(bodyBufResp, ct0);
             var ratio = cacheReadRatio(usage);
@@ -519,7 +524,7 @@ module.exports = {
               req_id: reqId,
               method: req.method,
               path: (req.url || '').split('?')[0],
-              query_present: (req.url || '').indexOf('?') >= 0,
+              query_present: (req.url || '').includes('?'),
               upstream: targetUrl.origin,
               req_headers_redacted: redactHeaders(req.headers),
               request_meta: buildRequestMeta(req, bodyBuf),
@@ -532,7 +537,25 @@ module.exports = {
               usage: usage,
               cache_read_ratio: ratio,
               cache_health: cacheHealthLabel(ratio, usage),
-              response_hints: respHints
+              response_hints: respHints,
+              ephemeral_1h_input_tokens: usage ? (usage.ephemeral_1h_input_tokens || 0) : 0,
+              ephemeral_5m_input_tokens: usage ? (usage.ephemeral_5m_input_tokens || 0) : 0,
+              source: 'proxy',
+              peak_hour: (function() {
+                var d = new Date(endedIso);
+                var h = d.getUTCHours();
+                var wd = d.getUTCDay();
+                return wd >= 1 && wd <= 5 && h >= 13 && h < 19;
+              })(),
+              ttl_tier: (function() {
+                if (!usage) return 'unknown';
+                var e1h = usage.ephemeral_1h_input_tokens || 0;
+                var e5m = usage.ephemeral_5m_input_tokens || 0;
+                if (e1h > 0 && e5m === 0) return '1h';
+                if (e5m > 0 && e1h === 0) return '5m';
+                if (e1h > 0 && e5m > 0) return 'mixed';
+                return 'unknown';
+              })()
             };
             if (alignJsonl && usage) {
               try {
@@ -540,7 +563,7 @@ module.exports = {
                   windowMs: ALIGN_WINDOW_MS
                 });
               } catch (ae) {
-                rec.jsonl_alignment_error = ae && ae.message ? ae.message : String(ae);
+                rec.jsonl_alignment_error = ae?.message ? ae.message : String(ae);
               }
             }
             try {

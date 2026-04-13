@@ -43,8 +43,15 @@ Proxy-specific flags: **`node … proxy --help`** and [Proxy](05-proxy.md).
 |--------|------|-------------|-------------|
 | **GET** | **`/api/debug/proxy-logs`** | **required** | JSON **`{ usage, files }`**: **`usage`** is the full **`cachedData`** snapshot (same shape as **`GET /api/usage`**). **`files`** is an array of **`{ name, content }`** for every **`proxy-*.ndjson`** under the proxy log directory — required so **`DEV_MODE=proxy`** can copy real NDJSON to the local temp dir. |
 | **POST** | **`/api/debug/cache-reset`** | **required** | Deletes the on-disk day cache and JSONL “today” index, then starts a **full** rescan. Used by some remote-dev flows. |
+| **GET** | **`/api/debug/cache-files`** | **required** | List of all cache files (JSONL, proxy, extract-cache) with size and mtime. |
+| **GET** | **`/api/debug/cache-file-view`** | **required** | Content of a single cache file. In DEV_MODE: proxies to remote if not available locally. |
+| **GET** | **`/api/debug/session-turns`** | **required** | Session-turns data (for Economic Usage section). |
 
 **Without `DEBUG_API` (always available):**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| **GET/PUT** | **`/api/layout`** | Read/write the layout file (`~/.claude/usage-dashboard-layout.json`). Controls section order, visibility, column width. See [Chapter 11](11-widget-system.md). |
 
 | Method | Path | Description |
 |--------|------|-------------|

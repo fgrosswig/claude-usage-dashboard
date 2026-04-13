@@ -10,6 +10,10 @@ function fmt(n) {
 }
 function pct(a,b){return b>0?(a/b*100).toFixed(1)+"%":"-";}
 function escHtml(s){return String(s==null?"":s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll("\"","&quot;");}
+/** Sonar S2486: catch blocks must reference the exception. */
+function logClientOptionalErr(err) {
+  if (typeof console !== "undefined" && console.debug) console.debug("[dashboard]", err?.message == null ? err : err.message);
+}
 /** Stunden mit Arbeit (tokens) ∪ Stunden mit JSONL-Session-Signalen, nach Log-Zeitstempel. */
 function unionWorkHourKeys(sd) {
   var m = {};
@@ -31,7 +35,7 @@ function hourHasTokenUsage(sd, wh) {
 function outageSpanHitsAtHour(spans, wh) {
   var hitSrv = false;
   var hitCli = false;
-  for (const span of spans) {
+  for (var span of spans) {
     if (wh >= Math.floor(span.from) && wh < Math.ceil(span.to)) {
       if (span.kind === "server") hitSrv = true;
       else hitCli = true;
@@ -62,14 +66,14 @@ function sumServiceImpactForDay(sd) {
   var affSrv = 0;
   var affCli = 0;
   var cleanCount = 0;
-  for (const wh of wHrs) {
+  for (var wh of wHrs) {
     var cls = classifyWorkHour(sd, spans, wh);
     if (cls === "srv") affSrv++;
     else if (cls === "cli") affCli++;
     else if (cls === "clean") cleanCount++;
   }
   var outTotal = 0;
-  for (const span of spans) outTotal += span.to - span.from;
+  for (var span of spans) outTotal += span.to - span.from;
   var outOnly = Math.max(0, Math.round((outTotal - affSrv - affCli) * 10) / 10);
   return { cleanWork: cleanCount, affSrv: affSrv, affCli: affCli, outOnly: outOnly };
 }
@@ -97,7 +101,7 @@ function buildSessionSignalsStackedByDay(days, hostLabel) {
   var intr = [];
   var outageH = [];
   var cacheRead = [];
-  for (const d of days) {
+  for (var d of days) {
     var oh = d?.outage_hours;
     outageH.push(oh != null && !Number.isNaN(Number(oh)) ? Number(oh) : 0);
     var sig = extractDaySignals(d, hostKey);
@@ -113,15 +117,15 @@ function buildSessionSignalsStackedByDay(days, hostLabel) {
     if (rowSum > maxSig) maxSig = rowSum;
   }
   var maxOut = 0;
-  for (var oi = 0; oi < outageH.length; oi++) {
-    if (outageH[oi] > maxOut) maxOut = outageH[oi];
+  for (var _oh of outageH) {
+    if (_oh > maxOut) maxOut = _oh;
   }
   var OUTAGE_VIS_FRAC = 0.22;
   var maxSigEff = maxSig > 0 ? maxSig : maxOut > 1e-9 ? 100 : 1;
   var outageScale = maxOut > 1e-9 ? (OUTAGE_VIS_FRAC * maxSigEff) / maxOut : 1;
   var outageBar = [];
-  for (var bi = 0; bi < outageH.length; bi++) {
-    outageBar.push(Math.round(outageH[bi] * outageScale * 100) / 100);
+  for (var _ohv of outageH) {
+    outageBar.push(Math.round(_ohv * outageScale * 100) / 100);
   }
   return {
     cont: cont,
@@ -135,18 +139,18 @@ function buildSessionSignalsStackedByDay(days, hostLabel) {
   };
 }
 
-var I18N = (typeof globalThis.__I18N_BUNDLES === "object" && globalThis.__I18N_BUNDLES && globalThis.__I18N_BUNDLES.de && globalThis.__I18N_BUNDLES.en)
+var I18N = (typeof globalThis.__I18N_BUNDLES === "object" && globalThis.__I18N_BUNDLES?.de && globalThis.__I18N_BUNDLES?.en)
   ? globalThis.__I18N_BUNDLES
   : { de: {}, en: {}, ko: {} };
 function detectLang() {
   try {
     var sv = localStorage.getItem("usageDashboardLang");
     if (sv === "de" || sv === "en" || sv === "ko") return sv;
-  } catch (e0) {}
+  } catch (error) { logClientOptionalErr(error); }
   var langs = navigator.languages;
-  if (langs && langs.length) {
-    for (var li = 0; li < langs.length; li++) {
-      var x = String(langs[li] || "").toLowerCase();
+  if (langs?.length) {
+    for (var _lng of langs) {
+      var x = String(_lng || "").toLowerCase();
       if (x.startsWith("ko")) return "ko";
       if (x.startsWith("de")) return "de";
     }
@@ -161,10 +165,11 @@ function getLang() { return __lang; }
 function setLang(code) {
   if (code !== "de" && code !== "en" && code !== "ko") return;
   __lang = code;
-  try { localStorage.setItem("usageDashboardLang", code); } catch (e1) {}
+  try { localStorage.setItem("usageDashboardLang", code); } catch (error) { logClientOptionalErr(error); }
   document.documentElement.lang = code;
   updateLangButtons();
   applyStaticChrome();
+  invalidateHealthAndFindingsRender();
   if (typeof __lastUsageData !== "undefined" && __lastUsageData) renderDashboard(__lastUsageData, true);
 }
 function t(k) {
@@ -176,7 +181,7 @@ function tr(k, m) {
   var s = t(k);
   if (!m) return s;
   for (var x in m) {
-    if (Object.prototype.hasOwnProperty.call(m, x)) s = s.split("{" + x + "}").join(String(m[x]));
+    if (Object.hasOwn(m, x)) s = s.split("{" + x + "}").join(String(m[x]));
   }
   return s;
 }
@@ -204,16 +209,15 @@ function activeHourKeysCount(hours) {
   if (!hours || typeof hours !== "object") return 0;
   var n = 0;
   for (var k in hours) {
-    if (Object.prototype.hasOwnProperty.call(hours, k)) n++;
+    if (Object.hasOwn(hours, k)) n++;
   }
   return n;
 }
 function findHostPeakAcrossDays(daysArr, hostKey) {
   var bestD = "";
   var bestT = -1;
-  for (var i = 0; i < daysArr.length; i++) {
-    var d = daysArr[i];
-    var hh = d.hosts && d.hosts[hostKey];
+  for (var d of daysArr) {
+    var hh = d.hosts?.[hostKey];
     if (!hh) continue;
     var tot = (hh.input || 0) + (hh.output || 0) + (hh.cache_read || 0) + (hh.cache_creation || 0);
     if (tot > bestT) {
@@ -281,8 +285,8 @@ function forensicScoreForChartDay(day, daysArr, hostFilter) {
 }
 function sumHostNumericField(daysArr, hostK, field) {
   var s = 0;
-  for (var i = 0; i < daysArr.length; i++) {
-    var hh = daysArr[i].hosts && daysArr[i].hosts[hostK];
+  for (var _day of daysArr) {
+    var hh = _day.hosts?.[hostK];
     s += hh ? hh[field] || 0 : 0;
   }
   return s;
@@ -299,13 +303,13 @@ function getMainChartsScope() {
   try {
     var s = sessionStorage.getItem("usageMainChartsScope");
     if (s === "hourly" || s === "timeline") return s;
-  } catch (eSc) {}
+  } catch (error) { logClientOptionalErr(error); }
   return "timeline";
 }
 function setMainChartsScope(val) {
   try {
     sessionStorage.setItem("usageMainChartsScope", val === "hourly" ? "hourly" : "timeline");
-  } catch (eS2) {}
+  } catch (error) { logClientOptionalErr(error); }
 }
 function padHour2(n) {
   return n < 10 ? "0" + n : String(n);
@@ -354,9 +358,11 @@ function hourlyCacheOutRatioEst(day) {
 }
 /** Hauptcharts: Tagesfeld Gesamt oder gewählte Scan-Quelle (Forensic-Host-Filter). */
 function dayNumericForMainCharts(d, hostKey, field) {
-  if (!hostKey) return d[field] != null ? Number(d[field]) || 0 : 0;
-  var H = d.hosts && d.hosts[hostKey];
-  return H && H[field] != null ? Number(H[field]) || 0 : 0;
+  if (hostKey) {
+    var H = d.hosts?.[hostKey];
+    return H?.[field] != null ? Number(H[field]) || 0 : 0;
+  }
+  return d[field] != null ? Number(d[field]) || 0 : 0;
 }
 function dayRatioCacheOutForMainCharts(d, hostKey) {
   if (!hostKey) return d.cache_output_ratio || 0;
@@ -370,7 +376,7 @@ function dayOutputPerHourForMainCharts(d, hostKey) {
 }
 function subCachePctForDayMainCharts(d, hostKey) {
   if (!hostKey) return d.sub_cache_pct != null ? d.sub_cache_pct : 0;
-  var H = d.hosts && d.hosts[hostKey];
+  var H = d.hosts?.[hostKey];
   if (!H) return 0;
   if (H.sub_cache_pct != null) return H.sub_cache_pct;
   var cr = d.cache_read || 0;
@@ -379,7 +385,7 @@ function subCachePctForDayMainCharts(d, hostKey) {
 }
 function estimatedFieldPerHourHost(day, hostKey, field) {
   if (!hostKey) return estimatedFieldPerHour(day, field);
-  var H = day.hosts && day.hosts[hostKey];
+  var H = day.hosts?.[hostKey];
   if (!H) {
     var z = [];
     for (var zi = 0; zi < 24; zi++) z.push(0);
@@ -408,8 +414,8 @@ function hourlyCacheOutRatioEstHost(day, hostKey) {
 }
 function hourSignalsArrayForHost(day, hostKey, key) {
   if (!hostKey) return hourSignalsArrayFor(day, key);
-  var H = day.hosts && day.hosts[hostKey];
-  var hs = (H && H.hour_signals && typeof H.hour_signals === "object") ? H.hour_signals : {};
+  var H = day.hosts?.[hostKey];
+  var hs = (H?.hour_signals && typeof H.hour_signals === "object") ? H.hour_signals : {};
   var a = [];
   for (var hh = 0; hh < 24; hh++) {
     var b = hs[String(hh)] || hs[hh] || {};
@@ -431,8 +437,9 @@ function destroyMainChartIfScopeMismatch(mainScope, chartKey) {
   var ch = _charts[chartKey];
   if (ch && ch._dashScope !== mainScope) {
     try {
-      ch.destroy();
-    } catch (eD) {}
+      if (typeof ch.dispose === 'function') ch.dispose();
+      else if (typeof ch.destroy === 'function') ch.destroy();
+    } catch (error) { logClientOptionalErr(error); }
     _charts[chartKey] = null;
   }
 }
@@ -445,7 +452,7 @@ function syncMainChartsScopeUi() {
     chips.dataset.scopeBound = "1";
     chips.addEventListener("click", function (ev) {
       var b = ev.target.closest(".main-charts-scope-chip");
-      if (!b || !b.dataset.scope) return;
+      if (!b?.dataset.scope) return;
       setMainChartsScope(b.dataset.scope === "hourly" ? "hourly" : "timeline");
       syncMainChartsScopeUi();
       if (typeof __lastUsageData !== "undefined" && __lastUsageData) renderDashboard(__lastUsageData, true);
@@ -472,28 +479,19 @@ function syncMainChartsScopeUi() {
   if (lbl) lbl.textContent = t("mainChartsScopeLabel");
   wrap.setAttribute("aria-label", t("mainChartsScopeAria"));
   var nodes = chips.querySelectorAll(".main-charts-scope-chip");
-  for (var ni = 0; ni < nodes.length; ni++) {
-    var nb = nodes[ni];
+  for (var nb of nodes) {
     var on = nb.dataset.scope === cur;
     nb.classList.toggle("active", on);
     nb.setAttribute("aria-pressed", on ? "true" : "false");
   }
 }
 function updateLangButtons() {
-  var bde = document.getElementById("lang-de");
-  var ben = document.getElementById("lang-en");
-  var bko = document.getElementById("lang-ko");
-  if (bde) {
-    bde.classList.toggle("active", __lang === "de");
-    bde.setAttribute("aria-pressed", __lang === "de" ? "true" : "false");
-  }
-  if (ben) {
-    ben.classList.toggle("active", __lang === "en");
-    ben.setAttribute("aria-pressed", __lang === "en" ? "true" : "false");
-  }
-  if (bko) {
-    bko.classList.toggle("active", __lang === "ko");
-    bko.setAttribute("aria-pressed", __lang === "ko" ? "true" : "false");
+  var picks = document.querySelectorAll(".lang-switch .lang-btn[data-lang], #us-lang-body .lang-btn[data-lang]");
+  for (var b of picks) {
+    var code = b.dataset.lang || "";
+    var on = code === __lang;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
   }
 }
 function apiNote(data, deKey, enKey) {
@@ -516,7 +514,7 @@ function cloneVersionChangeForMerge(vc) {
     release_utc_ymd: vc.release_utc_ymd || "",
     release_local_ymd: vc.release_local_ymd || ""
   };
-  if (vc.github_release_links && vc.github_release_links.length) {
+  if (vc.github_release_links?.length) {
     o.github_release_links = vc.github_release_links.map(function (gl) {
       return { version: gl.version, tag: gl.tag, url: gl.url };
     });
@@ -526,10 +524,9 @@ function cloneVersionChangeForMerge(vc) {
 
 function mergeExtensionTimelineIntoUsage(data) {
   var p = __extensionTimelinePayload;
-  if (!data || !data.days || !p || !p.by_date) return;
+  if (!data?.days || !p?.by_date) return;
   var bd = p.by_date;
-  for (var i = 0; i < data.days.length; i++) {
-    var d = data.days[i];
+  for (var d of data.days) {
     var dt = d.date;
     if (!dt || !bd[dt]) continue;
     d.version_change = cloneVersionChangeForMerge(bd[dt]);
@@ -569,7 +566,7 @@ function fetchExtensionTimelineOnceInternal() {
         renderDashboard(__lastUsageData, true);
       }
     })
-    .catch(function () {})
+    .catch (function (err) { logClientOptionalErr(err); })
     .then(function () {
       __extensionTimelineInFlight = false;
     });
@@ -590,7 +587,7 @@ function setSessionGithubToken(val) {
     } else {
       sessionStorage.removeItem(GITHUB_TOKEN_SESSION_KEY);
     }
-  } catch (eSt) {}
+  } catch (error) { logClientOptionalErr(error); }
 }
 
 function apiGithubTokenHeader() {
@@ -621,6 +618,59 @@ function scheduleGithubTokenUiRefresh() {
     });
   } else {
     setTimeout(updateGithubTokenPanelMode, 0);
+  }
+}
+
+/** Warmup splash — dismiss once first real render completes */
+var __warmupDismissed = false;
+function updateWarmupOverlay(data) {
+  if (__warmupDismissed) return;
+  var overlay = document.getElementById('warmup-overlay');
+  if (!overlay) return;
+  var status = document.getElementById('warmup-status');
+  var sub = document.getElementById('warmup-sub');
+  if (!data) return;
+  var sp = data.scan_progress;
+  var progressFill = document.getElementById('warmup-progress-fill');
+  if (data.scanning && sp?.total > 0) {
+    var pct = Math.round(sp.done / sp.total * 100);
+    if (status) status.textContent = t('warmupScanning').replace('{done}', sp.done).replace('{total}', sp.total);
+    if (sub) sub.textContent = pct + '%';
+    if (progressFill) progressFill.style.width = pct + '%';
+  } else if (data.scanning) {
+    if (status) status.textContent = t('warmupInit');
+    if (progressFill) progressFill.style.width = '0%';
+  }
+}
+function dismissWarmupOverlay() {
+  if (__warmupDismissed) return;
+  __warmupDismissed = true;
+  var overlay = document.getElementById('warmup-overlay');
+  if (!overlay) return;
+  var status = document.getElementById('warmup-status');
+  if (status) status.textContent = t('warmupReady');
+  setTimeout(function () {
+    overlay.classList.add('is-done');
+    setTimeout(function () { overlay.remove(); }, 500);
+  }, 300);
+}
+
+/** Recompute overlay — semi-transparent during re-render */
+function showRecomputeOverlay(show) {
+  var el = document.getElementById('recompute-overlay');
+  if (!el && show) {
+    el = document.createElement('div');
+    el.id = 'recompute-overlay';
+    el.className = 'recompute-overlay';
+    el.innerHTML = '<div class="recompute-indicator"><div class="recompute-spinner"></div><span>' + t('recomputeLabel') + '</span></div>';
+    document.body.appendChild(el);
+  }
+  if (el) {
+    if (show) el.classList.add('is-active');
+    else {
+      el.classList.remove('is-active');
+      setTimeout(function () { if (el.parentNode && !el.classList.contains('is-active')) el.remove(); }, 300);
+    }
   }
 }
 
@@ -662,12 +712,12 @@ function fillInitialShellText() {
     ["c3", "chartOutPerHour"],
     ["c4", "chartSubCachePct"]
   ];
-  for (var ci = 0; ci < chartPairs.length; ci++) {
-    var cv = document.getElementById(chartPairs[ci][0]);
+  for (var _cp of chartPairs) {
+    var cv = document.getElementById(_cp[0]);
     if (!cv) continue;
     var hx = cv.previousElementSibling;
-    if (hx && hx.tagName === "H3" && (coldStart || !String(hx.textContent || "").replace(/\s/g, "")))
-      hx.textContent = t(chartPairs[ci][1]);
+    if (hx?.tagName === "H3" && (coldStart || !String(hx.textContent || "").replace(/\s/g, "")))
+      hx.textContent = t(_cp[1]);
   }
 }
 
@@ -675,6 +725,8 @@ function applyStaticChrome() {
   document.title = t("pageTitle");
   var lsw = document.getElementById("lang-switch-wrap");
   if (lsw) lsw.setAttribute("aria-label", t("ariaLangGroup"));
+  var lswSb = document.getElementById("sidebar-lang-switch");
+  if (lswSb) lswSb.setAttribute("aria-label", t("ariaLangGroup"));
   var lsl = document.getElementById("lang-switch-label");
   if (lsl) lsl.textContent = t("langLabel");
   var mh = document.getElementById("main-heading");
@@ -750,7 +802,7 @@ var DASH_CORE_COALESCE_MS = 400;
 var __dashRenderCoreCoalesce = null;
 
 function chartXLabelsMatch(ch, newLabels) {
-  if (!ch || !ch.data || !ch.data.labels || !newLabels) return false;
+  if (!ch?.data?.labels || !newLabels) return false;
   var L = ch.data.labels;
   if (L.length !== newLabels.length) return false;
   for (var i = 0; i < L.length; i++) if (L[i] !== newLabels[i]) return false;
@@ -759,7 +811,7 @@ function chartXLabelsMatch(ch, newLabels) {
 
 /** Bestehende Chart-X-Achse ist Anfang von newLabels (z. B. SSE-Scan hängt Tage hinten an). Sonst destroy → Flackern. */
 function chartLabelsPrefixMatch(ch, newLabels) {
-  if (!ch || !ch.data || !ch.data.labels || !newLabels) return false;
+  if (!ch?.data?.labels || !newLabels) return false;
   var L = ch.data.labels;
   if (!L.length || newLabels.length < L.length) return false;
   for (var i = 0; i < L.length; i++) {
@@ -768,34 +820,15 @@ function chartLabelsPrefixMatch(ch, newLabels) {
   return true;
 }
 
-var __mainChartTransitions = {
-  active: { animation: { duration: 0 } },
-  resize: { animation: { duration: 0 } },
-  show: { animation: { duration: 0 } },
-  hide: { animation: { duration: 0 } }
-};
-/** Eine feste Referenz — nicht bei jedem renderDashboardCore neu erzeugen (sonst kann Chart.js bei options.transitions jedes Mal neu layouten / „zappeln“). */
-var __chartTransitionsOff = {
-  active: { animation: { duration: 0 } },
-  resize: { animation: { duration: 0 } },
-  show: { animation: { duration: 0 } },
-  hide: { animation: { duration: 0 } }
-};
-function freezeChartNoAnim(ch) {
-  if (!ch || !ch.options) return;
-  ch.options.animation = false;
-  ch.options.transitions = __chartTransitionsOff;
-}
-
-/** Chart.resize nur wenn Canvas noch im DOM — vermeidet ownerDocument-null nach Modal/DOM-Zug. */
+/** ECharts .resize() nur wenn DOM-Element noch angebunden. */
 function __safeChartResize(ch) {
   if (!ch || typeof ch.resize !== "function") return;
   try {
-    var c = ch.canvas;
-    if (!c?.isConnected) return;
+    var dom = ch.getDom ? ch.getDom() : null;
+    if (!dom?.isConnected) return;
     ch.resize();
-  } catch {
-    // canvas may have detached between isConnected check and resize()
+  } catch(e) {
+    // dom may have detached between isConnected check and resize()
   }
 }
 
@@ -806,6 +839,7 @@ function __scheduleAnthropicHealthChartsResize() {
     __anthropicHealthResizeT = null;
     __safeChartResize(_proxyCharts.uptimeChart);
     __safeChartResize(_proxyCharts.incidentHistory);
+    __safeChartResize(_proxyCharts.anthropicIncidents);
     __safeChartResize(_proxyCharts.outageTimeline);
   }, 80);
 }
@@ -813,6 +847,7 @@ function __scheduleAnthropicHealthChartsResize() {
 function __bumpAnthropicHealthCharts() {
   __safeChartResize(_proxyCharts.uptimeChart);
   __safeChartResize(_proxyCharts.incidentHistory);
+  __safeChartResize(_proxyCharts.anthropicIncidents);
   __safeChartResize(_proxyCharts.outageTimeline);
 }
 
@@ -828,7 +863,7 @@ function fetchUsageJsonOnce() {
         console.error(e);
       }
     })
-    .catch(function () {});
+    .catch (function (err) { logClientOptionalErr(err); });
 }
 
 function showGithubTokenStatus(msg, isWarn) {
@@ -875,10 +910,10 @@ function connectUsageStream() {
               var block = buf.slice(0, ix);
               buf = buf.slice(ix + 2);
               var lines = block.split("\n");
-              for (var li = 0; li < lines.length; li++) {
-                if (lines[li].indexOf("data: ") === 0) {
+              for (var _line of lines) {
+                if (_line.startsWith("data: ")) {
                   try {
-                    renderDashboard(JSON.parse(lines[li].slice(6)), false);
+                    renderDashboard(JSON.parse(_line.slice(6)), false);
                   } catch (err) {
                     console.error(err);
                   }
@@ -953,7 +988,7 @@ function initGithubTokenPanel() {
       syncGithubSessionThenReconnectStream();
       try {
         inp.focus();
-      } catch (eF2) {}
+      } catch (error) { logClientOptionalErr(error); }
     });
   }
   if (refBtn && !refBtn.dataset.boundGithubRf) {
@@ -1011,7 +1046,7 @@ function initMarketplaceRefreshButton() {
 function updateStatePathsRow(data) {
   var el = document.getElementById("state-cache-paths");
   if (!el) return;
-  var sp = data && data.state_paths;
+  var sp = data?.state_paths;
   if (!sp) {
     el.textContent = "";
     return;
@@ -1037,11 +1072,11 @@ function updateStatePathsRow(data) {
 function updateScanSourcesRow(data) {
   var el = document.getElementById("scan-sources");
   if (!el) return;
-  var srcs = data && data.scan_sources;
-  if (srcs && srcs.length > 1) {
+  var srcs = data?.scan_sources;
+  if (srcs?.length > 1) {
     var parts = [];
-    for (var si = 0; si < srcs.length; si++) {
-      parts.push(srcs[si].label + " (" + (srcs[si].jsonl_files || 0) + " .jsonl)");
+    for (var _src of srcs) {
+      parts.push(_src.label + " (" + (_src.jsonl_files || 0) + " .jsonl)");
     }
     el.textContent = t("scanSourcesPrefix") + parts.join(" · ");
     el.title = srcs.map(function (s) { return s.label + ": " + (s.path_hint || ""); }).join("\n");
@@ -1052,36 +1087,211 @@ function updateScanSourcesRow(data) {
     el.style.display = "none";
   }
 }
+var __liveScannedJsonlChart = null;
+function resizeLiveScannedJsonlChartIfAny() {
+  if (!__liveScannedJsonlChart) return;
+  try {
+    __liveScannedJsonlChart.resize();
+  } catch (error) { logClientOptionalErr(error); }
+}
+function __disposeLiveScannedJsonlChartIfNeeded() {
+  if (!__liveScannedJsonlChart) return;
+  try {
+    __liveScannedJsonlChart.dispose();
+  } catch (error) { logClientOptionalErr(error); }
+  __liveScannedJsonlChart = null;
+}
+function __liveJsonlBarTooltipFormatter(params) {
+  if (!params?.length) return "";
+  var p0 = params[0];
+  return escHtml(p0.name) + "<br/>" + p0.marker + String(p0.value) + " " + t("liveFilesChartFilesSuffix");
+}
+function liveScannedJsonlBucket(line) {
+  var s = String(line || "").replaceAll("\\", "/");
+  var dot = " \u00b7 ";
+  var pathPart = s;
+  var di = s.indexOf(dot);
+  if (di >= 0) pathPart = s.slice(di + dot.length).trim();
+  var marker = "/.claude/projects/";
+  var ix = pathPart.indexOf(marker);
+  if (ix >= 0) {
+    var rest = pathPart.slice(ix + marker.length);
+    var seg0 = rest.split("/")[0];
+    if (seg0) return seg0;
+  }
+  var fn = pathPart.split("/").pop() || pathPart;
+  if (fn.length > 24) return fn.slice(0, 22) + "\u2026";
+  return fn || "(?)";
+}
 function updateLiveFilesPanel(data) {
-  var ul = document.getElementById("live-files-list");
+  var host = document.getElementById("live-files-chart-host");
   var head = document.getElementById("live-files-head");
   var trig = document.getElementById("live-trigger");
-  if (!ul) return;
-  ul.innerHTML = "";
-  var files = (data && data.scanned_files) ? data.scanned_files : [];
+  if (!host) return;
+  __disposeLiveScannedJsonlChartIfNeeded();
+  host.innerHTML = "";
+  host.style.display = "";
+  var files = data?.scanned_files ? data.scanned_files : [];
   var n = files.length;
   if (head) head.textContent = n ? tr("liveFilesHeadN", { n: n }) : t("liveFilesHead0");
-  if (data && data.scanning && n === 0) {
-    ul.innerHTML = "<li>" + escHtml(t("scanStill")) + "</li>";
+  if (data?.scanning && n === 0) {
+    host.innerHTML = '<p class="live-files-chart-empty">' + escHtml(t("scanStill")) + "</p>";
     if (trig) trig.setAttribute("title", t("liveTriggerScanning"));
     return;
   }
   if (n === 0) {
-    ul.innerHTML = "<li>" + escHtml(t("noJsonlList")) + "</li>";
+    host.innerHTML = '<p class="live-files-chart-empty">' + escHtml(t("noJsonlList")) + "</p>";
     if (trig) trig.setAttribute("title", t("liveTriggerZero"));
     return;
   }
-  for (var lf = 0; lf < n; lf++) {
-    var li = document.createElement("li");
-    li.textContent = files[lf];
-    ul.appendChild(li);
+  if (typeof echarts === "undefined" || !echarts.init) {
+    host.innerHTML = '<p class="live-files-chart-empty">' + escHtml(String(n) + " JSONL") + "</p>";
+    if (trig) trig.setAttribute("title", tr("liveTriggerMany", { n: n }));
+    return;
+  }
+  var counts = Object.create(null);
+  for (var bi = 0; bi < n; bi++) {
+    var b = liveScannedJsonlBucket(files[bi]);
+    counts[b] = (counts[b] || 0) + 1;
+  }
+  var pairs = [];
+  for (var k in counts) {
+    if (Object.hasOwn(counts, k)) pairs.push({ name: k, value: counts[k] });
+  }
+  pairs.sort(function (a, b) {
+    return a.value - b.value;
+  });
+  var maxBars = 15;
+  if (pairs.length > maxBars) pairs = pairs.slice(pairs.length - maxBars);
+  var names = [];
+  var vals = [];
+  for (var _pair of pairs) {
+    names.push(_pair.name);
+    vals.push(_pair.value);
+  }
+  var cw = host.clientWidth || host.offsetWidth;
+  var ch = host.clientHeight || host.offsetHeight;
+  var initW = cw > 48 ? undefined : Math.min(520, Math.max(280, (window.innerWidth || 800) - 48));
+  var initH = ch > 48 ? undefined : 220;
+  var initOpts = { renderer: "canvas" };
+  if (initW != null) initOpts.width = initW;
+  if (initH != null) initOpts.height = initH;
+  __liveScannedJsonlChart = echarts.init(host, null, initOpts);
+  __liveScannedJsonlChart.setOption({
+    animation: false,
+    grid: { left: 6, right: 18, top: 6, bottom: 6, containLabel: true },
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "shadow" },
+      backgroundColor: "rgba(15,23,42,0.95)",
+      borderColor: "#334155",
+      textStyle: { color: "#e2e8f0" },
+      formatter: __liveJsonlBarTooltipFormatter
+    },
+    xAxis: {
+      type: "value",
+      axisLabel: { color: "#94a3b8" },
+      splitLine: { lineStyle: { color: "rgba(51,65,85,0.45)" } }
+    },
+    yAxis: {
+      type: "category",
+      data: names,
+      axisLabel: { color: "#94a3b8", width: 110, overflow: "truncate" }
+    },
+    series: [
+      {
+        type: "bar",
+        data: vals,
+        itemStyle: { color: "rgba(59,130,246,0.78)" },
+        label: { show: true, position: "right", color: "#cbd5e1", fontSize: 10 }
+      }
+    ]
+  });
+  if (typeof requestAnimationFrame !== "undefined") {
+    requestAnimationFrame(function () {
+      requestAnimationFrame(resizeLiveScannedJsonlChartIfAny);
+    });
+  } else {
+    setTimeout(resizeLiveScannedJsonlChartIfAny, 0);
   }
   if (trig) trig.setAttribute("title", tr("liveTriggerMany", { n: n }));
 }
+(function wireLiveReleasePanelChrome() {
+  function go() {
+    var det = document.getElementById("live-release-details");
+    if (!det || det.dataset.liveRelChromeWired === "1") return;
+    det.dataset.liveRelChromeWired = "1";
+    window.CacheFilesExplorer?.wireOpenButton("live-cache-files-open");
+    var expandBtn = document.getElementById("live-rel-expand-btn");
+    var relOverlay = document.getElementById("release-modal-overlay");
+    var relBody = document.getElementById("release-modal-body");
+    var relClose = document.getElementById("release-modal-close");
+    if (expandBtn && relOverlay && relBody) {
+      expandBtn.addEventListener("click", function () {
+        relOverlay.classList.add("is-open");
+        document.body.style.overflow = "hidden";
+        if (relBody.dataset.loaded) return;
+        relBody.innerHTML = '<p style="color:#64748b;font-size:.75rem">Loading releases...</p>';
+        var rlXhr = new XMLHttpRequest();
+        rlXhr.open("GET", "https://api.github.com/repos/fgrosswig/claude-usage-dashboard/releases?per_page=20", true);
+        rlXhr.onload = function () {
+          if (rlXhr.status !== 200) {
+            relBody.innerHTML = '<p style="color:#ef4444;font-size:.75rem">Failed to load releases</p>';
+            return;
+          }
+          try {
+            var releases = JSON.parse(rlXhr.responseText);
+            if (!releases.length) {
+              relBody.innerHTML = '<p style="color:#64748b;font-size:.75rem">No releases found</p>';
+              return;
+            }
+            var rh = "";
+            var isFirst = true;
+            for (var rel of releases) {
+              var rDate = rel.published_at ? rel.published_at.slice(0, 10) : "";
+              var rBody2 = (rel.body || "").replace(/^## .+\n?/m, "");
+              rh += "<details class=\"release-modal-item\"" + (isFirst ? " open" : "") + ">";
+              isFirst = false;
+              rh += "<summary class=\"release-modal-item-head\">";
+              rh += "<span class=\"rel-tag\">" + escHtml(rel.tag_name) + "</span>";
+              rh += "<span class=\"rel-date\">" + escHtml(rDate) + "</span>";
+              if (rel.name && rel.name !== rel.tag_name) rh += " — " + escHtml(rel.name);
+              rh += "</summary>";
+              rh += "<div class=\"release-modal-item-body\">" + miniMd(rBody2) + "</div>";
+              rh += "</details>";
+            }
+            relBody.innerHTML = rh;
+            relBody.dataset.loaded = "1";
+          } catch (eRel) {
+            relBody.innerHTML = '<p style="color:#ef4444;font-size:.75rem">Parse error</p>';
+          }
+        };
+        rlXhr.send();
+      });
+      if (relClose) {
+        relClose.addEventListener("click", function () {
+          relOverlay.classList.remove("is-open");
+          document.body.style.overflow = "";
+        });
+      }
+      relOverlay.addEventListener("click", function (e) {
+        if (e.target === relOverlay) {
+          relOverlay.classList.remove("is-open");
+          document.body.style.overflow = "";
+        }
+      });
+    }
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", go);
+  } else {
+    go();
+  }
+})();
 function liveExtOneLiner(d) {
   var vc = d.version_change;
   if (!vc) return d.date;
-  var verStr = vc.added && vc.added.length ? vc.added.join(", ") : "";
+  var verStr = vc.added?.length ? vc.added.join(", ") : "";
   if (vc.from) verStr = vc.from + " \u2192 " + verStr;
   return d.date + ": " + verStr;
 }
@@ -1095,17 +1305,15 @@ function updateLiveOutageAndExtensionSections(data) {
   if (!oh || !ol || !oe || !eh || !el || !ee) return;
   oh.textContent = t("liveOutageHead");
   eh.textContent = t("liveExtHead");
-  var days = (data && data.days) ? data.days : [];
+  var days = data?.days ? data.days : [];
   ol.innerHTML = "";
   var hasOut = false;
-  for (var di = 0; di < days.length; di++) {
-    var d = days[di];
+  for (var d of days) {
     var incs = d.outage_incidents || [];
     if (!incs.length) continue;
     hasOut = true;
     var seen = {};
-    for (var oi = 0; oi < incs.length; oi++) {
-      var inc = incs[oi];
+    for (var inc of incs) {
       var key = (inc.name || "") + "|" + String(inc.created_at || "") + "|" + String(inc.resolved_at || "");
       if (seen[key]) continue;
       seen[key] = true;
@@ -1156,15 +1364,15 @@ function updateLiveSidePanel(data) {
 function updateMetaDetailsSummary(data) {
   var sumEl = document.getElementById("meta-details-summary");
   if (!sumEl) return;
-  var sp = data && data.scan_progress;
-  if (sp && sp.total > 0 && data.scanning && sp.done < sp.total) {
+  var sp = data?.scan_progress;
+  if (sp?.total > 0 && data.scanning && sp.done < sp.total) {
     sumEl.textContent = tr("metaDetailsScanProgress", { done: sp.done, total: sp.total, sec: data.refresh_sec || 180 });
     return;
   }
-  var days = data && data.days;
-  if (!days || !days.length) {
-    if (data && data.scanning) sumEl.textContent = t("metaSummaryScanning");
-    else if (data && data.scan_error) sumEl.textContent = tr("metaScanError", { msg: String(data.scan_error).slice(0, 120) });
+  var days = data?.days;
+  if (!days?.length) {
+    if (data?.scanning) sumEl.textContent = t("metaSummaryScanning");
+    else if (data?.scan_error) sumEl.textContent = tr("metaScanError", { msg: String(data.scan_error).slice(0, 120) });
     else if (data && (data.parsed_files || 0) === 0) sumEl.textContent = t("metaSummaryNoFiles");
     else sumEl.textContent = tr("metaSummaryNoUsage", { files: data.parsed_files || 0 });
     return;
@@ -1177,164 +1385,18 @@ function initMetaDetailsPanel() {
   det.dataset.boundMeta = "1";
   try {
     if (sessionStorage.getItem("usageMetaDetailsOpen") === "1") det.setAttribute("open", "");
-  } catch (e) {}
+  } catch (error) { logClientOptionalErr(error); }
   det.addEventListener("toggle", function () {
     updateGithubTokenPanelMode();
     scheduleGithubTokenUiRefresh();
     try {
       sessionStorage.setItem("usageMetaDetailsOpen", det.open ? "1" : "0");
-    } catch (e2) {}
+    } catch (error) { logClientOptionalErr(error); }
   });
-}
-var USAGE_EXT_VLINE_END_OFFSET = 22;
-// Global: disable ALL Chart.js animations to prevent flickering
-if (typeof Chart !== "undefined") {
-  Chart.defaults.animation = false;
-  Chart.defaults.transitions = {
-    active: { animation: { duration: 0 } },
-    resize: { animation: { duration: 0 } },
-    show: { animation: { duration: 0 } },
-    hide: { animation: { duration: 0 } }
-  };
-  Chart.defaults.responsive = true;
-  Chart.defaults.resizeDelay = 300;
-  // Native DPR only: forcing min 2 (old workaround) oversizes the backing store on 1x / zoomed
-  // views → browser downscales the bitmap and charts look blurry. Flicker is handled by
-  // animation:false and the stable __chartTransitionsOff object on updates.
-  Chart.defaults.devicePixelRatio = window.devicePixelRatio || 1;
-
-}
-var __usageUpdatePluginRegistered = false;
-function registerUsageUpdateVLinePlugin() {
-  if (__usageUpdatePluginRegistered || typeof Chart === "undefined") return;
-  __usageUpdatePluginRegistered = true;
-  Chart.register({
-    id: "usageUpdateVerticalLines",
-    beforeDatasetsDraw: function (chart) {
-      var cid = chart.canvas && chart.canvas.id;
-      if (cid !== "c-service") return;
-      var idxs = window.__usageVersionDayIndices;
-      if (!idxs || !idxs.length) return;
-      var xScale = chart.scales.x;
-      if (!xScale || typeof xScale.getPixelForTick !== "function") return;
-      var ca = chart.chartArea;
-      if (!ca) return;
-      var n = chart.data.labels ? chart.data.labels.length : 0;
-      if (!n) return;
-      var ctx = chart.ctx;
-      var yEnd = ca.top + USAGE_EXT_VLINE_END_OFFSET;
-      var bot = ca.bottom;
-      if (yEnd >= bot) return;
-      ctx.save();
-      ctx.setLineDash([3, 4]);
-      ctx.strokeStyle = "rgba(74, 222, 128, 0.38)";
-      ctx.lineWidth = 1;
-      for (var k = 0; k < idxs.length; k++) {
-        var di = idxs[k];
-        if (di < 0 || di >= n) continue;
-        var x = xScale.getPixelForTick(di);
-        if (x == null || isNaN(x)) continue;
-        ctx.beginPath();
-        ctx.moveTo(x, bot);
-        ctx.lineTo(x, yEnd);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-  });
-}
-registerUsageUpdateVLinePlugin();
-function chartTickXToParentLeft(chart, hostEl, tickIndex) {
-  if (!chart || !chart.scales || !chart.scales.x || !chart.canvas || !hostEl) return null;
-  var xScale = chart.scales.x;
-  if (typeof xScale.getPixelForTick !== "function") return null;
-  var x = xScale.getPixelForTick(tickIndex);
-  if (x == null || isNaN(x)) return null;
-  var cw = chart.width;
-  var ch = chart.height;
-  if (!cw || !ch) return null;
-  var canvas = chart.canvas;
-  var cr = canvas.getBoundingClientRect();
-  var hr = hostEl.getBoundingClientRect();
-  var xCss = (x / cw) * cr.width;
-  return cr.left - hr.left + xCss;
-}
-function chartAreaTopInParent(chart, hostEl) {
-  if (!chart || !chart.canvas || !hostEl) return 0;
-  var cr = chart.canvas.getBoundingClientRect();
-  var hr = hostEl.getBoundingClientRect();
-  var t = chart.chartArea ? chart.chartArea.top : 0;
-  return cr.top - hr.top + (t / chart.height) * cr.height;
-}
-function chartAreaBottomInParent(chart, hostEl) {
-  if (!chart || !chart.canvas || !hostEl) return 0;
-  var cr = chart.canvas.getBoundingClientRect();
-  var hr = hostEl.getBoundingClientRect();
-  var b = chart.chartArea ? chart.chartArea.bottom : chart.height;
-  return cr.top - hr.top + (b / chart.height) * cr.height;
-}
-/** Y-Koordinate (px von hostEl-Oberkante) für einen Canvas-Y-Wert (von Canvas-Oberkante). */
-function chartYInParent(chart, hostEl, yCanvas) {
-  if (!chart || !chart.canvas || !hostEl) return 0;
-  var cr = chart.canvas.getBoundingClientRect();
-  var hr = hostEl.getBoundingClientRect();
-  var ch = chart.height;
-  if (!ch || yCanvas == null || isNaN(yCanvas)) return cr.top - hr.top;
-  return cr.top - hr.top + (yCanvas / ch) * cr.height;
-}
-function layoutFsUpdateOverlay() {
-  var wrap = document.getElementById("service-chart-canvas-wrap");
-  var overlay = document.getElementById("fs-update-overlay");
-  if (!wrap || !overlay || !_charts.cService || !_charts.cService.chartArea) return;
-  overlay.innerHTML = "";
-  var ch = _charts.cService;
-  var n = ch.data.labels ? ch.data.labels.length : 0;
-  var daysArr = (__lastUsageData && __lastUsageData.days) || [];
-  var triTop = chartYInParent(ch, wrap, ch.chartArea.top + 4);
-  for (var di = 0; di < n; di++) {
-    var d = daysArr[di];
-    if (!d) continue;
-    var leftAbs = chartTickXToParentLeft(ch, wrap, di);
-    if (leftAbs == null) continue;
-    var hasV = !!d.version_change;
-    var hasM = !!d.model_change;
-    if (!hasV && !hasM) continue;
-    if (hasV) {
-      var mark = document.createElement("button");
-      mark.type = "button";
-      mark.className = "fs-update-mark";
-      mark.textContent = "\u25b2";
-      mark.style.left = (leftAbs + (hasM ? -10 : 0)) + "px";
-      mark.style.top = triTop + "px";
-      mark.setAttribute("aria-label", t("updateDotAria"));
-      mark.dataset.dayIndex = String(di);
-      overlay.appendChild(mark);
-    }
-    if (hasM) {
-      var mmark = document.createElement("button");
-      mmark.type = "button";
-      mmark.className = "fs-model-mark";
-      mmark.textContent = "\u25c7";
-      mmark.style.left = (leftAbs + (hasV ? 10 : 0)) + "px";
-      mmark.style.top = triTop + "px";
-      mmark.setAttribute("aria-label", t("modelDotAria"));
-      mmark.dataset.dayIndex = String(di);
-      overlay.appendChild(mmark);
-    }
-  }
-}
-/** Extension-Update-Marker nur im Service-Impact-Chart (c-service), nicht in den Haupt-Charts. */
-function layoutMainChartsUpdateOverlay() {
-  var overlay = document.getElementById("main-charts-update-overlay");
-  if (overlay) overlay.innerHTML = "";
-}
-function layoutUpdateGuideOverlays() {
-  layoutFsUpdateOverlay();
-  layoutMainChartsUpdateOverlay();
 }
 /** Stunden 0–24 als HH:MM (UTC-Tag wie serverseitige outage_spans). */
 function fmtUtcHmFromDayHour(h) {
-  if (h == null || isNaN(h)) return "?";
+  if (h == null || Number.isNaN(Number(h))) return "?";
   var hi = Math.floor(h);
   var mi = Math.round((h - hi) * 60);
   while (mi >= 60) {
@@ -1412,8 +1474,7 @@ function appendDayDiagnosticSlideoutSection(bodyEl, d) {
       ulI.style.fontSize = "0.72rem";
       ulI.style.lineHeight = "1.45";
       ulI.style.color = "#e2e8f0";
-      for (var ii = 0; ii < incs.length; ii++) {
-        var inc = incs[ii];
+      for (var inc of incs) {
         var li = document.createElement("li");
         var imp = String(inc.impact || "none").toUpperCase();
         var k = inc.kind ? " (" + inc.kind + ")" : "";
@@ -1421,12 +1482,12 @@ function appendDayDiagnosticSlideoutSection(bodyEl, d) {
         if (inc.created_at) {
           try {
             parts.push(t("updateSlideoutIncidentStart") + " " + new Date(inc.created_at).toLocaleString());
-          } catch (e1) {}
+          } catch (error) { logClientOptionalErr(error); }
         }
         if (inc.resolved_at) {
           try {
             parts.push(t("updateSlideoutIncidentResolved") + " " + new Date(inc.resolved_at).toLocaleString());
-          } catch (e2) {}
+          } catch (error) { logClientOptionalErr(error); }
         } else if (inc.created_at) {
           parts.push(t("updateSlideoutIncidentOngoing"));
         }
@@ -1449,8 +1510,7 @@ function appendDayDiagnosticSlideoutSection(bodyEl, d) {
       ulS.style.fontSize = "0.68rem";
       ulS.style.lineHeight = "1.45";
       ulS.style.color = "#94a3b8";
-      for (var sj = 0; sj < spans.length; sj++) {
-        var sp = spans[sj];
+      for (var sp of spans) {
         var liS = document.createElement("li");
         var impS = String(sp.impact || "none").toUpperCase();
         var kS = sp.kind ? " (" + sp.kind + ")" : "";
@@ -1491,7 +1551,7 @@ function appendDayDiagnosticSlideoutSection(bodyEl, d) {
 }
 function openUpdateSlideout(dayIndex) {
   var data = __lastUsageData;
-  if (!data || !data.days || data.days[dayIndex] == null) return;
+  if (!data?.days || data.days[dayIndex] == null) return;
   var d = data.days[dayIndex];
   var vc = d.version_change;
   var titleEl = document.getElementById("update-sl-title");
@@ -1506,7 +1566,7 @@ function openUpdateSlideout(dayIndex) {
   } else {
     var pVer = document.createElement("p");
     pVer.className = "upd-ver";
-    var verStr = vc.added && vc.added.length ? vc.added.join(", ") : "";
+    var verStr = vc.added?.length ? vc.added.join(", ") : "";
     if (vc.from) verStr = vc.from + " \u2192 " + verStr;
     pVer.textContent = verStr;
     bodyEl.appendChild(pVer);
@@ -1551,11 +1611,11 @@ function openUpdateSlideout(dayIndex) {
       var ulg = document.createElement("ul");
       ulg.style.marginTop = "6px";
       ulg.style.paddingLeft = "1.2em";
-      for (var gi = 0; gi < gl.length; gi++) {
+      for (var _glItem of gl) {
         var gli = document.createElement("li");
         var a = document.createElement("a");
-        a.href = gl[gi].url;
-        a.textContent = "v" + gl[gi].version;
+        a.href = _glItem.url;
+        a.textContent = "v" + _glItem.version;
         a.target = "_blank";
         a.rel = "noopener noreferrer";
         a.style.color = "#93c5fd";
@@ -1572,7 +1632,7 @@ function openUpdateSlideout(dayIndex) {
 }
 function openModelChangeSlideout(dayIndex) {
   var data = __lastUsageData;
-  if (!data || !data.days || data.days[dayIndex] == null) return;
+  if (!data?.days || data.days[dayIndex] == null) return;
   var d = data.days[dayIndex];
   var mc = d.model_change;
   var titleEl = document.getElementById("update-sl-title");
@@ -1585,14 +1645,14 @@ function openModelChangeSlideout(dayIndex) {
   if (!mc) {
     bodyEl.appendChild(document.createTextNode(t("modelSlideoutNoDetail")));
   } else {
-    if (mc.added && mc.added.length) {
+    if (mc.added?.length) {
       var pAdd = document.createElement("p");
       pAdd.className = "upd-ver";
       pAdd.style.color = "#67e8f9";
       pAdd.textContent = t("tooltipModelAdded") + mc.added.join(", ");
       bodyEl.appendChild(pAdd);
     }
-    if (mc.removed && mc.removed.length) {
+    if (mc.removed?.length) {
       var pRem = document.createElement("p");
       pRem.className = "upd-meta";
       pRem.textContent = t("tooltipModelRemoved") + mc.removed.join(", ");
@@ -1622,15 +1682,15 @@ function initUpdateSlideoutOnce() {
   __updateSlideoutUiBound = true;
   document.body.addEventListener("click", function (ev) {
     var mDot = ev.target.closest(".fs-model-mark");
-    if (mDot && mDot.dataset.dayIndex != null) {
+    if (mDot?.dataset.dayIndex != null) {
       ev.preventDefault();
-      openModelChangeSlideout(parseInt(mDot.dataset.dayIndex, 10));
+      openModelChangeSlideout(Number.parseInt(mDot.dataset.dayIndex, 10));
       return;
     }
     var uDot = ev.target.closest(".fs-update-mark");
-    if (uDot && uDot.dataset.dayIndex != null) {
+    if (uDot?.dataset.dayIndex != null) {
       ev.preventDefault();
-      openUpdateSlideout(parseInt(uDot.dataset.dayIndex, 10));
+      openUpdateSlideout(Number.parseInt(uDot.dataset.dayIndex, 10));
     }
   });
   var back = document.getElementById("update-slideout-backdrop");
@@ -1641,36 +1701,21 @@ function initUpdateSlideoutOnce() {
     if (e.key === "Escape") closeUpdateSlideout();
   });
 }
-var __layoutOvTimer = null;
-/** Overlay-Marker erst nach stabilem Chart-Layout; entkoppelt von Resize/SSE, vermeidet Resize-Feedback. */
-function scheduleLayoutUpdateGuideOverlays() {
-  clearTimeout(window.__dashLayoutAfterCore);
-  window.__dashLayoutAfterCore = setTimeout(function () {
-    window.__dashLayoutAfterCore = null;
-    requestAnimationFrame(function () {
-      requestAnimationFrame(layoutUpdateGuideOverlays);
-    });
-  }, 140);
-}
-window.addEventListener("resize", function () {
-  clearTimeout(__layoutOvTimer);
-  __layoutOvTimer = setTimeout(scheduleLayoutUpdateGuideOverlays, 200);
-});
 
 // ── Date Range + Host Filter ──────────────────────────────────────────────
 function getFilteredDays(days) {
-  if (!days || !days.length) return days;
+  if (!days?.length) return days;
   var startEl = document.getElementById("filter-date-start");
   var endEl = document.getElementById("filter-date-end");
   var startVal = startEl ? startEl.value : "";
   var endVal = endEl ? endEl.value : "";
   if (!startVal && !endVal) return days;
   var filtered = [];
-  for (var i = 0; i < days.length; i++) {
-    var d = days[i].date;
+  for (var _dy of days) {
+    var d = _dy.date;
     if (startVal && d < startVal) continue;
     if (endVal && d > endVal) continue;
-    filtered.push(days[i]);
+    filtered.push(_dy);
   }
   return filtered.length ? filtered : days;
 }
@@ -1681,10 +1726,10 @@ function getFilterHost() {
   var sel = container.querySelector("select");
   if (sel) {
     var opts = sel.selectedOptions;
-    if (!opts || !opts.length) return "";
+    if (!opts?.length) return "";
     var vals = [];
-    for (var i = 0; i < opts.length; i++) vals.push(opts[i].value);
-    if (vals.indexOf("") >= 0) return "";
+    for (var _opt of opts) vals.push(_opt.value);
+    if (vals.includes("")) return "";
     return vals.join(",");
   }
   var active = container.querySelector(".filter-chip.active");
@@ -1694,7 +1739,9 @@ function getFilterHost() {
 
 function renderDashboard(data, urgent) {
   if (urgent) clearTimeout(__dashRenderCoreCoalesce);
+  if (__warmupDismissed && urgent) showRecomputeOverlay(true);
   __lastUsageData = data;
+  updateWarmupOverlay(data);
   updateGithubTokenPanelMode();
   updateLiveSidePanel(data);
   updateScanSourcesRow(data);
@@ -1706,8 +1753,8 @@ function renderDashboard(data, urgent) {
   renderKeyFindings(data);
   var days = getFilteredDays(data.days);
   var sp = data.scan_progress;
-  var scanInc = data.scanning && sp && sp.total > 0 && sp.done < sp.total;
-  if (!days || !days.length) {
+  var scanInc = data.scanning && sp?.total > 0 && sp.done < sp.total;
+  if (!days?.length) {
     if (data.scanning) showMainChartsSkeleton(true);
     else showMainChartsSkeleton(false);
   } else if (scanInc) {
@@ -1725,7 +1772,7 @@ function renderDashboard(data, urgent) {
       window.__dashRenderScanMaxWait = setTimeout(function () {
         window.__dashRenderScanMaxWait = null;
         var d = __lastUsageData;
-        if (!d || !d.scanning) return;
+        if (!d?.scanning) return;
         clearTimeout(window.__dashRenderDebounce);
         window.__dashRenderDebounce = null;
         renderDashboardCore(d);
@@ -1766,13 +1813,13 @@ function syncForensicHostFilterBar(data) {
   var chipsHost = document.getElementById("forensic-host-filter-chips");
   var hint = document.getElementById("forensic-host-filter-hint");
   if (!wrap || !chipsHost) return;
-  var hLabs = (data && data.host_labels) || [];
+  var hLabs = data?.host_labels || [];
   if (hLabs.length <= 1) {
     wrap.setAttribute("hidden", "");
     __forensicHostFilterSig = "";
     try {
       sessionStorage.removeItem("usageForensicHostFilter");
-    } catch (e0) {}
+    } catch (error) { logClientOptionalErr(error); }
     if (hint) {
       hint.style.display = "none";
       hint.textContent = "";
@@ -1783,8 +1830,8 @@ function syncForensicHostFilterBar(data) {
   var stored = "";
   try {
     stored = sessionStorage.getItem("usageForensicHostFilter") || "";
-  } catch (e1) {}
-  if (stored && hLabs.indexOf(stored) < 0) stored = "";
+  } catch (error) { logClientOptionalErr(error); }
+  if (stored && !hLabs.includes(stored)) stored = "";
   __forensicHostFilterSig = stored;
   var hostSig = hLabs.join("\u0000");
   var lbl = document.getElementById("forensic-host-filter-label");
@@ -1794,33 +1841,33 @@ function syncForensicHostFilterBar(data) {
     wrap.dataset.filterClickBound = "1";
     chipsHost.addEventListener("click", function (ev) {
       var btn = ev.target.closest(".forensic-host-chip");
-      if (!btn) return;
-      var raw = btn.dataset.hostFilter != null ? String(btn.dataset.hostFilter) : "__ALL__";
-      var val = raw === "__ALL__" ? "" : raw;
-      __forensicHostFilterSig = val;
-      try {
-        if (val) sessionStorage.setItem("usageForensicHostFilter", val);
-        else sessionStorage.removeItem("usageForensicHostFilter");
-      } catch (e2) {}
-      var nodes = chipsHost.querySelectorAll(".forensic-host-chip");
-      for (var ni = 0; ni < nodes.length; ni++) {
-        var b = nodes[ni];
-        var rv = b.dataset.hostFilter != null ? String(b.dataset.hostFilter) : "__ALL__";
-        var nv = rv === "__ALL__" ? "" : rv;
-        var on = nv === __forensicHostFilterSig;
-        b.classList.toggle("active", on);
-        b.setAttribute("aria-pressed", on ? "true" : "false");
-      }
-      if (hint) {
-        if (__forensicHostFilterSig) {
-          hint.style.display = "";
-          hint.textContent = tr("forensicHostFilterHint", { host: __forensicHostFilterSig });
-        } else {
-          hint.style.display = "none";
-          hint.textContent = "";
+      if (btn) {
+        var raw = btn.dataset.hostFilter != null ? String(btn.dataset.hostFilter) : "__ALL__";
+        var val = raw === "__ALL__" ? "" : raw;
+        __forensicHostFilterSig = val;
+        try {
+          if (val) sessionStorage.setItem("usageForensicHostFilter", val);
+          else sessionStorage.removeItem("usageForensicHostFilter");
+        } catch (error) { logClientOptionalErr(error); }
+        var nodes = chipsHost.querySelectorAll(".forensic-host-chip");
+        for (var _node of nodes) {
+          var rv = _node.dataset.hostFilter != null ? String(_node.dataset.hostFilter) : "__ALL__";
+          var nv = rv === "__ALL__" ? "" : rv;
+          var on = nv === __forensicHostFilterSig;
+          _node.classList.toggle("active", on);
+          _node.setAttribute("aria-pressed", on ? "true" : "false");
         }
+        if (hint) {
+          if (__forensicHostFilterSig) {
+            hint.style.display = "";
+            hint.textContent = tr("forensicHostFilterHint", { host: __forensicHostFilterSig });
+          } else {
+            hint.style.display = "none";
+            hint.textContent = "";
+          }
+        }
+        if (typeof __lastUsageData !== "undefined" && __lastUsageData) renderDashboard(__lastUsageData, true);
       }
-      if (typeof __lastUsageData !== "undefined" && __lastUsageData) renderDashboard(__lastUsageData, true);
     });
   }
   if (wrap.dataset.lastHostSig !== hostSig) {
@@ -1835,13 +1882,12 @@ function syncForensicHostFilterBar(data) {
       chipsHost.appendChild(b);
     }
     addChip("", t("forensicHostFilterAll"));
-    for (var hi = 0; hi < hLabs.length; hi++) {
-      addChip(hLabs[hi], hLabs[hi]);
+    for (var _hl of hLabs) {
+      addChip(_hl, _hl);
     }
   }
   var btns = chipsHost.querySelectorAll(".forensic-host-chip");
-  for (var bi = 0; bi < btns.length; bi++) {
-    var bb = btns[bi];
+  for (var bb of btns) {
     var rv2 = bb.dataset.hostFilter != null ? String(bb.dataset.hostFilter) : "__ALL__";
     var nv2 = rv2 === "__ALL__" ? "" : rv2;
     var active = nv2 === __forensicHostFilterSig;
@@ -1865,19 +1911,19 @@ function renderDashboardCore(data) {
     var ts = new Date(data.generated);
     devSync.textContent = "Last: " + ts.toLocaleTimeString() + (data.dev_source ? " · " + (data.days || []).length + "d" : "");
   }
+  __releaseStabilityData = data.release_stability || null;
+  var disp = window.__widgetDispatcher;
+  if (disp?.init) disp.init();
+  // applyGridLayout is called inside init() — no separate call needed
+  // Section renders — dispatcher controls order + visibility
   renderProxyAnalysis(data);
   renderBudgetEfficiency(data);
+  // Intelligence section removed — Saturation/Health now in Proxy KPIs
   renderEconomicSection(data, getFilteredDays(data.days));
-  __releaseStabilityData = data.release_stability || null;
   renderUserProfileCharts(getFilteredDays(data.days));
   updateMetaDetailsSummary(data);
   var days = getFilteredDays(data.days);
   if(!days.length){
-    window.__usageVersionDayIndices = [];
-    var fsO = document.getElementById("fs-update-overlay");
-    var mO = document.getElementById("main-charts-update-overlay");
-    if (fsO) fsO.innerHTML = "";
-    if (mO) mO.innerHTML = "";
     var meta0=document.getElementById("meta");
     var ls0=document.getElementById("limit-source");
     if(ls0) ls0.textContent = apiNote(data, "limit_source_note", "limit_source_note_en");
@@ -1889,15 +1935,15 @@ function renderDashboardCore(data) {
         selScan.disabled=true;
       }
       var sp0 = data.scan_progress;
-      if (sp0 && sp0.total > 0) meta0.textContent = tr("metaScanningExpanded", { done: sp0.done, total: sp0.total, sec: data.refresh_sec || 180 });
+      if (sp0?.total > 0) meta0.textContent = tr("metaScanningExpanded", { done: sp0.done, total: sp0.total, sec: data.refresh_sec || 180 });
       else meta0.textContent=t("metaScanning");
       var sumS=document.getElementById("forensic-summary-line");if(sumS)sumS.textContent=t("metaForensicScanning");
       var fnS=document.getElementById("forensic-note");if(fnS)fnS.textContent=tr("metaForensicNoteFirst",{sec:data.refresh_sec||180});
       document.getElementById("cards").innerHTML="";
       var fcS=document.getElementById("forensic-cards");if(fcS)fcS.innerHTML="";
-      if(_charts.cForensic){try{_charts.cForensic.destroy();}catch(e){}_charts.cForensic=null;}
-      if(_charts.cForensicSignals){try{_charts.cForensicSignals.destroy();}catch(e){}_charts.cForensicSignals=null;}
-      if(_charts.cService){try{_charts.cService.destroy();}catch(e){}_charts.cService=null;}
+      if(_charts.cForensic){try{_charts.cForensic.dispose();}catch (error) { logClientOptionalErr(error); }_charts.cForensic=null;}
+      if(_charts.cForensicSignals){try{_charts.cForensicSignals.dispose();}catch (error) { logClientOptionalErr(error); }_charts.cForensicSignals=null;}
+      if(_charts.cService){try{_charts.cService.dispose();}catch (error) { logClientOptionalErr(error); }_charts.cService=null;}
       chartShellSetLoading("c-forensic", true);
       chartShellSetLoading("c-forensic-signals", true);
       chartShellSetLoading("c-service", true);
@@ -1917,9 +1963,9 @@ function renderDashboardCore(data) {
     var fn0=document.getElementById("forensic-note");if(fn0)fn0.textContent="";
     var fc0=document.getElementById("forensic-cards");if(fc0)fc0.innerHTML="";
     document.getElementById("cards").innerHTML="";
-    if(_charts.cForensic){try{_charts.cForensic.destroy();}catch(e){}_charts.cForensic=null;}
-    if(_charts.cForensicSignals){try{_charts.cForensicSignals.destroy();}catch(e){}_charts.cForensicSignals=null;}
-    if(_charts.cService){try{_charts.cService.destroy();}catch(e){}_charts.cService=null;}
+    if(_charts.cForensic){try{_charts.cForensic.dispose();}catch (error) { logClientOptionalErr(error); }_charts.cForensic=null;}
+    if(_charts.cForensicSignals){try{_charts.cForensicSignals.dispose();}catch (error) { logClientOptionalErr(error); }_charts.cForensicSignals=null;}
+    if(_charts.cService){try{_charts.cService.dispose();}catch (error) { logClientOptionalErr(error); }_charts.cService=null;}
     chartShellSetLoading("c-forensic", false);
     chartShellSetLoading("c-forensic-signals", false);
     chartShellSetLoading("c-service", false);
@@ -1927,11 +1973,13 @@ function renderDashboardCore(data) {
   }
   
   showMainChartsSkeleton(false);
-  
+  showRecomputeOverlay(false);
+  dismissWarmupOverlay();
+
   var calToday = data.calendar_today || "";
   var spM = data.scan_progress;
   var metaLine =
-    data.scanning && spM && spM.total > 0 && spM.done < spM.total
+    data.scanning && spM?.total > 0 && spM.done < spM.total
       ? tr("metaParsedInProgress", {
           done: spM.done,
           total: spM.total,
@@ -1946,12 +1994,12 @@ function renderDashboardCore(data) {
   document.getElementById("meta").textContent = metaLine;
   
   var selEl = document.getElementById("day-picker");
-  var prevSel = selEl && selEl.value ? selEl.value : "";
+  var prevSel = selEl?.value ? selEl.value : "";
   if (!prevSel) {
-    try { prevSel = sessionStorage.getItem("usageDashboardDay") || ""; } catch (e) {}
+    try { prevSel = sessionStorage.getItem("usageDashboardDay") || ""; } catch (error) { logClientOptionalErr(error); }
   }
   var valid = {};
-  for (var vi = 0; vi < days.length; vi++) valid[days[vi].date] = true;
+  for (var _vd of days) valid[_vd.date] = true;
   var pick = prevSel;
   if (selEl) {
     selEl.innerHTML = "";
@@ -1978,7 +2026,7 @@ function renderDashboardCore(data) {
     if (!selEl.dataset.bound) {
       selEl.dataset.bound = "1";
       selEl.addEventListener("change", function () {
-        try { sessionStorage.setItem("usageDashboardDay", this.value); } catch (e) {}
+        try { sessionStorage.setItem("usageDashboardDay", this.value); } catch (error) { logClientOptionalErr(error); }
         if (__lastUsageData) renderDashboard(__lastUsageData, true);
       });
     }
@@ -1993,8 +2041,8 @@ function renderDashboardCore(data) {
     }
   }
   var selDay = null;
-  for (var sj = 0; sj < days.length; sj++) {
-    if (days[sj].date === pick) { selDay = days[sj]; break; }
+  for (var _sd of days) {
+    if (_sd.date === pick) { selDay = _sd; break; }
   }
   if (!selDay) selDay = days[days.length - 1];
   var hLabs = data.host_labels || [];
@@ -2004,7 +2052,7 @@ function renderDashboardCore(data) {
   var prevDPick = window.__usageDetailDayPick;
   window.__usageDetailDayPick = pick;
   if (typeof prevDPick !== "undefined" && prevDPick !== pick) window.__usageDetailHost = null;
-  if (window.__usageDetailHost && (!multiHost || !selDay.hosts || !selDay.hosts[window.__usageDetailHost])) window.__usageDetailHost = null;
+  if (window.__usageDetailHost && (!multiHost || !selDay.hosts?.[window.__usageDetailHost])) window.__usageDetailHost = null;
   var hintEl = document.getElementById("day-picker-hint");
   if (hintEl) {
     hintEl.textContent = (pick === calToday && (selDay.total || 0) === 0) ? t("dayPickerHintZero") : "";
@@ -2037,1491 +2085,22 @@ function renderDashboardCore(data) {
   var fn = document.getElementById("forensic-note");
   if(fn) fn.textContent = apiNote(data, "forensic_note", "forensic_note_en");
   document.getElementById("live-label").textContent = tr("liveConnected",{time:new Date().toLocaleTimeString()});
-  
-  // --- Summary cards (gewählter Tag im Dropdown); Host-Filter steuert Tages-/Peak-/Forensic-Kennzahlen ---
-  var fhCard = getForensicHostFilterForCharts();
-  var hSlicePick = fhCard && selDay.hosts && selDay.hosts[fhCard] ? selDay.hosts[fhCard] : null;
-  var emptyHostDay = {
-    output: 0,
-    cache_read: 0,
-    total: 0,
-    calls: 0,
-    active_hours: 0,
-    cache_output_ratio: 0,
-    overhead: 0,
-    hit_limit: 0,
-    session_signals: { continue: 0, resume: 0, retry: 0, interrupt: 0 }
-  };
-  var cardBase = fhCard ? hSlicePick || emptyHostDay : selDay;
-  var totalOut = fhCard ? sumHostNumericField(days, fhCard, "output") : days.reduce(function (s, d) { return s + d.output; }, 0);
-  var totalCache = fhCard ? sumHostNumericField(days, fhCard, "cache_read") : days.reduce(function (s, d) { return s + d.cache_read; }, 0);
-  var totalAll = fhCard
-    ? days.reduce(function (s, d) {
-        var hh = d.hosts && d.hosts[fhCard];
-        return s + (hh ? hh.total || 0 : 0);
-      }, 0)
-    : days.reduce(function (s, d) { return s + d.total; }, 0);
-  var peak = fhCard
-    ? (function () {
-        var hp = findHostPeakAcrossDays(days, fhCard);
-        return { date: hp.date, total: hp.total };
-      })()
-    : days.reduce(function (a, b) { return a.total > b.total ? a : b; });
-  var selTotalForBudget = cardBase.total || 0;
-  var budgetRatio =
-    peak.total > 0 && selTotalForBudget > 0 ? Math.round(peak.total / (selTotalForBudget / 0.9)) : 0;
-  var hitSel = fhCard ? (hSlicePick ? hSlicePick.hit_limit || 0 : 0) : selDay.hit_limit || 0;
-  var hitAll = fhCard
-    ? days.reduce(function (s, d) {
-        var hh = d.hosts && d.hosts[fhCard];
-        return s + (hh ? hh.hit_limit || 0 : 0);
-      }, 0)
-    : days.reduce(function (s, d) { return s + (d.hit_limit || 0); }, 0);
-  var fc;
-  var fwarn;
-  var impl90;
-  var forensicHintF;
-  if (fhCard) {
-    var rHost = hostApiToForensicRow(hSlicePick);
-    var hpK = findHostPeakAcrossDays(days, fhCard);
-    var fHost = computeForensicForDayClient(pick, rHost, hpK.date, hpK.total);
-    fc = fHost.forensic_code;
-    forensicHintF = fHost.forensic_hint;
-    impl90 = fHost.forensic_implied_cap_90;
-    fwarn = fc === "?" || fc === "HIT" || fc === "<<P";
-  } else {
-    fc = selDay.forensic_code || "\u2014";
-    forensicHintF = selDay.forensic_hint || "";
-    fwarn = fc === "?" || fc === "HIT" || fc === "<<P";
-    impl90 = selDay.forensic_implied_cap_90 || 0;
-  }
-  var sumEl = document.getElementById("forensic-summary-line");
-  if (sumEl) {
-    var sumLine = tr("forensicSummaryLine", {
-      pick: pick,
-      fc: fc,
-      impl: impl90 > 0 ? fmt(impl90) : "\u2014",
-      bud: String(budgetRatio),
-      peak: peak.date || "\u2014"
-    });
-    if (fhCard) sumLine += tr("forensicSummaryHostSuffix", { host: fhCard });
-    sumEl.textContent = sumLine;
-  }
-  var cards = [
-    { label: t("cardDayOutput"), value: fmt(cardBase.output || 0), sub: selDay.date, cls: "" },
-    {
-      label: t("cardDayCacheRead"),
-      value: fmt(cardBase.cache_read || 0),
-      sub: tr("cardCacheOutSub", { ratio: cardBase.cache_output_ratio || 0 }),
-      cls: (cardBase.cache_output_ratio || 0) > 500 ? "warn" : ""
-    },
-    {
-      label: t("cardDayTotal"),
-      value: fmt(cardBase.total || 0),
-      sub: tr("cardCallsActiveSub", { calls: cardBase.calls || 0, hours: cardBase.active_hours || 0 }),
-      cls: ""
-    },
-    { label: t("cardHitDay"), value: String(hitSel), sub: t("cardHitDaySub"), cls: hitSel > 0 ? "warn" : "ok" },
-    { label: t("cardHitAll"), value: String(hitAll), sub: t("cardHitAllSub"), cls: hitAll > 0 ? "warn" : "" },
-    {
-      label: t("cardOverhead"),
-      value: (cardBase.overhead || 0) + "x",
-      sub: t("cardOverheadSub"),
-      cls: (cardBase.overhead || 0) > 1000 ? "danger" : ""
-    },
-    { label: t("cardPeak"), value: fmt(peak.total || 0), sub: tr("cardPeakSub", { date: peak.date || "\u2014" }), cls: "ok" },
-    { label: t("cardAllOut"), value: fmt(totalOut), sub: tr("cardAllOutSub", { days: days.length }), cls: "" },
-    { label: t("cardAllCache"), value: fmt(totalCache), sub: tr("cardAllCacheSub", { pct: pct(totalCache, totalAll) }), cls: "" }
-  ];
-  var ssSel = cardBase.session_signals || {};
-  var ssc = ssSel.continue || 0;
-  var ssr = ssSel.resume || 0;
-  var ssy = ssSel.retry || 0;
-  var ssi = ssSel.interrupt || 0;
-  cards.push({
-    label: t("cardSessionSignals"),
-    value: String(ssc + ssr + ssy + ssi),
-    sub: tr("cardSessionSignalsSub", { c: String(ssc), r: String(ssr), y: String(ssy), i: String(ssi) }),
-    cls: ssy + ssi > 0 ? "warn" : ""
-  });
-  if (multiHost && selDay.hosts) {
-    for (var hci = 0; hci < hLabs.length; hci++) {
-      var hlbl = hLabs[hci];
-      var hday = selDay.hosts[hlbl];
-      if (!hday) continue;
-      var hhit = hday.hit_limit || 0;
-      cards.push({
-        label: hlbl + t("cardHostParen"),
-        value: fmt(hday.total),
-        sub: tr("cardHostSub", { out: fmt(hday.output), calls: hday.calls, hit: String(hhit) }),
-        cls: hhit > 0 ? "warn" : ""
-      });
-    }
-  }
-  var fcards = [
-    { label: t("fcForensicDay"), value: fc, sub: forensicHintF, cls: fwarn ? "warn" : "" },
-    { label: t("fcImpl"), value: impl90 > 0 ? fmt(impl90) : "\u2014", sub: t("fcImplSub"), cls: "" },
-    { label: t("fcBudget"), value: "~" + budgetRatio + "x", sub: t("fcBudgetSub"), cls: budgetRatio > 10 ? "danger" : "warn" }
-  ];
-  var chtml="";
-  cards.forEach(function(c){chtml+="<div class=\"card "+c.cls+"\"><div class=\"label\">"+escHtml(c.label)+"</div><div class=\"value\">"+escHtml(c.value)+"</div><div class=\"sub\">"+escHtml(c.sub)+"</div></div>";});
-  var _ce=document.getElementById("cards");if(_ce&&_ce.innerHTML!==chtml)_ce.innerHTML=chtml;
-  var tsSum=document.getElementById("token-stats-summary-line");
-  if(tsSum) tsSum.textContent=tr("tokenStatsSummary",{date:selDay.date||"",out:fmt(cardBase.output||0),cache:fmt(cardBase.cache_read||0),overhead:(cardBase.overhead||0)+"x"});
-  var fch="";
-  fcards.forEach(function(c){fch+="<div class=\"card "+c.cls+"\"><div class=\"label\">"+escHtml(c.label)+"</div><div class=\"value\">"+escHtml(c.value)+"</div><div class=\"sub\">"+escHtml(c.sub)+"</div></div>";});
-  var fcg=document.getElementById("forensic-cards");if(fcg&&fcg.innerHTML!==fch)fcg.innerHTML=fch;
-  
-  // --- Charts ---
-  var labels = days.map(function(d){return d.date.slice(5)});
-  var mainScope = getMainChartsScope();
-  var hourlyMode = mainScope === "hourly";
-  var hourLabs = buildHourlyAxisLabels();
-  var dayForHourly = selDay;
-  var fhForMainCharts = getForensicHostFilterForCharts();
-  var mainHostKey =
-    multiHost && fhForMainCharts && hLabs.indexOf(fhForMainCharts) >= 0 ? fhForMainCharts : "";
-  var c4TimelineHostStack = multiHost && !mainHostKey;
-  destroyMainChartIfScopeMismatch(mainScope, "c1");
-  destroyMainChartIfScopeMismatch(mainScope, "c2");
-  destroyMainChartIfScopeMismatch(mainScope, "c3");
-  destroyMainChartIfScopeMismatch(mainScope, "c4");
-  if (_charts.c1hosts && _charts.c1hosts._dashScope !== mainScope) {
-    try {
-      _charts.c1hosts.destroy();
-    } catch (eHs) {}
-    _charts.c1hosts = null;
-  }
-  window.__usageVersionDayIndices = [];
-  for (var uxi = 0; uxi < days.length; uxi++) {
-    if (days[uxi].version_change) window.__usageVersionDayIndices.push(uxi);
-  }
 
-  // Haupt-Chart-Boxen stehen in tpl/dashboard.html (c1–c4); nur Host-Box ggf. einfügen.
-  (function reorderChartBoxes(){
-    var cr = document.getElementById("charts");
-    var pair = document.getElementById("charts-host-sub");
-    if (!cr || !pair) return;
-    var c1b = document.getElementById("c1") && document.getElementById("c1").closest(".chart-box");
-    var c2b = document.getElementById("c2") && document.getElementById("c2").closest(".chart-box");
-    var c3b = document.getElementById("c3") && document.getElementById("c3").closest(".chart-box");
-    var hb = document.getElementById("chart-host-wrap");
-    var c4b = document.getElementById("c4") && document.getElementById("c4").closest(".chart-box");
-    if (c1b) cr.appendChild(c1b);
-    if (c2b) cr.appendChild(c2b);
-    if (hb) pair.appendChild(hb);
-    if (c3b) pair.appendChild(c3b);
-    if (c4b) pair.appendChild(c4b);
-  })();
-  
-  var elc1 = document.getElementById("c1");
-  if (elc1 && elc1.previousElementSibling && elc1.previousElementSibling.tagName === "H3") {
-    elc1.previousElementSibling.textContent = hourlyMode
-      ? t("chartDailyTokenHourly") + " (" + pick + ")"
-      : t("chartDailyToken");
-  }
-  var elc2 = document.getElementById("c2");
-  if (elc2 && elc2.previousElementSibling && elc2.previousElementSibling.tagName === "H3") {
-    elc2.previousElementSibling.textContent = hourlyMode ? t("chartCacheRatioHourly") : t("chartCacheRatio");
-  }
-
-  var c1Reuse = false;
-  if (hourlyMode) {
-    c1Reuse =
-      _charts.c1 &&
-      _charts.c1.data.datasets.length === 3 &&
-      _charts.c1.data.datasets[0].label === t("chartDS_cacheRead") &&
-      chartXLabelsMatch(_charts.c1, hourLabs);
-    if (c1Reuse) {
-      _charts.c1.options.transitions = __mainChartTransitions;
-      _charts.c1.options.resizeDelay = 200;
-      _charts.c1.data.labels = hourLabs.slice();
-      var c1dh = _charts.c1.data.datasets;
-      c1dh[0].data = estimatedFieldPerHourHost(dayForHourly, mainHostKey, "cache_read");
-      c1dh[1].data = estimatedFieldPerHourHost(dayForHourly, mainHostKey, "output");
-      c1dh[2].data = estimatedFieldPerHourHost(dayForHourly, mainHostKey, "cache_creation");
-      _charts.c1.update("none");
-    } else {
-      if (_charts.c1) {
-        try {
-          _charts.c1.destroy();
-        } catch (eC1h) {}
-        _charts.c1 = null;
-      }
-      _charts.c1 = new Chart(elc1, {
-        type: "bar",
-        data: {
-          labels: hourLabs,
-          datasets: [
-            {
-              label: t("chartDS_cacheRead"),
-              data: estimatedFieldPerHourHost(dayForHourly, mainHostKey, "cache_read"),
-              backgroundColor: "rgba(139,92,246,0.7)",
-              stack: "tok",
-              yAxisID: "y"
-            },
-            {
-              label: t("chartDS_output"),
-              data: estimatedFieldPerHourHost(dayForHourly, mainHostKey, "output"),
-              backgroundColor: "rgba(59,130,246,0.9)",
-              stack: "tok",
-              yAxisID: "y"
-            },
-            {
-              label: t("chartDS_cacheCreate"),
-              data: estimatedFieldPerHourHost(dayForHourly, mainHostKey, "cache_creation"),
-              backgroundColor: "rgba(6,182,212,0.5)",
-              stack: "tok",
-              yAxisID: "y"
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          resizeDelay: 200,
-          animation: false,
-          transitions: __mainChartTransitions,
-          interaction: { mode: "index", intersect: false },
-          scales: {
-            x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" } },
-            y: {
-              stacked: true,
-              position: "left",
-              ticks: { callback: function (v) { return fmt(v); } },
-              grid: { color: "rgba(51,65,85,0.5)" },
-              title: { display: true, text: t("unifiedAxisTokens"), color: "#94a3b8" }
-            }
-          },
-          plugins: {
-            legend: { labels: { color: "#cbd5e1" } },
-            tooltip: {
-              callbacks: {
-                label: function (c) { return c.dataset.label + ": " + fmt(c.raw); },
-                footer: function () {
-                  return (
-                    t("chartTooltipHourlyTokenEst") +
-                    " | C:O " +
-                    String(dayForHourly.cache_output_ratio || 0) +
-                    "x (" +
-                    dayForHourly.date +
-                    ")"
-                  );
-                }
-              }
-            }
-          }
-        }
-      });
-    }
-  } else {
-    c1Reuse =
-      _charts.c1 &&
-      _charts.c1.data.datasets.length === 3 &&
-      _charts.c1.data.datasets[0].label === t("chartDS_cacheRead") &&
-      (chartXLabelsMatch(_charts.c1, labels) || chartLabelsPrefixMatch(_charts.c1, labels));
-    if (c1Reuse) {
-      _charts.c1.options.transitions = __mainChartTransitions;
-      _charts.c1.options.resizeDelay = 200;
-      _charts.c1.data.labels = labels.slice();
-      var c1d = _charts.c1.data.datasets;
-      c1d[0].data = days.map(function (d) { return dayNumericForMainCharts(d, mainHostKey, "cache_read"); });
-      c1d[1].data = days.map(function (d) { return dayNumericForMainCharts(d, mainHostKey, "output"); });
-      c1d[2].data = days.map(function (d) { return dayNumericForMainCharts(d, mainHostKey, "cache_creation"); });
-      _charts.c1.update("none");
-    } else {
-      if (_charts.c1) {
-        try {
-          _charts.c1.destroy();
-        } catch (eC1) {}
-        _charts.c1 = null;
-      }
-      _charts.c1 = new Chart(elc1, {
-        type: "bar",
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: t("chartDS_cacheRead"),
-              data: days.map(function (d) { return dayNumericForMainCharts(d, mainHostKey, "cache_read"); }),
-              backgroundColor: "rgba(139,92,246,0.7)",
-              stack: "tok",
-              yAxisID: "y"
-            },
-            {
-              label: t("chartDS_output"),
-              data: days.map(function (d) { return dayNumericForMainCharts(d, mainHostKey, "output"); }),
-              backgroundColor: "rgba(59,130,246,0.9)",
-              stack: "tok",
-              yAxisID: "y"
-            },
-            {
-              label: t("chartDS_cacheCreate"),
-              data: days.map(function (d) { return dayNumericForMainCharts(d, mainHostKey, "cache_creation"); }),
-              backgroundColor: "rgba(6,182,212,0.5)",
-              stack: "tok",
-              yAxisID: "y"
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          resizeDelay: 200,
-          animation: false,
-          transitions: __mainChartTransitions,
-          interaction: { mode: "index", intersect: false },
-          scales: {
-            x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" } },
-            y: { stacked: true, position: "left", ticks: { callback: function (v) { return fmt(v); } }, grid: { color: "rgba(51,65,85,0.5)" }, title: { display: true, text: t("unifiedAxisTokens"), color: "#94a3b8" } }
-          },
-          plugins: {
-            legend: { labels: { color: "#cbd5e1" } },
-            tooltip: {
-              callbacks: {
-                label: function (c) { return c.dataset.label + ": " + fmt(c.raw); },
-                footer: function (items) {
-                  if (!items.length) return "";
-                  var di = items[0].dataIndex;
-                  return tr("chartTooltipCoDay", { ratio: String(dayRatioCacheOutForMainCharts(days[di], mainHostKey)) });
-                }
-              }
-            }
-          }
-        }
-      });
+  // --- Token Stats + Forensic via extracted sections ---
+  var __sectionCtx = { data: data, days: days, selDay: selDay, pick: pick, hLabs: hLabs, multiHost: multiHost };
+  if (typeof renderTokenStatsSection === 'function') {
+    var __tsResult = renderTokenStatsSection(__sectionCtx);
+    if (typeof renderForensicSection === 'function') {
+      renderForensicSection(__sectionCtx, __tsResult);
     }
   }
-  if (_charts.c1) _charts.c1._dashScope = mainScope;
-
-  var hostBarColors = ["rgba(59,130,246,0.88)","rgba(167,139,250,0.88)","rgba(52,211,153,0.88)","rgba(251,191,36,0.88)","rgba(249,115,22,0.88)","rgba(236,72,153,0.88)"];
-  if (multiHost && !hourlyMode && !mainHostKey) {
-    if (!document.getElementById("c1-hosts")) {
-      var ch1h = document.createElement("div");
-      ch1h.className = "chart-box";
-      ch1h.id = "chart-host-wrap";
-      ch1h.innerHTML = "<h3></h3><p style=\"font-size:.72rem;color:#94a3b8;margin:4px 0 10px;line-height:1.4\"></p><canvas id=\"c1-hosts\"></canvas>";
-      var pairIns = document.getElementById("charts-host-sub");
-      if (pairIns) {
-        if (pairIns.firstChild) pairIns.insertBefore(ch1h, pairIns.firstChild);
-        else pairIns.appendChild(ch1h);
-      }
-    }
-    var pairBar = document.getElementById("charts-host-sub");
-    if (pairBar) pairBar.classList.remove("no-host-chart");
-    var chw = document.getElementById("chart-host-wrap");
-    if (chw) {
-      chw.style.display = "";
-      var h3h = chw.querySelector("h3");
-      var ph = chw.querySelector("p");
-      if (h3h) h3h.textContent = t("chartHostTitle");
-      if (ph) ph.textContent = t("chartHostBlurb");
-    }
-    var dsH = [];
-    for (var hli = 0; hli < hLabs.length; hli++) {
-      var lb0 = hLabs[hli];
-      dsH.push({label: lb0,data: days.map(function(d){ var x = d.hosts && d.hosts[lb0]; return x ? (x.total || 0) : 0;}),backgroundColor: hostBarColors[hli % hostBarColors.length],stack: "h"});
-    }
-    var c1hReuse =
-      _charts.c1hosts &&
-      _charts.c1hosts.data.datasets.length === hLabs.length &&
-      (chartXLabelsMatch(_charts.c1hosts, labels) || chartLabelsPrefixMatch(_charts.c1hosts, labels));
-    if (c1hReuse) {
-      for (var hci = 0; hci < hLabs.length; hci++) {
-        if (_charts.c1hosts.data.datasets[hci].label !== hLabs[hci]) {
-          c1hReuse = false;
-          break;
-        }
-      }
-    }
-    if (c1hReuse) {
-      _charts.c1hosts.options.transitions = __mainChartTransitions;
-      _charts.c1hosts.options.resizeDelay = 200;
-      _charts.c1hosts.data.labels = labels.slice();
-      for (var hliU = 0; hliU < hLabs.length; hliU++) {
-        var lbU = hLabs[hliU];
-        _charts.c1hosts.data.datasets[hliU].data = days.map(function (d) {
-          var x = d.hosts && d.hosts[lbU];
-          return x ? (x.total || 0) : 0;
-        });
-      }
-      _charts.c1hosts.update("none");
-    } else {
-      if (_charts.c1hosts) {
-        try { _charts.c1hosts.destroy(); } catch (e1h) {}
-        _charts.c1hosts = null;
-      }
-      _charts.c1hosts = new Chart(document.getElementById("c1-hosts"), {
-        type: "bar",
-        data: { labels: labels, datasets: dsH },
-        options: {
-          responsive: true,
-          resizeDelay: 200,
-          animation: false,
-          transitions: __mainChartTransitions,
-          scales: {
-            x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" } },
-            y: { stacked: true, ticks: { callback: function (v) { return fmt(v); } }, grid: { color: "rgba(51,65,85,0.5)" } }
-          },
-          plugins: {
-            legend: { labels: { color: "#cbd5e1" } },
-            tooltip: {
-              callbacks: {
-                label: function (c) { return c.dataset.label + ": " + fmt(c.parsed.y); },
-                footer: function (tipItems) {
-                  if (!tipItems.length) return "";
-                  var di = tipItems[0].dataIndex;
-                  var segs = [];
-                  for (var ci = 0; ci < tipItems.length; ci++) {
-                    var L = tipItems[ci].dataset.label;
-                    var hh = days[di].hosts && days[di].hosts[L];
-                    if (hh) segs.push(tr("chartTooltipCoHostLine", { host: L, ratio: String(hh.cache_output_ratio) }));
-                  }
-                  var s = 0;
-                  for (var fi = 0; fi < tipItems.length; fi++) s += tipItems[fi].parsed.y || 0;
-                  return (segs.length ? segs.join(" · ") + " | " : "") + t("hostStackFooter") + fmt(s);
-                }
-              }
-            }
-          }
-        }
-      });
-    }
-    if (_charts.c1hosts) _charts.c1hosts._dashScope = mainScope;
-  } else {
-    if (_charts.c1hosts) {
-      try { _charts.c1hosts.destroy(); } catch (eH0) {}
-      _charts.c1hosts = null;
-    }
-    var chw2 = document.getElementById("chart-host-wrap");
-    if (chw2) chw2.style.display = "none";
-    var pairBar2 = document.getElementById("charts-host-sub");
-    if (pairBar2) pairBar2.classList.add("no-host-chart");
+  // Render extracted charts in standalone wrappers (after all section contexts are set)
+  if (globalThis.__widgetDispatcher?.dispatchRender) {
+    globalThis.__widgetDispatcher.dispatchRender(data, days);
   }
-
-  var c2Reuse = false;
-  if (hourlyMode) {
-    c2Reuse =
-      _charts.c2 &&
-      _charts.c2.data.datasets.length === 1 &&
-      _charts.c2.data.datasets[0].label === t("chartLineCacheOut") &&
-      chartXLabelsMatch(_charts.c2, hourLabs);
-    if (c2Reuse) {
-      _charts.c2.options.transitions = __mainChartTransitions;
-      _charts.c2.options.resizeDelay = 200;
-      _charts.c2.data.labels = hourLabs.slice();
-      _charts.c2.data.datasets[0].data = hourlyCacheOutRatioEstHost(dayForHourly, mainHostKey);
-      _charts.c2.update("none");
-    } else {
-      if (_charts.c2) {
-        try {
-          _charts.c2.destroy();
-        } catch (eC2h) {}
-        _charts.c2 = null;
-      }
-      _charts.c2 = new Chart(elc2, {
-        type: "line",
-        data: {
-          labels: hourLabs,
-          datasets: [
-            {
-              label: t("chartLineCacheOut"),
-              data: hourlyCacheOutRatioEstHost(dayForHourly, mainHostKey),
-              borderColor: "#f59e0b",
-              backgroundColor: "rgba(245,158,11,0.1)",
-              fill: true,
-              tension: 0.3
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          resizeDelay: 200,
-          animation: false,
-          transitions: __mainChartTransitions,
-          scales: { y: { beginAtZero: true } },
-          plugins: {
-            tooltip: {
-              callbacks: {
-                label: function (c) { return c.raw + "x"; },
-                footer: function () {
-                  return t("chartTooltipHourlyTokenEst");
-                }
-              }
-            }
-          }
-        }
-      });
-    }
-  } else {
-    c2Reuse =
-      _charts.c2 &&
-      _charts.c2.data.datasets.length === 1 &&
-      _charts.c2.data.datasets[0].label === t("chartLineCacheOut") &&
-      (chartXLabelsMatch(_charts.c2, labels) || chartLabelsPrefixMatch(_charts.c2, labels));
-    if (c2Reuse) {
-      _charts.c2.options.transitions = __mainChartTransitions;
-      _charts.c2.options.resizeDelay = 200;
-      _charts.c2.data.labels = labels.slice();
-      _charts.c2.data.datasets[0].data = days.map(function (d) { return dayRatioCacheOutForMainCharts(d, mainHostKey); });
-      _charts.c2.update("none");
-    } else {
-      if (_charts.c2) {
-        try {
-          _charts.c2.destroy();
-        } catch (eC2) {}
-        _charts.c2 = null;
-      }
-      _charts.c2 = new Chart(elc2, {
-        type: "line",
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: t("chartLineCacheOut"),
-              data: days.map(function (d) { return dayRatioCacheOutForMainCharts(d, mainHostKey); }),
-              borderColor: "#f59e0b",
-              backgroundColor: "rgba(245,158,11,0.1)",
-              fill: true,
-              tension: 0.3
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          resizeDelay: 200,
-          animation: false,
-          transitions: __mainChartTransitions,
-          scales: { y: { beginAtZero: true } },
-          plugins: {
-            tooltip: {
-              callbacks: {
-                label: function (c) { return c.raw + "x"; },
-                footer: function (items) {
-                  if (!items.length) return "";
-                  var di = items[0].dataIndex;
-                  var d = days[di];
-                  if (mainHostKey && d.hosts && d.hosts[mainHostKey]) {
-                    var hh = d.hosts[mainHostKey];
-                    return tr("chartTooltipOutCacheDay", { out: fmt(hh.output), cache: fmt(hh.cache_read) });
-                  }
-                  return tr("chartTooltipOutCacheDay", { out: fmt(d.output), cache: fmt(d.cache_read) });
-                }
-              }
-            }
-          }
-        }
-      });
-    }
+  if (globalThis.__widgetDispatcher?.applyAllChartVisibility) {
+    globalThis.__widgetDispatcher.applyAllChartVisibility();
   }
-  if (_charts.c2) _charts.c2._dashScope = mainScope;
-
-  var elc3 = document.getElementById("c3");
-  if (elc3 && elc3.previousElementSibling && elc3.previousElementSibling.tagName === "H3") {
-    elc3.previousElementSibling.textContent = hourlyMode ? t("chartOutPerHourHourly") : t("chartOutPerHour");
-  }
-  var elc4 = document.getElementById("c4");
-  if (elc4 && elc4.previousElementSibling && elc4.previousElementSibling.tagName === "H3") {
-    elc4.previousElementSibling.textContent = hourlyMode ? t("chartSubCachePctHourly") : t("chartSubCachePct");
-  }
-
-  var c3Reuse = false;
-  if (hourlyMode) {
-    var hwC = mainHostKey
-      ? dayHourCallWeights({
-          hours:
-            (dayForHourly.hosts &&
-              dayForHourly.hosts[mainHostKey] &&
-              dayForHourly.hosts[mainHostKey].hours) ||
-            {},
-          calls:
-            dayForHourly.hosts &&
-            dayForHourly.hosts[mainHostKey] &&
-            dayForHourly.hosts[mainHostKey].calls != null
-              ? dayForHourly.hosts[mainHostKey].calls
-              : dayForHourly.calls || 0
-        })
-      : dayHourCallWeights(dayForHourly);
-    c3Reuse =
-      _charts.c3 &&
-      _charts.c3.data.datasets.length === 1 &&
-      _charts.c3.data.datasets[0].label === t("chartHourlyApiEventsLabel") &&
-      chartXLabelsMatch(_charts.c3, hourLabs);
-    if (c3Reuse) {
-      _charts.c3.options.transitions = __mainChartTransitions;
-      _charts.c3.options.resizeDelay = 200;
-      _charts.c3.data.labels = hourLabs.slice();
-      _charts.c3.data.datasets[0].data = hwC.w.slice();
-      _charts.c3.update("none");
-    } else {
-      if (_charts.c3) {
-        try {
-          _charts.c3.destroy();
-        } catch (eC3h) {}
-        _charts.c3 = null;
-      }
-      _charts.c3 = new Chart(elc3, {
-        type: "bar",
-        data: {
-          labels: hourLabs,
-          datasets: [
-            {
-              label: t("chartHourlyApiEventsLabel"),
-              data: hwC.w.slice(),
-              backgroundColor: "rgba(34,197,94,0.7)"
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          resizeDelay: 200,
-          animation: false,
-          transitions: __mainChartTransitions,
-          scales: {
-            y: { beginAtZero: true, ticks: { callback: function (v) { return fmt(v); } } }
-          },
-          plugins: { tooltip: { callbacks: { label: function (c) { return fmt(c.raw) + "/h"; } } } }
-        }
-      });
-    }
-  } else {
-    c3Reuse =
-      _charts.c3 &&
-      _charts.c3.data.datasets.length === 1 &&
-      _charts.c3.data.datasets[0].label === t("chartOutPerHLabel") &&
-      (chartXLabelsMatch(_charts.c3, labels) || chartLabelsPrefixMatch(_charts.c3, labels));
-    if (c3Reuse) {
-      _charts.c3.options.transitions = __mainChartTransitions;
-      _charts.c3.options.resizeDelay = 200;
-      _charts.c3.data.labels = labels.slice();
-      _charts.c3.data.datasets[0].data = days.map(function (d) { return dayOutputPerHourForMainCharts(d, mainHostKey); });
-      _charts.c3.update("none");
-    } else {
-      if (_charts.c3) {
-        try {
-          _charts.c3.destroy();
-        } catch (eC3) {}
-        _charts.c3 = null;
-      }
-      _charts.c3 = new Chart(elc3, {
-        type: "bar",
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: t("chartOutPerHLabel"),
-              data: days.map(function (d) { return dayOutputPerHourForMainCharts(d, mainHostKey); }),
-              backgroundColor: "rgba(34,197,94,0.7)"
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          resizeDelay: 200,
-          animation: false,
-          transitions: __mainChartTransitions,
-          scales: { y: { ticks: { callback: function (v) { return fmt(v); } } } },
-          plugins: { tooltip: { callbacks: { label: function (c) { return fmt(c.raw) + "/h"; } } } }
-        }
-      });
-    }
-  }
-  if (_charts.c3) _charts.c3._dashScope = mainScope;
-
-  if (hourlyMode) {
-    var c4Rh =
-      _charts.c4 &&
-      _charts.c4.data.datasets.length === 4 &&
-      _charts.c4.data.datasets[0].label === t("forensicDS_continueStack") &&
-      chartXLabelsMatch(_charts.c4, hourLabs);
-    if (c4Rh) {
-      _charts.c4.options.transitions = __mainChartTransitions;
-      _charts.c4.options.resizeDelay = 200;
-      _charts.c4.data.labels = hourLabs.slice();
-      var d4h = _charts.c4.data.datasets;
-      d4h[0].data = hourSignalsArrayForHost(dayForHourly, mainHostKey, "continue");
-      d4h[1].data = hourSignalsArrayForHost(dayForHourly, mainHostKey, "resume");
-      d4h[2].data = hourSignalsArrayForHost(dayForHourly, mainHostKey, "retry");
-      d4h[3].data = hourSignalsArrayForHost(dayForHourly, mainHostKey, "interrupt");
-      _charts.c4.update("none");
-    } else {
-      if (_charts.c4) {
-        try {
-          _charts.c4.destroy();
-        } catch (eC4h) {}
-        _charts.c4 = null;
-      }
-      _charts.c4 = new Chart(elc4, {
-        type: "bar",
-        data: {
-          labels: hourLabs,
-          datasets: [
-            {
-              label: t("forensicDS_continueStack"),
-              data: hourSignalsArrayForHost(dayForHourly, mainHostKey, "continue"),
-              backgroundColor: "rgba(59,130,246,0.75)",
-              stack: "hsig"
-            },
-            {
-              label: t("forensicDS_resumeStack"),
-              data: hourSignalsArrayForHost(dayForHourly, mainHostKey, "resume"),
-              backgroundColor: "rgba(6,182,212,0.7)",
-              stack: "hsig"
-            },
-            {
-              label: t("forensicDS_retryStack"),
-              data: hourSignalsArrayForHost(dayForHourly, mainHostKey, "retry"),
-              backgroundColor: "rgba(239,68,68,0.65)",
-              stack: "hsig"
-            },
-            {
-              label: t("forensicDS_interruptStack"),
-              data: hourSignalsArrayForHost(dayForHourly, mainHostKey, "interrupt"),
-              backgroundColor: "rgba(251,191,36,0.55)",
-              stack: "hsig"
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          resizeDelay: 200,
-          animation: false,
-          transitions: __mainChartTransitions,
-          scales: {
-            x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" } },
-            y: { stacked: true, beginAtZero: true, ticks: { precision: 0 }, grid: { color: "rgba(51,65,85,0.5)" } }
-          },
-          plugins: {
-            legend: { labels: { color: "#cbd5e1", boxWidth: 12 } },
-            tooltip: {
-              callbacks: {
-                label: function (c) {
-                  return c.dataset.label + ": " + c.raw;
-                }
-              }
-            }
-          }
-        }
-      });
-    }
-    if (_charts.c4) _charts.c4._dashScope = mainScope;
-  } else {
-    var c4Reuse = false;
-    if (c4TimelineHostStack) {
-      c4Reuse =
-        _charts.c4 &&
-        _charts.c4.data.datasets.length === hLabs.length &&
-        _charts.c4.data.datasets[0] &&
-        _charts.c4.data.datasets[0].stack === "subcache" &&
-        (chartXLabelsMatch(_charts.c4, labels) || chartLabelsPrefixMatch(_charts.c4, labels));
-      if (c4Reuse) {
-        for (var c4j = 0; c4j < hLabs.length; c4j++) {
-          if (_charts.c4.data.datasets[c4j].label !== hLabs[c4j]) {
-            c4Reuse = false;
-            break;
-          }
-        }
-      }
-    } else {
-      c4Reuse =
-        _charts.c4 &&
-        _charts.c4.data.datasets.length === 1 &&
-        _charts.c4.data.datasets[0].label === t("chartSubCachePct") &&
-        !_charts.c4.data.datasets[0].stack &&
-        (chartXLabelsMatch(_charts.c4, labels) || chartLabelsPrefixMatch(_charts.c4, labels));
-    }
-
-    if (c4Reuse) {
-      _charts.c4.options.transitions = __mainChartTransitions;
-      _charts.c4.options.resizeDelay = 200;
-      _charts.c4.data.labels = labels.slice();
-      if (c4TimelineHostStack) {
-        for (var c4k = 0; c4k < hLabs.length; c4k++) {
-          var lbC = hLabs[c4k];
-          _charts.c4.data.datasets[c4k].data = days.map(function (d) {
-            var cr = d.cache_read || 0;
-            var x = d.hosts && d.hosts[lbC];
-            if (!x || cr <= 0) return 0;
-            return Math.round(((x.sub_cache || 0) / cr) * 100);
-          });
-        }
-      } else {
-        var dsC0 = _charts.c4.data.datasets[0];
-        dsC0.data = days.map(function (d) { return subCachePctForDayMainCharts(d, mainHostKey); });
-        dsC0.backgroundColor = days.map(function (d) {
-          var p = subCachePctForDayMainCharts(d, mainHostKey);
-          return p > 50 ? "rgba(239,68,68,0.7)" : "rgba(100,116,139,0.5)";
-        });
-      }
-      _charts.c4.update("none");
-    } else {
-      if (_charts.c4) {
-        try { _charts.c4.destroy(); } catch (eC4) {}
-        _charts.c4 = null;
-      }
-      var c4Data;
-      var c4Opts;
-      if (c4TimelineHostStack) {
-      var ds4 = [];
-      for (var c4i = 0; c4i < hLabs.length; c4i++) {
-        var lb4 = hLabs[c4i];
-        ds4.push({
-          label: lb4,
-          stack: "subcache",
-          data: days.map(function (d) {
-            var cr = d.cache_read || 0;
-            var x = d.hosts && d.hosts[lb4];
-            if (!x || cr <= 0) return 0;
-            return Math.round(((x.sub_cache || 0) / cr) * 100);
-          }),
-          backgroundColor: hostBarColors[c4i % hostBarColors.length]
-        });
-      }
-      c4Data = { labels: labels, datasets: ds4 };
-      c4Opts = {
-        responsive: true,
-        resizeDelay: 200,
-        animation: false,
-        transitions: __mainChartTransitions,
-        scales: {
-          x: { stacked: true, grid: { color: "rgba(51,65,85,0.5)" } },
-          y: { max: 100, stacked: true, ticks: { callback: function (v) { return v + "%"; } }, grid: { color: "rgba(51,65,85,0.5)" } }
-        },
-        plugins: {
-          legend: { labels: { color: "#cbd5e1" } },
-          tooltip: {
-            callbacks: {
-              label: function (c) {
-                return c.dataset.label + ": " + c.raw + "% " + t("chartTooltipSubCacheOfDay");
-              },
-              footer: function (items) {
-                if (!items.length) return "";
-                var di = items[0].dataIndex;
-                return tr("chartTooltipSubCacheStackTotal", { pct: String(days[di].sub_cache_pct) });
-              }
-            }
-          }
-        }
-      };
-    } else {
-      c4Data = {
-        labels: labels,
-        datasets: [
-          {
-            label: t("chartSubCachePct"),
-            data: days.map(function (d) { return subCachePctForDayMainCharts(d, mainHostKey); }),
-            backgroundColor: days.map(function (d) {
-              var p = subCachePctForDayMainCharts(d, mainHostKey);
-              return p > 50 ? "rgba(239,68,68,0.7)" : "rgba(100,116,139,0.5)";
-            })
-          }
-        ]
-      };
-      c4Opts = {
-        responsive: true,
-        resizeDelay: 200,
-        animation: false,
-        transitions: __mainChartTransitions,
-        scales: { y: { max: 100, ticks: { callback: function (v) { return v + "%"; } } } },
-        plugins: { tooltip: { callbacks: { label: function (c) { return c.raw + "%"; } } } }
-      };
-      }
-      _charts.c4 = new Chart(elc4, { type: "bar", data: c4Data, options: c4Opts });
-    }
-    if (_charts.c4) _charts.c4._dashScope = mainScope;
-  }
-  var crSig = document.getElementById("charts");
-  if (crSig) crSig.classList.remove("has-session-row");
-  
-  var tblDeleg = document.getElementById("tbl");
-  if (tblDeleg && !tblDeleg.dataset.hostDetailDeleg) {
-    tblDeleg.dataset.hostDetailDeleg = "1";
-    tblDeleg.addEventListener("click", function (ev) {
-      var tr = ev.target.closest("tr");
-      if (!tr || !tr.dataset.detailRow) return;
-      if (tr.dataset.detailRow === "host" && tr.dataset.hostLabel) {
-        window.__usageDetailHost = tr.dataset.hostLabel;
-        if (__lastUsageData) renderDashboard(__lastUsageData, true);
-      } else if (tr.dataset.detailRow === "filtered") {
-        window.__usageDetailHost = null;
-        if (__lastUsageData) renderDashboard(__lastUsageData, true);
-      }
-    });
-  }
-  
-  // --- Table ---
-  var cols=t("tableCols").split("|");
-  var thead=document.querySelector("#tbl thead tr");
-  thead.innerHTML="";
-  cols.forEach(function(c,ci){var th=document.createElement("th");th.textContent=c;if(ci>0)th.className="num";thead.appendChild(th);});
-  
-  var tbody=document.querySelector("#tbl tbody");
-  tbody.innerHTML="";
-  var filteredHost = window.__usageDetailHost;
-  var fhDay = filteredHost && selDay.hosts && selDay.hosts[filteredHost] ? selDay.hosts[filteredHost] : null;
-  var tableRows = fhDay
-    ? [{
-        date: pick,
-        output: fhDay.output,
-        cache_read: fhDay.cache_read,
-        cache_output_ratio: fhDay.cache_output_ratio,
-        overhead: fhDay.overhead,
-        total: fhDay.total,
-        calls: fhDay.calls,
-        active_hours: fhDay.active_hours,
-        hit_limit: fhDay.hit_limit || 0,
-        sub_pct: fhDay.sub_pct,
-        sub_cache_pct: fhDay.sub_cache_pct,
-        output_per_hour: fhDay.output_per_hour
-      }]
-    : [selDay];
-  for(var i=0;i<tableRows.length;i++){
-    var d=tableRows[i];
-    var trEl=document.createElement("tr");
-    if (fhDay) {
-      trEl.dataset.detailRow = "filtered";
-      trEl.style.cursor = "pointer";
-      trEl.title = t("dailyDetailFilteredRowTitle");
-    }
-    var hl=d.hit_limit||0;
-    var vals=[d.date,fmt(d.output),fmt(d.cache_read),d.cache_output_ratio+"x",d.overhead+"x",fmt(d.total),d.calls,d.active_hours,String(hl),d.sub_pct+"%",d.sub_cache_pct+"%",fmt(d.output_per_hour)];
-    vals.forEach(function(v,j){
-      var td=document.createElement("td");
-      td.textContent=v;
-      if(j>0)td.className="num";
-      if(j===3&&d.cache_output_ratio>1000)td.classList.add("hi");
-      if(j===3&&d.cache_output_ratio>2000)td.classList.add("crit");
-      if(j===4&&d.overhead>1500)td.classList.add("hi");
-      if(j===8&&hl>0)td.classList.add("hi");
-      trEl.appendChild(td);
-    });
-    tbody.appendChild(trEl);
-    if (!fhDay && multiHost && selDay.hosts) {
-      for (var ti = 0; ti < hLabs.length; ti++) {
-        var tlab = hLabs[ti];
-        var hd = selDay.hosts[tlab];
-        if (!hd) continue;
-        var trh = document.createElement("tr");
-        trh.style.color = "#94a3b8";
-        trh.style.cursor = "pointer";
-        trh.title = t("dailyDetailHostRowTitle");
-        trh.dataset.detailRow = "host";
-        trh.dataset.hostLabel = tlab;
-        var hhl = hd.hit_limit || 0;
-        var hvals = ["  └ " + tlab, fmt(hd.output), fmt(hd.cache_read), hd.cache_output_ratio + "x", hd.overhead + "x", fmt(hd.total), hd.calls, hd.active_hours, String(hhl), hd.sub_pct + "%", hd.sub_cache_pct + "%", fmt(hd.output_per_hour)];
-        for (var hj = 0; hj < hvals.length; hj++) {
-          var tdh = document.createElement("td");
-          tdh.textContent = hvals[hj];
-          if (hj > 0) tdh.className = "num";
-          if (hj === 8 && hhl > 0) tdh.classList.add("hi");
-          trh.appendChild(tdh);
-        }
-        tbody.appendChild(trh);
-      }
-    }
-  }
-  
-  /** Während Scan: SSE feuert oft → Chart.update flimmert. Pro Chart separat drosseln (Service nicht an Forensic koppeln). */
-  var spForensic = data.scan_progress;
-  var scanInProgForensic =
-    data.scanning && spForensic && spForensic.total > 0 && spForensic.done < spForensic.total;
-  var nowForensic = Date.now();
-  var fsUntilMs = window.__dashForensicSvcPaintUntilMs || 0;
-  var inFsThrottleWindow = scanInProgForensic && nowForensic < fsUntilMs;
-  var skipForensicPaint = inFsThrottleWindow && !!_charts.cForensic && !!_charts.cForensicSignals;
-  var skipServicePaint = inFsThrottleWindow && !!_charts.cService;
-  if (!skipForensicPaint || !skipServicePaint) {
-    if (scanInProgForensic) window.__dashForensicSvcPaintUntilMs = nowForensic + 3500;
-    else window.__dashForensicSvcPaintUntilMs = 0;
-  }
-
-  // ─── Forensic Chart (Original: Hit-Limit Bars + Score Line) ───
-  var fhForensic = getForensicHostFilterForCharts();
-  function hitLimitBarForChart(d) {
-    if (!fhForensic) return d.hit_limit || 0;
-    var H = d.hosts && d.hosts[fhForensic];
-    return H ? H.hit_limit || 0 : 0;
-  }
-  function forensicScoreDay(d) {
-    return forensicScoreForChartDay(d, days, fhForensic);
-  }
-  var elF=document.getElementById("c-forensic");
-  if(elF){
-    try {
-    if (!skipForensicPaint) {
-    var forensicReuse =
-      _charts.cForensic &&
-      _charts.cForensic.data.datasets.length === 2 &&
-      (chartXLabelsMatch(_charts.cForensic, labels) || chartLabelsPrefixMatch(_charts.cForensic, labels));
-    if (forensicReuse) {
-      freezeChartNoAnim(_charts.cForensic);
-      _charts.cForensic.data.labels = labels.slice();
-      var fh0 = _charts.cForensic.data.datasets[0];
-      fh0.data = days.map(hitLimitBarForChart);
-      fh0.backgroundColor = days.map(function (d) {
-        return hitLimitBarForChart(d) > 0 ? "rgba(248,113,113,0.55)" : "rgba(71,85,105,0.35)";
-      });
-      fh0.borderColor = days.map(function (d) {
-        return hitLimitBarForChart(d) > 0 ? "#f87171" : "transparent";
-      });
-      _charts.cForensic.data.datasets[1].data = days.map(forensicScoreDay);
-      _charts.cForensic.data.datasets[1].hidden = !!fhForensic;
-      if (_charts.cForensic.options.scales && _charts.cForensic.options.scales.y1) {
-        _charts.cForensic.options.scales.y1.display = !fhForensic;
-      }
-      _charts.cForensic.update("none");
-    } else {
-      if (_charts.cForensic) {
-        try {
-          _charts.cForensic.destroy();
-        } catch (e) {}
-      }
-      _charts.cForensic = new Chart(elF, {
-      data:{
-        labels:labels,
-        datasets:[
-          {
-            type:"bar",
-            stack:"hitlim",
-            yAxisID:"y",
-            label:t("forensicDS_hitLimit"),
-            data:days.map(hitLimitBarForChart),
-            backgroundColor:days.map(function(d){return hitLimitBarForChart(d)>0?"rgba(248,113,113,0.55)":"rgba(71,85,105,0.35)"}),
-            borderColor:days.map(function(d){return hitLimitBarForChart(d)>0?"#f87171":"transparent"}),
-            borderWidth:1
-          },
-          {
-            type:"line",
-            label:t("forensicDS_score"),
-            hidden:!!fhForensic,
-            data:days.map(forensicScoreDay),
-            borderColor:"#f59e0b",
-            backgroundColor:"rgba(245,158,11,0.12)",
-            pointBackgroundColor:"#fbbf24",
-            pointRadius:4,
-            tension:0.25,
-            yAxisID:"y1",
-            borderWidth:2
-          }
-        ]
-      },
-      options:{
-        responsive:true,
-        resizeDelay:120,
-        animation:false,
-        transitions: __chartTransitionsOff,
-        maintainAspectRatio:true,
-        aspectRatio:2.4,
-        interaction:{mode:"index",intersect:false},
-        scales:{
-          x:{stacked:true,grid:{color:"rgba(51,65,85,0.5)"}},
-          y:{
-            stacked:true,
-            position:"left",
-            beginAtZero:true,
-            title:{display:true,text:t("forensicAxisCounts"),color:"#94a3b8"},
-            ticks:{color:"#94a3b8",precision:0},
-            grid:{color:"rgba(51,65,85,0.5)"}
-          },
-          y1:{
-            display:!fhForensic,
-            position:"right",
-            min:0,max:3.5,
-            title:{display:true,text:t("forensicAxisForensic"),color:"#fbbf24"},
-            ticks:{stepSize:1,color:"#94a3b8"},
-            grid:{drawOnChartArea:false}
-          }
-        },
-        plugins:{
-          legend:{labels:{color:"#cbd5e1"}},
-          tooltip:{
-            callbacks:{
-              title:function(items){
-                var dArr = (__lastUsageData && __lastUsageData.days) || [];
-                return items.length && dArr[items[0].dataIndex] ? dArr[items[0].dataIndex].date : "";
-              },
-              afterBody:function(items){
-                if(!items.length)return"";
-                var di=items[0].dataIndex;
-                var dArr = (__lastUsageData && __lastUsageData.days) || [];
-                var x = dArr[di];
-                if (!x) return "";
-                var fh = getForensicHostFilterForCharts();
-                var lines=[];
-                if (fh) lines.push(tr("forensicTooltipHostHitScope",{host:fh}));
-                lines.push(t("tooltipVsPeak")+(x.forensic_vs_peak>0?x.forensic_vs_peak+"×":"—"));
-                lines.push(t("tooltipImpl90")+(x.forensic_implied_cap_90>0?fmt(x.forensic_implied_cap_90):"—"));
-                if(x.forensic_hint)lines.push(x.forensic_hint);
-                return lines;
-              }
-            }
-          }
-        }
-      }
-    });
-    }
-    }
-    } finally {
-      chartShellSetLoading("c-forensic", false);
-    }
-  }
-
-  // ─── Forensic: Session-Signale gestapelt (Ausfall oben im Stack) + Cache Read (Linie, rechts) ───
-  var elSig = document.getElementById("c-forensic-signals");
-  if (elSig) {
-    try {
-      if (!skipForensicPaint) {
-        var sigStack = buildSessionSignalsStackedByDay(days, fhForensic);
-        var sigReuse =
-          _charts.cForensicSignals &&
-          _charts.cForensicSignals.data.datasets.length === 6 &&
-          _charts.cForensicSignals.data.datasets[0].type === "bar" &&
-          _charts.cForensicSignals.data.datasets[4].type === "bar" &&
-          _charts.cForensicSignals.data.datasets[5].type === "line" &&
-          (chartXLabelsMatch(_charts.cForensicSignals, labels) || chartLabelsPrefixMatch(_charts.cForensicSignals, labels));
-        if (sigReuse) {
-          freezeChartNoAnim(_charts.cForensicSignals);
-          _charts.cForensicSignals.data.labels = labels.slice();
-          _charts.cForensicSignals.data.datasets[0].data = sigStack.cont;
-          _charts.cForensicSignals.data.datasets[1].data = sigStack.res;
-          _charts.cForensicSignals.data.datasets[2].data = sigStack.retry;
-          _charts.cForensicSignals.data.datasets[3].data = sigStack.intr;
-          _charts.cForensicSignals.data.datasets[4].data = sigStack.outageBar;
-          _charts.cForensicSignals.data.datasets[4].outageHoursPerDay = sigStack.outageH;
-          _charts.cForensicSignals.data.datasets[5].data = sigStack.cacheRead;
-          _charts.cForensicSignals.update("none");
-        } else {
-          if (_charts.cForensicSignals) {
-            try {
-              _charts.cForensicSignals.destroy();
-            } catch (eFs) {}
-          }
-          _charts.cForensicSignals = new Chart(elSig, {
-            data: {
-              labels: labels.slice(),
-              datasets: [
-                {
-                  type: "bar",
-                  label: t("forensicDS_continueStack"),
-                  stack: "sig",
-                  yAxisID: "y",
-                  order: 2,
-                  data: sigStack.cont,
-                  backgroundColor: "rgba(59,130,246,0.75)",
-                  borderColor: "rgba(59,130,246,0.95)",
-                  borderWidth: 1
-                },
-                {
-                  type: "bar",
-                  label: t("forensicDS_resumeStack"),
-                  stack: "sig",
-                  yAxisID: "y",
-                  order: 2,
-                  data: sigStack.res,
-                  backgroundColor: "rgba(6,182,212,0.7)",
-                  borderColor: "rgba(6,182,212,0.95)",
-                  borderWidth: 1
-                },
-                {
-                  type: "bar",
-                  label: t("forensicDS_retryStack"),
-                  stack: "sig",
-                  yAxisID: "y",
-                  order: 2,
-                  data: sigStack.retry,
-                  backgroundColor: "rgba(239,68,68,0.65)",
-                  borderColor: "rgba(239,68,68,0.9)",
-                  borderWidth: 1
-                },
-                {
-                  type: "bar",
-                  label: t("forensicDS_interruptStack"),
-                  stack: "sig",
-                  yAxisID: "y",
-                  order: 2,
-                  data: sigStack.intr,
-                  backgroundColor: "rgba(251,191,36,0.55)",
-                  borderColor: "rgba(251,191,36,0.9)",
-                  borderWidth: 1
-                },
-                {
-                  type: "bar",
-                  label: t("forensicDS_outageHoursDay"),
-                  stack: "sig",
-                  yAxisID: "y",
-                  order: 2,
-                  data: sigStack.outageBar,
-                  outageHoursPerDay: sigStack.outageH,
-                  backgroundColor: "rgba(107,114,128,0.35)",
-                  borderColor: "rgba(107,114,128,0.5)",
-                  borderWidth: 1
-                },
-                {
-                  type: "line",
-                  label: t("chartDS_cacheRead"),
-                  yAxisID: "y2",
-                  order: 1,
-                  data: sigStack.cacheRead,
-                  borderColor: "rgba(139,92,246,0.95)",
-                  backgroundColor: "rgba(139,92,246,0.06)",
-                  pointBackgroundColor: "#8b5cf6",
-                  pointRadius: 3,
-                  tension: 0.2,
-                  borderWidth: 2,
-                  fill: false
-                }
-              ]
-            },
-            options: {
-              responsive: true,
-              resizeDelay: 280,
-              animation: false,
-              transitions: __chartTransitionsOff,
-              maintainAspectRatio: true,
-              aspectRatio: 2.4,
-              interaction: { mode: "index", intersect: false },
-              scales: {
-                x: {
-                  stacked: true,
-                  grid: { color: "rgba(51,65,85,0.45)" },
-                  ticks: { color: "#94a3b8", maxRotation: 45, autoSkip: true }
-                },
-                y: {
-                  stacked: true,
-                  position: "left",
-                  beginAtZero: true,
-                  title: { display: true, text: t("forensicSignalsAxisLines"), color: "#94a3b8" },
-                  ticks: { color: "#94a3b8", precision: 0 },
-                  grid: { color: "rgba(51,65,85,0.5)" }
-                },
-                y2: {
-                  type: "linear",
-                  position: "right",
-                  beginAtZero: true,
-                  title: { display: true, text: t("forensicSignalsAxisCacheRead"), color: "#a78bfa" },
-                  ticks: {
-                    color: "#a78bfa",
-                    callback: function (value) {
-                      return fmt(value);
-                    }
-                  },
-                  grid: { drawOnChartArea: false }
-                }
-              },
-              plugins: {
-                legend: { labels: { color: "#cbd5e1", boxWidth: 12 } },
-                tooltip: {
-                  callbacks: {
-                    title: function (items) {
-                      var dArr = (__lastUsageData && __lastUsageData.days) || [];
-                      var di = items.length ? items[0].dataIndex : -1;
-                      return di >= 0 && dArr[di] ? dArr[di].date : "";
-                    },
-                    label: function (ctx) {
-                      var v = ctx.parsed.y;
-                      if (ctx.dataset.outageHoursPerDay && ctx.dataIndex != null) {
-                        var oh = ctx.dataset.outageHoursPerDay[ctx.dataIndex];
-                        var h = oh != null ? Math.round(Number(oh) * 10) / 10 : 0;
-                        return ctx.dataset.label + ": " + h + " h";
-                      }
-                      if (ctx.dataset.yAxisID === "y2") {
-                        return ctx.dataset.label + ": " + fmt(v);
-                      }
-                      return ctx.dataset.label + ": " + v;
-                    },
-                    afterBody: function (items) {
-                      var lines = [t("forensicSignalsTooltipStackFooter")];
-                      if (items && items.length) {
-                        var di = items[0].dataIndex;
-                        var dArr = (__lastUsageData && __lastUsageData.days) || [];
-                        var row = di >= 0 ? dArr[di] : null;
-                        var fhx = getForensicHostFilterForCharts();
-                        if (fhx && row && row.hosts && row.hosts[fhx]) {
-                          var hrow = row.hosts[fhx];
-                          lines.push(
-                            tr("chartTooltipOutCacheDay", {
-                              out: fmt(hrow.output || 0),
-                              cache: fmt(hrow.cache_read || 0)
-                            })
-                          );
-                          lines.push(tr("chartTooltipCoDay", { ratio: hrow.cache_output_ratio || 0 }));
-                        } else if (row && row.cache_output_ratio != null) {
-                          lines.push(
-                            tr("chartTooltipOutCacheDay", {
-                              out: fmt(row.output || 0),
-                              cache: fmt(row.cache_read || 0)
-                            })
-                          );
-                          lines.push(tr("chartTooltipCoDay", { ratio: row.cache_output_ratio }));
-                        }
-                        if (fhx) lines.push(t("forensicSignalsTooltipOutageDayScope"));
-                      }
-                      return lines;
-                    }
-                  }
-                }
-              }
-            }
-          });
-        }
-      }
-    } finally {
-      chartShellSetLoading("c-forensic-signals", false);
-    }
-  }
-
-  // ─── Service Impact Chart (Arbeitszeit vs Ausfall + Cache-Read-Kosten) ───
-  var elS=document.getElementById("c-service");
-  if(elS){
-    try {
-    if (!skipServicePaint) {
-    // Berechne pro Tag: saubere Arbeitsstunden, betroffene Stunden, Ausfall ausserhalb Arbeit
-    var sClean=[],sAffServer=[],sAffClient=[],sOutOnly=[],sCacheRead=[];
-    for(var si=0;si<days.length;si++){
-      var sd=days[si];
-      var imp=sumServiceImpactForDay(sd);
-      sClean.push(imp.cleanWork);
-      sAffServer.push(imp.affSrv);
-      sAffClient.push(imp.affCli);
-      sOutOnly.push(imp.outOnly);
-      sCacheRead.push(sd.cache_read||0);
-    }
-    window.__svcTip = { sClean: sClean, sAffServer: sAffServer, sAffClient: sAffClient, sOutOnly: sOutOnly, labels: labels };
-    var svcReuse =
-      _charts.cService &&
-      _charts.cService.data.datasets.length === 5 &&
-      _charts.cService.data.datasets[0].label === t("serviceDS_cleanWork") &&
-      (chartXLabelsMatch(_charts.cService, labels) || chartLabelsPrefixMatch(_charts.cService, labels));
-    if (svcReuse) {
-      freezeChartNoAnim(_charts.cService);
-      _charts.cService.options.resizeDelay = 280;
-      _charts.cService.data.labels = labels.slice();
-      var dss = _charts.cService.data.datasets;
-      dss[0].data = sClean;
-      dss[1].data = sAffServer;
-      dss[2].data = sAffClient;
-      dss[3].data = sOutOnly;
-      dss[4].data = sCacheRead;
-      _charts.cService.update("none");
-    } else {
-      if (_charts.cService) {
-        try {
-          _charts.cService.destroy();
-        } catch (e) {}
-      }
-      _charts.cService = new Chart(elS, {
-      data:{
-        labels:labels,
-        datasets:[
-          {
-            type:"bar",label:t("serviceDS_cleanWork"),
-            order:2,
-            data:sClean,
-            backgroundColor:"rgba(59,130,246,0.7)",borderColor:"rgba(59,130,246,0.9)",borderWidth:1,
-            stack:"hours",yAxisID:"y"
-          },
-          {
-            type:"bar",label:t("serviceDS_affectedServer"),
-            order:2,
-            data:sAffServer,
-            backgroundColor:"rgba(239,68,68,0.7)",borderColor:"rgba(239,68,68,0.9)",borderWidth:1,
-            stack:"hours",yAxisID:"y"
-          },
-          {
-            type:"bar",label:t("serviceDS_affectedClient"),
-            order:2,
-            data:sAffClient,
-            backgroundColor:"rgba(251,191,36,0.6)",borderColor:"rgba(251,191,36,0.9)",borderWidth:1,
-            stack:"hours",yAxisID:"y"
-          },
-          {
-            type:"bar",label:t("serviceDS_outageOnly"),
-            order:2,
-            data:sOutOnly,
-            backgroundColor:"rgba(107,114,128,0.35)",borderColor:"rgba(107,114,128,0.5)",borderWidth:1,
-            stack:"hours",yAxisID:"y"
-          },
-          {
-            type:"line",label:t("chartDS_cacheRead"),
-            order:1,
-            data:sCacheRead,
-            borderColor:"rgba(139,92,246,0.8)",backgroundColor:"rgba(139,92,246,0.08)",
-            pointBackgroundColor:"#8b5cf6",pointRadius:3,tension:0.25,borderWidth:2,
-            yAxisID:"yCR",fill:true
-          }
-        ]
-      },
-      options:{
-        responsive:true,animation:false,transitions:__chartTransitionsOff,maintainAspectRatio:true,aspectRatio:2.4,
-        interaction:{mode:"index",intersect:false},
-        scales:{
-          x:{type:"category",stacked:true,grid:{color:"rgba(51,65,85,0.5)"}},
-          y:{stacked:true,position:"left",beginAtZero:true,
-            title:{display:true,text:t("serviceAxisHours"),color:"#94a3b8"},
-            ticks:{color:"#94a3b8",stepSize:4,callback:function(v){return v+"h";}},
-            grid:{color:"rgba(51,65,85,0.5)"}},
-          yCR:{position:"right",beginAtZero:true,
-            title:{display:true,text:t("chartDS_cacheRead"),color:"#8b5cf6"},
-            ticks:{color:"#8b5cf6",callback:function(v){return fmt(v);}},
-            grid:{drawOnChartArea:false}}
-        },
-        plugins:{
-          legend:{labels:{color:"#cbd5e1"}},
-          tooltip:{
-            callbacks:{
-              label:function(tooltipItem){
-                var ds=tooltipItem.dataset;
-                var di=tooltipItem.dataIndex;
-                if(ds.type==="line")return ds.label+": "+fmt(tooltipItem.raw);
-                return ds.label+": "+tooltipItem.parsed.y+"h";
-              },
-              title:function(items){
-                if(!items.length)return"";
-                var daysArr=(__lastUsageData&&__lastUsageData.days)||[];
-                var snap=window.__svcTip||{};
-                var lab=snap.labels;
-                var rawT=items[0].raw;
-                var diT=items[0].dataIndex;
-                if(rawT&&typeof rawT==="object"&&typeof rawT.x==="string"){var ixT=lab?lab.indexOf(rawT.x):-1;if(ixT>=0)diT=ixT;}
-                return daysArr[diT]?daysArr[diT].date:"";
-              },
-              afterBody:function(items){
-                if(!items.length)return"";
-                var daysArr=(__lastUsageData&&__lastUsageData.days)||[];
-                var snap=window.__svcTip||{};
-                var lab=snap.labels;
-                var rawB=items[0].raw;
-                var di=items[0].dataIndex;
-                if(rawB&&typeof rawB==="object"&&typeof rawB.x==="string"){var ixB=lab?lab.indexOf(rawB.x):-1;if(ixB>=0)di=ixB;}
-                var d=daysArr[di];
-                if(!d)return"";
-                var lines=[];
-                lines.push(t("serviceDS_cleanWork")+": "+(snap.sClean&&snap.sClean[di]!=null?snap.sClean[di]:0)+"h");
-                if((snap.sAffServer&&snap.sAffServer[di])>0)lines.push(t("serviceDS_affectedServer")+": "+snap.sAffServer[di]+"h");
-                if((snap.sAffClient&&snap.sAffClient[di])>0)lines.push(t("serviceDS_affectedClient")+": "+snap.sAffClient[di]+"h");
-                if((snap.sOutOnly&&snap.sOutOnly[di])>0)lines.push(t("serviceDS_outageOnly")+": "+snap.sOutOnly[di].toFixed(1)+"h");
-                var ssX=d.session_signals||{};
-                var sc=ssX.continue||0,sr=ssX.resume||0,sy=ssX.retry||0,si=ssX.interrupt||0;
-                if(sc+sr+sy+si>0){
-                  lines.push(t("serviceTooltipSessionSig")+": "+sc+" / "+sr+" / "+sy+" / "+si);
-                  lines.push(t("serviceTooltipSessionSigHourNote"));
-                }
-                lines.push("Cache Read: "+fmt(d.cache_read||0)+" (C:O "+(d.cache_output_ratio||0)+"x)");
-                lines.push(t("serviceTooltipSlideoutHint"));
-                return lines;
-              }
-            }
-          }
-        }
-      }
-    });
-    }
-    }
-    } finally {
-      chartShellSetLoading("c-service", false);
-    }
-  }
-  initUpdateSlideoutOnce();
-  /** Overlay leert DOM → sichtbares Flackern; nur nach echtem Service-Chart-Repaint (nicht während Drossel). */
-  if (!skipServicePaint) scheduleLayoutUpdateGuideOverlays();
 }
 
 // (renderTimelineChart entfernt)
@@ -3544,7 +2123,7 @@ function updateStatusLamp(data) {
   for (var i = days.length - 1; i >= 0; i--) { if (days[i].date === today) { todayData = days[i]; break; } }
   var hasActiveOutage = false;
   var hasRecentIncident = false;
-  if (todayData && todayData.outage_incidents) {
+  if (todayData?.outage_incidents) {
     for (var ii = 0; ii < todayData.outage_incidents.length; ii++) {
       var inc = todayData.outage_incidents[ii];
       if (!inc.resolved_at) { hasActiveOutage = true; break; }
@@ -3580,7 +2159,7 @@ function generateForensicReportMd(data) {
 
   // Detect peak + limit days
   var peakDay = null, peakVal = 0;
-  for (const dy of days) {
+  for (var dy of days) {
     var tt = __rptDayTotal(dy);
     if (tt > peakVal) {
       peakVal = tt;
@@ -3588,11 +2167,11 @@ function generateForensicReportMd(data) {
     }
   }
   var limitDays = [];
-  for (const dy of days) {
+  for (var dy2 of days) {
     var fl = [];
-    if ((dy.hit_limit || 0) >= HIT_MIN) fl.push("HIT(" + dy.hit_limit + ")");
-    if ((dy.cache_read || 0) >= CACHE_THRESH) fl.push("CACHE\u2265500M");
-    if (fl.length) limitDays.push({ d: dy, flags: fl });
+    if ((dy2.hit_limit || 0) >= HIT_MIN) fl.push("HIT(" + dy2.hit_limit + ")");
+    if ((dy2.cache_read || 0) >= CACHE_THRESH) fl.push("CACHE\u2265500M");
+    if (fl.length) limitDays.push({ d: dy2, flags: fl });
   }
 
   md.push(
@@ -3608,14 +2187,14 @@ function generateForensicReportMd(data) {
     "|------------|----------|------------|--------|-------|-------|-------------|--------|"
   );
 
-  for (const dy of days) {
-    var cr = dy.output > 0 ? Math.round(dy.cache_read / dy.output) : 0;
+  for (var dy3 of days) {
+    var cr = dy3.output > 0 ? Math.round(dy3.cache_read / dy3.output) : 0;
     var lim = "\u2014";
-    if ((dy.hit_limit || 0) >= HIT_MIN) lim = "HIT(" + dy.hit_limit + ")";
-    if ((dy.cache_read || 0) >= CACHE_THRESH) {
+    if ((dy3.hit_limit || 0) >= HIT_MIN) lim = "HIT(" + dy3.hit_limit + ")";
+    if ((dy3.cache_read || 0) >= CACHE_THRESH) {
       lim = lim === "\u2014" ? "CACHE\u2265500M" : lim + ", CACHE\u2265500M";
     }
-    md.push("| " + dy.date + " | " + fmt(dy.output) + " | " + fmt(dy.cache_read) + " | " + cr + "x | " + dy.calls + " | " + (dy.active_hours || 0) + " | " + __rptSigCell(dy) + " | " + lim + " |");
+    md.push("| " + dy3.date + " | " + fmt(dy3.output) + " | " + fmt(dy3.cache_read) + " | " + cr + "x | " + dy3.calls + " | " + (dy3.active_hours || 0) + " | " + __rptSigCell(dy3) + " | " + lim + " |");
   }
   md.push("");
 
@@ -3625,12 +2204,12 @@ function generateForensicReportMd(data) {
     "| " + (isDE ? "Datum" : "Date") + " | Overhead | Output/h | Total/h | Subagent% |",
     "|------------|----------|----------|---------|-----------|"
   );
-  for (const dy of days) {
-    var tot2 = __rptDayTotal(dy);
-    var ah = Math.max(1, dy.active_hours || 1);
-    var oh = dy.output > 0 ? (tot2 / dy.output).toFixed(0) + "x" : "\u2014";
-    var sp = (dy.sub_pct || 0) + "%";
-    md.push("| " + dy.date + " | " + oh + " | " + fmt(Math.round(dy.output / ah)) + " | " + fmt(Math.round(tot2 / ah)) + " | " + sp + " |");
+  for (var dy4 of days) {
+    var tot2 = __rptDayTotal(dy4);
+    var ah = Math.max(1, dy4.active_hours || 1);
+    var oh = dy4.output > 0 ? (tot2 / dy4.output).toFixed(0) + "x" : "\u2014";
+    var sp = (dy4.sub_pct || 0) + "%";
+    md.push("| " + dy4.date + " | " + oh + " | " + fmt(Math.round(dy4.output / ah)) + " | " + fmt(Math.round(tot2 / ah)) + " | " + sp + " |");
   }
 
   // 3. Subagent
@@ -3641,7 +2220,11 @@ function generateForensicReportMd(data) {
     "| "+(isDE?"Datum":"Date")+" | "+(isDE?"Aufrufe":"Calls")+" | Sub | Sub-Cache | Sub-Cache% |",
     "|------------|--------|------|-----------|------------|"
   );
-  for(const dy of days){var sc=dy.sub_cache||0;var scp=(dy.sub_cache_pct||0)+"%";md.push("| "+dy.date+" | "+dy.calls+" | "+(dy.sub_calls||0)+" | "+fmt(sc)+" | "+scp+" |");}
+  for (var dy5 of days) {
+    var sc = dy5.sub_cache || 0;
+    var scp = (dy5.sub_cache_pct || 0) + "%";
+    md.push("| " + dy5.date + " | " + dy5.calls + " | " + (dy5.sub_calls || 0) + " | " + fmt(sc) + " | " + scp + " |");
+  }
   md.push("");
 
   // 4. Budget estimate
@@ -3655,7 +2238,7 @@ function generateForensicReportMd(data) {
       "|------------|---------|----------|---------|-------|--------|"
     );
     var prevI = 0;
-    for (const ld of limitDays) {
+    for (var ld of limitDays) {
       var tot4 = __rptDayTotal(ld.d);
       var impl = Math.round(tot4 / 0.9);
       var vsp = peakVal > 0 ? (peakVal / impl).toFixed(1) + "x" : "\u2014";
@@ -3672,7 +2255,9 @@ function generateForensicReportMd(data) {
 
     // Median
     var ivs=[];
-    for(const ld of limitDays){if(ld.d.calls>=50&&(ld.d.active_hours||0)>=2)ivs.push(Math.round(__rptDayTotal(ld.d)/0.9));}
+    for (var ld2 of limitDays) {
+      if (ld2.d.calls >= 50 && (ld2.d.active_hours || 0) >= 2) ivs.push(Math.round(__rptDayTotal(ld2.d) / 0.9));
+    }
     if(ivs.length>=2){
       ivs.sort(function(a,b){return a-b;});
       var med=ivs[Math.floor(ivs.length/2)];
@@ -3721,7 +2306,7 @@ function generateForensicReportMd(data) {
 
   // ─── Service Impact: Work vs Outage mit ASCII-Bars ───
   var hasAnyOutage = false;
-  for (const dayOut of days) {
+  for (var dayOut of days) {
     if ((dayOut.outage_hours || 0) > 0) { hasAnyOutage = true; break; }
   }
   if (hasAnyOutage) {
@@ -3733,19 +2318,19 @@ function generateForensicReportMd(data) {
     );
     var maxH = 0;
     var svcRows = [];
-    for (const sd of days) {
+    for (var sd of days) {
       var wHrs = Object.keys(sd.hours || {}).map(function (h) { return Number.parseInt(h, 10); });
       var spans = sd.outage_spans || [];
       var affected = 0;
-      for (const hour of wHrs) {
+      for (var hour of wHrs) {
         var hitSpan = false;
-        for (const span of spans) {
+        for (var span of spans) {
           if (hour >= Math.floor(span.from) && hour < Math.ceil(span.to)) { hitSpan = true; break; }
         }
         if (hitSpan) affected++;
       }
       var outTotal = 0;
-      for (const span2 of spans) outTotal += span2.to - span2.from;
+      for (var span2 of spans) outTotal += span2.to - span2.from;
       var clean = wHrs.length - affected;
       var outOnly = Math.max(0, Math.round((outTotal - affected) * 10) / 10);
       var totalHRow = clean + affected + outOnly;
@@ -3754,7 +2339,7 @@ function generateForensicReportMd(data) {
     }
     var barW = 40;
     md.push("```");
-    for (const r of svcRows) {
+    for (var r of svcRows) {
       var totalH = r.clean + r.affected + r.outOnly;
       if (totalH === 0 && r.outageH === 0) continue;
       var scale = maxH > 0 ? barW / maxH : 1;
@@ -3768,14 +2353,14 @@ function generateForensicReportMd(data) {
       if (r.outOnly > 0) label += " (+" + r.outOnly.toFixed(0) + "h " + (isDE ? "nur Ausfall" : "outage only") + ")";
       if (r.cr > 0) label += " | C:" + fmt(r.cr) + " (" + r.co + "x)";
       if (r.mc) {
-        if (r.mc.added && r.mc.added.length) label += " \u25c7+" + r.mc.added.join(",");
-        if (r.mc.removed && r.mc.removed.length) label += " \u25c7-" + r.mc.removed.join(",");
+        if (r.mc.added?.length) label += " \u25c7+" + r.mc.added.join(",");
+        if (r.mc.removed?.length) label += " \u25c7-" + r.mc.removed.join(",");
       }
       md.push(label);
     }
     md.push("```", "");
     var totClean = 0, totAff = 0, totOutOnly = 0;
-    for (const rowSum of svcRows) {
+    for (var rowSum of svcRows) {
       totClean += rowSum.clean;
       totAff += rowSum.affected;
       totOutOnly += rowSum.outOnly;
@@ -3790,7 +2375,7 @@ function generateForensicReportMd(data) {
 
   // ─── Extension-Versionen & Releases ───
   var hasVerChange = false;
-  for (const dvc of days) {
+  for (var dvc of days) {
     if (dvc.version_change) { hasVerChange = true; break; }
   }
   if (hasVerChange) {
@@ -3800,7 +2385,7 @@ function generateForensicReportMd(data) {
       "| " + (isDE ? "Datum" : "Date") + " | Version | Highlights |",
       "|------------|---------|------------|"
     );
-    for (const dVer of days) {
+    for (var dVer of days) {
       var vc = dVer.version_change;
       if (!vc) continue;
       var ver = vc.added.join(", ");
@@ -3866,7 +2451,7 @@ function generateForensicReportMd(data) {
     md.push("");
 
     var totOut = 0, totAll = 0, totCr = 0, totCc = 0, totRetries = 0, totInterrupts = 0, totTrunc = 0, totOutageH = 0;
-    for (const bd of days) {
+    for (var bd of days) {
       totOut += bd.output || 0;
       totAll += bd.total || 0;
       totCr += bd.cache_read || 0;
@@ -4046,6 +2631,15 @@ function copyReport(){
       if (open) lp.classList.add("live-files-open");
       else lp.classList.remove("live-files-open");
       tr.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) {
+        if (typeof requestAnimationFrame !== "undefined") {
+          requestAnimationFrame(function () {
+            requestAnimationFrame(resizeLiveScannedJsonlChartIfAny);
+          });
+        } else {
+          setTimeout(resizeLiveScannedJsonlChartIfAny, 50);
+        }
+      }
     }
     tr.setAttribute("aria-expanded", "false");
     tr.addEventListener("click", function (e) {
@@ -4070,7 +2664,7 @@ function copyReport(){
       lfpanel.dataset.extOpenBound = "1";
       lfpanel.addEventListener("click", function (ev) {
         var btn = ev.target.closest(".live-ext-open");
-        if (!btn || btn.dataset.dayIndex == null) return;
+        if (btn?.dataset.dayIndex == null) return;
         ev.preventDefault();
         ev.stopPropagation();
         initUpdateSlideoutOnce();
@@ -4096,6 +2690,49 @@ function copyReport(){
 
 // ── User Profile Charts ──────────────────────────────────────────────────
 var _userCharts = { versions: null, entrypoints: null, releaseStability: null };
+/** Identical grid for all User-Profile horizontal bar charts (aligns Y rows + bar thickness across columns). */
+var __USER_PROFILE_BAR_GRID = { left: 6, right: 6, top: 54, bottom: 56, containLabel: true };
+var __USER_PROFILE_BAR_Y_LABEL = {
+  color: "#e2e8f0",
+  fontSize: 11,
+  fontFamily: "monospace",
+  width: 64,
+  overflow: "truncate",
+  margin: 2,
+  align: "right"
+};
+/** Scroll legend with fixed vertical footprint so Version / Entry / Release reserve the same top band. */
+function __userProfileLegendOpts(legendData) {
+  return {
+    type: "scroll",
+    orient: "horizontal",
+    top: 6,
+    left: 6,
+    right: 6,
+    height: 30,
+    itemGap: 6,
+    itemWidth: 10,
+    itemHeight: 10,
+    textStyle: { fontSize: 10, color: "#cbd5e1" },
+    data: legendData
+  };
+}
+
+/** Display names for entrypoint keys — aligned with userEntrypointBlurb (VS Code, CLI, JetBrains). */
+function __userEntrypointLegendName(key) {
+  if (key === "claude-vscode") return t("userEntrypointLegendVscode");
+  if (key === "cli") return t("userEntrypointLegendCli");
+  if (key === "claude-jetbrains") return t("userEntrypointLegendJetbrains");
+  return key;
+}
+function __disposeUserEchartsChart(which) {
+  var ch = _userCharts[which];
+  if (!ch) return;
+  if (typeof ch.dispose === "function") {
+    ch.dispose();
+  }
+  _userCharts[which] = null;
+}
 var __releaseStabilityData = null;
 var __userVersionSort = "anomalies"; // anomalies | newest | calls
 var __userVersionFilter = null; // null = all, [] = none selected
@@ -4123,13 +2760,13 @@ var __versionHealthMetrics = [
 function __stackedHBarXMax(datasets) {
   if (!datasets?.length) return undefined;
   var len = 0;
-  for (const ds of datasets) {
-    var d = ds.data;
+  for (var ds0 of datasets) {
+    var d = ds0.data;
     if (d && d.length > len) len = d.length;
   }
   if (!len) return undefined;
   var sums = new Array(len).fill(0);
-  for (const ds of datasets) {
+  for (var ds of datasets) {
     var row = ds.data || [];
     for (var j = 0; j < len; j++) sums[j] += Number(row[j]) || 0;
   }
@@ -4144,7 +2781,7 @@ function __stackedHBarXMax(datasets) {
 function semverCmpDesc(a, b) {
   var pa = a.split(".").map(Number);
   var pb = b.split(".").map(Number);
-  for (const i of [0, 1, 2]) {
+  for (var i of [0, 1, 2]) {
     var da = pa[i] || 0, db = pb[i] || 0;
     if (da !== db) return db - da;
   }
@@ -4152,9 +2789,9 @@ function semverCmpDesc(a, b) {
 }
 
 function mergeVersionEntry(tgt, src) {
-  for (const fk of Object.keys(src)) {
+  for (var fk of Object.keys(src)) {
     if (fk === 'entrypoints') {
-      for (const ek of Object.keys(src.entrypoints || {})) {
+      for (var ek of Object.keys(src.entrypoints || {})) {
         tgt.entrypoints[ek] = (tgt.entrypoints[ek] || 0) + (src.entrypoints[ek] || 0);
       }
     } else {
@@ -4165,9 +2802,9 @@ function mergeVersionEntry(tgt, src) {
 
 function aggregateVersionStats(days) {
   var merged = {};
-  for (const day of days) {
+  for (var day of days) {
     var vs = day.version_stats || {};
-    for (const ver of Object.keys(vs)) {
+    for (var ver of Object.keys(vs)) {
       if (!merged[ver]) merged[ver] = { calls: 0, output: 0, cache_read: 0, hit_limit: 0, retry: 0, interrupt: 0, continue: 0, resume: 0, truncated: 0, api_error: 0, entrypoints: {} };
       mergeVersionEntry(merged[ver], vs[ver]);
     }
@@ -4202,7 +2839,7 @@ function initVersionSortDropdown(days) {
     { val: "newest", lbl: t("userSortNewest") },
     { val: "calls", lbl: t("userSortCalls") }
   ];
-  for (const opt of opts) {
+  for (var opt of opts) {
     var o = document.createElement("option");
     o.value = opt.val;
     o.textContent = opt.lbl;
@@ -4217,7 +2854,7 @@ function initVersionSortDropdown(days) {
 
 function buildFilterCheckboxHtml(allVers, stats) {
   var html = "";
-  for (const v of allVers) {
+  for (var v of allVers) {
     var checked = !__userVersionFilter || __userVersionFilter.includes(v);
     var anomalies = versionAnomalyTotal(stats[v]);
     var calls = stats[v]?.calls || 0;
@@ -4264,25 +2901,25 @@ function initUserVersionControls(stats, days) {
   var cbs = dd.querySelectorAll('input[type=checkbox]');
   function applyFilter() {
     var sel = [];
-    for (const cb of cbs) {
+    for (var cb of cbs) {
       if (cb.checked) sel.push(cb.value);
     }
     __userVersionFilter = sel.length === allVers.length ? null : sel;
     updateCount();
     renderUserProfileCharts(days);
   }
-  for (const cb of cbs) {
+  for (var cb of cbs) {
     cb.addEventListener("change", applyFilter);
   }
 
   var allBtn = document.getElementById("user-ver-all");
   var noneBtn = document.getElementById("user-ver-none");
   if (allBtn) allBtn.onclick = function() {
-    for (const cb of cbs) cb.checked = true;
+    for (var cb of cbs) cb.checked = true;
     applyFilter();
   };
   if (noneBtn) noneBtn.onclick = function() {
-    for (const cb of cbs) cb.checked = false;
+    for (var cb of cbs) cb.checked = false;
     applyFilter();
   };
 }
@@ -4295,15 +2932,15 @@ function collectAllVersionKeys(stats, days) {
 
 function collectFallbackVersionKeys(days) {
   var fallbackVers = {};
-  for (const day of days) {
-    for (const fk of Object.keys(day.versions || {})) fallbackVers[fk] = true;
+  for (var day of days) {
+    for (var fk of Object.keys(day.versions || {})) fallbackVers[fk] = true;
   }
   return Object.keys(fallbackVers);
 }
 
 function maxKeyByValue(obj) {
   var best = "", bestVal = 0;
-  for (const k of Object.keys(obj)) {
+  for (var k of Object.keys(obj)) {
     if (obj[k] > bestVal) { best = k; bestVal = obj[k]; }
   }
   return best;
@@ -4332,7 +2969,7 @@ function computeAnomalyStats(allVers, stats) {
   var totalAnomalies = 0;
   var worstVer = "";
   var worstAnomaly = 0;
-  for (const ver of allVers) {
+  for (var ver of allVers) {
     var sv = stats[ver];
     if (sv) {
       totalCalls += sv.calls || 0;
@@ -4345,6 +2982,60 @@ function computeAnomalyStats(allVers, stats) {
   return { totalCalls: totalCalls, totalAnomalies: totalAnomalies, anomalyRate: anomalyRate, worstVer: worstVer, worstAnomaly: worstAnomaly };
 }
 
+/**
+ * Compute shared context for User Profile charts.
+ * Cached on window.__sectionCtx_userProfile so standalone chart renderers can use it.
+ */
+function _computeUserProfileCtx(days) {
+  var stats = aggregateVersionStats(days);
+  var allVers = collectAllVersionKeys(stats, days);
+  var top = findLatestDayTopEntries(days);
+  var anom = computeAnomalyStats(allVers, stats);
+
+  var filteredVers = __userVersionFilter
+    ? allVers.filter(function(v) { return __userVersionFilter.includes(v); })
+    : allVers;
+  var sortedVers = sortVersionKeys(filteredVers, stats, __userVersionSort);
+
+  var barPitch = 30;
+  var chartCanvasH = Math.max(240, sortedVers.length * barPitch + 56);
+
+  var sCtx = {
+    days: days,
+    stats: stats,
+    allVers: allVers,
+    top: top,
+    anom: anom,
+    sortedVers: sortedVers,
+    chartCanvasH: chartCanvasH,
+    releaseData: __releaseStabilityData
+  };
+  window.__sectionCtx_userProfile = sCtx;
+  return sCtx;
+}
+window._computeUserProfileCtx = _computeUserProfileCtx;
+
+/** Standalone: render Version Health horizontal bar chart. */
+window.renderUserProfile_versions = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_userProfile;
+  if (!sCtx) return;
+  renderVersionHealthChart(sCtx.sortedVers, sCtx.stats, sCtx.allVers);
+};
+
+/** Standalone: render Entrypoints horizontal bar chart. */
+window.renderUserProfile_entrypoints = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_userProfile;
+  if (!sCtx) return;
+  renderEntrypointsChart(sCtx.sortedVers, sCtx.stats);
+};
+
+/** Standalone: render Release Stability horizontal bar chart. */
+window.renderUserProfile_releaseStability = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_userProfile;
+  if (!sCtx) return;
+  renderReleaseStabilityChart(sCtx.sortedVers, sCtx.releaseData);
+};
+
 function renderUserProfileCharts(days) {
   var sumEl = document.getElementById("user-profile-summary-line");
   if (!sumEl) return;
@@ -4354,46 +3045,48 @@ function renderUserProfileCharts(days) {
     return;
   }
 
-  var stats = aggregateVersionStats(days);
-  var allVers = collectAllVersionKeys(stats, days);
-
-  var top = findLatestDayTopEntries(days);
-  var anom = computeAnomalyStats(allVers, stats);
+  var sCtx = _computeUserProfileCtx(days);
 
   sumEl.textContent = t("userProfileSummary")
-    .replace("{version}", top.topVersion || "?")
-    .replace("{entrypoint}", top.topEntrypoint || "?")
-    .replace("{verCount}", String(allVers.length))
-    .replace("{rate}", String(anom.anomalyRate))
-    .replace("{anomalies}", String(anom.totalAnomalies))
-    .replace("{calls}", String(anom.totalCalls))
-    .replace("{worst}", anom.worstVer || "-")
-    .replace("{worstCount}", String(anom.worstAnomaly));
+    .replace("{version}", sCtx.top.topVersion || "?")
+    .replace("{entrypoint}", sCtx.top.topEntrypoint || "?")
+    .replace("{verCount}", String(sCtx.allVers.length))
+    .replace("{rate}", String(sCtx.anom.anomalyRate))
+    .replace("{anomalies}", String(sCtx.anom.totalAnomalies))
+    .replace("{calls}", String(sCtx.anom.totalCalls))
+    .replace("{worst}", sCtx.anom.worstVer || "-")
+    .replace("{worstCount}", String(sCtx.anom.worstAnomaly));
 
   // Init sort/filter controls
-  initUserVersionControls(stats, days);
+  initUserVersionControls(sCtx.stats, days);
 
-  // Sort + filter (declared here so it's available for both charts)
-  var filteredVers = __userVersionFilter
-    ? allVers.filter(function(v) { return __userVersionFilter.includes(v); })
-    : allVers;
-  var sortedVers = sortVersionKeys(filteredVers, stats, __userVersionSort);
-
-  // Nur der Canvas-Host bekommt die Plot-Höhe — nicht die ganze .chart-box (sonst stimmt Chart.js-Layout vs. h3+Blurb nicht).
-  var barPitch = 30;
-  var chartCanvasH = Math.max(240, sortedVers.length * barPitch + 56);
+  // Set canvas heights
   var hosts = document.querySelectorAll("#user-profile-charts .user-chart-canvas-host");
-  for (const hEl of hosts) {
-    hEl.style.height = chartCanvasH + "px";
-    hEl.style.minHeight = chartCanvasH + "px";
+  for (var hEl of hosts) {
+    hEl.style.height = sCtx.chartCanvasH + "px";
+    hEl.style.minHeight = sCtx.chartCanvasH + "px";
   }
-  for (const bx of document.querySelectorAll("#user-profile-charts .chart-box")) {
+  for (var bx of document.querySelectorAll("#user-profile-charts .chart-box")) {
     bx.style.height = "";
   }
 
-  renderVersionHealthChart(sortedVers, stats, allVers);
-  renderEntrypointsChart(sortedVers, stats);
-  renderReleaseStabilityChart(sortedVers, __releaseStabilityData);
+  // Render via standalone functions
+  window.renderUserProfile_versions(sCtx);
+  window.renderUserProfile_entrypoints(sCtx);
+  window.renderUserProfile_releaseStability(sCtx);
+
+  function __resizeUserProfileChartsAfterLayout() {
+    try {
+      if (_userCharts.versions && typeof _userCharts.versions.resize === "function") _userCharts.versions.resize();
+      if (_userCharts.entrypoints && typeof _userCharts.entrypoints.resize === "function") _userCharts.entrypoints.resize();
+      if (_userCharts.releaseStability && typeof _userCharts.releaseStability.resize === "function") _userCharts.releaseStability.resize();
+    } catch (error) { logClientOptionalErr(error); }
+  }
+  if (typeof requestAnimationFrame !== "undefined") {
+    requestAnimationFrame(__resizeUserProfileChartsAfterLayout);
+  } else {
+    setTimeout(__resizeUserProfileChartsAfterLayout, 0);
+  }
 }
 
 function renderVersionHealthChart(sortedVers, stats, allVers) {
@@ -4403,63 +3096,37 @@ function renderVersionHealthChart(sortedVers, stats, allVers) {
   var blurbV = document.getElementById("user-version-blurb");
   if (blurbV) blurbV.textContent = t("userVersionHealthBlurb");
   if (!elV || !allVers.length || !sortedVers.length) {
-    if (_userCharts.versions) { _userCharts.versions.destroy(); _userCharts.versions = null; }
+    __disposeUserEchartsChart("versions");
     return;
   }
-  if (_userCharts.versions) { _userCharts.versions.destroy(); _userCharts.versions = null; }
+  __disposeUserEchartsChart("versions");
 
   var datasets = [];
-  for (const m of __versionHealthMetrics) {
+  for (var m of __versionHealthMetrics) {
     var mData = sortedVers.map(function(sv) { return stats[sv] ? (stats[sv][m.key] || 0) : 0; });
-    datasets.push({ label: t(m.label), data: mData, backgroundColor: m.color, stack: "vh" });
+    datasets.push({ name: t(m.label), data: mData, color: m.color });
   }
 
-  var vhXMax = __stackedHBarXMax(datasets);
-  _userCharts.versions = new Chart(elV, {
-    type: "bar",
-    data: { labels: sortedVers, datasets: datasets },
-    options: {
-      indexAxis: "y",
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      layout: { padding: { left: 2, right: 10, top: 4, bottom: 10 } },
-      interaction: { mode: "index", intersect: false },
-      datasets: {
-        bar: { categoryPercentage: 0.88, barPercentage: 0.92 }
-      },
-      scales: {
-        x: {
-          stacked: true,
-          min: 0,
-          max: vhXMax,
-          grid: { color: "rgba(51,65,85,0.5)" },
-          ticks: { color: "#94a3b8", precision: 0 }
-        },
-        y: {
-          stacked: false,
-          offset: true,
-          grid: { color: "rgba(51,65,85,0.3)" },
-          ticks: { color: "#e2e8f0", font: { family: "monospace" }, autoSkip: false }
-        }
-      },
-      plugins: {
-        legend: { labels: { color: "#cbd5e1" } },
-        tooltip: {
-          callbacks: {
-            afterBody: function(items) {
-              if (!items.length) return "";
-              var ver = sortedVers[items[0].dataIndex];
-              var s = stats[ver];
-              if (!s) return "";
-              return t("userProfileCardVersion") + ": " + ver + " | Calls: " + (s.calls || 0) + " | Output: " + (s.output || 0);
-            }
-          }
-        }
-      }
-    }
+  _userCharts.versions = echarts.init(elV, null, { renderer: 'canvas' });
+  var vSeries = datasets.map(function(ds) {
+    return { name: ds.name, type: 'bar', stack: 'vh', data: ds.data, itemStyle: { color: ds.color }, barCategoryGap: '12%' };
   });
+  _userCharts.versions.setOption({
+    animation: false,
+    grid: __USER_PROFILE_BAR_GRID,
+    legend: __userProfileLegendOpts(datasets.map(function(ds) { return ds.name; })),
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 12 } },
+    xAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: {
+      type: "category",
+      data: sortedVers,
+      inverse: true,
+      boundaryGap: true,
+      axisLabel: __USER_PROFILE_BAR_Y_LABEL,
+      splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } }
+    },
+    series: vSeries
+  }, true);
 }
 
 function renderEntrypointsChart(sortedVers, stats) {
@@ -4469,15 +3136,15 @@ function renderEntrypointsChart(sortedVers, stats) {
   var blurbE = document.getElementById("user-entrypoint-blurb");
   if (blurbE) blurbE.textContent = t("userEntrypointBlurb");
   if (!elE || !sortedVers.length) {
-    if (_userCharts.entrypoints) { _userCharts.entrypoints.destroy(); _userCharts.entrypoints = null; }
+    __disposeUserEchartsChart("entrypoints");
     return;
   }
-  if (_userCharts.entrypoints) { _userCharts.entrypoints.destroy(); _userCharts.entrypoints = null; }
+  __disposeUserEchartsChart("entrypoints");
 
   var allEp = {};
-  for (const sv of sortedVers) {
+  for (var sv of sortedVers) {
     if (stats[sv]?.entrypoints) {
-      for (const epk of Object.keys(stats[sv].entrypoints)) allEp[epk] = true;
+      for (var epk of Object.keys(stats[sv].entrypoints)) allEp[epk] = true;
     }
   }
   var epKeys = Object.keys(allEp).sort(function(a, b) { return a.localeCompare(b); });
@@ -4487,59 +3154,42 @@ function renderEntrypointsChart(sortedVers, stats) {
     "cli": "rgba(34,197,94,0.8)",
     "claude-jetbrains": "rgba(245,158,11,0.8)"
   };
-  var epDatasets = [];
+  var epSeries = [];
+  var epLegendNames = [];
   for (var edi = 0; edi < epKeys.length; edi++) {
     var eKey = epKeys[edi];
+    var legName = __userEntrypointLegendName(eKey);
+    epLegendNames.push(legName);
     var eData = sortedVers.map(function(sv) { return stats[sv]?.entrypoints ? (stats[sv].entrypoints[eKey] || 0) : 0; });
-    epDatasets.push({
-      label: eKey,
-      data: eData,
-      backgroundColor: epColors[eKey] || __userProfileColors[edi % __userProfileColors.length],
-      stack: "ep"
+    epSeries.push({
+      name: legName, type: 'bar', stack: 'ep', data: eData, barCategoryGap: '12%',
+      itemStyle: { color: epColors[eKey] || __userProfileColors[edi % __userProfileColors.length] }
     });
   }
-  var epXMax = __stackedHBarXMax(epDatasets);
-  _userCharts.entrypoints = new Chart(elE, {
-    type: "bar",
-    data: { labels: sortedVers, datasets: epDatasets },
-    options: {
-      indexAxis: "y",
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      layout: { padding: { left: 2, right: 10, top: 4, bottom: 10 } },
-      interaction: { mode: "index", intersect: false },
-      datasets: {
-        bar: { categoryPercentage: 0.88, barPercentage: 0.92 }
-      },
-      scales: {
-        x: {
-          stacked: true,
-          min: 0,
-          max: epXMax,
-          grid: { color: "rgba(51,65,85,0.5)" },
-          ticks: { color: "#94a3b8", precision: 0 }
-        },
-        y: {
-          stacked: false,
-          offset: true,
-          grid: { color: "rgba(51,65,85,0.3)" },
-          ticks: { color: "#e2e8f0", font: { family: "monospace" }, autoSkip: false }
-        }
-      },
-      plugins: {
-        legend: { labels: { color: "#cbd5e1" } },
-        tooltip: { callbacks: { label: function(c) { return c.dataset.label + ": " + c.raw; } } }
-      }
-    }
-  });
+
+  _userCharts.entrypoints = echarts.init(elE, null, { renderer: 'canvas' });
+  _userCharts.entrypoints.setOption({
+    animation: false,
+    grid: __USER_PROFILE_BAR_GRID,
+    legend: __userProfileLegendOpts(epLegendNames),
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 12 } },
+    xAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: {
+      type: "category",
+      data: sortedVers,
+      inverse: true,
+      boundaryGap: true,
+      axisLabel: __USER_PROFILE_BAR_Y_LABEL,
+      splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } }
+    },
+    series: epSeries
+  }, true);
 }
 
 // ── Release Stability Chart ──────────────────────────────────────────────
 function __countReleaseStabilityBlurb(sortedVers, lookup) {
   var matched = 0, stableN = 0, regN = 0, hotN = 0, unknownN = 0;
-  for (const ver of sortedVers) {
+  for (var ver of sortedVers) {
     var info = lookup[ver];
     if (info) {
       matched++;
@@ -4559,7 +3209,7 @@ function __buildReleaseStabilitySeries(sortedVers, lookup) {
   var hotfixData = [];
   var unknownData = [];
   var meta = [];
-  for (const ver of sortedVers) {
+  for (var ver of sortedVers) {
     var r = lookup[ver];
     if (!r) {
       stableData.push(0);
@@ -4600,7 +3250,7 @@ function __releaseStabilityTooltipAfterBody(meta, items, t) {
 function __buildReleaseLookup(releaseData) {
   var map = {};
   if (!releaseData?.releases) return map;
-  for (const r of releaseData.releases) {
+  for (var r of releaseData.releases) {
     var key = (r.tag || "").replace(/^v/, "");
     map[key] = r;
   }
@@ -4613,7 +3263,10 @@ function renderReleaseStabilityChart(sortedVers, releaseData) {
   if (h3) h3.textContent = t("releaseStabilityTitle");
   var blurb = document.getElementById("user-release-stability-blurb");
   if (!el) return;
-  if (_userCharts.releaseStability) { _userCharts.releaseStability.destroy(); _userCharts.releaseStability = null; }
+  if (_userCharts.releaseStability) {
+    if (typeof _userCharts.releaseStability.dispose === 'function') _userCharts.releaseStability.dispose();
+    _userCharts.releaseStability = null;
+  }
   if (!sortedVers?.length || !releaseData) {
     if (blurb) blurb.textContent = t("releaseStabilityNoData");
     return;
@@ -4630,68 +3283,35 @@ function renderReleaseStabilityChart(sortedVers, releaseData) {
     .replace("{regressions}", String(counts.regN));
 
   var series = __buildReleaseStabilitySeries(sortedVers, lookup);
-  var stableData = series.stableData;
-  var regressionData = series.regressionData;
-  var hotfixData = series.hotfixData;
-  var unknownData = series.unknownData;
-  var meta = series.meta;
 
-  var datasets = [
-    { label: t("releaseStabilityStable"), data: stableData, backgroundColor: "rgba(34,197,94,0.8)", stack: "s" },
-    { label: t("releaseStabilityRegression"), data: regressionData, backgroundColor: "rgba(250,204,21,0.85)", stack: "s" },
-    { label: t("releaseStabilityHotfix"), data: hotfixData, backgroundColor: "rgba(248,113,113,0.85)", stack: "s" },
-    { label: t("releaseStabilityUnknown"), data: unknownData, backgroundColor: "rgba(100,116,139,0.4)", stack: "s" }
-  ];
-
-  var rsXMax = __stackedHBarXMax(datasets);
-  _userCharts.releaseStability = new Chart(el, {
-    type: "bar",
-    data: { labels: sortedVers, datasets: datasets },
-    options: {
-      indexAxis: "y",
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      layout: { padding: { left: 2, right: 10, top: 4, bottom: 32 } },
-      interaction: { mode: "index", intersect: false },
-      datasets: {
-        bar: { categoryPercentage: 0.88, barPercentage: 0.92 }
-      },
-      scales: {
-        x: {
-          stacked: true,
-          min: 0,
-          max: rsXMax,
-          grid: { color: "rgba(51,65,85,0.5)" },
-          ticks: { color: "#94a3b8" },
-          title: {
-            display: true,
-            text: t("releaseStabilityXAxis"),
-            color: "#64748b",
-            font: { size: 11 },
-            padding: { top: 10 }
-          }
-        },
-        y: {
-          stacked: false,
-          offset: true,
-          grid: { color: "rgba(51,65,85,0.18)" },
-          ticks: { color: "#e2e8f0", font: { family: "monospace" }, autoSkip: false }
-        }
-      },
-      plugins: {
-        legend: { labels: { color: "#cbd5e1" } },
-        tooltip: {
-          callbacks: {
-            afterBody: function(items) {
-              return __releaseStabilityTooltipAfterBody(meta, items, t);
-            }
-          }
-        }
-      }
-    }
-  });
+  _userCharts.releaseStability = echarts.init(el, null, { renderer: 'canvas' });
+  _userCharts.releaseStability.setOption({
+    animation: false,
+    grid: __USER_PROFILE_BAR_GRID,
+    legend: __userProfileLegendOpts([
+      t("releaseStabilityStable"),
+      t("releaseStabilityRegression"),
+      t("releaseStabilityHotfix"),
+      t("releaseStabilityUnknown")
+    ]),
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 12 } },
+    xAxis: { type: 'value', min: 0, name: t("releaseStabilityXAxis"), nameLocation: 'center', nameGap: 22, nameTextStyle: { color: '#64748b', fontSize: 11 },
+      axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: {
+      type: "category",
+      data: sortedVers,
+      inverse: true,
+      boundaryGap: true,
+      axisLabel: __USER_PROFILE_BAR_Y_LABEL,
+      splitLine: { lineStyle: { color: 'rgba(51,65,85,0.18)' } }
+    },
+    series: [
+      { name: t("releaseStabilityStable"), type: 'bar', stack: 's', data: series.stableData, itemStyle: { color: 'rgba(34,197,94,0.8)' }, barCategoryGap: '12%' },
+      { name: t("releaseStabilityRegression"), type: 'bar', stack: 's', data: series.regressionData, itemStyle: { color: 'rgba(250,204,21,0.85)' }, barCategoryGap: '12%' },
+      { name: t("releaseStabilityHotfix"), type: 'bar', stack: 's', data: series.hotfixData, itemStyle: { color: 'rgba(248,113,113,0.85)' }, barCategoryGap: '12%' },
+      { name: t("releaseStabilityUnknown"), type: 'bar', stack: 's', data: series.unknownData, itemStyle: { color: 'rgba(100,116,139,0.4)' }, barCategoryGap: '12%' }
+    ]
+  }, true);
 }
 
 // ── Budget Efficiency Section ─────────────────────────────────────────────
@@ -4701,7 +3321,7 @@ function __aggregateBudgetDaysForEfficiency(days, filteredHost) {
   var tot = { input: 0, output: 0, cache_read: 0, cache_creation: 0, total: 0,
     retries: 0, interrupts: 0, api_errors: 0, hit_limits: 0, calls: 0, active_hours: 0 };
   var dailyTrend = [];
-  for (const d of days) {
+  for (var d of days) {
     var src_d = d;
     if (filteredHost && d.hosts?.[filteredHost]) src_d = d.hosts[filteredHost];
     tot.input += src_d.input || 0;
@@ -4737,9 +3357,9 @@ function __aggregateBudgetDaysForEfficiency(days, filteredHost) {
 
 function __budgetHostTotalsFromDays(days) {
   var hostTotals = {};
-  for (const dayRow of days) {
+  for (var dayRow of days) {
     var dh = dayRow.hosts || {};
-    for (const hl of Object.keys(dh)) {
+    for (var hl of Object.keys(dh)) {
       var hv = dh[hl];
       if (!hostTotals[hl]) hostTotals[hl] = { output: 0, input: 0, cache_read: 0, cache_creation: 0, total: 0 };
       hostTotals[hl].output += hv.output || 0;
@@ -4755,7 +3375,7 @@ function __budgetHostTotalsFromDays(days) {
 function __budgetSankeyWeights(src) {
   var allVals = [src.out, src.inp, src.cr, src.cc].filter(function(v) { return v > 0; });
   var maxLog = 0;
-  for (const av of allVals) {
+  for (var av of allVals) {
     var lx = Math.log10(1 + av);
     if (lx > maxLog) maxLog = lx;
   }
@@ -4770,21 +3390,34 @@ function __budgetSankeyWeights(src) {
 
 function __budgetKpiCardsHtml(days, tot, outputPct, overheadFactor, cacheMissRate, lostSignals) {
   var totalOutageH = 0;
-  for (const d of days) totalOutageH += d.outage_hours || 0;
   var totalTruncated = 0;
-  for (const d of days) totalTruncated += d.session_signals?.truncated || 0;
+  for (var d of days) {
+    totalOutageH += d.outage_hours || 0;
+    totalTruncated += d.session_signals?.truncated || 0;
+  }
   var cards = [
-    { label: t("budgetCardOutput"), value: outputPct + "%", sub: t("budgetCardOutputSub"), cls: outputPct < 25 ? "warn" : "" },
-    { label: t("budgetCardOverhead"), value: overheadFactor + "x", sub: t("budgetCardOverheadSub"), cls: overheadFactor > 4 ? "warn" : "" },
-    { label: t("budgetCardCacheMiss"), value: cacheMissRate + "%", sub: t("budgetCardCacheMissSub"), cls: cacheMissRate > 40 ? "warn" : "" },
-    { label: t("budgetCardLost"), value: String(lostSignals), sub: t("budgetCardLostSub").replace("{r}", String(tot.retries)).replace("{i}", String(tot.interrupts)).replace("{e}", String(tot.api_errors)), cls: lostSignals > 5 ? "warn" : "" },
-    { label: t("budgetCardOutage"), value: totalOutageH.toFixed(1) + "h", sub: t("budgetCardOutageSub"), cls: totalOutageH > 2 ? "warn" : "" },
-    { label: t("budgetCardTruncated"), value: String(totalTruncated), sub: t("budgetCardTruncatedSub"), cls: totalTruncated > 50 ? "warn" : "" }
+    { wid: "budget-kpi-output", label: t("budgetCardOutput"), value: outputPct + "%", sub: t("budgetCardOutputSub"), cls: outputPct < 25 ? "warn" : "" },
+    { wid: "budget-kpi-overhead", label: t("budgetCardOverhead"), value: overheadFactor + "x", sub: t("budgetCardOverheadSub"), cls: overheadFactor > 4 ? "warn" : "" },
+    { wid: "budget-kpi-cache-miss", label: t("budgetCardCacheMiss"), value: cacheMissRate + "%", sub: t("budgetCardCacheMissSub"), cls: cacheMissRate > 40 ? "warn" : "" },
+    { wid: "budget-kpi-lost", label: t("budgetCardLost"), value: String(lostSignals), sub: t("budgetCardLostSub").replace("{r}", String(tot.retries)).replace("{i}", String(tot.interrupts)).replace("{e}", String(tot.api_errors)), cls: lostSignals > 5 ? "warn" : "" },
+    { wid: "budget-kpi-outage", label: t("budgetCardOutage"), value: totalOutageH.toFixed(1) + "h", sub: t("budgetCardOutageSub"), cls: totalOutageH > 2 ? "warn" : "" },
+    { wid: "budget-kpi-truncated", label: t("budgetCardTruncated"), value: String(totalTruncated), sub: t("budgetCardTruncatedSub"), cls: totalTruncated > 50 ? "warn" : "" }
   ];
   var ch = "";
-  cards.forEach(function(c) {
-    ch += "<div class=\"card " + c.cls + "\"><div class=\"label\">" + escHtml(c.label) + "</div><div class=\"value\">" + escHtml(c.value) + "</div><div class=\"sub\">" + escHtml(c.sub) + "</div></div>";
-  });
+  for (var c of cards) {
+    ch +=
+      '<div class="chart-box chart-box--kpi" id="' +
+      c.wid +
+      '"><div class="card ' +
+      c.cls +
+      '"><div class="label">' +
+      escHtml(c.label) +
+      '</div><div class="value">' +
+      escHtml(c.value) +
+      '</div><div class="sub">' +
+      escHtml(c.sub) +
+      "</div></div></div>";
+  }
   return ch;
 }
 
@@ -4815,7 +3448,7 @@ function __budgetQuotaFromLatestProxy(proxy) {
 
 function __budgetQuotaByDateMap(proxyDays) {
   var quotaByDate = {};
-  for (const pd of proxyDays) {
+  for (var pd of proxyDays) {
     if (!pd.date || !pd.rate_limit) continue;
     var rl = pd.rate_limit;
     var pdQ5 = rl["anthropic-ratelimit-unified-5h-utilization"];
@@ -4832,7 +3465,7 @@ function __budgetQuotaByDateMap(proxyDays) {
 }
 
 function __budgetApplyQuotaToTrend(dailyTrend, quotaByDate) {
-  for (const dt of dailyTrend) {
+  for (var dt of dailyTrend) {
     var qd = quotaByDate[dt.date];
     dt.quota_5h = qd ? qd.pct_5h : null;
     dt.quota_7d = qd ? qd.pct_7d : null;
@@ -4877,10 +3510,21 @@ function __budgetFuelGaugeHtml(tot, quota, t) {
   return fuelRows.join("");
 }
 
-/** Destroy waterfall + trend chart instances (called from empty-state handler). */
+/** Destroy waterfall + trend + quota chart instances (called from empty-state handler). */
 function __budgetDisposeCharts() {
-  if (_budgetCharts.waterfall) { _budgetCharts.waterfall.destroy(); _budgetCharts.waterfall = null; }
-  if (_budgetCharts.trend) { _budgetCharts.trend.destroy(); _budgetCharts.trend = null; }
+  if (_budgetCharts.waterfall) {
+    if (typeof _budgetCharts.waterfall.dispose === 'function') _budgetCharts.waterfall.dispose();
+    else if (typeof _budgetCharts.waterfall.destroy === 'function') _budgetCharts.waterfall.destroy();
+    _budgetCharts.waterfall = null;
+  }
+  if (_budgetCharts.trend) {
+    if (typeof _budgetCharts.trend.dispose === 'function') _budgetCharts.trend.dispose();
+    _budgetCharts.trend = null;
+  }
+  if (_budgetCharts.quota) {
+    if (typeof _budgetCharts.quota.dispose === 'function') _budgetCharts.quota.dispose();
+    _budgetCharts.quota = null;
+  }
 }
 
 /** Handle empty-data state: render 'no data' text and clean up charts. */
@@ -4943,6 +3587,67 @@ function __budgetRenderAlert(alertEl, quota) {
   }
 }
 
+/**
+ * Compute shared context for Budget Efficiency charts.
+ * Cached on window.__sectionCtx_budget.
+ */
+function _computeBudgetCtx(data) {
+  var days = getFilteredDays(data.days);
+  var filteredHost = typeof getFilterHost === "function" ? getFilterHost() : "";
+  __budgetFilteredHost = filteredHost;
+
+  var aggBe = __aggregateBudgetDaysForEfficiency(days, filteredHost);
+  var tot = aggBe.tot;
+  var dailyTrend = aggBe.dailyTrend;
+  var m = __budgetMetricsFromTot(tot);
+  var quota = __budgetQuotaFromLatestProxy(data.proxy);
+  var hostTotals = __budgetHostTotalsFromDays(days);
+  var proxyDays = data.proxy?.proxy_days || [];
+  __budgetApplyQuotaToTrend(dailyTrend, __budgetQuotaByDateMap(proxyDays));
+
+  var sCtx = {
+    data: data, days: days, tot: tot, dailyTrend: dailyTrend,
+    m: m, quota: quota, hostTotals: hostTotals, filteredHost: filteredHost
+  };
+  window.__sectionCtx_budget = sCtx;
+  return sCtx;
+}
+window._computeBudgetCtx = _computeBudgetCtx;
+
+/** Standalone: render Budget Sankey chart. */
+window.renderBudget_sankey = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_budget;
+  if (!sCtx) return;
+  renderBudgetWaterfall(sCtx.tot, sCtx.quota, sCtx.filteredHost ? {} : sCtx.hostTotals);
+};
+
+/** Standalone: render Budget Trend chart. */
+window.renderBudget_trend = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_budget;
+  if (!sCtx) return;
+  var el = document.getElementById("c-budget-trend");
+  var h3 = document.getElementById("budget-trend-h3");
+  if (h3) h3.textContent = t("budgetTrendTitle");
+  var blurb = document.getElementById("budget-trend-blurb");
+  if (blurb) blurb.textContent = t("budgetTrendBlurb");
+  __budgetDrawTrendEfficiencyChart(el, sCtx.dailyTrend.map(function(d) { return d.date; }), sCtx.dailyTrend, t);
+};
+
+/** Standalone: render Budget Quota Usage chart. */
+window.renderBudget_quota = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_budget;
+  if (!sCtx) return;
+  var labels = sCtx.dailyTrend.map(function(d) { return d.date; });
+  var el2 = document.getElementById("c-budget-quota");
+  var h32 = document.getElementById("budget-quota-h3");
+  if (h32) h32.textContent = t("budgetQuotaTitle");
+  var blurb2 = document.getElementById("budget-quota-blurb");
+  if (blurb2) blurb2.textContent = t("budgetQuotaBlurb");
+  if (el2 && sCtx.dailyTrend.length) {
+    __budgetDrawQuotaUsageChart(el2, labels, __budgetQuotaTrendDatasets(sCtx.dailyTrend, t));
+  }
+};
+
 function renderBudgetEfficiency(data) {
   var sumEl = document.getElementById("budget-summary-line");
   var cardsEl = document.getElementById("budget-cards");
@@ -4954,34 +3659,21 @@ function renderBudgetEfficiency(data) {
     return;
   }
 
-  // Respect host filter from top bar
-  var filteredHost = typeof getFilterHost === "function" ? getFilterHost() : "";
-  __budgetFilteredHost = filteredHost;
+  var sCtx = _computeBudgetCtx(data);
 
-  var aggBe = __aggregateBudgetDaysForEfficiency(days, filteredHost);
-  var tot = aggBe.tot;
-  var dailyTrend = aggBe.dailyTrend;
-
-  var m = __budgetMetricsFromTot(tot);
-  __budgetFillSummary(sumEl, tot, m);
+  __budgetFillSummary(sumEl, sCtx.tot, sCtx.m);
 
   if (cardsEl) {
-    cardsEl.innerHTML = __budgetKpiCardsHtml(days, tot, m.outputPct, m.overheadFactor, m.cacheMissRate, m.lostSignals);
+    cardsEl.innerHTML = __budgetKpiCardsHtml(sCtx.days, sCtx.tot, sCtx.m.outputPct, sCtx.m.overheadFactor, sCtx.m.cacheMissRate, sCtx.m.lostSignals);
   }
 
-  var quota = __budgetQuotaFromLatestProxy(data.proxy);
-  __budgetRenderFuel(document.getElementById("budget-fuel"), tot, quota);
-  __budgetRenderAlert(document.getElementById("budget-alert"), quota);
+  __budgetRenderFuel(document.getElementById("budget-fuel"), sCtx.tot, sCtx.quota);
+  __budgetRenderAlert(document.getElementById("budget-alert"), sCtx.quota);
 
-  var hostTotals = __budgetHostTotalsFromDays(days);
-
-  // Waterfall Chart — if host filter active, skip multi-host view
-  renderBudgetWaterfall(tot, quota, filteredHost ? {} : hostTotals);
-
-  var proxyDays = data.proxy?.proxy_days || [];
-  __budgetApplyQuotaToTrend(dailyTrend, __budgetQuotaByDateMap(proxyDays));
-
-  renderBudgetTrend(dailyTrend);
+  // Render charts via standalone functions
+  window.renderBudget_sankey(sCtx);
+  window.renderBudget_trend(sCtx);
+  window.renderBudget_quota(sCtx);
 }
 
 // Approximate quota cost weights (relative to output=1)
@@ -4996,142 +3688,17 @@ var __budgetFlowMode = "budget"; // "budget" | "api" | "user"
 var __budgetSankeyState = null;
 var __budgetFilteredHost = "";
 var __budgetSwitchesWired = false;
-var __googleChartsReady = false;
-var __budgetSankeyChart = null;
-var __budgetSankeyData = null;
-var __budgetSankeyRowCount = 0;
-var __budgetSankeyRo = null;
-var __budgetSankeyResizeDeb = null;
-var __budgetSankeyWindowResizeBound = false;
 
 function __budgetSankeyDispose() {
-  if (__budgetSankeyRo) {
-    try {
-      __budgetSankeyRo.disconnect();
-    } catch {
-      // ResizeObserver may already be disconnected
-    }
-    __budgetSankeyRo = null;
+  if (_budgetCharts.waterfall) {
+    if (typeof _budgetCharts.waterfall.dispose === 'function') _budgetCharts.waterfall.dispose();
+    _budgetCharts.waterfall = null;
   }
-  if (__budgetSankeyResizeDeb) {
-    clearTimeout(__budgetSankeyResizeDeb);
-    __budgetSankeyResizeDeb = null;
-  }
-  __budgetSankeyChart = null;
-  __budgetSankeyData = null;
-  __budgetSankeyRowCount = 0;
-}
-
-function __budgetSankeyMeasure(el, rowCount) {
-  var w = 0;
-  if (el?.getBoundingClientRect) {
-    w = Math.floor(el.getBoundingClientRect().width);
-  }
-  if (w < 48 && el?.closest) {
-    var box = el.closest(".chart-box");
-    if (box?.getBoundingClientRect) {
-      w = Math.floor(box.getBoundingClientRect().width - 36);
-    }
-  }
-  var win = globalThis.window;
-  if (w < 48 && win) {
-    w = Math.floor(win.innerWidth - 80);
-  }
-  // Kein Math.max(300, …): sonst wird beim Verkleinern nie schmaler neu gezeichnet.
-  w = Math.max(160, Math.min(w, 12000));
-  var rc = Math.max(rowCount, 1);
-  var pitch = Math.max(14, Math.min(26, Math.round(w / 26)));
-  var hFromRows = Math.max(220, rc * pitch);
-  var vh = win ? win.innerHeight : 700;
-  var hFromVp = Math.floor(Math.min(720, Math.max(220, vh * 0.42)));
-  var h = Math.min(780, Math.max(hFromRows, hFromVp));
-  return { width: w, height: h };
-}
-
-function __budgetSankeyDrawOptions(width, height) {
-  var fs = Math.max(10, Math.min(12, Math.round(width / 72)));
-  var pad = Math.max(10, Math.min(18, Math.round(width / 52)));
-  var nw = Math.max(22, Math.min(34, Math.round(width / 26)));
-  return {
-    width: width,
-    height: height,
-    sankey: {
-      node: {
-        label: { fontSize: fs, bold: true, color: "#e2e8f0" },
-        nodePadding: pad,
-        width: nw,
-        colors: ["#94a3b8", "#22c55e", "#3b82f6", "#22d3ee", "#f59e0b", "#f87171", "#a855f7", "#8b5cf6"]
-      },
-      link: {
-        color: { fill: "#94a3b8", fillOpacity: 0.18 },
-        colorMode: "gradient"
-      }
-    }
-  };
-}
-
-function __budgetSankeyRedraw() {
-  if (!__budgetSankeyChart || !__budgetSankeyData || !globalThis.google?.visualization) return;
-  var el = document.getElementById("c-budget-sankey");
-  if (!el) return;
-  var m = __budgetSankeyMeasure(el, __budgetSankeyRowCount || 1);
-  try {
-    if (typeof __budgetSankeyChart.clearChart === "function") __budgetSankeyChart.clearChart();
-  } catch {
-    // Google Charts may throw on repeat clearChart
-  }
-  el.style.minWidth = "";
-  el.style.width = "100%";
-  __budgetSankeyChart.draw(__budgetSankeyData, __budgetSankeyDrawOptions(m.width, m.height));
-}
-
-function __budgetSankeyBindResize(el) {
-  if (typeof ResizeObserver !== "undefined") {
-    if (__budgetSankeyRo) {
-      try {
-        __budgetSankeyRo.disconnect();
-      } catch {
-        // already disconnected
-      }
-      __budgetSankeyRo = null;
-    }
-    __budgetSankeyRo = new ResizeObserver(function() {
-      if (__budgetSankeyResizeDeb) clearTimeout(__budgetSankeyResizeDeb);
-      __budgetSankeyResizeDeb = setTimeout(__budgetSankeyRedraw, 100);
-    });
-    __budgetSankeyRo.observe(el);
-    var box = el.closest?.(".chart-box");
-    if (box && box !== el) __budgetSankeyRo.observe(box);
-  }
-  var winB = globalThis.window;
-  if (winB && !__budgetSankeyWindowResizeBound) {
-    __budgetSankeyWindowResizeBound = true;
-    winB.addEventListener("resize", function() {
-      if (__budgetSankeyResizeDeb) clearTimeout(__budgetSankeyResizeDeb);
-      __budgetSankeyResizeDeb = setTimeout(__budgetSankeyRedraw, 120);
-    });
-  }
-}
-
-// Load Google Charts Sankey package
-(function() {
-  if (globalThis.google?.charts) {
-    globalThis.google.charts.load("current", { packages: ["sankey"] });
-    globalThis.google.charts.setOnLoadCallback(function() { __googleChartsReady = true; });
-  } else {
-    var iv = setInterval(function() {
-      if (globalThis.google?.charts) {
-        clearInterval(iv);
-        globalThis.google.charts.load("current", { packages: ["sankey"] });
-        globalThis.google.charts.setOnLoadCallback(function() { __googleChartsReady = true; });
-      }
-    }, 200);
-  }
-})();
+};
 
 function __renderBudgetGroup(el, modes, current, setter) {
   el.innerHTML = "";
-  for (const mode of modes) {
+  for (var mode of modes) {
     var btn = document.createElement("button");
     btn.type = "button";
     btn.textContent = mode.label;
@@ -5173,12 +3740,12 @@ function __updateBudgetSwitchActive() {
   var flowGrp = document.getElementById("budget-flow-group");
   var weightGrp = document.getElementById("budget-weight-group");
   if (flowGrp) {
-    for (const btn of flowGrp.querySelectorAll("button")) {
+    for (var btn of flowGrp.querySelectorAll("button")) {
       btn.className = btn.dataset.key === __budgetFlowMode ? "active" : "";
     }
   }
   if (weightGrp) {
-    for (const b2 of weightGrp.querySelectorAll("button")) {
+    for (var b2 of weightGrp.querySelectorAll("button")) {
       b2.className = b2.dataset.key === __budgetViewMode ? "active" : "";
     }
   }
@@ -5207,7 +3774,7 @@ function __budgetPushLeafs(rows, from, s, x, w) {
 
 /** Expand parentNode into per-host sub-nodes and recurse into leafs. */
 function __budgetExpandHosts(rows, parentNode, x) {
-  for (const hk of x.hostKeys) {
+  for (var hk of x.hostKeys) {
     var hd = x.hostTotals[hk];
     var hLabel = hk + " (" + x.fmtTok(hd.total) + ")";
     var hsrc = __budgetHostSrc(hd, x.isCost);
@@ -5306,13 +3873,6 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
   var blurb = document.getElementById("budget-waterfall-blurb");
   if (!el) return;
 
-  if (!__googleChartsReady || !globalThis.google?.visualization) {
-    __budgetSankeyDispose();
-    el.innerHTML = "<div style='text-align:center;padding:2rem;color:#94a3b8'>Loading Google Charts...</div>";
-    setTimeout(function() { if (__budgetSankeyState) renderBudgetWaterfall(__budgetSankeyState.tot, __budgetSankeyState.quota, __budgetSankeyState.hostTotals); }, 500);
-    return;
-  }
-
   if (tot.total <= 0) {
     __budgetSankeyDispose();
     el.innerHTML = "<div style='text-align:center;padding:2rem;color:#94a3b8'>" + t("budgetNoData") + "</div>";
@@ -5336,13 +3896,11 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
     blurb.textContent = isCost ? t("budgetWaterfallBlurbCost") : t("budgetWaterfallBlurb");
   }
 
-  // Build Google DataTable rows: [From, To, Weight]
   var nOut = t("budgetWfOutput") + " " + pctOf(src.out) + "%";
   var nInp = t("budgetWfInput") + " " + pctOf(src.inp) + "%";
   var nCr  = t("budgetWfCacheRead") + " " + pctOf(src.cr) + "%";
   var nCc  = t("budgetWfCacheCreate") + " " + pctOf(src.cc) + "%";
 
-  // Compressed weights: log-scaled (see __budgetSankeyWeights)
   var sw2 = __budgetSankeyWeights(src);
   var wOf = sw2.wOf;
   var wOut = sw2.wOut, wInp = sw2.wInp, wCr = sw2.wCr, wCc = sw2.wCc;
@@ -5369,96 +3927,130 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
     return;
   }
 
-  var data = new globalThis.google.visualization.DataTable();
-  data.addColumn("string", "From");
-  data.addColumn("string", "To");
-  data.addColumn("number", "Weight");
-  data.addRows(rows);
-
-  if (!__budgetSankeyChart) {
-    el.innerHTML = "";
-    __budgetSankeyChart = new globalThis.google.visualization.Sankey(el);
-    __budgetSankeyBindResize(el);
+  // Convert [From, To, Weight] rows to ECharts sankey nodes + links
+  var nodeSet = {};
+  var links = [];
+  var palette = ['#94a3b8', '#22c55e', '#3b82f6', '#22d3ee', '#f59e0b', '#f87171', '#a855f7', '#8b5cf6'];
+  for (var _row of rows) {
+    var from = _row[0], to = _row[1], weight = _row[2];
+    if (!nodeSet[from]) nodeSet[from] = { name: from, itemStyle: { color: palette[Object.keys(nodeSet).length % palette.length] } };
+    if (!nodeSet[to]) nodeSet[to] = { name: to, itemStyle: { color: palette[Object.keys(nodeSet).length % palette.length] } };
+    links.push({ source: from, target: to, value: weight });
   }
-  __budgetSankeyData = data;
-  __budgetSankeyRowCount = rows.length;
-  var m0 = __budgetSankeyMeasure(el, rows.length);
-  __budgetSankeyChart.draw(data, __budgetSankeyDrawOptions(m0.width, m0.height));
+  var nodes = [];
+  for (var nk in nodeSet) {
+    if (Object.hasOwn(nodeSet, nk)) nodes.push(nodeSet[nk]);
+  }
+
+  // ECharts Sankey
+  if (!_budgetCharts.waterfall) {
+    el.innerHTML = "";
+    _budgetCharts.waterfall = echarts.init(el, null, { renderer: 'canvas' });
+  }
+  var chart = _budgetCharts.waterfall;
+  var rc = Math.max(rows.length, 1);
+  var winH = typeof window !== "undefined" && window.innerHeight ? window.innerHeight : 800;
+  var byRows = Math.max(160, Math.min(410, rc * 12));
+  var byVh = Math.round(winH * 0.31);
+  var h = Math.max(byRows, Math.min(430, byVh));
+  el.style.width = "100%";
+  el.style.height = h + "px";
+  el.style.minHeight = Math.min(180, byRows) + "px";
+  chart.setOption({
+    animation: false,
+    tooltip: {
+      trigger: 'item',
+      triggerOn: 'mousemove',
+      backgroundColor: 'rgba(15,23,42,0.95)',
+      borderColor: '#334155',
+      textStyle: { color: '#e2e8f0' }
+    },
+    series: [{
+      type: 'sankey',
+      layout: 'none',
+      left: "1%",
+      right: "1%",
+      top: "3%",
+      bottom: "3%",
+      emphasis: { focus: 'adjacency' },
+      nodeWidth: 32,
+      nodeGap: 12,
+      layoutIterations: 32,
+      label: { color: '#e2e8f0', fontSize: 11 },
+      lineStyle: { color: 'gradient', curveness: 0.5, opacity: 0.48 },
+      data: nodes,
+      links: links
+    }]
+  }, true);
+  try {
+    chart.resize();
+  } catch (error) { logClientOptionalErr(error); }
+  if (typeof requestAnimationFrame === "function") {
+    requestAnimationFrame(function () {
+      try {
+        if (_budgetCharts.waterfall && typeof _budgetCharts.waterfall.resize === "function") {
+          _budgetCharts.waterfall.resize();
+        }
+      } catch (error) { logClientOptionalErr(error); }
+    });
+  }
+}
+
+/** X-Achse Budget-Trend/Quota: ohne Jahr (MM-TT aus YYYY-MM-TT), sonst unveraendert. */
+function __budgetTrendAxisLabel(dateStr) {
+  if (!dateStr || typeof dateStr !== "string") return dateStr == null ? "" : String(dateStr);
+  if (dateStr.length >= 10 && dateStr.charAt(4) === "-" && dateStr.charAt(7) === "-") return dateStr.slice(5, 10);
+  return dateStr;
+}
+
+function __budgetTrendAxisLabelsFromDates(labels) {
+  var out = [];
+  for (var _lbl of labels) out.push(__budgetTrendAxisLabel(_lbl));
+  return out;
 }
 
 function __budgetDrawTrendEfficiencyChart(el, labels, dailyTrend, t) {
   if (!el || !dailyTrend.length) return;
+  if (_budgetCharts.trend) { _budgetCharts.trend.dispose(); _budgetCharts.trend = null; }
+  var chart = echarts.init(el, null, { renderer: 'canvas' });
+  _budgetCharts.trend = chart;
+  var axisLabs = __budgetTrendAxisLabelsFromDates(labels);
   var outputPctData = dailyTrend.map(function(d) { return d.output_pct; });
   var overheadInvData = dailyTrend.map(function(d) { return d.overhead > 0 ? -Math.min(d.overhead, 100) : 0; });
   var cacheMissData = dailyTrend.map(function(d) { return d.cache_miss_rate; });
-  _budgetCharts.trend = new Chart(el, {
-    type: "line",
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: t("budgetTrendOutputPct"),
-          data: outputPctData,
-          borderColor: "rgba(34,197,94,0.9)",
-          backgroundColor: "rgba(34,197,94,0.15)",
-          tension: 0.3,
-          fill: "origin",
-          pointRadius: 3
-        },
-        {
-          label: t("budgetTrendOverhead"),
-          data: overheadInvData,
-          borderColor: "rgba(248,113,113,0.9)",
-          backgroundColor: "rgba(248,113,113,0.15)",
-          tension: 0.3,
-          fill: "origin",
-          pointRadius: 3
-        },
-        {
-          label: t("budgetTrendCacheMiss"),
-          data: cacheMissData,
-          borderColor: "rgba(245,158,11,0.8)",
-          backgroundColor: "transparent",
-          tension: 0.3,
-          fill: false,
-          borderDash: [5, 3],
-          pointRadius: 2
+  chart.setOption({
+    animation: false,
+    grid: { left: 50, right: 20, top: 40, bottom: 34 },
+    legend: { data: [t("budgetTrendOutputPct"), t("budgetTrendOverhead"), t("budgetTrendCacheMiss")], textStyle: { color: '#cbd5e1' }, top: 4 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) {
+        var ix = params[0].dataIndex;
+        var head = dailyTrend[ix]?.date ? dailyTrend[ix].date : params[0].axisValueLabel;
+        var lines = [head];
+        for (var p of params) {
+          var val = p.value;
+          if (val == null) continue;
+          var fmt = p.seriesIndex === 1 ? Math.abs(val) + 'x' : val + '%';
+          lines.push(p.marker + ' ' + p.seriesName + ': ' + fmt);
         }
-      ]
-    },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { grid: { color: "rgba(51,65,85,0.3)" }, ticks: { color: "#94a3b8", maxRotation: 45 } },
-        y: {
-          grid: { color: "rgba(51,65,85,0.3)" },
-          ticks: {
-            color: "#94a3b8",
-            callback: function(v) {
-              if (v >= 0) return v + "%";
-              return Math.abs(v) + "x";
-            }
-          },
-          suggestedMin: -20,
-          suggestedMax: 50
-        }
-      },
-      plugins: {
-        legend: { labels: { color: "#cbd5e1" } },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) {
-              if (ctx.raw == null) return null;
-              if (ctx.datasetIndex === 1) return ctx.dataset.label + ": " + Math.abs(ctx.raw) + "x";
-              return ctx.dataset.label + ": " + ctx.raw + "%";
-            }
-          }
-        }
+        return lines.join('<br>');
       }
-    }
+    },
+    xAxis: { type: 'category', data: axisLabs, axisLabel: { color: '#94a3b8', rotate: 45, fontSize: 9 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
+    yAxis: { type: 'value', min: -20, max: function(v) { return Math.max(50, v.max + 5); },
+      axisLabel: { color: '#94a3b8', formatter: function(v) { return v >= 0 ? v + '%' : Math.abs(v) + 'x'; } },
+      splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } }
+    },
+    series: [
+      { name: t("budgetTrendOutputPct"), type: 'line', data: outputPctData, smooth: 0.3, symbol: 'circle', symbolSize: 6,
+        lineStyle: { color: 'rgba(34,197,94,0.9)' }, itemStyle: { color: 'rgba(34,197,94,0.9)' },
+        areaStyle: { color: 'rgba(34,197,94,0.15)' } },
+      { name: t("budgetTrendOverhead"), type: 'line', data: overheadInvData, smooth: 0.3, symbol: 'circle', symbolSize: 6,
+        lineStyle: { color: 'rgba(248,113,113,0.9)' }, itemStyle: { color: 'rgba(248,113,113,0.9)' },
+        areaStyle: { color: 'rgba(248,113,113,0.15)' } },
+      { name: t("budgetTrendCacheMiss"), type: 'line', data: cacheMissData, smooth: 0.3, symbol: 'circle', symbolSize: 4,
+        lineStyle: { color: 'rgba(245,158,11,0.8)', type: 'dashed' }, itemStyle: { color: 'rgba(245,158,11,0.8)' } }
+    ]
   });
 }
 
@@ -5522,58 +4114,204 @@ function __budgetDrawQuotaUsageChart(el2, labels, qDatasets) {
     return;
   }
   el2.parentElement.style.display = "";
-  _budgetCharts.quota = new Chart(el2, {
-    type: "line",
-    data: { labels: labels, datasets: qDatasets },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { grid: { color: "rgba(51,65,85,0.3)" }, ticks: { color: "#94a3b8", maxRotation: 45 } },
-        y: {
-          grid: { color: "rgba(51,65,85,0.3)" },
-          ticks: { color: "#a855f7", callback: function(v) { return v + "%"; } },
-          min: 0,
-          suggestedMax: 100
-        }
-      },
-      plugins: {
-        legend: { labels: { color: "#cbd5e1" } },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) {
-              if (ctx.raw == null) return null;
-              return ctx.dataset.label + ": " + ctx.raw + "%";
-            }
-          }
-        }
-      }
+  if (_budgetCharts.quota) { _budgetCharts.quota.dispose(); _budgetCharts.quota = null; }
+  var chart = echarts.init(el2, null, { renderer: 'canvas' });
+  _budgetCharts.quota = chart;
+  var series = [];
+  var legendNames = [];
+  for (var ds of qDatasets) {
+    legendNames.push(ds.label);
+    var s = {
+      name: ds.label,
+      type: 'line',
+      data: ds.data,
+      smooth: 0.3,
+      symbol: ds.pointStyle === 'triangle' ? 'triangle' : ds.pointStyle === 'star' ? 'diamond' : 'roundRect',
+      symbolSize: (ds.pointRadius || 3) * 2,
+      lineStyle: { color: ds.borderColor, width: ds.borderWidth || 2 },
+      itemStyle: { color: ds.borderColor },
+      connectNulls: ds.spanGaps || false
+    };
+    if (ds.borderDash) s.lineStyle.type = 'dashed';
+    if (ds.fill && ds.backgroundColor !== 'transparent') {
+      s.areaStyle = { color: ds.backgroundColor };
     }
+    series.push(s);
+  }
+  var axisLabsQ = __budgetTrendAxisLabelsFromDates(labels);
+  chart.setOption({
+    animation: false,
+    grid: { left: 50, right: 20, top: 40, bottom: 34 },
+    legend: { data: legendNames, textStyle: { color: '#cbd5e1' }, top: 4 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) {
+        var ixq = params[0].dataIndex;
+        var headQ = (ixq >= 0 && ixq < labels.length && labels[ixq]) ? labels[ixq] : params[0].axisValueLabel;
+        var lines = [headQ];
+        for (var _pm of params) {
+          if (_pm.value == null) continue;
+          lines.push(_pm.marker + ' ' + _pm.seriesName + ': ' + _pm.value + '%');
+        }
+        return lines.join('<br>');
+      }
+    },
+    xAxis: { type: 'category', data: axisLabsQ, axisLabel: { color: '#94a3b8', rotate: 45, fontSize: 9 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
+    yAxis: { type: 'value', min: 0, max: 100,
+      axisLabel: { color: '#a855f7', formatter: '{value}%' },
+      splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } }
+    },
+    series: series
   });
 }
 
+// renderBudgetTrend: kept as backward-compat wrapper (called from __budgetSwitchesWired flow)
 function renderBudgetTrend(dailyTrend) {
-  if (_budgetCharts.trend) { _budgetCharts.trend.destroy(); _budgetCharts.trend = null; }
-  if (_budgetCharts.quota) { _budgetCharts.quota.destroy(); _budgetCharts.quota = null; }
-
   var labels = dailyTrend.map(function(d) { return d.date; });
-
-  var el = document.getElementById("c-budget-trend");
-  var h3 = document.getElementById("budget-trend-h3");
-  if (h3) h3.textContent = t("budgetTrendTitle");
-  var blurb = document.getElementById("budget-trend-blurb");
-  if (blurb) blurb.textContent = t("budgetTrendBlurb");
-  __budgetDrawTrendEfficiencyChart(el, labels, dailyTrend, t);
-
+  __budgetDrawTrendEfficiencyChart(document.getElementById("c-budget-trend"), labels, dailyTrend, t);
   var el2 = document.getElementById("c-budget-quota");
-  var h32 = document.getElementById("budget-quota-h3");
-  if (h32) h32.textContent = t("budgetQuotaTitle");
-  var blurb2 = document.getElementById("budget-quota-blurb");
-  if (blurb2) blurb2.textContent = t("budgetQuotaBlurb");
   if (el2 && dailyTrend.length) {
     __budgetDrawQuotaUsageChart(el2, labels, __budgetQuotaTrendDatasets(dailyTrend, t));
+  }
+}
+
+// ── Intelligence / Predictive Metrics Section ────────────────────────────
+
+var _intelCharts = { seasonality: null };
+
+function renderIntelligenceSection(data) {
+  var sumEl = document.getElementById('intelligence-summary-line');
+  var scoresEl = document.getElementById('intelligence-scores');
+  var narrativeEl = document.getElementById('intelligence-narrative');
+  var rootCauseEl = document.getElementById('intelligence-rootcause');
+  if (!sumEl) return;
+
+  var engine = window.__metricsEngine;
+  if (!engine) { sumEl.textContent = t('intelNoData'); return; }
+
+  var proxyDays = data.proxy?.proxy_days || [];
+  if (!proxyDays.length) { sumEl.textContent = t('intelNoData'); return; }
+
+  // Compute health indicators (reuse existing function)
+  var indicators = typeof computeHealthIndicators === 'function'
+    ? computeHealthIndicators(data) : null;
+
+  var metrics = engine.computeAll(data, indicators);
+
+  // Summary line
+  sumEl.textContent = tr('intelSummaryLine', {
+    sat: String(metrics.saturation),
+    health: String(metrics.healthScore),
+    q5: String(metrics.quotaETA.pct5h)
+  });
+
+  // Score cards
+  if (scoresEl) {
+    var satCls = metrics.saturation >= 75 ? 'danger' : metrics.saturation >= 40 ? 'warn' : 'ok';
+    var healthCls = metrics.healthScore < 50 ? 'danger' : metrics.healthScore < 75 ? 'warn' : 'ok';
+    var etaVal = metrics.quotaETA.minutesLeft > 0
+      ? (metrics.quotaETA.minutesLeft >= 60
+        ? Math.floor(metrics.quotaETA.minutesLeft / 60) + 'h ' + (metrics.quotaETA.minutesLeft % 60) + 'm'
+        : metrics.quotaETA.minutesLeft + 'm')
+      : '\u2014';
+    var etaCls = metrics.quotaETA.minutesLeft > 0 && metrics.quotaETA.minutesLeft < 60 ? 'warn' : '';
+
+    var cards = [
+      { wid: 'intel-saturation', label: t('intelSaturation'), value: metrics.saturation + '/100', sub: satCls === 'ok' ? 'Low stress' : satCls === 'warn' ? 'Elevated' : 'Critical', cls: satCls },
+      { wid: 'intel-health', label: t('intelHealth'), value: metrics.healthScore + '/100', sub: healthCls === 'ok' ? 'Good' : healthCls === 'warn' ? 'Degraded' : 'Poor', cls: healthCls },
+      { wid: 'intel-quota-eta', label: t('intelQuotaEta'), value: etaVal, sub: metrics.quotaETA.pct5h + '% used' + (metrics.quotaETA.confidence !== 'none' ? ' (' + metrics.quotaETA.confidence + ')' : ''), cls: etaCls }
+    ];
+    var ch = '';
+    for (var c of cards) {
+      ch += '<div class="chart-box chart-box--kpi" id="' + c.wid + '"><div class="card ' + c.cls + '">' +
+        '<div class="label">' + escHtml(c.label) + '</div>' +
+        '<div class="value">' + escHtml(c.value) + '</div>' +
+        '<div class="sub">' + escHtml(c.sub) + '</div></div></div>';
+    }
+    scoresEl.innerHTML = ch;
+  }
+
+  // Narrative summary
+  if (narrativeEl && metrics.narrative.length) {
+    var nh = '<div class="intel-narrative-box" id="intel-narrative">';
+    for (var ni = 0; ni < metrics.narrative.length; ni++) {
+      var line = metrics.narrative[ni];
+      var dotCls = 'intel-dot';
+      if (line.includes('critical') || line.includes('poor') || line.includes('high')) dotCls += ' intel-dot--red';
+      else if (line.includes('elevated') || line.includes('degraded')) dotCls += ' intel-dot--yellow';
+      else dotCls += ' intel-dot--green';
+      nh += '<div class="intel-narrative-line"><span class="' + dotCls + '"></span> ' + escHtml(line) + '</div>';
+    }
+    nh += '</div>';
+    narrativeEl.innerHTML = nh;
+  }
+
+  // Root cause (only if saturation elevated)
+  if (rootCauseEl) {
+    if (metrics.rootCause.length && metrics.saturation >= 40) {
+      var rh = '<div class="intel-rootcause-box"><h4>' + t('intelRootCauseTitle') + '</h4>';
+      for (var ri = 0; ri < metrics.rootCause.length; ri++) {
+        var rc = metrics.rootCause[ri];
+        var rcCls = rc.severity === 'high' ? 'intel-rc--high' : 'intel-rc--medium';
+        rh += '<div class="intel-rc-item ' + rcCls + '">' + escHtml(rc.factor) + ' <strong>' + escHtml(rc.pct) + '</strong></div>';
+      }
+      rh += '</div>';
+      rootCauseEl.innerHTML = rh;
+    } else {
+      rootCauseEl.innerHTML = '';
+    }
+  }
+
+  // Seasonality chart
+  renderIntelSeasonalityChart(metrics.seasonality);
+}
+
+/** Standalone: render seasonality bar chart. */
+window.renderIntel_seasonality = function (sCtx) {
+  var seasonal = sCtx || window.__metricsEngine?._lastSeasonality;
+  if (!seasonal) return;
+  renderIntelSeasonalityChart(seasonal);
+};
+
+function renderIntelSeasonalityChart(seasonal) {
+  if (!seasonal?.byHour) return;
+  var el = document.getElementById('c-intel-seasonality');
+  if (!el) return;
+
+  if (typeof echarts === 'undefined') return;
+  if (_intelCharts.seasonality) { _intelCharts.seasonality.dispose(); _intelCharts.seasonality = null; }
+
+  _intelCharts.seasonality = echarts.init(el, null, { renderer: 'canvas' });
+
+  var labels = [];
+  var values = [];
+  var latValues = [];
+  for (var h = 0; h < seasonal.byHour.length; h++) {
+    var bh = seasonal.byHour[h];
+    labels.push(String(bh.hour).padStart(2, '0') + ':00');
+    values.push(bh.avgRequests);
+    latValues.push(bh.avgLatencyMs);
+  }
+
+  _intelCharts.seasonality.setOption({
+    animation: false,
+    grid: { left: 40, right: 50, top: 30, bottom: 30 },
+    legend: { data: ['Requests', 'Latency (ms)'], textStyle: { color: '#cbd5e1', fontSize: 10 }, top: 2 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' } },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: [
+      { type: 'value', min: 0, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+      { type: 'value', min: 0, axisLabel: { color: '#f59e0b', fontSize: 10, formatter: function (v) { return v >= 1000 ? (v / 1000).toFixed(1) + 's' : v + 'ms'; } }, splitLine: { show: false } }
+    ],
+    series: [
+      { name: 'Requests', type: 'bar', data: values, itemStyle: { color: function (p) { return p.dataIndex === seasonal.peakHour ? 'rgba(239,68,68,0.7)' : 'rgba(59,130,246,0.6)'; }, borderRadius: [3, 3, 0, 0] } },
+      { name: 'Latency (ms)', type: 'line', yAxisIndex: 1, data: latValues, smooth: 0.3, symbol: 'circle', symbolSize: 4, lineStyle: { color: '#f59e0b', width: 2 }, itemStyle: { color: '#f59e0b' } }
+    ]
+  }, true);
+  __safeChartResize(_intelCharts.seasonality);
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(function () {
+      __safeChartResize(_intelCharts.seasonality);
+    });
   }
 }
 
@@ -5583,22 +4321,67 @@ var _proxyCharts = { tokens: null, latency: null };
 var _effCharts = { heatmap: null, ratio: null, vispct: null, cachemiss: null };
 var __effResizeT = null;
 function __effResizeAll() {
-  for (const key of Object.keys(_effCharts)) {
+  for (var key of Object.keys(_effCharts)) {
     var c = _effCharts[key];
     if (c && typeof c.resize === "function") {
       try {
         c.resize();
-      } catch {
-        // chart detached or not initialized
+      } catch (error) {
+        logClientOptionalErr(error);
       }
     }
+  }
+}
+function __budgetResizeAll() {
+  for (var bk in _budgetCharts) {
+    if (_budgetCharts[bk] && typeof _budgetCharts[bk].resize === 'function') {
+      try { _budgetCharts[bk].resize(); } catch (error) { logClientOptionalErr(error); }
+    }
+  }
+}
+function __mainChartsResizeAll() {
+  var keys = ['c1', 'c2', 'c3', 'c4', 'c1hosts', 'cForensic', 'cForensicSignals', 'cService'];
+  for (var _ck of keys) {
+    if (_charts[_ck] && typeof _charts[_ck].resize === 'function') {
+      try { _charts[_ck].resize(); } catch (error) { logClientOptionalErr(error); }
+    }
+  }
+}
+function __proxyChartsResizeAll() {
+  for (var k in _proxyCharts) {
+    if (_proxyCharts[k] && typeof _proxyCharts[k].resize === 'function') {
+      try { _proxyCharts[k].resize(); } catch (error) { logClientOptionalErr(error); }
+    }
+  }
+}
+function __userProfileChartsResizeAll() {
+  if (_userCharts.versions && typeof _userCharts.versions.resize === "function") {
+    try { _userCharts.versions.resize(); } catch (error) { logClientOptionalErr(error); }
+  }
+  if (_userCharts.entrypoints && typeof _userCharts.entrypoints.resize === "function") {
+    try { _userCharts.entrypoints.resize(); } catch (error) { logClientOptionalErr(error); }
+  }
+  if (_userCharts.releaseStability && typeof _userCharts.releaseStability.resize === "function") {
+    try { _userCharts.releaseStability.resize(); } catch (error) { logClientOptionalErr(error); }
   }
 }
 var __effWin = globalThis.window;
 if (__effWin) {
   __effWin.addEventListener("resize", function () {
     if (__effResizeT) clearTimeout(__effResizeT);
-    __effResizeT = setTimeout(__effResizeAll, 120);
+    __effResizeT = setTimeout(function() {
+      var disp = window.__widgetDispatcher;
+      if (disp) { disp.resizeAll(); }
+      else {
+        __effResizeAll();
+        __budgetResizeAll();
+        __mainChartsResizeAll();
+        __proxyChartsResizeAll();
+        __userProfileChartsResizeAll();
+        resizeLiveScannedJsonlChartIfAny();
+        __safeChartResize(_intelCharts.seasonality);
+      }
+    }, 120);
   });
 }
 
@@ -5609,14 +4392,165 @@ function getProxyDay(data) {
 }
 
 var __lastProxyFingerprint = "";
+var __proxyToggleBound = false;
+function __bindProxyToggleResize() {
+  if (__proxyToggleBound) return;
+  if (window.__widgetDispatcher) return; // dispatcher handles toggle resize
+  var det = document.getElementById("proxy-collapse");
+  if (!det) return;
+  __proxyToggleBound = true;
+  det.addEventListener("toggle", function() {
+    if (det.open) setTimeout(function() { __proxyChartsResizeAll(); __effResizeAll(); }, 60);
+  });
+}
+
+/**
+ * Compute shared context for Proxy Analytics charts.
+ * Cached on window.__sectionCtx_proxy.
+ */
+function _computeProxyCtx(data) {
+  var sCtx = { data: data };
+  window.__sectionCtx_proxy = sCtx;
+  return sCtx;
+}
+window._computeProxyCtx = _computeProxyCtx;
+
+/** Standalone: render Proxy Token stacked bar chart. */
+window.renderProxy_tokens = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_proxy;
+  if (!sCtx) return;
+  renderProxyTokenChart(sCtx.data);
+};
+/** Standalone: render Proxy Latency line chart. */
+window.renderProxy_latency = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_proxy;
+  if (!sCtx) return;
+  renderProxyLatencyChart(sCtx.data);
+};
+/** Standalone: render Proxy Hourly bar chart. */
+window.renderProxy_hourly = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_proxy;
+  if (!sCtx) return;
+  renderProxyHourlyHeatmap(sCtx.data);
+};
+/** Standalone: render Proxy Model breakdown chart. */
+window.renderProxy_models = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_proxy;
+  if (!sCtx) return;
+  renderProxyModelChart(sCtx.data);
+};
+/** Standalone: render Proxy Hourly Latency overlay chart. */
+window.renderProxy_hourlyLatency = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_proxy;
+  if (!sCtx) return;
+  renderProxyHourlyLatency(sCtx.data);
+};
+/** Standalone: render Proxy Error Trend chart. */
+window.renderProxy_errorTrend = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_proxy;
+  if (!sCtx) return;
+  renderProxyErrorTrend(sCtx.data);
+};
+/** Standalone: render Proxy Cache Trend chart. */
+window.renderProxy_cacheTrend = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_proxy;
+  if (!sCtx) return;
+  renderProxyCacheTrend(sCtx.data);
+};
+
+/** Standalone: TTL tier history (1h vs 5m stacked bar over days). */
+window.renderProxy_ttlHistory = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_proxy;
+  if (!sCtx) return;
+  var data = sCtx.data;
+  var el = document.getElementById("c-proxy-ttl-history");
+  if (!el) return;
+  var h3 = document.getElementById("proxy-ttl-history-h3");
+  if (h3) h3.textContent = t("proxyTtlHistoryTitle");
+  var blurb = document.getElementById("proxy-ttl-history-blurb");
+  if (blurb) blurb.textContent = t("proxyTtlHistoryBlurb");
+
+  var pd = data?.proxy ? data.proxy.proxy_days || [] : [];
+  if (!pd.length) return;
+  // Match proxy days to JSONL days for interrupt overlay
+  var jsonlDays = data?.days ? data.days : [];
+  var jsonlByDate = {};
+  for (var _jd of jsonlDays) {
+    if (_jd.date) jsonlByDate[_jd.date] = _jd;
+  }
+  var labels = [], d1h = [], d5m = [], dUnk = [], dIntr = [], dCold = [];
+  for (var day of pd) {
+    labels.push(day.date || "");
+    var ttl = day.ttl_tiers || {};
+    var t1h = ttl["1h"] || 0;
+    var t5m = ttl["5m"] || 0;
+    var tUnk = ttl.unknown || 0;
+    d1h.push(t1h);
+    d5m.push(t5m);
+    dUnk.push(tUnk);
+    var ttlTotal = t1h + t5m + tUnk;
+    dCold.push(ttlTotal > 0 ? Math.round(t5m / ttlTotal * 100) : 0);
+    var jd = jsonlByDate[day.date];
+    var sig = jd?.session_signals ? jd.session_signals : {};
+    dIntr.push((sig.interrupt || 0) + (sig.retry || 0));
+  }
+  if (!_proxyCharts.ttlHistory) _proxyCharts.ttlHistory = echarts.init(el, null, { renderer: "canvas" });
+  _proxyCharts.ttlHistory.setOption({
+    animation: false,
+    grid: { left: 50, right: 55, top: 36, bottom: 30 },
+    legend: { data: ["1h", "5m", "unknown", t("proxyTtlColdPct"), t("proxyTtlInterrupts")], textStyle: { color: "#cbd5e1", fontSize: 10 }, top: 4 },
+    tooltip: {
+      trigger: "axis",
+      backgroundColor: "rgba(15,23,42,0.95)",
+      borderColor: "#334155",
+      textStyle: { color: "#e2e8f0", fontSize: 12 },
+      formatter: function (params) {
+        var lines = [params[0].axisValueLabel];
+        var ttlTotal = 0;
+        for (var _pt of params) {
+          if (_pt.seriesType === "bar") ttlTotal += _pt.value || 0;
+        }
+        for (var p of params) {
+          if (p.seriesType === "bar") {
+            var pct = ttlTotal > 0 ? Math.round(p.value / ttlTotal * 100) : 0;
+            lines.push(p.marker + " " + p.seriesName + ": " + p.value + " (" + pct + "%)");
+          } else {
+            lines.push(p.marker + " " + p.seriesName + ": " + p.value);
+          }
+        }
+        return lines.join("<br>");
+      }
+    },
+    xAxis: { type: "category", data: labels, axisLabel: { color: "#94a3b8", fontSize: 11 }, splitLine: { lineStyle: { color: "rgba(51,65,85,0.5)" } } },
+    yAxis: [
+      { type: "value", name: "Requests", nameTextStyle: { color: "#94a3b8", fontSize: 11 }, axisLabel: { color: "#94a3b8", fontSize: 11 }, splitLine: { lineStyle: { color: "rgba(51,65,85,0.5)" } } },
+      { type: "value", name: "Cold %", nameLocation: "center", nameGap: 35, nameRotate: 90, nameTextStyle: { color: "#fbbf24", fontSize: 11 }, min: 0, max: 100, axisLabel: { color: "#fbbf24", fontSize: 11, formatter: "{value}%" }, splitLine: { show: false } },
+      { type: "value", name: t("proxyTtlInterrupts"), nameLocation: "center", nameGap: 40, nameRotate: 90, nameTextStyle: { color: "#f87171", fontSize: 11 }, axisLabel: { show: false }, splitLine: { show: false }, show: false }
+    ],
+    series: [
+      { name: "1h", type: "bar", stack: "ttl", data: d1h, itemStyle: { color: "rgba(34,197,94,0.7)" }, barCategoryGap: "20%" },
+      { name: "5m", type: "bar", stack: "ttl", data: d5m, itemStyle: { color: "rgba(251,191,36,0.6)" }, barCategoryGap: "20%" },
+      { name: "unknown", type: "bar", stack: "ttl", data: dUnk, itemStyle: { color: "rgba(107,114,128,0.35)" }, barCategoryGap: "20%" },
+      { name: t("proxyTtlColdPct"), type: "line", yAxisIndex: 1, data: dCold, smooth: 0.25, symbol: "diamond", symbolSize: 6,
+        lineStyle: { color: "rgba(251,191,36,0.8)", width: 2 }, itemStyle: { color: "#fbbf24" },
+        markLine: { silent: true, symbol: "none", lineStyle: { color: "rgba(251,191,36,0.3)", type: "dashed" },
+          data: [{ yAxis: 20, label: { formatter: "20%", color: "#fbbf24", fontSize: 10 } }] } },
+      { name: t("proxyTtlInterrupts"), type: "bar", yAxisIndex: 2, data: dIntr, barCategoryGap: "60%",
+        itemStyle: { color: "rgba(248,113,113,0.45)" } }
+    ]
+  }, true);
+};
+
 function renderProxyAnalysis(data) {
+  __bindProxyToggleResize();
+  _computeProxyCtx(data);
   var sumEl = document.getElementById("proxy-summary-line");
   var noteEl = document.getElementById("proxy-note");
   var cardsEl = document.getElementById("proxy-cards");
   if (!sumEl) return;
 
   var pd = getProxyDay(data);
-  var fp = (data.proxy && data.proxy.generated) || "";
+  var fp = data.proxy?.generated || "";
   if (fp && fp === __lastProxyFingerprint && _proxyCharts.gauge5h) return;
   __lastProxyFingerprint = fp;
   if (!pd) {
@@ -5635,33 +4569,42 @@ function renderProxyAnalysis(data) {
   var q7pct = "?";
   if (q5h !== undefined && q5h !== null) q5pct = (Number.parseFloat(q5h) * 100).toFixed(1);
   if (q7d !== undefined && q7d !== null) q7pct = (Number.parseFloat(q7d) * 100).toFixed(1);
-  sumEl.textContent = tr("proxySummaryLine", {
+  var summaryText = tr("proxySummaryLine", {
     reqs: pd.requests || 0,
     errs: pd.errors || 0,
     q5h: q5pct,
     q7d: q7pct
   });
+  // Data source badge (proxy / interceptor / both)
+  var ds = pd.data_sources || {};
+  var hasProxy = (ds.proxy || 0) > 0;
+  var hasInterceptor = (ds["claude-code-cache-fix"] || 0) > 0;
+  if (hasProxy && hasInterceptor) summaryText += " · " + t("proxySourceBoth");
+  else if (hasInterceptor) summaryText += " · " + t("proxySourceInterceptor");
+  sumEl.textContent = summaryText;
   if (noteEl) noteEl.textContent = t("proxyNote");
 
   // Cards
   var ch = pd.cache_health || {};
   var models = pd.models || {};
-  var opusReqs = (models["claude-opus-4-6"] || {}).requests || 0;
+  var opusReqs = models["claude-opus-4-6"]?.requests || 0;
   var sonnetReqs = 0;
   var otherReqs = 0;
   for (var mk in models) {
-    if (!Object.prototype.hasOwnProperty.call(models, mk)) continue;
-    if (mk.indexOf("opus") >= 0) continue;
-    else if (mk.indexOf("sonnet") >= 0) sonnetReqs += models[mk].requests || 0;
+    if (!Object.hasOwn(models, mk)) continue;
+    if (mk.includes("opus")) continue;
+    else if (mk.includes("sonnet")) sonnetReqs += models[mk].requests || 0;
     else otherReqs += models[mk].requests || 0;
   }
 
   // Status code breakdown for request card sub text
   var sc = pd.status_codes || {};
   var scParts = [];
-  var scKeys = Object.keys(sc).sort();
-  for (var si = 0; si < scKeys.length; si++) {
-    if (scKeys[si] !== "200" && sc[scKeys[si]] > 0) scParts.push(scKeys[si] + ":" + sc[scKeys[si]]);
+  var scKeys = Object.keys(sc).sort(function (a, b) {
+    return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+  });
+  for (var _sk of scKeys) {
+    if (_sk !== "200" && sc[_sk] > 0) scParts.push(_sk + ":" + sc[_sk]);
   }
   var reqSub = tr("proxyCardRequestsSub", { errs: pd.errors || 0, rate: (pd.error_rate || 0).toFixed(1) });
   if (scParts.length) reqSub += " (" + scParts.join(", ") + ")";
@@ -5683,30 +4626,35 @@ function renderProxyAnalysis(data) {
 
   var pcards = [
     {
+      wid: "proxy-kpi-requests",
       label: t("proxyCardRequests"),
       value: String(pd.requests || 0),
       sub: reqSub,
       cls: (pd.error_rate || 0) > 5 ? "warn" : ""
     },
     {
+      wid: "proxy-kpi-latency",
       label: t("proxyCardLatency"),
       value: (pd.avg_duration_ms >= 1000 ? (pd.avg_duration_ms/1000).toFixed(1) + "s" : Math.round(pd.avg_duration_ms || 0) + "ms"),
       sub: tr("proxyCardLatencySub", { min: pd.min_duration_ms || 0, max: pd.max_duration_ms || 0 }),
       cls: (pd.avg_duration_ms || 0) > 15000 ? "warn" : ""
     },
     {
+      wid: "proxy-kpi-cache-ratio",
       label: t("proxyCardCacheRatio"),
       value: ((pd.cache_read_ratio || 0) * 100).toFixed(1) + "%",
       sub: tr("proxyCardCacheRatioSub", { healthy: ch.healthy || 0, affected: ch.affected || 0 }),
       cls: (pd.cache_read_ratio || 0) < 0.8 ? "warn" : "ok"
     },
     {
+      wid: "proxy-kpi-models",
       label: t("proxyCardModels"),
       value: String(pd.requests || 0),
       sub: tr("proxyCardModelsSub", { opus: opusReqs, sonnet: sonnetReqs, other: otherReqs }),
       cls: ""
     },
     {
+      wid: "proxy-kpi-quota-5h",
       label: t("proxyCardQuota5h"),
       value: q5pctVal.toFixed(1) + "%",
       sub: quotaResetStr(rl["anthropic-ratelimit-unified-5h-reset"]),
@@ -5714,6 +4662,7 @@ function renderProxyAnalysis(data) {
       valueColor: gaugeColor(q5pctVal)
     },
     {
+      wid: "proxy-kpi-quota-7d",
       label: t("proxyCardQuota7d"),
       value: q7pctVal.toFixed(1) + "%",
       sub: quotaResetStr(rl["anthropic-ratelimit-unified-7d-reset"]),
@@ -5721,12 +4670,65 @@ function renderProxyAnalysis(data) {
       valueColor: gaugeColor(q7pctVal)
     }
   ];
+
+  // TTL tier card (only if interceptor data present, not all unknown)
+  var ttl = pd.ttl_tiers || {};
+  var ttlTotal = (ttl["1h"] || 0) + (ttl["5m"] || 0);
+  if (ttlTotal > 0) {
+    var ttl1hPct = Math.round((ttl["1h"] || 0) / ttlTotal * 100);
+    var ttl5mPct = 100 - ttl1hPct;
+    pcards.push({
+      wid: "proxy-kpi-ttl-tier",
+      label: t("proxyTtlTier"),
+      value: tr("proxyTtl1h", { pct: ttl1hPct }),
+      sub: tr("proxyTtl5m", { pct: ttl5mPct }),
+      cls: ttl5mPct > 20 ? "warn" : "ok"
+    });
+  }
+
+  // Peak / Off-Peak card
+  var peakReqs = pd.peak_hour_requests || 0;
+  var offPeakReqs = pd.off_peak_requests || 0;
+  if (peakReqs + offPeakReqs > 0) {
+    pcards.push({
+      wid: "proxy-kpi-peak-hours",
+      label: t("proxyDataSource"),
+      value: tr("proxyPeakHours", { peak: peakReqs, offpeak: offPeakReqs }),
+      sub: hasInterceptor ? t("proxySourceInterceptor") : t("proxySourceProxy"),
+      cls: ""
+    });
+  }
+  // Saturation + Health from metrics engine
+  var me = window.__metricsEngine;
+  if (me) {
+    var sat = me.calcSaturationScore(pd);
+    var hi = { error_rate: pd.error_rate || 0, avg_duration_ms: pd.avg_duration_ms || 0, cache_read_ratio: pd.cache_read_ratio || 0, cold_starts: 0, retry_rate: 0 };
+    var health = me.calcHealthScore(hi, pd);
+    var satCls = sat > 60 ? "danger" : sat > 30 ? "warn" : "ok";
+    var healthCls = health < 50 ? "danger" : health < 70 ? "warn" : "ok";
+    pcards.push({ wid: "proxy-kpi-saturation", label: t("proxySaturation"), value: sat + "/100", sub: t("proxySaturationSub"), cls: satCls, valueColor: sat > 60 ? "#ef4444" : sat > 30 ? "#f59e0b" : "#22c55e" });
+    pcards.push({ wid: "proxy-kpi-health", label: t("proxyHealth"), value: health + "/100", sub: t("proxyHealthSub"), cls: healthCls, valueColor: health < 50 ? "#ef4444" : health < 70 ? "#f59e0b" : "#22c55e" });
+  }
   if (cardsEl) {
     var ch2 = "";
-    pcards.forEach(function (c) {
+    for (var c of pcards) {
       var valStyle = c.valueColor ? " style=\"color:" + c.valueColor + "\"" : "";
-      ch2 += "<div class=\"card " + c.cls + "\"><div class=\"label\">" + escHtml(c.label) + "</div><div class=\"value\"" + valStyle + ">" + escHtml(c.value) + "</div><div class=\"sub\">" + escHtml(c.sub) + "</div></div>";
-    });
+      var w = c.wid || "proxy-kpi";
+      ch2 +=
+        '<div class="chart-box chart-box--kpi" id="' +
+        w +
+        '"><div class="card ' +
+        c.cls +
+        '"><div class="label">' +
+        escHtml(c.label) +
+        '</div><div class="value"' +
+        valStyle +
+        ">" +
+        escHtml(c.value) +
+        '</div><div class="sub">' +
+        escHtml(c.sub) +
+        "</div></div></div>";
+    }
     cardsEl.innerHTML = ch2;
   }
 
@@ -5758,6 +4760,7 @@ function renderProxyAnalysis(data) {
   renderProxyHourlyLatency(data);
   renderProxyErrorTrend(data);
   renderProxyCacheTrend(data);
+  if (typeof window.renderProxy_ttlHistory === 'function') window.renderProxy_ttlHistory();
   renderProxyEfficiencyTrend(data);
   var h3hl = document.getElementById("proxy-hourly-latency-h3");
   if (h3hl) h3hl.textContent = t("proxyHourlyLatencyTitle");
@@ -5767,7 +4770,7 @@ function renderProxyAnalysis(data) {
 
 function destroyProxyCharts() {
   for (var k in _proxyCharts) {
-    if (_proxyCharts[k]) { try { _proxyCharts[k].destroy(); } catch (e) {} _proxyCharts[k] = null; }
+    if (_proxyCharts[k]) { try { _proxyCharts[k].dispose(); } catch (error) { logClientOptionalErr(error); } _proxyCharts[k] = null; }
   }
 }
 
@@ -5779,14 +4782,11 @@ function gaugeColor(pct) {
 
 
 function renderProxyTokenChart(data) {
-  if (typeof Chart === "undefined") return;
+  if (typeof echarts === "undefined") return;
   var proxyDays = data.proxy?.proxy_days || [];
   if (!proxyDays.length) { chartShellSetLoading("c-proxy-tokens", false); return; }
 
-  var labels = [];
-  var cacheRead = [];
-  var cacheCreate = [];
-  var output = [];
+  var labels = [], cacheRead = [], cacheCreate = [], output = [];
   for (var i = 0; i < proxyDays.length; i++) {
     var d = proxyDays[i];
     labels.push(d.date ? d.date.slice(5) : String(i));
@@ -5798,56 +4798,38 @@ function renderProxyTokenChart(data) {
   chartShellSetLoading("c-proxy-tokens", false);
   var el = document.getElementById("c-proxy-tokens");
   if (!el) return;
-
-  if (_proxyCharts.tokens) {
-    _proxyCharts.tokens.data.labels = labels;
-    _proxyCharts.tokens.data.datasets[0].data = cacheRead;
-    _proxyCharts.tokens.data.datasets[1].data = cacheCreate;
-    _proxyCharts.tokens.data.datasets[2].data = output;
-    freezeChartNoAnim(_proxyCharts.tokens);
-    _proxyCharts.tokens.update("none");
-    return;
-  }
-
-  _proxyCharts.tokens = new Chart(el.getContext("2d"), {
-    type: "bar",
-    data: {
-      labels: labels,
-      datasets: [
-        { label: t("proxyDSCacheRead"), data: cacheRead, backgroundColor: "rgba(139,92,246,.7)", stack: "s" },
-        { label: t("proxyDSCacheCreate"), data: cacheCreate, backgroundColor: "rgba(6,182,212,.6)", stack: "s" },
-        { label: t("proxyDSOutput"), data: output, backgroundColor: "rgba(34,197,94,.7)", stack: "s" }
-      ]
-    },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { stacked: true, ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { stacked: true, ticks: { color: "#94a3b8", callback: function (v) { return fmt(v); } }, grid: { color: "rgba(51,65,85,.4)" } }
-      },
-      plugins: {
-        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
-        tooltip: {
-          callbacks: {
-            label: function (ctx) { return ctx.dataset.label + ": " + fmt(ctx.parsed.y); }
-          }
-        }
+  if (!_proxyCharts.tokens) _proxyCharts.tokens = echarts.init(el, null, { renderer: 'canvas' });
+  _proxyCharts.tokens.setOption({
+    animation: false,
+    grid: { left: 60, right: 16, top: 36, bottom: 30 },
+    legend: { data: [t("proxyDSCacheRead"), t("proxyDSCacheCreate"), t("proxyDSOutput")], textStyle: { color: '#cbd5e1' }, top: 4 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel];
+        for (var _pm of params) lines.push(_pm.marker + ' ' + _pm.seriesName + ': ' + fmt(_pm.value));
+        return lines.join('<br>');
       }
-    }
-  });
+    },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: function(v) { return fmt(v); } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    series: [
+      { name: t("proxyDSCacheRead"), type: 'bar', stack: 's', data: cacheRead, itemStyle: { color: 'rgba(139,92,246,0.7)' } },
+      { name: t("proxyDSCacheCreate"), type: 'bar', stack: 's', data: cacheCreate, itemStyle: { color: 'rgba(6,182,212,0.6)' } },
+      { name: t("proxyDSOutput"), type: 'bar', stack: 's', data: output, itemStyle: { color: 'rgba(34,197,94,0.7)' } }
+    ]
+  }, true);
+}
+
+function __fmtMsShort(v) {
+  return v >= 1000 ? (v / 1000).toFixed(1) + "s" : Math.round(v) + "ms";
 }
 
 function renderProxyLatencyChart(data) {
-  if (typeof Chart === "undefined") return;
+  if (typeof echarts === "undefined") return;
   var proxyDays = data.proxy?.proxy_days || [];
   if (!proxyDays.length) { chartShellSetLoading("c-proxy-latency", false); return; }
 
-  var labels = [];
-  var avg = [];
-  var mn = [];
+  var labels = [], avg = [], mn = [];
   for (var i = 0; i < proxyDays.length; i++) {
     var d = proxyDays[i];
     labels.push(d.date ? d.date.slice(5) : String(i));
@@ -5858,47 +4840,25 @@ function renderProxyLatencyChart(data) {
   chartShellSetLoading("c-proxy-latency", false);
   var el = document.getElementById("c-proxy-latency");
   if (!el) return;
-
-  if (_proxyCharts.latency) {
-    _proxyCharts.latency.data.labels = labels;
-    _proxyCharts.latency.data.datasets[0].data = avg;
-    _proxyCharts.latency.data.datasets[1].data = mn;
-    freezeChartNoAnim(_proxyCharts.latency);
-    _proxyCharts.latency.update("none");
-    return;
-  }
-
-  _proxyCharts.latency = new Chart(el.getContext("2d"), {
-    type: "line",
-    data: {
-      labels: labels,
-      datasets: [
-        { label: t("proxyDSAvgLatency"), data: avg, borderColor: "#3b82f6", backgroundColor: "rgba(59,130,246,.15)", fill: true, tension: .3, pointRadius: 3, borderWidth: 2 },
-        { label: t("proxyDSMinLatency"), data: mn, borderColor: "#22c55e", borderDash: [4, 2], tension: .3, pointRadius: 2, borderWidth: 1 }
-      ]
-    },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { ticks: { color: "#94a3b8", callback: function (v) { return v >= 1000 ? (v/1000).toFixed(1) + "s" : v + "ms"; } }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true }
-      },
-      plugins: {
-        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
-        tooltip: {
-          callbacks: {
-            label: function (ctx) {
-              var v = ctx.parsed.y;
-              return ctx.dataset.label + ": " + (v >= 1000 ? (v/1000).toFixed(1) + "s" : Math.round(v) + "ms");
-            }
-          }
-        }
+  if (!_proxyCharts.latency) _proxyCharts.latency = echarts.init(el, null, { renderer: 'canvas' });
+  _proxyCharts.latency.setOption({
+    animation: false,
+    grid: { left: 60, right: 16, top: 36, bottom: 30 },
+    legend: { data: [t("proxyDSAvgLatency"), t("proxyDSMinLatency")], textStyle: { color: '#cbd5e1' }, top: 4 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel];
+        for (var _pm of params) lines.push(_pm.marker + ' ' + _pm.seriesName + ': ' + __fmtMsShort(_pm.value));
+        return lines.join('<br>');
       }
-    }
-  });
+    },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8', formatter: function(v) { return __fmtMsShort(v); } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    series: [
+      { name: t("proxyDSAvgLatency"), type: 'line', data: avg, smooth: 0.3, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#3b82f6', width: 2 }, itemStyle: { color: '#3b82f6' }, areaStyle: { color: 'rgba(59,130,246,0.15)' } },
+      { name: t("proxyDSMinLatency"), type: 'line', data: mn, smooth: 0.3, symbol: 'circle', symbolSize: 4, lineStyle: { color: '#22c55e', width: 1, type: [4, 2] }, itemStyle: { color: '#22c55e' } }
+    ]
+  }, true);
 }
 
 // ── Phase 2: Invisible Cost Indicator ─────────────────────────────────────
@@ -5926,7 +4886,7 @@ function renderProxyInvisibleCost(pd) {
 // ── Phase 4: Hourly Request Heatmap ───────────────────────────────────────
 function aggregateHourlyTotals(proxyDays) {
   var totals = {};
-  for (const pd of proxyDays) {
+  for (var pd of proxyDays) {
     var dh = pd.hours || {};
     for (var hk in dh) {
       if (Object.hasOwn(dh, hk)) totals[hk] = (totals[hk] || 0) + (dh[hk] || 0);
@@ -5947,119 +4907,80 @@ function aggregateHourlyTotals(proxyDays) {
 }
 
 function renderProxyHourlyHeatmap(data) {
-  if (typeof Chart === "undefined") return;
+  if (typeof echarts === "undefined") return;
   var el = document.getElementById("c-proxy-hourly");
   if (!el) return;
   var proxyDays = data.proxy?.proxy_days || [];
   var hd = aggregateHourlyTotals(proxyDays);
 
   chartShellSetLoading("c-proxy-hourly", false);
-
-  if (_proxyCharts.hourly) {
-    _proxyCharts.hourly.data.datasets[0].data = hd.values;
-    _proxyCharts.hourly.data.datasets[0].backgroundColor = hd.bgColors;
-    freezeChartNoAnim(_proxyCharts.hourly);
-    _proxyCharts.hourly.update("none");
-    return;
-  }
-
-  _proxyCharts.hourly = new Chart(el.getContext("2d"), {
-    type: "bar",
-    data: {
-      labels: hd.labels,
-      datasets: [{
-        label: t("proxyDSRequestsPerHour"),
-        data: hd.values,
-        backgroundColor: hd.bgColors,
-        borderRadius: 3
-      }]
+  if (!_proxyCharts.hourly) _proxyCharts.hourly = echarts.init(el, null, { renderer: 'canvas' });
+  var nDays = proxyDays.length;
+  _proxyCharts.hourly.setOption({
+    animation: false,
+    grid: { left: 40, right: 16, top: 12, bottom: 30 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) { var p = params[0]; return p.name + ':00 UTC<br>' + p.value + ' requests (' + nDays + ' days)'; }
     },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      scales: {
-        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { ticks: { color: "#94a3b8" }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true }
-      },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            title: function (ctx) { return ctx[0].label + ":00 UTC"; },
-            label: function (ctx) { return ctx.parsed.y + " requests (" + proxyDays.length + " days)"; }
-          }
-        }
-      }
-    }
-  });
+    xAxis: { type: 'category', data: hd.labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    series: [{
+      type: 'bar', data: hd.values,
+      itemStyle: { color: function(p) { return hd.bgColors[p.dataIndex]; }, borderRadius: [3, 3, 0, 0] }
+    }]
+  }, true);
 }
 
 
 // ── Phase 5: Model Breakdown ──────────────────────────────────────────────
 function renderProxyModelChart(data) {
-  if (typeof Chart === "undefined") return;
+  if (typeof echarts === "undefined") return;
   var el = document.getElementById("c-proxy-models");
   if (!el) return;
   var proxyDays = data.proxy?.proxy_days || [];
   if (!proxyDays.length) return;
   var colors = ["#8b5cf6", "#3b82f6", "#06b6d4", "#22c55e", "#f59e0b", "#ef4444", "#ec4899"];
-  // Collect all model keys across all days
   var allModels = {};
-  for (const pd of proxyDays) {
+  for (var pd of proxyDays) {
     var dm = pd.models || {};
     for (var mk in dm) { if (Object.hasOwn(dm, mk)) allModels[mk] = true; }
   }
   var modelKeys = Object.keys(allModels).sort(function(a, b) { return a.localeCompare(b); });
   var labels = proxyDays.map(function(d) { return d.date ? d.date.slice(5) : "?"; });
-  // Build stacked bar datasets per model + latency line
-  var datasets = [];
+  var series = [];
+  var legendData = [];
   for (var mi = 0; mi < modelKeys.length; mi++) {
     var mKey = modelKeys[mi];
     var short = mKey.replace("claude-", "").replace(/-\d{8}$/, "");
-    var mData = proxyDays.map(function(d) { return d.models?.[mKey]?.requests || 0; });
-    datasets.push({ label: short, data: mData, backgroundColor: colors[mi % colors.length], stack: "models", yAxisID: "y", borderRadius: 2 });
+    legendData.push(short);
+    series.push({ name: short, type: 'bar', stack: 'models', yAxisIndex: 0, data: proxyDays.map(function(d) { return d.models?.[mKey]?.requests || 0; }), itemStyle: { color: colors[mi % colors.length], borderRadius: [2, 2, 0, 0] } });
   }
-  // Avg latency line across all models per day
-  var latData = proxyDays.map(function(d) { return d.avg_duration_ms || 0; });
-  datasets.push({ label: t("proxyDSModelLatency"), data: latData, type: "line", borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.15)", yAxisID: "y1", tension: 0.3, pointRadius: 3 });
+  var latLabel = t("proxyDSModelLatency");
+  legendData.push(latLabel);
+  series.push({ name: latLabel, type: 'line', yAxisIndex: 1, data: proxyDays.map(function(d) { return d.avg_duration_ms || 0; }), smooth: 0.3, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#f59e0b' }, itemStyle: { color: '#f59e0b' }, areaStyle: { color: 'rgba(245,158,11,0.15)' } });
 
   chartShellSetLoading("c-proxy-models", false);
-
-  if (_proxyCharts.models) {
-    _proxyCharts.models.data.labels = labels;
-    _proxyCharts.models.data.datasets = datasets;
-    freezeChartNoAnim(_proxyCharts.models);
-    _proxyCharts.models.update("none");
-    return;
-  }
-
-  _proxyCharts.models = new Chart(el.getContext("2d"), {
-    type: "bar",
-    data: { labels: labels, datasets: datasets },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { stacked: true, ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { stacked: true, position: "left", ticks: { color: "#94a3b8" }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, title: { display: true, text: "Requests", color: "#94a3b8", font: { size: 10 } } },
-        y1: { position: "right", ticks: { color: "#f59e0b", callback: function (v) { return v >= 1000 ? (v / 1000).toFixed(1) + "s" : v + "ms"; } }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: "Latency", color: "#f59e0b", font: { size: 10 } } }
-      },
-      plugins: {
-        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
-        tooltip: {
-          callbacks: {
-            label: function (ctx) {
-              if (ctx.dataset.yAxisID === "y1") return ctx.dataset.label + ": " + (ctx.parsed.y >= 1000 ? (ctx.parsed.y / 1000).toFixed(1) + "s" : Math.round(ctx.parsed.y) + "ms");
-              return ctx.dataset.label + ": " + ctx.parsed.y;
-            }
-          }
+  if (!_proxyCharts.models) _proxyCharts.models = echarts.init(el, null, { renderer: 'canvas' });
+  _proxyCharts.models.setOption({
+    animation: false,
+    grid: { left: 50, right: 60, top: 36, bottom: 30 },
+    legend: { data: legendData, textStyle: { color: '#cbd5e1', fontSize: 10 }, top: 4 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel];
+        for (var p of params) {
+          lines.push(p.marker + ' ' + p.seriesName + ': ' + (p.seriesType === 'line' ? __fmtMsShort(p.value) : p.value));
         }
+        return lines.join('<br>');
       }
-    }
-  });
+    },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: [
+      { type: 'value', min: 0, position: 'left', name: t("proxyAxisRequests"), nameTextStyle: { color: '#94a3b8', fontSize: 10 }, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+      { type: 'value', min: 0, position: 'right', name: t("proxyAxisLatency"), nameTextStyle: { color: '#f59e0b', fontSize: 10 }, axisLabel: { color: '#f59e0b', formatter: function(v) { return __fmtMsShort(v); } }, splitLine: { show: false } }
+    ],
+    series: series
+  }, true);
 }
 
 // ── P3.2 Cold-Start Detection ─────────────────────────────────────────────
@@ -6070,7 +4991,7 @@ function renderProxyColdStart(pd) {
   var ratios = pd.cache_ratios || [];
   if (!ratios.length) { el.textContent = ""; return; }
   var avgRatio = 0;
-  for (var i = 0; i < ratios.length; i++) avgRatio += ratios[i];
+  for (var _rv of ratios) avgRatio += _rv;
   avgRatio = avgRatio / ratios.length;
   var minRatio = ratios[0];
   for (var j = 1; j < ratios.length; j++) { if (ratios[j] < minRatio) minRatio = ratios[j]; }
@@ -6089,7 +5010,7 @@ function __proxyJsonlMatchAggregate(days, proxyByDate) {
   var matches = 0;
   var jsonlTotal = 0;
   var proxyTotal = 0;
-  for (const day of days) {
+  for (var day of days) {
     var pdx = proxyByDate[day.date];
     if (!pdx) continue;
     matches++;
@@ -6109,7 +5030,7 @@ function renderProxyJsonlComparison(data) {
     return;
   }
   var proxyByDate = {};
-  for (const pDay of proxyDays) {
+  for (var pDay of proxyDays) {
     proxyByDate[pDay.date] = pDay;
   }
   var agg = __proxyJsonlMatchAggregate(days, proxyByDate);
@@ -6138,7 +5059,7 @@ function __aggAddHourLatency(agg, hk, hl) {
 
 function aggregateHourlyLatency(proxyDays) {
   var agg = {};
-  for (const pd of proxyDays) {
+  for (var pd of proxyDays) {
     var phl = pd.per_hour_latency || {};
     for (var hk in phl) {
       if (!Object.hasOwn(phl, hk)) continue;
@@ -6154,59 +5075,66 @@ function aggregateHourlyLatency(proxyDays) {
     avgData.push(a?.count > 0 ? Math.round(a.sum / a.count) : 0);
     maxData.push(a?.max || 0);
   }
-  return { labels: labels, avgData: avgData, maxData: maxData };
+  var nonZeroMax = maxData.filter(function(v) { return v > 0; }).sort(function(a, b) { return a - b; });
+  var avgMean = avgData.reduce(function(s, v) { return s + v; }, 0) / (avgData.length || 1);
+  var actualMax = nonZeroMax.length ? nonZeroMax[nonZeroMax.length - 1] : 0;
+  var p95 = nonZeroMax.length ? nonZeroMax[Math.floor(nonZeroMax.length * 0.95)] : 0;
+  var yCap = (p95 > 0 && actualMax > avgMean * 5) ? Math.ceil(p95 * 1.3) : undefined;
+  return { labels: labels, avgData: avgData, maxData: maxData, yCap: yCap };
+}
+
+/** Y-axis for hourly latency: outlier cap only applies while Max series is visible (legend). */
+function __proxyHourlyLatencyYAxis(ld, legendSelected) {
+  var nameMax = t("proxyDSMaxLatency");
+  var yBase = { type: 'value', min: 0, axisLabel: { color: '#94a3b8', formatter: function(v) { return __fmtMsShort(v); } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } };
+  var maxOn = legendSelected?.[nameMax] !== false;
+  if (ld.yCap && maxOn) yBase.max = ld.yCap;
+  return yBase;
 }
 
 function renderProxyHourlyLatency(data) {
-  if (typeof Chart === "undefined") return;
+  if (typeof echarts === "undefined") return;
   var el = document.getElementById("c-proxy-hourly-latency");
   if (!el) return;
   var proxyDays = data.proxy?.proxy_days || [];
   var ld = aggregateHourlyLatency(proxyDays);
 
   chartShellSetLoading("c-proxy-hourly-latency", false);
-
-  if (_proxyCharts.hourlyLatency) {
-    _proxyCharts.hourlyLatency.data.datasets[0].data = ld.avgData;
-    _proxyCharts.hourlyLatency.data.datasets[1].data = ld.maxData;
-    freezeChartNoAnim(_proxyCharts.hourlyLatency);
-    _proxyCharts.hourlyLatency.update("none");
-    return;
+  if (!_proxyCharts.hourlyLatency) _proxyCharts.hourlyLatency = echarts.init(el, null, { renderer: 'canvas' });
+  var chart = _proxyCharts.hourlyLatency;
+  var yOpts = __proxyHourlyLatencyYAxis(ld, null);
+  var maxSeries = { name: t("proxyDSMaxLatency"), type: 'bar', data: ld.maxData, barGap: '-100%', z: 1, itemStyle: { color: 'rgba(239,68,68,0.25)', borderRadius: [2, 2, 0, 0] } };
+  if (ld.yCap) {
+    maxSeries.markLine = { silent: true, symbol: 'none', data: [{ yAxis: ld.yCap, lineStyle: { color: '#ef4444', type: 'dashed', width: 1 }, label: { show: true, position: 'insideEndTop', color: '#ef4444', fontSize: 9, formatter: 'outlier cap ' + __fmtMsShort(ld.yCap) } }] };
   }
-
-  _proxyCharts.hourlyLatency = new Chart(el.getContext("2d"), {
-    type: "bar",
-    data: {
-      labels: ld.labels,
-      datasets: [
-        { label: t("proxyDSAvgLatency"), data: ld.avgData, backgroundColor: "rgba(59,130,246,.6)", borderRadius: 2 },
-        { label: t("proxyDSMaxLatency"), data: ld.maxData, backgroundColor: "rgba(239,68,68,.35)", borderRadius: 2 }
-      ]
-    },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { ticks: { color: "#94a3b8", callback: function(v) { return v >= 1000 ? (v/1000).toFixed(1)+"s" : v+"ms"; } }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true }
-      },
-      plugins: {
-        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) { return ctx.dataset.label + ": " + (ctx.parsed.y >= 1000 ? (ctx.parsed.y/1000).toFixed(1)+"s" : ctx.parsed.y+"ms"); }
-          }
-        }
+  chart.setOption({
+    animation: false,
+    grid: { left: 60, right: 16, top: 36, bottom: 38 },
+    legend: { data: [t("proxyDSAvgLatency"), t("proxyDSMaxLatency")], textStyle: { color: '#cbd5e1' }, top: 4 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel + ':00'];
+        for (var _pm of params) lines.push(_pm.marker + ' ' + _pm.seriesName + ': ' + __fmtMsShort(_pm.value));
+        return lines.join('<br>');
       }
-    }
+    },
+    xAxis: { type: 'category', data: ld.labels, axisLabel: { color: '#94a3b8', fontSize: 10, rotate: 0 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: yOpts,
+    series: [
+      maxSeries,
+      { name: t("proxyDSAvgLatency"), type: 'bar', data: ld.avgData, z: 2, itemStyle: { color: 'rgba(59,130,246,0.7)', borderRadius: [2, 2, 0, 0] } }
+    ]
+  }, true);
+  chart.off("legendselectchanged");
+  chart.on("legendselectchanged", function(ev) {
+    var sel = ev.selected || {};
+    chart.setOption({ yAxis: __proxyHourlyLatencyYAxis(ld, sel) }, { replaceMerge: ["yAxis"] });
   });
 }
 
 // ── Error/429 Rate Trend ─────────────────────────────────────────────────
 function renderProxyErrorTrend(data) {
-  if (typeof Chart === "undefined") return;
+  if (typeof echarts === "undefined") return;
   var el = document.getElementById("c-proxy-error-trend");
   if (!el) return;
   var proxyDays = data.proxy?.proxy_days || [];
@@ -6221,44 +5149,30 @@ function renderProxyErrorTrend(data) {
   var blurb = document.getElementById("proxy-error-trend-blurb");
   if (blurb) blurb.textContent = t("proxyErrorTrendBlurb");
 
-  if (_proxyCharts.errorTrend) {
-    _proxyCharts.errorTrend.data.labels = labels;
-    _proxyCharts.errorTrend.data.datasets[0].data = errRate;
-    _proxyCharts.errorTrend.data.datasets[1].data = f429;
-    freezeChartNoAnim(_proxyCharts.errorTrend);
-    _proxyCharts.errorTrend.update("none");
-    return;
-  }
-
-  _proxyCharts.errorTrend = new Chart(el.getContext("2d"), {
-    type: "line",
-    data: {
-      labels: labels,
-      datasets: [
-        { label: t("proxyDSErrorRate"), data: errRate, borderColor: "#ef4444", backgroundColor: "rgba(239,68,68,.1)", fill: true, tension: 0.3, pointRadius: 3 },
-        { label: t("proxyDSFalse429Rate"), data: f429, borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.1)", fill: true, tension: 0.3, pointRadius: 3 }
-      ]
-    },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { ticks: { color: "#94a3b8", callback: function(v) { return v + "%"; } }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true }
-      },
-      plugins: {
-        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
-        tooltip: { callbacks: { label: function(ctx) { return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(1) + "%"; } } }
+  if (!_proxyCharts.errorTrend) _proxyCharts.errorTrend = echarts.init(el, null, { renderer: 'canvas' });
+  _proxyCharts.errorTrend.setOption({
+    animation: false,
+    grid: { left: 46, right: 16, top: 36, bottom: 30 },
+    legend: { data: [t("proxyDSErrorRate"), t("proxyDSFalse429Rate")], textStyle: { color: '#cbd5e1' }, top: 4 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel];
+        for (var _pm of params) lines.push(_pm.marker + ' ' + _pm.seriesName + ': ' + _pm.value.toFixed(1) + '%');
+        return lines.join('<br>');
       }
-    }
-  });
+    },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: { type: 'value', min: 0, axisLabel: { color: '#94a3b8', formatter: function(v) { return v + '%'; } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    series: [
+      { name: t("proxyDSErrorRate"), type: 'line', data: errRate, smooth: 0.3, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#ef4444' }, itemStyle: { color: '#ef4444' }, areaStyle: { color: 'rgba(239,68,68,0.1)' } },
+      { name: t("proxyDSFalse429Rate"), type: 'line', data: f429, smooth: 0.3, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#f59e0b' }, itemStyle: { color: '#f59e0b' }, areaStyle: { color: 'rgba(245,158,11,0.1)' } }
+    ]
+  }, true);
 }
 
 // ── Cache Quality Trend ──────────────────────────────────────────────────
 function renderProxyCacheTrend(data) {
-  if (typeof Chart === "undefined") return;
+  if (typeof echarts === "undefined") return;
   var el = document.getElementById("c-proxy-cache-trend");
   if (!el) return;
   var proxyDays = data.proxy?.proxy_days || [];
@@ -6273,47 +5187,30 @@ function renderProxyCacheTrend(data) {
   var blurb = document.getElementById("proxy-cache-trend-blurb");
   if (blurb) blurb.textContent = t("proxyCacheTrendBlurb");
 
-  if (_proxyCharts.cacheTrend) {
-    _proxyCharts.cacheTrend.data.labels = labels;
-    _proxyCharts.cacheTrend.data.datasets[0].data = ratio;
-    _proxyCharts.cacheTrend.data.datasets[1].data = coldStarts;
-    freezeChartNoAnim(_proxyCharts.cacheTrend);
-    _proxyCharts.cacheTrend.update("none");
-    return;
-  }
-
-  _proxyCharts.cacheTrend = new Chart(el.getContext("2d"), {
-    type: "line",
-    data: {
-      labels: labels,
-      datasets: [
-        { label: t("proxyDSCacheRatio"), data: ratio, borderColor: "#22c55e", backgroundColor: "rgba(34,197,94,.1)", fill: true, tension: 0.3, pointRadius: 3, yAxisID: "y" },
-        { label: t("proxyDSColdStarts"), data: coldStarts, type: "bar", backgroundColor: "rgba(59,130,246,.5)", borderRadius: 2, yAxisID: "y1" }
-      ]
-    },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { position: "left", ticks: { color: "#22c55e", callback: function(v) { return v + "%"; } }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, max: 100, title: { display: true, text: "Cache Ratio", color: "#22c55e", font: { size: 10 } } },
-        y1: { position: "right", ticks: { color: "#3b82f6" }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: "Cold Starts", color: "#3b82f6", font: { size: 10 } } }
-      },
-      plugins: {
-        legend: { labels: { color: "#e2e8f0", boxWidth: 12, font: { size: 11 } } },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) {
-              if (ctx.dataset.yAxisID === "y") return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(1) + "%";
-              return ctx.dataset.label + ": " + ctx.parsed.y;
-            }
-          }
+  if (!_proxyCharts.cacheTrend) _proxyCharts.cacheTrend = echarts.init(el, null, { renderer: 'canvas' });
+  _proxyCharts.cacheTrend.setOption({
+    animation: false,
+    grid: { left: 50, right: 60, top: 36, bottom: 30 },
+    legend: { data: [t("proxyDSCacheRatio"), t("proxyDSColdStarts")], textStyle: { color: '#cbd5e1' }, top: 4 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel];
+        for (var p of params) {
+          lines.push(p.marker + ' ' + p.seriesName + ': ' + (p.seriesType === 'line' ? p.value.toFixed(1) + '%' : p.value));
         }
+        return lines.join('<br>');
       }
-    }
-  });
+    },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+    yAxis: [
+      { type: 'value', min: 0, max: 100, position: 'left', name: 'Cache Ratio', nameTextStyle: { color: '#22c55e', fontSize: 10 }, axisLabel: { color: '#22c55e', formatter: function(v) { return v + '%'; } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } },
+      { type: 'value', min: 0, position: 'right', name: 'Cold Starts', nameTextStyle: { color: '#3b82f6', fontSize: 10 }, axisLabel: { color: '#3b82f6' }, splitLine: { show: false } }
+    ],
+    series: [
+      { name: t("proxyDSCacheRatio"), type: 'line', yAxisIndex: 0, data: ratio, smooth: 0.3, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#22c55e' }, itemStyle: { color: '#22c55e' }, areaStyle: { color: 'rgba(34,197,94,0.1)' } },
+      { name: t("proxyDSColdStarts"), type: 'bar', yAxisIndex: 1, data: coldStarts, itemStyle: { color: 'rgba(59,130,246,0.5)', borderRadius: [2, 2, 0, 0] } }
+    ]
+  }, true);
 }
 
 // ── Efficiency Trend (JSONL Ratio + Visible/1% + Cache Miss aus JSONL) ───
@@ -6321,7 +5218,7 @@ function buildEfficiencyData(proxyDays, mainDays) {
   var jsonlByDate = {};
   var jsonlVisibleByDate = {};
   var cacheMissByDate = {};
-  for (const md of mainDays) {
+  for (var md of mainDays) {
     if (!md.date) continue;
     jsonlByDate[md.date] = (md.input || 0) + (md.output || 0) + (md.cache_read || 0) + (md.cache_creation || 0);
     jsonlVisibleByDate[md.date] = (md.input || 0) + (md.output || 0);
@@ -6331,7 +5228,7 @@ function buildEfficiencyData(proxyDays, mainDays) {
   }
   var labels = [], ratioData = [], visPerPctData = [], cacheMissData = [];
   var visPerPctMeta = []; // per-day {method, q5Pct, coverage, samples, lowCoverage}
-  for (const pd of proxyDays) {
+  for (var pd of proxyDays) {
     var dk = pd.date || "";
     labels.push(dk ? dk.slice(5) : "?");
     var proxyTotal = pd.total_tokens || 0;
@@ -6369,11 +5266,11 @@ function buildEfficiencyData(proxyDays, mainDays) {
 // ── Efficiency Trend: ECharts PoC (issue #166, Phase 1) ────────────────
 // 1 Heatmap Matrix (metric x day, per-row min-max normalized) +
 // 3 Small Multiples (JSONL/Proxy Ratio, Visible Tokens/1%, Cache Miss %).
-// Synced tooltips via echarts.connect(). No Chart.js here.
+// Synced tooltips via echarts.connect().
 
 function __effNormalizeRow(row) {
   var min = Infinity, max = -Infinity;
-  for (const v of row) {
+  for (var v of row) {
     if (v == null || Number.isNaN(v)) continue;
     if (v < min) min = v;
     if (v > max) max = v;
@@ -6431,18 +5328,20 @@ function __effHeatmapOption(ed) {
           + "normalized: " + (norm * 100).toFixed(0) + "%";
       }
     },
-    grid: { left: 110, right: 20, top: 8, bottom: 24 },
+    /* Festes grid.left: containLabel sonst bei Resize/Layout schwankend → Zellen wirken ungleich breit */
+    grid: { left: 118, right: 6, top: 6, bottom: 26, containLabel: false },
     xAxis: {
       type: "category",
       data: ed.labels,
-      axisLabel: { color: "#94a3b8", fontSize: 10 },
+      boundaryGap: true,
+      axisLabel: { color: "#94a3b8", fontSize: 10, interval: 0 },
       axisLine: { lineStyle: { color: "#475569" } },
       splitArea: { show: false }
     },
     yAxis: {
       type: "category",
       data: metricLabels,
-      axisLabel: { color: "#cbd5e1", fontSize: 10 },
+      axisLabel: { color: "#cbd5e1", fontSize: 10, width: 102, overflow: "truncate" },
       axisLine: { lineStyle: { color: "#475569" } },
       splitArea: { show: false }
     },
@@ -6490,7 +5389,7 @@ function __effSmallMultipleOption(spec) {
       textStyle: { color: "#e2e8f0", fontSize: 11 },
       formatter: spec.tooltipFormatter
     },
-    grid: { left: 42, right: 10, top: 28, bottom: 22 },
+    grid: { left: 6, right: 6, top: 28, bottom: 22, containLabel: true },
     xAxis: {
       type: "category",
       data: spec.labels,
@@ -6515,6 +5414,18 @@ function __effInitOrSet(key, el, option, notMerge) {
     _effCharts[key] = echarts.init(el, null, { renderer: "canvas" });
   }
   _effCharts[key].setOption(option, { notMerge: !!notMerge, lazyUpdate: false });
+  try {
+    _effCharts[key].resize();
+  } catch (error) { logClientOptionalErr(error); }
+  if (typeof requestAnimationFrame === "function") {
+    requestAnimationFrame(function () {
+      try {
+        if (_effCharts[key] && typeof _effCharts[key].resize === "function") {
+          _effCharts[key].resize();
+        }
+      } catch (error) { logClientOptionalErr(error); }
+    });
+  }
 }
 
 function __effConnectCharts() {
@@ -6641,6 +5552,13 @@ function renderProxyEfficiencyTrend(data) {
 
 // ── Health Score Ampel ────────────────────────────────────────────────────
 var __lastHealthFingerprint = "";
+var __lastFindingsFingerprint = "";
+
+function invalidateHealthAndFindingsRender() {
+  __lastHealthFingerprint = "";
+  __lastFindingsFingerprint = "";
+}
+window.invalidateHealthAndFindingsRender = invalidateHealthAndFindingsRender;
 
 function healthColor(value, greenMax, yellowMax) {
   // greenMax = upper bound for green, yellowMax = upper bound for yellow
@@ -6665,9 +5583,9 @@ function computeHealthIndicators(data) {
 
   // Averages from JSONL
   var totalHits = 0, totalInterrupts = 0, totalRetries = 0;
-  for (var i = 0; i < days.length; i++) {
-    totalHits += (days[i].hit_limit || 0);
-    var ss = days[i].session_signals || {};
+  for (var _hd of days) {
+    totalHits += (_hd.hit_limit || 0);
+    var ss = _hd.session_signals || {};
     totalInterrupts += (ss.interrupt || 0);
     totalRetries += (ss.retry || 0);
   }
@@ -6684,8 +5602,8 @@ function computeHealthIndicators(data) {
       var tgPd = pdAll[tgi];
       if (!(tgPd.total_tokens > 0)) continue;
       var tgJsonl = null;
-      for (var tgj = 0; tgj < days.length; tgj++) {
-        if (days[tgj].date === tgPd.date && (days[tgj].total || 0) > 0) { tgJsonl = days[tgj]; break; }
+      for (var _tgd of days) {
+        if (_tgd.date === tgPd.date && (_tgd.total || 0) > 0) { tgJsonl = _tgd; break; }
       }
       if (tgJsonl) {
         thinkingGap = tgJsonl.total / tgPd.total_tokens;
@@ -6711,8 +5629,8 @@ function computeHealthIndicators(data) {
   var truncPerDay = 0;
   if (days.length) {
     var truncTotal = 0;
-    for (var tri = 0; tri < days.length; tri++) {
-      var trSig = days[tri].session_signals;
+    for (var _trd of days) {
+      var trSig = _trd.session_signals;
       if (trSig) truncTotal += (trSig.truncated || 0);
     }
     truncPerDay = Math.round(truncTotal / days.length);
@@ -6721,8 +5639,8 @@ function computeHealthIndicators(data) {
   // Stop-reason anomalies: count non-standard stop reasons
   var anomalStops = 0;
   if (days.length) {
-    for (var sri = 0; sri < days.length; sri++) {
-      var sr = days[sri].stop_reasons || {};
+    for (var _srd of days) {
+      var sr = _srd.stop_reasons || {};
       for (var srk in sr) {
         if (srk !== "end_turn" && srk !== "tool_use" && srk !== "max_tokens" && srk !== "unknown") {
           anomalStops += sr[srk];
@@ -6732,20 +5650,20 @@ function computeHealthIndicators(data) {
   }
 
   return [
-    { id: "quota5h", label: t("healthQuota5h"), value: q5h, display: q5h.toFixed(0) + "%", color: healthColor(q5h, 50, 80), barPct: Math.min(100, q5h) },
-    { id: "thinkingGap", label: t("healthThinkingGap"), value: thinkingGap, display: thinkingGap > 0 ? thinkingGap.toFixed(1) + "x" : "-", color: thinkingGap <= 0 ? "green" : healthColor(thinkingGap, 2, 5), barPct: Math.min(100, thinkingGap * 10) },
-    { id: "cacheHealth", label: t("healthCacheHealth"), value: cacheRatio, display: cacheRatio.toFixed(1) + "%", color: healthColorInverse(cacheRatio, 90, 70), barPct: cacheRatio },
-    { id: "errorRate", label: t("healthErrorRate"), value: errorRate, display: errorRate.toFixed(1) + "%", color: healthColor(errorRate, 3, 10), barPct: Math.min(100, errorRate * 5) },
-    { id: "hitLimits", label: t("healthHitLimits"), value: hitsPerDay, display: String(hitsPerDay), color: healthColor(hitsPerDay, 50, 500), barPct: Math.min(100, hitsPerDay / 10) },
-    { id: "latency", label: t("healthLatency"), value: avgLatS, display: avgLatS >= 1 ? avgLatS.toFixed(1) + "s" : Math.round(avgLatMs) + "ms", color: healthColor(avgLatS, 5, 15), barPct: Math.min(100, avgLatS * 5) },
-    { id: "interrupts", label: t("healthInterrupts"), value: interruptsPerDay, display: String(interruptsPerDay), color: healthColor(interruptsPerDay, 100, 500), barPct: Math.min(100, interruptsPerDay / 10) },
-    { id: "coldStarts", label: t("healthColdStarts"), value: coldStarts, display: String(coldStarts), color: healthColor(coldStarts, 0, 5), barPct: Math.min(100, coldStarts * 10) },
-    { id: "retries", label: t("healthRetries"), value: retriesPerDay, display: String(retriesPerDay), color: healthColor(retriesPerDay, 50, 200), barPct: Math.min(100, retriesPerDay / 5) },
-    { id: "false429", label: t("healthFalse429"), value: false429s, display: String(false429s), color: healthColor(false429s, 0, 1), barPct: Math.min(100, false429s * 50) },
-    { id: "truncations", label: t("healthTruncations"), value: truncPerDay, display: String(truncPerDay), color: healthColor(truncPerDay, 0, 5), barPct: Math.min(100, truncPerDay * 10) },
-    { id: "contextResets", label: t("healthContextResets"), value: contextResets, display: String(contextResets), color: healthColor(contextResets, 0, 3), barPct: Math.min(100, contextResets * 20) },
-    { id: "quotaBench", label: t("healthQuotaBench"), value: tokPerPct, display: tokPerPctM, color: tokPerPct > 0 ? healthColor(tokPerPct / 1000000, 2.1, 3) : "gray", barPct: tokPerPct > 0 ? Math.min(100, tokPerPct / 21000) : 0 },
-    { id: "anomalStops", label: t("healthAnomalStops"), value: anomalStops, display: String(anomalStops), color: healthColor(anomalStops, 0, 10), barPct: Math.min(100, anomalStops * 5) }
+    { id: "quota5h", label: t("healthQuota5h"), sub: t("healthQuota5hSub"), value: q5h, display: q5h.toFixed(0) + "%", color: healthColor(q5h, 50, 80), barPct: Math.min(100, q5h) },
+    { id: "thinkingGap", label: t("healthThinkingGap"), sub: t("healthThinkingGapSub"), value: thinkingGap, display: thinkingGap > 0 ? thinkingGap.toFixed(1) + "x" : "-", color: thinkingGap <= 0 ? "green" : healthColor(thinkingGap, 2, 5), barPct: Math.min(100, thinkingGap * 10) },
+    { id: "cacheHealth", label: t("healthCacheHealth"), sub: t("healthCacheHealthSub"), value: cacheRatio, display: cacheRatio.toFixed(1) + "%", color: healthColorInverse(cacheRatio, 90, 70), barPct: cacheRatio },
+    { id: "errorRate", label: t("healthErrorRate"), sub: t("healthErrorRateSub"), value: errorRate, display: errorRate.toFixed(1) + "%", color: healthColor(errorRate, 3, 10), barPct: Math.min(100, errorRate * 5) },
+    { id: "hitLimits", label: t("healthHitLimits"), sub: t("healthHitLimitsSub"), value: hitsPerDay, display: String(hitsPerDay), color: healthColor(hitsPerDay, 50, 500), barPct: Math.min(100, hitsPerDay / 10) },
+    { id: "latency", label: t("healthLatency"), sub: t("healthLatencySub"), value: avgLatS, display: avgLatS >= 1 ? avgLatS.toFixed(1) + "s" : Math.round(avgLatMs) + "ms", color: healthColor(avgLatS, 5, 15), barPct: Math.min(100, avgLatS * 5) },
+    { id: "interrupts", label: t("healthInterrupts"), sub: t("healthInterruptsSub"), value: interruptsPerDay, display: String(interruptsPerDay), color: healthColor(interruptsPerDay, 100, 500), barPct: Math.min(100, interruptsPerDay / 10) },
+    { id: "coldStarts", label: t("healthColdStarts"), sub: t("healthColdStartsSub"), value: coldStarts, display: String(coldStarts), color: healthColor(coldStarts, 0, 5), barPct: Math.min(100, coldStarts * 10) },
+    { id: "retries", label: t("healthRetries"), sub: t("healthRetriesSub"), value: retriesPerDay, display: String(retriesPerDay), color: healthColor(retriesPerDay, 50, 200), barPct: Math.min(100, retriesPerDay / 5) },
+    { id: "false429", label: t("healthFalse429"), sub: t("healthFalse429Sub"), value: false429s, display: String(false429s), color: healthColor(false429s, 0, 1), barPct: Math.min(100, false429s * 50) },
+    { id: "truncations", label: t("healthTruncations"), sub: t("healthTruncationsSub"), value: truncPerDay, display: String(truncPerDay), color: healthColor(truncPerDay, 0, 5), barPct: Math.min(100, truncPerDay * 10) },
+    { id: "contextResets", label: t("healthContextResets"), sub: t("healthContextResetsSub"), value: contextResets, display: String(contextResets), color: healthColor(contextResets, 0, 3), barPct: Math.min(100, contextResets * 20) },
+    { id: "quotaBench", label: t("healthQuotaBench"), sub: t("healthQuotaBenchSub"), value: tokPerPct, display: tokPerPctM, color: tokPerPct > 0 ? healthColor(tokPerPct / 1000000, 2.1, 3) : "gray", barPct: tokPerPct > 0 ? Math.min(100, tokPerPct / 21000) : 0 },
+    { id: "anomalStops", label: t("healthAnomalStops"), sub: t("healthAnomalStopsSub"), value: anomalStops, display: String(anomalStops), color: healthColor(anomalStops, 0, 10), barPct: Math.min(100, anomalStops * 5) }
   ];
 }
 
@@ -6754,7 +5672,7 @@ function renderHealthScore(data) {
   var gridEl = document.getElementById("health-grid");
   if (!headerEl || !gridEl) return;
 
-  var fp = (data.generated || "") + "|" + ((data.proxy && data.proxy.generated) || "");
+  var fp = (data.generated || "") + "|" + (data.proxy?.generated || "");
   if (fp === __lastHealthFingerprint) return;
   __lastHealthFingerprint = fp;
 
@@ -6764,18 +5682,35 @@ function renderHealthScore(data) {
   if (!days.length && !pdays.length) {
     headerEl.innerHTML = "<span style=\"color:#94a3b8\">" + escHtml(t("healthScoreNoData")) + "</span>";
     gridEl.innerHTML = "";
+    var hintNoData = document.getElementById("health-kpi-all-hidden-hint");
+    if (hintNoData) {
+      hintNoData.textContent = "";
+      hintNoData.classList.remove("is-visible");
+    }
     return;
   }
 
   var indicators = computeHealthIndicators(data);
-  var totalPts = 0, warns = 0, crits = 0;
-  for (var i = 0; i < indicators.length; i++) {
-    totalPts += healthPoints(indicators[i].color);
-    if (indicators[i].color === "yellow") warns++;
-    if (indicators[i].color === "red") crits++;
+  var dispH = window.__widgetDispatcher;
+  var visInd = [];
+  for (var _ind of indicators) {
+    var kpiId = "health-kpi-" + _ind.id;
+    if (dispH && typeof dispH.isChartVisible === "function" && !dispH.isChartVisible(kpiId)) continue;
+    visInd.push(_ind);
   }
-  var score = Math.round(totalPts / (indicators.length * 2) * 10);
-  var scoreColor = score > 7 ? "#22c55e" : score >= 4 ? "#f59e0b" : "#ef4444";
+  var totalPts = 0, warns = 0, crits = 0;
+  var score = 0;
+  var scoreColor = "#64748b";
+  if (visInd.length) {
+    for (var _vi of visInd) {
+      totalPts += healthPoints(_vi.color);
+      if (_vi.color === "yellow") warns++;
+      if (_vi.color === "red") crits++;
+    }
+    var denom = visInd.length * 2;
+    score = denom > 0 ? Math.round(totalPts / denom * 10) : 0;
+    scoreColor = score > 7 ? "#22c55e" : score >= 4 ? "#f59e0b" : "#ef4444";
+  }
 
   // Header
   var hh = "<div class=\"health-total-circle\" style=\"background:" + scoreColor + "\">" + score + "</div>";
@@ -6792,10 +5727,9 @@ function renderHealthScore(data) {
   if (smCircle) { smCircle.style.background = scoreColor; smCircle.textContent = score; }
   if (smText) {
     var sh = "";
-    for (var si = 0; si < indicators.length; si++) {
-      var ind = indicators[si];
-      var dc = ind.color === "red" ? "#ef4444" : ind.color === "yellow" ? "#f59e0b" : "#22c55e";
-      sh += '<span class="hs-inline-badge"><span class="hs-inline-dot" style="background:' + dc + '"></span>' + escHtml(ind.label) + ' <strong>' + escHtml(ind.display) + '</strong></span>';
+    for (var inlineInd of visInd) {
+      var dc = inlineInd.color === "red" ? "#ef4444" : inlineInd.color === "yellow" ? "#f59e0b" : "#22c55e";
+      sh += '<span class="hs-inline-badge"><span class="hs-inline-dot" style="background:' + dc + '"></span>' + escHtml(inlineInd.label) + ' <strong>' + escHtml(inlineInd.display) + '</strong></span>';
     }
 
     smText.innerHTML = sh;
@@ -6805,21 +5739,42 @@ function renderHealthScore(data) {
   renderOutageTimeline(data);
   renderAvailabilityKpis(data);
 
-  // Grid
+  // Grid (one host per KPI for visibility sync)
   var gh = "";
-  for (var gi = 0; gi < indicators.length; gi++) {
-    var ind = indicators[gi];
+  for (var ind of indicators) {
+    var hostId = "health-kpi-" + ind.id;
+    gh += "<div class=\"chart-box chart-box--kpi\" id=\"" + hostId + "\">";
     gh += "<div class=\"health-badge health-badge--" + ind.color + "\">";
     gh += "<div class=\"health-badge-label\">" + escHtml(ind.label) + "</div>";
     gh += "<div class=\"health-badge-value\">" + escHtml(ind.display) + "</div>";
+    gh += "<div class=\"health-badge-sub\">" + escHtml(ind.sub || "") + "</div>";
     gh += "<div class=\"health-badge-bar\"><div class=\"health-badge-bar-fill health-badge-bar-fill--" + ind.color + "\" style=\"width:" + Math.round(ind.barPct) + "%\"></div></div>";
-    gh += "</div>";
+    gh += "</div></div>";
   }
   if (gridEl.innerHTML !== gh) gridEl.innerHTML = gh;
+
+  var hintAll = document.getElementById("health-kpi-all-hidden-hint");
+  if (hintAll) {
+    var anyK = false;
+    var wd = window.__widgetDispatcher;
+    for (var _hki of indicators) {
+      var kpid = "health-kpi-" + _hki.id;
+      if (!wd || typeof wd.isChartVisible !== "function" || wd.isChartVisible(kpid)) {
+        anyK = true;
+        break;
+      }
+    }
+    if (indicators.length && !anyK) {
+      hintAll.textContent = t("healthKpiAllHiddenHint");
+      hintAll.classList.add("is-visible");
+    } else {
+      hintAll.textContent = "";
+      hintAll.classList.remove("is-visible");
+    }
+  }
 }
 
 // ── Key Findings Panel ────────────────────────────────────────────────────
-var __lastFindingsFingerprint = "";
 
 function computeKeyFindings(data) {
   var days = data.days || [];
@@ -6833,8 +5788,7 @@ function computeKeyFindings(data) {
   var totalOut = 0, totalCache = 0, totalAll = 0, totalCalls = 0;
   var totalHits = 0, totalRetries = 0, totalInterrupts = 0, totalContinue = 0;
   var peakDay = null, peakTotal = 0;
-  for (var i = 0; i < days.length; i++) {
-    var d = days[i];
+  for (var d of days) {
     totalOut += (d.output || 0);
     totalCache += (d.cache_read || 0);
     totalAll += (d.total || 0);
@@ -6850,10 +5804,11 @@ function computeKeyFindings(data) {
   // 1. Thinking Token Gap
   if (pd && days.length) {
     var todayJ = null;
-    for (var j = 0; j < days.length; j++) { if (days[j].date === pd.date) { todayJ = days[j]; break; } }
+    for (var _dj of days) { if (_dj.date === pd.date) { todayJ = _dj; break; } }
     if (todayJ && pd.total_tokens > 0) {
       var gap = (todayJ.total || 0) / pd.total_tokens;
       findings.push({
+        widgetId: "health-finding-jsonlProxyGap",
         icon: gap > 5 ? "red" : gap > 2 ? "yellow" : "green",
         title: t("findingThinkingGap"),
         value: gap.toFixed(1) + "x",
@@ -6866,6 +5821,7 @@ function computeKeyFindings(data) {
   if (totalOut > 0) {
     var overhead = Math.round(totalAll / totalOut);
     findings.push({
+      widgetId: "health-finding-overhead",
       icon: overhead > 1000 ? "red" : overhead > 500 ? "yellow" : "green",
       title: t("findingOverhead"),
       value: overhead + "x",
@@ -6877,6 +5833,7 @@ function computeKeyFindings(data) {
   if (totalHits > 0) {
     var hpd = Math.round(totalHits / numDays);
     findings.push({
+      widgetId: "health-finding-hitLimits",
       icon: hpd > 500 ? "red" : hpd > 50 ? "yellow" : "green",
       title: t("findingHitLimits"),
       value: fmt(totalHits),
@@ -6887,6 +5844,7 @@ function computeKeyFindings(data) {
   // 4. Interrupts vs Hit Limits
   if (totalInterrupts > 0) {
     findings.push({
+      widgetId: "health-finding-interrupts",
       icon: totalInterrupts > totalHits ? "red" : "yellow",
       title: t("findingInterrupts"),
       value: fmt(totalInterrupts),
@@ -6901,6 +5859,7 @@ function computeKeyFindings(data) {
     var q7 = Number.parseFloat(rl["anthropic-ratelimit-unified-7d-utilization"] || 0) * 100;
     if (q5 > 0) {
       findings.push({
+        widgetId: "health-finding-quota",
         icon: q5 > 80 ? "red" : q5 > 50 ? "yellow" : "green",
         title: t("findingQuota"),
         value: q5.toFixed(0) + "% / " + q7.toFixed(0) + "%",
@@ -6916,6 +5875,7 @@ function computeKeyFindings(data) {
     if (fb !== undefined && fb !== null) {
       var fbPct = Math.round(Number.parseFloat(fb) * 100);
       findings.push({
+        widgetId: "health-finding-fallback",
         icon: fbPct < 100 ? "red" : "green",
         title: t("findingFallback"),
         value: fbPct + "%",
@@ -6931,6 +5891,7 @@ function computeKeyFindings(data) {
     var ovReason = rl7["anthropic-ratelimit-unified-overage-disabled-reason"];
     if (ovStatus) {
       findings.push({
+        widgetId: "health-finding-overage",
         icon: ovStatus === "rejected" ? "red" : "green",
         title: t("findingOveragePolicy"),
         value: ovStatus,
@@ -6945,6 +5906,7 @@ function computeKeyFindings(data) {
     var claim = rl8["anthropic-ratelimit-unified-representative-claim"];
     if (claim) {
       findings.push({
+        widgetId: "health-finding-claim",
         icon: claim === "five_hour" ? "yellow" : "green",
         title: t("findingClaim"),
         value: claim.replaceAll("_", " "),
@@ -6956,6 +5918,7 @@ function computeKeyFindings(data) {
   // 9. Peak Day
   if (peakDay) {
     findings.push({
+      widgetId: "health-finding-peakDay",
       icon: peakTotal > 2e9 ? "red" : peakTotal > 500e6 ? "yellow" : "green",
       title: t("findingPeakDay"),
       value: peakDay.date,
@@ -6967,6 +5930,7 @@ function computeKeyFindings(data) {
   if (totalRetries > 0) {
     var rpd = Math.round(totalRetries / numDays);
     findings.push({
+      widgetId: "health-finding-retries",
       icon: rpd > 200 ? "red" : rpd > 50 ? "yellow" : "green",
       title: t("findingRetries"),
       value: fmt(totalRetries),
@@ -6975,8 +5939,9 @@ function computeKeyFindings(data) {
   }
 
   // 11. Cache paradox
-  if (pd && pd.cache_read_ratio > 0.9 && totalHits > 100) {
+  if (pd?.cache_read_ratio > 0.9 && totalHits > 100) {
     findings.push({
+      widgetId: "health-finding-cacheParadox",
       icon: "yellow",
       title: t("findingCacheParadox"),
       value: (pd.cache_read_ratio * 100).toFixed(1) + "%",
@@ -6992,39 +5957,58 @@ function renderKeyFindings(data) {
   var headerEl = document.getElementById("key-findings-header");
   if (!el) return;
 
-  var fp = (data.generated || "") + "|" + ((data.proxy && data.proxy.generated) || "");
+  var fp = (data.generated || "") + "|" + (data.proxy?.generated || "");
   if (fp === __lastFindingsFingerprint) return;
   __lastFindingsFingerprint = fp;
 
   var days = data.days || [];
-  var pdays = data.proxy?.proxy_days || [];
+  var px = data.proxy;
+  var pdays = px?.proxy_days || [];
   if (!days.length && !pdays.length) {
     if (headerEl) headerEl.textContent = t("findingsNoData");
     el.innerHTML = "";
+    var kfClear = document.getElementById("key-findings");
+    if (kfClear) kfClear.classList.remove("is-layout-empty");
     return;
   }
 
   var findings = computeKeyFindings(data);
+  function findingShown(f) {
+    var w = f.widgetId || "";
+    var disp = window.__widgetDispatcher;
+    if (!w || !disp || typeof disp.isChartVisible !== "function") return true;
+    return disp.isChartVisible(w);
+  }
   if (headerEl) {
-    var reds = 0, yellows = 0;
-    for (var c = 0; c < findings.length; c++) {
-      if (findings[c].icon === "red") reds++;
-      if (findings[c].icon === "yellow") yellows++;
+    var reds = 0, yellows = 0, visTotal = 0;
+    for (var _fg of findings) {
+      if (!findingShown(_fg)) continue;
+      visTotal++;
+      if (_fg.icon === "red") reds++;
+      if (_fg.icon === "yellow") yellows++;
     }
     headerEl.innerHTML = "<strong>" + escHtml(t("findingsTitle")) + "</strong> <span style=\"font-size:.78rem;color:#94a3b8\">" +
-      escHtml(tr("findingsSummary", { total: findings.length, reds: reds, yellows: yellows })) + "</span>";
+      escHtml(tr("findingsSummary", { total: visTotal, reds: reds, yellows: yellows })) + "</span>";
   }
 
   var html = "";
-  for (var fi = 0; fi < findings.length; fi++) {
-    var f = findings[fi];
+  for (var f of findings) {
+    if (!findingShown(f)) continue;
+    var wid = f.widgetId || "";
     var dot = f.icon === "red" ? "#ef4444" : f.icon === "yellow" ? "#f59e0b" : "#22c55e";
+    html += '<div class="finding-card-host" id="' + wid + '">';
     html += "<div class=\"finding-card\">";
     html += "<div class=\"finding-head\"><span class=\"finding-dot\" style=\"background:" + dot + "\"></span>";
     html += "<span class=\"finding-title\">" + escHtml(f.title) + "</span>";
     html += "<span class=\"finding-value\">" + escHtml(f.value) + "</span></div>";
     html += "<div class=\"finding-detail\">" + escHtml(f.detail) + "</div>";
-    html += "</div>";
+    html += "</div></div>";
+  }
+  var kfWrap = document.getElementById("key-findings");
+  if (!html && findings.length) {
+    if (kfWrap) kfWrap.classList.add("is-layout-empty");
+  } else {
+    if (kfWrap) kfWrap.classList.remove("is-layout-empty");
   }
   if (el.innerHTML !== html) el.innerHTML = html;
 }
@@ -7051,7 +6035,7 @@ function initFilterBar(data) {
   if (startEl && endEl && days.length && !startEl.dataset.bound) {
     startEl.dataset.bound = '1';
     var opts = '';
-    for (var di = 0; di < days.length; di++) opts += '<option value="' + escHtml(days[di].date) + '">' + escHtml(days[di].date) + '</option>';
+    for (var _od of days) opts += '<option value="' + escHtml(_od.date) + '">' + escHtml(_od.date) + '</option>';
     startEl.innerHTML = opts;
     endEl.innerHTML = opts;
     startEl.value = days[0].date;
@@ -7066,15 +6050,15 @@ function initFilterBar(data) {
       '<button type="button" class="filter-chip" data-scope="hourly">' + escHtml(t('mainChartsScopeHourly')) + '</button>';
     scopeChips.addEventListener('click', function(e) {
       var btn = e.target.closest('.filter-chip');
-      if (!btn || !btn.dataset.scope) return;
+      if (!btn?.dataset.scope) return;
       scopeChips.querySelectorAll('.filter-chip').forEach(function(c) { c.classList.remove('active'); });
       btn.classList.add('active');
       // Sync with existing scope chips
       var existing = document.getElementById('main-charts-scope-chips');
       if (existing) {
         var btns = existing.querySelectorAll('[data-scope]');
-        for (var i = 0; i < btns.length; i++) {
-          if (btns[i].dataset.scope === btn.dataset.scope) btns[i].click();
+        for (var _btn of btns) {
+          if (_btn.dataset.scope === btn.dataset.scope) _btn.click();
         }
       }
     });
@@ -7085,17 +6069,17 @@ function initFilterBar(data) {
   if (hostContainer && days.length && !hostContainer.dataset.bound) {
     hostContainer.dataset.bound = '1';
     var hosts = {};
-    for (var hdi = 0; hdi < days.length; hdi++) {
-      var dh = days[hdi].hosts || {};
-      for (var hk in dh) { if (Object.prototype.hasOwnProperty.call(dh, hk)) hosts[hk] = true; }
+    for (var _hdd of days) {
+      var dh = _hdd.hosts || {};
+      for (var hk in dh) { if (Object.hasOwn(dh, hk)) hosts[hk] = true; }
     }
     var hkeys = Object.keys(hosts).sort(function (a, b) { return a.localeCompare(b); });
     if (hkeys.length <= 5) {
       // Chips mode
       var hhtml = '<div class="filter-chips">';
       hhtml += '<button type="button" class="filter-chip active" data-host="">' + escHtml(t('filterHostAll')) + '</button>';
-      for (var hci = 0; hci < hkeys.length; hci++) {
-        hhtml += '<button type="button" class="filter-chip" data-host="' + escHtml(hkeys[hci]) + '">' + escHtml(hkeys[hci]) + '</button>';
+      for (var _hk of hkeys) {
+        hhtml += '<button type="button" class="filter-chip" data-host="' + escHtml(_hk) + '">' + escHtml(_hk) + '</button>';
       }
       hhtml += '</div>';
       hostContainer.innerHTML = hhtml;
@@ -7110,14 +6094,14 @@ function initFilterBar(data) {
         try {
           if (hostVal) sessionStorage.setItem("usageForensicHostFilter", hostVal);
           else sessionStorage.removeItem("usageForensicHostFilter");
-        } catch(ehf) {}
+        } catch (error) { logClientOptionalErr(error); }
         if (__lastUsageData) renderDashboard(__lastUsageData, true);
       });
     } else {
       // Multi-select mode
       var hopts = '<option value="" selected>' + escHtml(t('filterHostAll')) + '</option>';
-      for (var hsi = 0; hsi < hkeys.length; hsi++) {
-        hopts += '<option value="' + escHtml(hkeys[hsi]) + '">' + escHtml(hkeys[hsi]) + '</option>';
+      for (var _hk2 of hkeys) {
+        hopts += '<option value="' + escHtml(_hk2) + '">' + escHtml(_hk2) + '</option>';
       }
       hostContainer.innerHTML = '<select class="filter-input" multiple size="' + Math.min(hkeys.length + 1, 6) + '">' + hopts + '</select>';
       hostContainer.querySelector('select').addEventListener('change', function() {
@@ -7200,7 +6184,7 @@ function computeHealthScoreForDay(dayData, proxyDay) {
   var errorRate = pd ? (pd.error_rate || 0) : 0;
   var avgLatS = pd ? ((pd.avg_duration_ms || 0) / 1000) : 5;
   var coldStarts = pd ? (pd.cold_starts || 0) : 0;
-  var thinkingGap = (pd && pd.total_tokens > 0 && d.total > 0) ? d.total / pd.total_tokens : 0;
+  var thinkingGap = (pd?.total_tokens > 0 && d.total > 0) ? d.total / pd.total_tokens : 0;
 
   var colors = [
     healthColor(q5h, 50, 80),
@@ -7214,7 +6198,7 @@ function computeHealthScoreForDay(dayData, proxyDay) {
     healthColor(retries, 50, 200)
   ];
   var pts = 0;
-  for (var i = 0; i < colors.length; i++) pts += healthPoints(colors[i]);
+  for (var _clr of colors) pts += healthPoints(_clr);
   return Math.round(pts / (colors.length * 2) * 10);
 }
 
@@ -7222,38 +6206,38 @@ function buildHealthScoreHistory(data) {
   var days = getFilteredDays(data.days || []);
   var proxyDays = data.proxy?.proxy_days || [];
   var proxyByDate = {};
-  for (var pi = 0; pi < proxyDays.length; pi++) proxyByDate[proxyDays[pi].date] = proxyDays[pi];
+  for (var _pd of proxyDays) proxyByDate[_pd.date] = _pd;
   var scores = [];
-  for (var di = 0; di < days.length; di++) {
-    scores.push(computeHealthScoreForDay(days[di], proxyByDate[days[di].date] || null));
+  for (var _hsd of days) {
+    scores.push(computeHealthScoreForDay(_hsd, proxyByDate[_hsd.date] || null));
   }
   return scores;
 }
 
 // ── Uptime Chart (24h stacked by component status) ───────────────────────
 function renderUptimeChart(data) {
-  if (typeof Chart === "undefined") return;
-  var el = document.getElementById("c-uptime-chart");
-  if (!el) return;
   var titleEl = document.getElementById("uptime-chart-title");
   if (titleEl) titleEl.textContent = t("uptimeChartTitle");
+  var el = document.getElementById("c-uptime-chart");
+  if (!el) return;
+  if (typeof echarts === "undefined") return;
 
   // Apply month filter (same as outage timeline)
   var srcDays = _outageTimelineMonthFilter ? (data.days || []) : getFilteredDays(data.days || []);
   var filtDays = [];
-  for (var fi = 0; fi < srcDays.length; fi++) {
-    if (_outageTimelineMonthFilter && srcDays[fi].date && srcDays[fi].date.slice(0, 7) !== _outageTimelineMonthFilter) continue;
-    filtDays.push(srcDays[fi]);
+  for (var _sfd of srcDays) {
+    if (_outageTimelineMonthFilter && _sfd.date && _sfd.date.slice(0, 7) !== _outageTimelineMonthFilter) continue;
+    filtDays.push(_sfd);
   }
   if (filtDays.length < 1) filtDays = getFilteredDays(data.days || []);
 
   // Pad month with empty days
   var dayMap = {};
-  for (var dm = 0; dm < filtDays.length; dm++) dayMap[filtDays[dm].date] = filtDays[dm];
+  for (var _fdm of filtDays) dayMap[_fdm.date] = _fdm;
   var days = [];
   if (_outageTimelineMonthFilter) {
     var parts = _outageTimelineMonthFilter.split("-");
-    var yr = parseInt(parts[0], 10), mo = parseInt(parts[1], 10);
+    var yr = Number.parseInt(parts[0], 10), mo = Number.parseInt(parts[1], 10);
     var dim = new Date(yr, mo, 0).getDate();
     for (var pd = 1; pd <= dim; pd++) {
       var dk = yr + "-" + String(mo).padStart(2, "0") + "-" + String(pd).padStart(2, "0");
@@ -7266,8 +6250,7 @@ function renderUptimeChart(data) {
 
   var labels = [], opData = [], degData = [], partData = [], outData = [], greyData = [];
 
-  for (var di = 0; di < days.length; di++) {
-    var d = days[di];
+  for (var d of days) {
     labels.push(d.date.slice(5));
     if (d._empty) {
       opData.push(0); degData.push(0); partData.push(0); outData.push(0); greyData.push(24);
@@ -7277,9 +6260,9 @@ function renderUptimeChart(data) {
 
     // Total hours by comp_status (unfiltered)
     var totalByStatus = { major_outage: 0, partial_outage: 0, degraded_performance: 0 };
-    for (var sa = 0; sa < spans.length; sa++) {
-      var aCs = spans[sa].comp_status || "degraded_performance";
-      var aDur = (spans[sa].to || 0) - (spans[sa].from || 0);
+    for (var _sp of spans) {
+      var aCs = _sp.comp_status || "degraded_performance";
+      var aDur = (_sp.to || 0) - (_sp.from || 0);
       if (aDur < 0) aDur = 0;
       if (totalByStatus[aCs] !== undefined) totalByStatus[aCs] += aDur;
       else totalByStatus.degraded_performance += aDur;
@@ -7310,65 +6293,50 @@ function renderUptimeChart(data) {
   }
 
   if (_proxyCharts.uptimeChart) {
-    _proxyCharts.uptimeChart.destroy();
+    _proxyCharts.uptimeChart.dispose();
     _proxyCharts.uptimeChart = null;
   }
 
-  _proxyCharts.uptimeChart = new Chart(el.getContext("2d"), {
-    type: "bar",
-    data: {
-      labels: labels,
-      datasets: [
-        { label: t("uptimeOperational"), data: opData, backgroundColor: "rgba(34,197,94,.3)", borderColor: "rgba(34,197,94,.5)", borderWidth: 1, stack: "s" },
-        { label: t("uptimeDegraded"), data: degData, backgroundColor: "rgba(245,158,11,.3)", borderColor: "rgba(245,158,11,.6)", borderWidth: 1, stack: "s" },
-        { label: t("uptimePartial"), data: partData, backgroundColor: "rgba(249,115,22,.35)", borderColor: "rgba(249,115,22,.7)", borderWidth: 1, stack: "s" },
-        { label: t("uptimeOutage"), data: outData, backgroundColor: "rgba(239,68,68,.4)", borderColor: "rgba(239,68,68,.7)", borderWidth: 1, stack: "s" },
-        { label: "", data: greyData, backgroundColor: "rgba(51,65,85,.45)", borderColor: "rgba(51,65,85,.55)", borderWidth: 1, stack: "s", hidden: false }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      layout: { padding: { left: 0, right: 2, top: 4, bottom: 0 } },
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { stacked: true, ticks: { color: "#cbd5e1", font: { size: _cf().tick } }, grid: { color: "rgba(51,65,85,.3)" } },
-        y: { stacked: true, max: 24, ticks: { color: "#cbd5e1", font: { size: _cf().tick }, stepSize: 6, callback: function(v) { return v + "h"; } }, grid: { color: "rgba(51,65,85,.3)" } }
-      },
-      plugins: {
-        legend: { labels: { color: "#f8fafc", boxWidth: 12, font: { size: _cf().legend } } },
-        tooltip: {
-          titleFont: { size: _cf().tooltip },
-          bodyFont: { size: _cf().tooltip },
-          callbacks: {
-            label: function(ctx) { return ctx.dataset.label + ": " + ctx.parsed.y + "h"; }
-          }
-        }
+  _proxyCharts.uptimeChart = echarts.init(el, null, { renderer: 'canvas' });
+  _proxyCharts.uptimeChart.setOption({
+    animation: false,
+    grid: { left: 40, right: 8, top: 30, bottom: 24 },
+    legend: { data: [t("uptimeOperational"), t("uptimeDegraded"), t("uptimePartial"), t("uptimeOutage")], textStyle: { color: '#f8fafc', fontSize: _cf().legend }, top: 2, itemWidth: 12, itemHeight: 10 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: _cf().tooltip },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel];
+        for (var _pm of params) { if (_pm.seriesName) lines.push(_pm.marker + ' ' + _pm.seriesName + ': ' + _pm.value + 'h'); }
+        return lines.join('<br>');
       }
-    }
-  });
+    },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#cbd5e1', fontSize: _cf().tick }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
+    yAxis: { type: 'value', max: 24, min: 0, interval: 6, axisLabel: { color: '#cbd5e1', fontSize: _cf().tick, formatter: function(v) { return v + 'h'; } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
+    series: [
+      { name: t("uptimeOperational"), type: 'bar', stack: 's', data: opData, itemStyle: { color: 'rgba(34,197,94,0.3)', borderColor: 'rgba(34,197,94,0.5)', borderWidth: 1 } },
+      { name: t("uptimeDegraded"), type: 'bar', stack: 's', data: degData, itemStyle: { color: 'rgba(245,158,11,0.3)', borderColor: 'rgba(245,158,11,0.6)', borderWidth: 1 } },
+      { name: t("uptimePartial"), type: 'bar', stack: 's', data: partData, itemStyle: { color: 'rgba(249,115,22,0.35)', borderColor: 'rgba(249,115,22,0.7)', borderWidth: 1 } },
+      { name: t("uptimeOutage"), type: 'bar', stack: 's', data: outData, itemStyle: { color: 'rgba(239,68,68,0.4)', borderColor: 'rgba(239,68,68,0.7)', borderWidth: 1 } },
+      { name: '', type: 'bar', stack: 's', data: greyData, itemStyle: { color: 'rgba(51,65,85,0.45)', borderColor: 'rgba(51,65,85,0.55)', borderWidth: 1 } }
+    ]
+  }, true);
   __scheduleAnthropicHealthChartsResize();
 }
 
 // ── Incident History Chart ────────────────────────────────────────────────
 function renderIncidentHistory(data) {
-  if (typeof Chart === "undefined") return;
-  var el = document.getElementById("c-incident-history");
-  if (!el) return;
   var titleEl = document.getElementById("incident-history-title");
   if (titleEl) titleEl.textContent = t("incidentHistoryLabel");
-
   var titleOT = document.getElementById("outage-timeline-title");
   if (titleOT) titleOT.textContent = t("outageTimelineTitle");
+  var el = document.getElementById("c-incident-history");
+  if (!el) return;
+  if (typeof echarts === "undefined") return;
 
-  // Apply same month filter as other charts
   var srcDays = _outageTimelineMonthFilter ? (data.days || []) : getFilteredDays(data.days || []);
   var days = [];
-  for (var fi = 0; fi < srcDays.length; fi++) {
-    if (_outageTimelineMonthFilter && srcDays[fi].date && srcDays[fi].date.slice(0, 7) !== _outageTimelineMonthFilter) continue;
-    days.push(srcDays[fi]);
+  for (var _sfd2 of srcDays) {
+    if (_outageTimelineMonthFilter && _sfd2.date && _sfd2.date.slice(0, 7) !== _outageTimelineMonthFilter) continue;
+    days.push(_sfd2);
   }
   if (days.length < 1) days = getFilteredDays(data.days || []);
   if (days.length < 2) return;
@@ -7377,18 +6345,17 @@ function renderIncidentHistory(data) {
   var critH = [], majorH = [], minorH = [], greyH = [];
   var hitLimits = [];
 
-  for (var i = 0; i < days.length; i++) {
-    var d = days[i];
+  for (var d of days) {
     labels.push(d.date.slice(5));
     hitLimits.push(d.hit_limit || 0);
 
     var spans = d.outage_spans || [];
     var bySev = { critical: 0, major: 0, minor: 0 };
     var excludedH = 0;
-    for (var si = 0; si < spans.length; si++) {
-      var imp = spans[si].impact || "none";
-      if (imp === "none") continue; // none = uptime, skip
-      var dur = (spans[si].to || 0) - (spans[si].from || 0);
+    for (var _sp2 of spans) {
+      var imp = _sp2.impact || "none";
+      if (imp === "none") continue;
+      var dur = (_sp2.to || 0) - (_sp2.from || 0);
       if (dur < 0) dur = 0;
       if (_outageImpactExclude[imp]) { excludedH += dur; continue; }
       if (bySev[imp] !== undefined) bySev[imp] += dur;
@@ -7400,59 +6367,56 @@ function renderIncidentHistory(data) {
   }
 
   if (_proxyCharts.incidentHistory) {
-    _proxyCharts.incidentHistory.destroy();
+    _proxyCharts.incidentHistory.dispose();
     _proxyCharts.incidentHistory = null;
   }
 
-  _proxyCharts.incidentHistory = new Chart(el.getContext("2d"), {
-    type: "bar",
-    data: {
-      labels: labels,
-      datasets: [
-        { label: "critical", data: critH, backgroundColor: "rgba(239,68,68,.4)", borderColor: "rgba(239,68,68,.7)", borderWidth: 1, yAxisID: "y", stack: "inc" },
-        { label: "major", data: majorH, backgroundColor: "rgba(249,115,22,.35)", borderColor: "rgba(249,115,22,.6)", borderWidth: 1, yAxisID: "y", stack: "inc" },
-        { label: "minor", data: minorH, backgroundColor: "rgba(245,158,11,.3)", borderColor: "rgba(245,158,11,.6)", borderWidth: 1, yAxisID: "y", stack: "inc" },
-        { label: "", data: greyH, backgroundColor: "rgba(51,65,85,.45)", borderColor: "rgba(51,65,85,.55)", borderWidth: 1, yAxisID: "y", stack: "inc", hidden: false },
-        { label: t("incidentDSHitLimits"), data: hitLimits, type: "line", borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.1)", yAxisID: "y1", tension: 0.3, pointRadius: 3, fill: true }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      layout: { padding: { left: 0, right: 4, top: 4, bottom: 0 } },
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { stacked: true, ticks: { color: "#cbd5e1", font: { size: _cf().tick } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { stacked: true, position: "left", ticks: { color: "#cbd5e1", font: { size: _cf().tick } }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, title: { display: true, text: t("incidentAxisOutage"), color: "#cbd5e1", font: { size: _cf().title } } },
-        y1: { position: "right", ticks: { color: "#f59e0b", font: { size: _cf().tick } }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: t("incidentAxisHitLimits"), color: "#f59e0b", font: { size: _cf().title } } }
-      },
-      plugins: {
-        legend: { labels: { color: "#f8fafc", boxWidth: 12, font: { size: _cf().legend }, filter: function(item) { return item.text !== ""; } } },
-        tooltip: {
-          titleFont: { size: _cf().tooltip },
-          bodyFont: { size: _cf().tooltip },
-          callbacks: {
-            label: function(ctx) { if (!ctx.dataset.label) return null; return ctx.dataset.label + ": " + ctx.parsed.y + (ctx.dataset.yAxisID === "y1" ? "" : "h"); }
-          }
+  var legCrit = t("incidentLegendCritical");
+  var legMajor = t("incidentLegendMajor");
+  var legMinor = t("incidentLegendMinor");
+  _proxyCharts.incidentHistory = echarts.init(el, null, { renderer: 'canvas' });
+  _proxyCharts.incidentHistory.setOption({
+    animation: false,
+    grid: { left: 50, right: 50, top: 30, bottom: 24 },
+    legend: { data: [legCrit, legMajor, legMinor, t("incidentDSHitLimits")], textStyle: { color: '#f8fafc', fontSize: _cf().legend }, top: 2, itemWidth: 12, itemHeight: 10 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: _cf().tooltip },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel];
+        for (var pi = 0; pi < params.length; pi++) {
+          var p = params[pi];
+          if (!p.seriesName) continue;
+          var suffix = p.seriesType === 'line' ? '' : 'h';
+          lines.push(p.marker + ' ' + p.seriesName + ': ' + p.value + suffix);
         }
+        return lines.join('<br>');
       }
-    }
-  });
+    },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#cbd5e1', fontSize: _cf().tick }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.4)' } } },
+    yAxis: [
+      { type: 'value', min: 0, position: 'left', name: t("incidentAxisOutage"), nameTextStyle: { color: '#cbd5e1', fontSize: _cf().title }, axisLabel: { color: '#cbd5e1', fontSize: _cf().tick }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.4)' } } },
+      { type: 'value', min: 0, position: 'right', name: t("incidentAxisHitLimits"), nameTextStyle: { color: '#f59e0b', fontSize: _cf().title }, axisLabel: { color: '#f59e0b', fontSize: _cf().tick }, splitLine: { show: false } }
+    ],
+    series: [
+      { name: legCrit, type: 'bar', stack: 'inc', yAxisIndex: 0, data: critH, itemStyle: { color: 'rgba(239,68,68,0.4)', borderColor: 'rgba(239,68,68,0.7)', borderWidth: 1 } },
+      { name: legMajor, type: 'bar', stack: 'inc', yAxisIndex: 0, data: majorH, itemStyle: { color: 'rgba(249,115,22,0.35)', borderColor: 'rgba(249,115,22,0.6)', borderWidth: 1 } },
+      { name: legMinor, type: 'bar', stack: 'inc', yAxisIndex: 0, data: minorH, itemStyle: { color: 'rgba(245,158,11,0.3)', borderColor: 'rgba(245,158,11,0.6)', borderWidth: 1 } },
+      { name: '', type: 'bar', stack: 'inc', yAxisIndex: 0, data: greyH, itemStyle: { color: 'rgba(51,65,85,0.45)', borderColor: 'rgba(51,65,85,0.55)', borderWidth: 1 } },
+      { name: t("incidentDSHitLimits"), type: 'line', yAxisIndex: 1, data: hitLimits, smooth: 0.3, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#f59e0b' }, itemStyle: { color: '#f59e0b' }, areaStyle: { color: 'rgba(245,158,11,0.1)' } }
+    ]
+  }, true);
   __scheduleAnthropicHealthChartsResize();
 }
 
 
 function updateAnthropicPopup(data) {
-  if (typeof Chart === "undefined") return;
+  var scatterTitle = document.getElementById("anthropic-scatter-chart-title");
+  if (scatterTitle) scatterTitle.textContent = t("chartStatusOutageScatter");
   var el = document.getElementById("c-anthropic-incidents");
   if (!el) return;
+  if (typeof echarts === "undefined") return;
 
   var label = document.getElementById("anthropic-label");
   if (label) label.textContent = "Anthropic";
-
-
 
   var days = getFilteredDays(data.days || []);
   if (days.length < 2) return;
@@ -7461,47 +6425,51 @@ function updateAnthropicPopup(data) {
   var outageH = [];
   var outageColors = [];
   var incidentCounts = [];
+  var scatterData = [];
   for (var i = 0; i < days.length; i++) {
     var d = days[i];
     labels.push(d.date.slice(5));
     var oh = d.outage_hours || 0;
     outageH.push(oh);
-    outageColors.push(oh > 2 ? "rgba(239,68,68,.08)" : oh > 0 ? "rgba(245,158,11,.08)" : "rgba(51,65,85,.05)");
-    incidentCounts.push((d.outage_incidents || []).length);
+    outageColors.push(oh > 2 ? 'rgba(239,68,68,0.08)' : oh > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(51,65,85,0.05)');
+    var ic = (d.outage_incidents || []).length;
+    incidentCounts.push(ic);
+    if (ic > 0) scatterData.push([i, ic]);
   }
 
   if (_proxyCharts.anthropicIncidents) {
-    freezeChartNoAnim(_proxyCharts.anthropicIncidents);
-    _proxyCharts.anthropicIncidents.data.labels = labels;
-    _proxyCharts.anthropicIncidents.data.datasets[0].data = outageH;
-    _proxyCharts.anthropicIncidents.data.datasets[0].backgroundColor = outageColors;
-    _proxyCharts.anthropicIncidents.data.datasets[1].data = incidentCounts;
-    _proxyCharts.anthropicIncidents.update("none");
-    return;
-  }
-
-  _proxyCharts.anthropicIncidents = new Chart(el.getContext("2d"), {
-    type: "bar",
-    data: {
-      labels: labels,
-      datasets: [
-        { label: t("incidentDSOutageHours"), data: outageH, backgroundColor: outageColors, borderColor: outageColors.map(function(c) { return c.replace(/,[\d.]+\)/, ",0.8)"); }), borderWidth: 1, yAxisID: "y", borderRadius: 2, barPercentage: 0.35, categoryPercentage: 0.6 },
-        { label: "Incidents", data: incidentCounts, type: "scatter", borderColor: "rgba(239,68,68,.8)", backgroundColor: "rgba(239,68,68,.15)", pointRadius: function(ctx) { return ctx.parsed.y > 0 ? 4 : 0; }, pointBorderWidth: 2, pointStyle: "circle", yAxisID: "y1" }
-      ]
-    },
-    options: {
-      responsive: true,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { ticks: { color: "#94a3b8", font: { size: 9 } }, grid: { color: "rgba(51,65,85,.4)" } },
-        y: { position: "left", ticks: { color: "#94a3b8" }, grid: { color: "rgba(51,65,85,.4)" }, beginAtZero: true, title: { display: true, text: "Outage (h)", color: "#94a3b8", font: { size: 9 } } },
-        y1: { position: "right", ticks: { color: "#ef4444" }, grid: { drawOnChartArea: false }, beginAtZero: true, title: { display: true, text: "Incidents", color: "#ef4444", font: { size: 9 } } }
-      },
-      plugins: { legend: { labels: { color: "#e2e8f0", boxWidth: 10, font: { size: 10 } } } }
+    try {
+      var domA = _proxyCharts.anthropicIncidents.getDom ? _proxyCharts.anthropicIncidents.getDom() : null;
+      if (domA !== el) {
+        _proxyCharts.anthropicIncidents.dispose();
+        _proxyCharts.anthropicIncidents = null;
+      }
+    } catch (eAnth) {
+      try {
+        _proxyCharts.anthropicIncidents.dispose();
+      } catch (error) { logClientOptionalErr(error); }
+      _proxyCharts.anthropicIncidents = null;
     }
-  });
+  }
+  if (!_proxyCharts.anthropicIncidents) {
+    _proxyCharts.anthropicIncidents = echarts.init(el, null, { renderer: 'canvas' });
+  }
+  var legAnthInc = t("anthropicLegendIncidents");
+  _proxyCharts.anthropicIncidents.setOption({
+    animation: false,
+    grid: { left: 50, right: 50, top: 16, bottom: 24 },
+    legend: { data: [t("incidentDSOutageHours"), legAnthInc], textStyle: { color: '#e2e8f0', fontSize: 10 }, top: 0, itemWidth: 10, itemHeight: 8 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: 11 } },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 9 }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.4)' } } },
+    yAxis: [
+      { type: 'value', min: 0, position: 'left', name: t("incidentAxisOutage"), nameTextStyle: { color: '#94a3b8', fontSize: 9 }, axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.4)' } } },
+      { type: 'value', min: 0, position: 'right', name: t("availKpiIncidents"), nameTextStyle: { color: '#ef4444', fontSize: 9 }, axisLabel: { color: '#ef4444' }, splitLine: { show: false } }
+    ],
+    series: [
+      { name: t("incidentDSOutageHours"), type: 'bar', yAxisIndex: 0, data: outageH, barWidth: '35%', itemStyle: { color: function(p) { return outageColors[p.dataIndex]; }, borderColor: function(p) { return outageColors[p.dataIndex].replace(/[\d.]+\)$/, '0.8)'); }, borderWidth: 1, borderRadius: 2 } },
+      { name: legAnthInc, type: 'scatter', yAxisIndex: 1, data: scatterData, symbolSize: 8, itemStyle: { color: 'rgba(239,68,68,0.15)', borderColor: 'rgba(239,68,68,0.8)', borderWidth: 2 } }
+    ]
+  }, true);
 }
 
 
@@ -7514,9 +6482,11 @@ var _outageTimelineMonthFilter = null;   // null = all, "2026-03" = single month
 var _outageImpactExclude = {};            // { "critical": true, "minor": true } = hidden
 var _outageStatusExclude = {};            // { "major_outage": true } = hidden (uptime chart)
 function renderOutageTimeline(data, monthFilter) {
-  if (typeof Chart === "undefined") return;
+  var titleOT = document.getElementById("outage-timeline-title");
+  if (titleOT) titleOT.textContent = t("outageTimelineTitle");
   var el = document.getElementById("c-outage-timeline");
   if (!el) return;
+  if (typeof echarts === "undefined") return;
   if (monthFilter !== undefined) _outageTimelineMonthFilter = monthFilter;
 
   var srcDays = _outageTimelineMonthFilter ? (data.days || []) : getFilteredDays(data.days || []);
@@ -7528,15 +6498,14 @@ function renderOutageTimeline(data, monthFilter) {
   if (days.length < 1) days = getFilteredDays(data.days || []);
   if (days.length < 2 && !_outageTimelineMonthFilter) return;
 
-  // When filtering by month, pad to full month with empty (future) days
   var dayMap = {};
   for (var dm = 0; dm < days.length; dm++) dayMap[days[dm].date] = days[dm];
 
   var paddedDays = [];
   if (_outageTimelineMonthFilter) {
     var parts = _outageTimelineMonthFilter.split("-");
-    var yr = parseInt(parts[0], 10);
-    var mo = parseInt(parts[1], 10);
+    var yr = Number.parseInt(parts[0], 10);
+    var mo = Number.parseInt(parts[1], 10);
     var daysInMonth = new Date(yr, mo, 0).getDate();
     for (var pd = 1; pd <= daysInMonth; pd++) {
       var dk = yr + "-" + String(mo).padStart(2, "0") + "-" + String(pd).padStart(2, "0");
@@ -7559,7 +6528,6 @@ function renderOutageTimeline(data, monthFilter) {
     }
     var spans = d.outage_spans || [];
 
-    // Hours per severity
     var bySev = { critical: 0, major: 0, minor: 0, none: 0 };
     for (var si = 0; si < spans.length; si++) {
       var dur = (spans[si].to || 0) - (spans[si].from || 0);
@@ -7569,7 +6537,6 @@ function renderOutageTimeline(data, monthFilter) {
       else bySev.none += dur;
     }
 
-    // Cap total to 24h
     var totalInc = bySev.critical + bySev.major + bySev.minor + bySev.none;
     if (totalInc > 24) {
       var scale = 24 / totalInc;
@@ -7577,14 +6544,10 @@ function renderOutageTimeline(data, monthFilter) {
       totalInc = 24;
     }
 
-    // Uptime = 24h - all incident hours
     var uptimeH = 24 - totalInc;
     if (uptimeH < 0) uptimeH = 0;
-
-    // none severity = uptime (no impact = service was fine)
     bySev.none += uptimeH;
 
-    // Apply exclude filter: excluded severity → grey
     var greyH = 0;
     var visCrit = bySev.critical, visMajor = bySev.major, visMinor = bySev.minor, visNone = bySev.none;
     if (_outageImpactExclude["critical"]) { greyH += visCrit; visCrit = 0; }
@@ -7600,51 +6563,40 @@ function renderOutageTimeline(data, monthFilter) {
   }
 
   if (_proxyCharts.outageTimeline) {
-    _proxyCharts.outageTimeline.destroy();
+    _proxyCharts.outageTimeline.dispose();
     _proxyCharts.outageTimeline = null;
   }
 
-  // Always stacked bar — thin bars for many days
-  var barOpts = paddedDays.length > 31 ? { barPercentage: 0.95, categoryPercentage: 0.95 } : {};
-  var xTickOpts = paddedDays.length > 31
-    ? { color: "#cbd5e1", font: { size: Math.max(9, _cf().tick - 2) }, maxRotation: 45, autoSkip: true, maxTicksLimit: 25 }
-    : { color: "#cbd5e1", font: { size: _cf().tick } };
+  var xLabelOpts = paddedDays.length > 31
+    ? { color: '#cbd5e1', fontSize: Math.max(9, _cf().tick - 2), rotate: 45, interval: 0 }
+    : { color: '#cbd5e1', fontSize: _cf().tick };
 
-  var datasets = [
-    Object.assign({ label: "none", data: noneData, backgroundColor: "rgba(34,197,94,.25)", borderColor: "rgba(34,197,94,.5)", borderWidth: 1, stack: "s" }, barOpts),
-    Object.assign({ label: "critical", data: critData, backgroundColor: "rgba(239,68,68,.35)", borderColor: "rgba(239,68,68,.7)", borderWidth: 1, stack: "s" }, barOpts),
-    Object.assign({ label: "major", data: majorData, backgroundColor: "rgba(249,115,22,.3)", borderColor: "rgba(249,115,22,.6)", borderWidth: 1, stack: "s" }, barOpts),
-    Object.assign({ label: "minor", data: minorData, backgroundColor: "rgba(245,158,11,.25)", borderColor: "rgba(245,158,11,.6)", borderWidth: 1, stack: "s" }, barOpts),
-    Object.assign({ label: "", data: greyData, backgroundColor: "rgba(51,65,85,.45)", borderColor: "rgba(51,65,85,.55)", borderWidth: 1, stack: "s", hidden: false }, barOpts)
-  ];
-  var scaleOpts = {
-    x: { stacked: true, ticks: xTickOpts, grid: { color: "rgba(51,65,85,.3)" } },
-    y: { stacked: true, max: 24, ticks: { color: "#cbd5e1", font: { size: _cf().tick }, stepSize: 6, callback: function(v) { return v + "h"; } }, grid: { color: "rgba(51,65,85,.3)" } }
-  };
-
-  _proxyCharts.outageTimeline = new Chart(el.getContext("2d"), {
-    type: "bar",
-    data: { labels: labels, datasets: datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      transitions: __chartTransitionsOff,
-      layout: { padding: { left: 0, right: 2, top: 4, bottom: 0 } },
-      interaction: { mode: "index", intersect: false },
-      scales: scaleOpts,
-      plugins: {
-        legend: { labels: { color: "#f8fafc", boxWidth: 12, font: { size: _cf().legend }, filter: function(item) { return item.text !== ""; } } },
-        tooltip: {
-          titleFont: { size: _cf().tooltip },
-          bodyFont: { size: _cf().tooltip },
-          callbacks: {
-            label: function(ctx) { if (!ctx.dataset.label) return null; return ctx.dataset.label + ": " + ctx.parsed.y + "h"; }
-          }
-        }
+  var legNone = t("outageTimelineOk");
+  var legOCrit = t("incidentLegendCritical");
+  var legOMajor = t("incidentLegendMajor");
+  var legOMinor = t("incidentLegendMinor");
+  _proxyCharts.outageTimeline = echarts.init(el, null, { renderer: 'canvas' });
+  _proxyCharts.outageTimeline.setOption({
+    animation: false,
+    grid: { left: 40, right: 8, top: 30, bottom: paddedDays.length > 31 ? 40 : 24 },
+    legend: { data: [legNone, legOCrit, legOMajor, legOMinor], textStyle: { color: '#f8fafc', fontSize: _cf().legend }, top: 2, itemWidth: 12, itemHeight: 10 },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: _cf().tooltip },
+      formatter: function(params) {
+        var lines = [params[0].axisValueLabel];
+        for (var pi = 0; pi < params.length; pi++) { if (params[pi].seriesName) lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + params[pi].value + 'h'); }
+        return lines.join('<br>');
       }
-    }
-  });
+    },
+    xAxis: { type: 'category', data: labels, axisLabel: xLabelOpts, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
+    yAxis: { type: 'value', max: 24, min: 0, interval: 6, axisLabel: { color: '#cbd5e1', fontSize: _cf().tick, formatter: function(v) { return v + 'h'; } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.3)' } } },
+    series: [
+      { name: legNone, type: 'bar', stack: 's', data: noneData, itemStyle: { color: 'rgba(34,197,94,0.25)', borderColor: 'rgba(34,197,94,0.5)', borderWidth: 1 } },
+      { name: legOCrit, type: 'bar', stack: 's', data: critData, itemStyle: { color: 'rgba(239,68,68,0.35)', borderColor: 'rgba(239,68,68,0.7)', borderWidth: 1 } },
+      { name: legOMajor, type: 'bar', stack: 's', data: majorData, itemStyle: { color: 'rgba(249,115,22,0.3)', borderColor: 'rgba(249,115,22,0.6)', borderWidth: 1 } },
+      { name: legOMinor, type: 'bar', stack: 's', data: minorData, itemStyle: { color: 'rgba(245,158,11,0.25)', borderColor: 'rgba(245,158,11,0.6)', borderWidth: 1 } },
+      { name: '', type: 'bar', stack: 's', data: greyData, itemStyle: { color: 'rgba(51,65,85,0.45)', borderColor: 'rgba(51,65,85,0.55)', borderWidth: 1 } }
+    ]
+  }, true);
   __scheduleAnthropicHealthChartsResize();
 }
 
@@ -7747,7 +6699,7 @@ function renderAvailabilityKpis(data) {
   var h = "";
 
   var inModal = document.getElementById("anthropic-modal-overlay");
-  var isWide = inModal && inModal.classList.contains("is-open");
+  var isWide = inModal?.classList.contains("is-open");
 
   var utCCls = medianUt >= 99.8 ? "ok" : medianUt >= 99 ? "warn" : medianUt >= 95 ? "caution" : "danger";
   var sqCCls = medianSq >= 99 ? "ok" : medianSq >= 95 ? "warn" : medianSq >= 85 ? "caution" : "danger";
@@ -8021,12 +6973,12 @@ function renderAvailabilityKpis(data) {
 // ── Auto-collapse charts when Kennzahlen opens (and vice versa) ──────────
 (function() {
   var kpiDet = document.getElementById("avail-kpi-details");
-  var chartIds = ["uptime-chart-details", "incident-history-details"];
+  var chartIds = ["uptime-chart-details", "incident-history-details", "anthropic-incidents-details"];
   var keepOpen = "outage-timeline-details";
   if (!kpiDet) return;
   function isInModal() {
     var overlay = document.getElementById("anthropic-modal-overlay");
-    return overlay && overlay.classList.contains("is-open");
+    return overlay?.classList.contains("is-open");
   }
   kpiDet.addEventListener("toggle", function() {
     if (isInModal()) return;
@@ -8037,14 +6989,18 @@ function renderAvailabilityKpis(data) {
       }
     }
   });
-  // Re-open charts when Kennzahlen closes
+  // Re-open default service charts when Kennzahlen closes (incident charts stay collapsed)
   kpiDet.addEventListener("toggle", function() {
     if (isInModal()) return;
     if (!kpiDet.open) {
-      for (var i = 0; i < chartIds.length; i++) {
-        var el = document.getElementById(chartIds[i]);
-        if (el) el.setAttribute("open", "");
-      }
+      var u = document.getElementById("uptime-chart-details");
+      var o = document.getElementById("outage-timeline-details");
+      var ih = document.getElementById("incident-history-details");
+      var ai = document.getElementById("anthropic-incidents-details");
+      if (u) u.setAttribute("open", "");
+      if (o) o.setAttribute("open", "");
+      if (ih) ih.removeAttribute("open");
+      if (ai) ai.removeAttribute("open");
     }
   });
 })();
@@ -8076,13 +7032,18 @@ function renderAvailabilityKpis(data) {
   var badge = document.getElementById("anthropic-badge");
   if (!expandBtn || !overlay || !modalBody || !popup) return;
 
-  var chartDetailIds = ["uptime-chart-details", "incident-history-details", "outage-timeline-details"];
+  var chartDetailIds = ["uptime-chart-details", "outage-timeline-details", "incident-history-details", "anthropic-incidents-details"];
 
-  function forceChartsOpen() {
-    for (var i = 0; i < chartDetailIds.length; i++) {
-      var el = document.getElementById(chartDetailIds[i]);
-      if (el) { el.setAttribute("open", ""); el.classList.add("no-collapse"); }
-    }
+  /** Service row open, incident row closed — same as initial popup / refresh. */
+  function setDefaultAnthropicHealthDetailsState() {
+    var u = document.getElementById("uptime-chart-details");
+    var o = document.getElementById("outage-timeline-details");
+    var ih = document.getElementById("incident-history-details");
+    var ai = document.getElementById("anthropic-incidents-details");
+    if (u) u.setAttribute("open", "");
+    if (o) o.setAttribute("open", "");
+    if (ih) ih.removeAttribute("open");
+    if (ai) ai.removeAttribute("open");
   }
 
   function restoreChartsCollapse() {
@@ -8098,14 +7059,13 @@ function renderAvailabilityKpis(data) {
     // Hide expand button inside modal (not needed)
     var expInModal = modalBody.querySelector(".anthropic-popup-expand");
     if (expInModal) expInModal.style.display = "none";
-    // Force all charts open and disable collapsing
-    forceChartsOpen();
-    // Move Kennzahlen above charts in modal + force open
+    setDefaultAnthropicHealthDetailsState();
+    // Move Kennzahlen above charts in modal (collapsed by default)
     var kpiEl = modalBody.querySelector("#avail-kpi-details");
     var chartsRow = modalBody.querySelector(".health-charts-row");
-    if (kpiEl && chartsRow && chartsRow.parentNode) {
+    if (kpiEl && chartsRow?.parentNode) {
       chartsRow.parentNode.insertBefore(kpiEl, chartsRow);
-      kpiEl.setAttribute("open", "");
+      kpiEl.removeAttribute("open");
     }
     // Close the dropdown popup
     if (badge) badge.classList.remove("popup-open");
@@ -8118,6 +7078,7 @@ function renderAvailabilityKpis(data) {
       renderIncidentHistory(_lastAvailKpiData);
       renderOutageTimeline(_lastAvailKpiData);
       renderAvailabilityKpis(_lastAvailKpiData);
+      updateAnthropicPopup(_lastAvailKpiData);
     }
     requestAnimationFrame(function () {
       __bumpAnthropicHealthCharts();
@@ -8130,7 +7091,7 @@ function renderAvailabilityKpis(data) {
     // Move Kennzahlen back below charts
     var kpiEl = modalBody.querySelector("#avail-kpi-details");
     var chartsRow = modalBody.querySelector(".health-charts-row");
-    if (kpiEl && chartsRow && chartsRow.parentNode) {
+    if (kpiEl && chartsRow?.parentNode) {
       chartsRow.parentNode.insertBefore(kpiEl, chartsRow.nextSibling);
     }
     // Restore collapse behavior
@@ -8149,6 +7110,7 @@ function renderAvailabilityKpis(data) {
       renderIncidentHistory(_lastAvailKpiData);
       renderOutageTimeline(_lastAvailKpiData);
       renderAvailabilityKpis(_lastAvailKpiData);
+      updateAnthropicPopup(_lastAvailKpiData);
     }
     requestAnimationFrame(function () {
       __bumpAnthropicHealthCharts();
@@ -8179,21 +7141,35 @@ function renderAvailabilityKpis(data) {
   var winH = globalThis.window;
   if (!winH) return;
   winH.addEventListener("resize", __scheduleAnthropicHealthChartsResize);
-  ["uptime-chart-details", "incident-history-details", "outage-timeline-details"].forEach(function (id) {
+  ["uptime-chart-details", "outage-timeline-details", "incident-history-details", "anthropic-incidents-details"].forEach(function (id) {
     var d = document.getElementById(id);
     if (d) d.addEventListener("toggle", __scheduleAnthropicHealthChartsResize);
   });
   if (typeof ResizeObserver === "undefined") return;
-  var ids = ["c-uptime-chart", "c-incident-history", "c-outage-timeline"];
-  for (const id of ids) {
-    var cv = document.getElementById(id);
-    var host = cv?.parentElement;
+  var ids = ["c-uptime-chart", "c-incident-history", "c-anthropic-incidents", "c-outage-timeline"];
+  for (var _id of ids) {
+    var chartEl = document.getElementById(_id);
+    var host = chartEl?.parentElement;
     if (host?.classList?.contains("health-chart-canvas-host")) {
       var ro = new ResizeObserver(__scheduleAnthropicHealthChartsResize);
       ro.observe(host);
     }
   }
 })();
+
+// Registry renderFn targets for Anthropic status charts (widget dispatcher / template preview).
+window.renderStatus_uptime = function () {
+  if (window.__lastUsageData) renderUptimeChart(window.__lastUsageData);
+};
+window.renderStatus_incidents = function () {
+  if (window.__lastUsageData) renderIncidentHistory(window.__lastUsageData);
+};
+window.renderStatus_outageScatter = function () {
+  if (window.__lastUsageData) updateAnthropicPopup(window.__lastUsageData);
+};
+window.renderStatus_outageTimeline = function () {
+  if (window.__lastUsageData) renderOutageTimeline(window.__lastUsageData);
+};
 
 fetchUsageJsonOnce();
 connectUsageStream();
@@ -8203,7 +7179,7 @@ scheduleFetchExtensionTimeline(900);
 function miniMd(src) {
   var lines = (src || "").split("\n");
   var html = "", inList = false;
-  for (const ln of lines) {
+  for (var ln of lines) {
     // Headings
     var hm = ln.match(/^(#{1,4})\s+(.*)/);
     if (hm) {
@@ -8240,6 +7216,25 @@ function inlineMd(s) {
 }
 
 // ── Dev Mode Overlay ─────────────────────────────────────────────────────
+function formatDevCacheTs(iso) {
+  if (!iso) return "\u2014";
+  var d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "\u2014";
+  return d.toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+}
+function __devSetMutedTextColor(el) {
+  if (el) el.style.color = "#64748b";
+}
+function applyDevCacheFromStatus(info) {
+  var jEl = document.getElementById("dev-jsonl-cache-at");
+  var pEl = document.getElementById("dev-proxy-cache-at");
+  if (jEl) {
+    var jt = "last Cache: " + formatDevCacheTs(info.jsonl_cache_at);
+    if (info.scanning) jt += " (scanning\u2026)";
+    jEl.textContent = jt;
+  }
+  if (pEl) pEl.textContent = "last Cache: " + formatDevCacheTs(info.proxy_cache_at);
+}
 (function () {
   var xhr = new XMLHttpRequest();
   xhr.open("GET", "/api/debug/status", true);
@@ -8247,86 +7242,192 @@ function inlineMd(s) {
     if (xhr.status !== 200) return;
     try {
       var info = JSON.parse(xhr.responseText);
-      // Show release version in Live panel — compact row
-      var relRow = document.getElementById("live-release-row");
-      var ver = info.version?.length && info.version !== "dev" ? info.version : null;
-      if (relRow) {
-        if (ver) {
-          relRow.innerHTML = '<span class="live-rel-badge live-rel-badge-ok">' + escHtml(ver) + '</span>' +
-            '<a class="live-rel-link" href="https://github.com/fgrosswig/claude-usage-dashboard/releases/tag/' + escHtml(ver) + '" target="_blank" rel="noopener">GitHub</a>' +
-            '<button class="live-rel-expand" id="live-rel-expand-btn">History</button>';
-        } else {
-          relRow.innerHTML = '<span class="live-rel-badge live-rel-badge-dev">dev</span>' +
-            '<a class="live-rel-link" href="https://github.com/fgrosswig/claude-usage-dashboard/releases" target="_blank" rel="noopener">GitHub</a>' +
-            '<button class="live-rel-expand" id="live-rel-expand-btn">History</button>';
-        }
-        // Release History popout
-        var expandBtn = document.getElementById("live-rel-expand-btn");
-        var relOverlay = document.getElementById("release-modal-overlay");
-        var relBody = document.getElementById("release-modal-body");
-        var relClose = document.getElementById("release-modal-close");
-        if (expandBtn && relOverlay && relBody) {
-          expandBtn.addEventListener("click", function() {
-            relOverlay.classList.add("is-open");
-            document.body.style.overflow = "hidden";
-            if (relBody.dataset.loaded) return;
-            relBody.innerHTML = '<p style="color:#64748b;font-size:.75rem">Loading releases...</p>';
-            var rlXhr = new XMLHttpRequest();
-            rlXhr.open("GET", "https://api.github.com/repos/fgrosswig/claude-usage-dashboard/releases?per_page=20", true);
-            rlXhr.onload = function() {
-              if (rlXhr.status !== 200) { relBody.innerHTML = '<p style="color:#ef4444;font-size:.75rem">Failed to load releases</p>'; return; }
-              try {
-                var releases = JSON.parse(rlXhr.responseText);
-                if (!releases.length) { relBody.innerHTML = '<p style="color:#64748b;font-size:.75rem">No releases found</p>'; return; }
-                var rh = "";
-                var isFirst = true;
-                for (const rel of releases) {
-                  var rDate = rel.published_at ? rel.published_at.slice(0, 10) : "";
-                  var rBody2 = (rel.body || "").replace(/^## .+\n?/m, "");
-                  rh += "<details class=\"release-modal-item\"" + (isFirst ? " open" : "") + ">";
-                  isFirst = false;
-                  rh += "<summary class=\"release-modal-item-head\">";
-                  rh += "<span class=\"rel-tag\">" + escHtml(rel.tag_name) + "</span>";
-                  rh += "<span class=\"rel-date\">" + escHtml(rDate) + "</span>";
-                  if (rel.name && rel.name !== rel.tag_name) rh += " — " + escHtml(rel.name);
-                  rh += "</summary>";
-                  rh += "<div class=\"release-modal-item-body\">" + miniMd(rBody2) + "</div>";
-                  rh += "</details>";
-                }
-                relBody.innerHTML = rh;
-                relBody.dataset.loaded = "1";
-              } catch (e) { relBody.innerHTML = '<p style="color:#ef4444;font-size:.75rem">Parse error</p>'; }
-            };
-            rlXhr.send();
-          });
-          if (relClose) relClose.addEventListener("click", function() { relOverlay.classList.remove("is-open"); document.body.style.overflow = ""; });
-          relOverlay.addEventListener("click", function(e) { if (e.target === relOverlay) { relOverlay.classList.remove("is-open"); document.body.style.overflow = ""; } });
-        }
-      }
       if (!info.dev_mode) return;
       var modeLabel = info.dev_mode === "full" ? "FULL" : "PROXY";
       var bar = document.createElement("div");
       bar.id = "dev-overlay";
-      bar.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;background:#1e293b;border-bottom:2px solid #f59e0b;padding:6px 16px;display:flex;align-items:center;gap:12px;font-size:.8rem;color:#f59e0b";
-      bar.innerHTML = '<span style="font-weight:700">DEV ' + modeLabel + '</span>' +
-        '<span style="color:#94a3b8">Source: ' + escHtml(info.dev_proxy_source || "") + '</span>' +
-        '<span id="dev-last-sync" style="color:#94a3b8">Sync: ' + info.refresh_sec + 's</span>' +
-        '<button id="dev-sync-btn" style="background:#f59e0b;color:#0f172a;border:none;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:.75rem;font-weight:600">Sync Now</button>' +
-        '<span id="dev-sync-status" style="color:#64748b;font-size:.7rem"></span>';
+      bar.className = "dev-overlay-bar";
+      bar.innerHTML =
+        '<span class="dev-overlay-brand">DEV ' + modeLabel + "</span>" +
+        '<span class="dev-overlay-muted">Source: ' + escHtml(info.dev_proxy_source || "") + "</span>" +
+        '<span id="dev-last-sync" class="dev-overlay-muted">Sync: ' + info.refresh_sec + "s</span>" +
+        '<button type="button" id="dev-sync-btn" class="dev-cache-rebuild-btn dev-sync-now-btn">Sync Now</button>' +
+        '<span id="dev-sync-status" class="dev-cache-meta"></span>' +
+        '<span class="dev-overlay-spacer"></span>' +
+        '<div class="dev-cache-row">' +
+        '<span class="dev-cache-sep">|</span>' +
+        '<span class="dev-cache-block">' +
+        '<button type="button" id="dev-bench-btn" class="dev-cache-rebuild-btn">Benchmark</button>' +
+        '<label class="dev-bench-days-wrap"><span class="dev-cache-meta">Tage</span> ' +
+        '<input type="number" id="dev-bench-days" class="dev-bench-days-input" min="1" max="31" value="8" /></label>' +
+        '<span id="dev-bench-status" class="dev-cache-meta"></span>' +
+        "</span>" +
+        '<span class="dev-cache-sep">|</span>' +
+        '<span class="dev-cache-block">' +
+        '<button type="button" id="dev-cache-files-open" class="dev-cache-rebuild-btn">Cache-Dateien</button>' +
+        "</span>" +
+        '<span class="dev-cache-sep">|</span>' +
+        '<span class="dev-cache-block">' +
+        '<button type="button" id="dev-rebuild-jsonl" class="dev-cache-rebuild-btn">JSONL Cache rebuild</button>' +
+        '<span id="dev-jsonl-cache-at" class="dev-cache-meta">last Cache: \u2014</span>' +
+        "</span>" +
+        '<span class="dev-cache-sep">|</span>' +
+        '<span class="dev-cache-block">' +
+        '<button type="button" id="dev-rebuild-proxy" class="dev-cache-rebuild-btn">PROXY Cache rebuild</button>' +
+        '<span id="dev-proxy-cache-at" class="dev-cache-meta">last Cache: \u2014</span>' +
+        "</span>" +
+        '<span class="dev-cache-sep">|</span>' +
+        '<span class="dev-cache-block">' +
+        '<button type="button" id="dev-clear-layout" class="dev-cache-rebuild-btn" style="background:#dc2626">Clear Layout</button>' +
+        '<span id="dev-clear-layout-status" class="dev-cache-meta"></span>' +
+        "</span>" +
+        "</div>";
       document.body.prepend(bar);
+      applyDevCacheFromStatus(info);
       var devH = bar.offsetHeight;
       document.body.style.paddingTop = devH + "px";
       document.documentElement.style.setProperty("--dev-bar-h", devH + "px");
+      function pullDevNavCacheStatus() {
+        var px = new XMLHttpRequest();
+        px.open("GET", "/api/debug/status", true);
+        px.onload = function () {
+          if (px.status !== 200) return;
+          try {
+            var infPull = JSON.parse(px.responseText);
+            applyDevCacheFromStatus(infPull);
+          } catch (error) { logClientOptionalErr(error); }
+        };
+        px.send();
+      }
       document.getElementById("dev-sync-btn").addEventListener("click", function () {
         var st = document.getElementById("dev-sync-status");
         st.textContent = "syncing...";
         var sx = new XMLHttpRequest();
         sx.open("POST", "/api/debug/sync-proxy-logs", true);
-        sx.onload = function () { st.textContent = "synced " + new Date().toLocaleTimeString(); st.style.color = "#22c55e"; setTimeout(function(){ st.style.color = "#64748b"; }, 3000); };
+        sx.onload = function () {
+          if (sx.status !== 200) {
+            st.textContent = "sync failed (" + sx.status + ")";
+            st.style.color = "#ef4444";
+            return;
+          }
+          st.textContent = "synced " + new Date().toLocaleTimeString();
+          st.style.color = "#22c55e";
+          setTimeout(__devSetMutedTextColor, 3000, st);
+          pullDevNavCacheStatus();
+          setTimeout(pullDevNavCacheStatus, 400);
+          setTimeout(pullDevNavCacheStatus, 2500);
+          setTimeout(pullDevNavCacheStatus, 8000);
+        };
         sx.onerror = function () { st.textContent = "sync failed"; };
         sx.send();
       });
-    } catch (e) {}
+      function postDevRebuild(url, btnId) {
+        var btn = document.getElementById(btnId);
+        if (!btn) return;
+        btn.addEventListener("click", function () {
+          btn.disabled = true;
+          var rq = new XMLHttpRequest();
+          rq.open("POST", url, true);
+          rq.onload = function () {
+            btn.disabled = false;
+            var st2 = document.getElementById("dev-sync-status");
+            if (rq.status !== 200) {
+              if (st2) st2.textContent = (btnId === "dev-rebuild-jsonl" ? "JSONL" : "PROXY") + " rebuild failed";
+              return;
+            }
+            try {
+              pullDevNavCacheStatus();
+              setTimeout(pullDevNavCacheStatus, 400);
+              setTimeout(pullDevNavCacheStatus, 2500);
+              setTimeout(pullDevNavCacheStatus, 8000);
+            } catch (error) { logClientOptionalErr(error); }
+            if (st2) st2.textContent = (btnId === "dev-rebuild-jsonl" ? "JSONL" : "PROXY") + " rebuild started";
+          };
+          rq.onerror = function () { btn.disabled = false; };
+          rq.send();
+        });
+      }
+      postDevRebuild("/api/debug/rebuild-jsonl-cache", "dev-rebuild-jsonl");
+      postDevRebuild("/api/debug/rebuild-proxy-cache", "dev-rebuild-proxy");
+      (function wireDevSessionTurnsBench() {
+        var btnB = document.getElementById("dev-bench-btn");
+        var inpD = document.getElementById("dev-bench-days");
+        var stB = document.getElementById("dev-bench-status");
+        if (!btnB || !inpD) return;
+        btnB.addEventListener("click", function () {
+          var nd = Number.parseInt(String(inpD.value || "8"), 10);
+          if (Number.isNaN(nd) || nd < 1) nd = 8;
+          if (nd > 31) nd = 31;
+          inpD.value = String(nd);
+          btnB.disabled = true;
+          if (stB) stB.textContent = "running…";
+          var bq = new XMLHttpRequest();
+          bq.open("POST", "/api/debug/benchmark-session-turns", true);
+          bq.setRequestHeader("Content-Type", "application/json");
+          bq.onload = function () {
+            btnB.disabled = false;
+            if (!stB) return;
+            if (bq.status !== 200) {
+              stB.textContent = "bench failed (" + bq.status + ")";
+              stB.style.color = "#ef4444";
+              return;
+            }
+            try {
+              var out = JSON.parse(bq.responseText);
+              if (!out.ok) {
+                stB.textContent = "bench error";
+                stB.style.color = "#ef4444";
+                return;
+              }
+              stB.textContent =
+                "total " + out.total_s.toFixed(2) + "s (pass1 " + out.pass1_s.toFixed(2) + "s) — see server log";
+              stB.style.color = "#22c55e";
+              setTimeout(__devSetMutedTextColor, 5000, stB);
+            } catch (eB) {
+              stB.textContent = "bench parse error";
+              stB.style.color = "#ef4444";
+            }
+          };
+          bq.onerror = function () {
+            btnB.disabled = false;
+            if (stB) stB.textContent = "bench network error";
+          };
+          bq.send(JSON.stringify({ days_back: nd }));
+        });
+      })();
+      function devClearReload() { location.reload(); }
+      (function wireDevClearLayout() {
+        var btn = document.getElementById("dev-clear-layout");
+        if (!btn) return;
+        btn.addEventListener("click", function () {
+          var st = document.getElementById("dev-clear-layout-status");
+          localStorage.removeItem("cud_layout_prefs_v2");
+          localStorage.removeItem("cud_active_template");
+          // Keep cud_templates — user-created templates survive clear
+          try { sessionStorage.removeItem("usageDashboardDay"); } catch (error) { logClientOptionalErr(error); }
+          console.info("[DEV] layout cleared — prefs + active template reset (user templates preserved)");
+          // Also delete server-side layout file
+          try {
+            var xd = new XMLHttpRequest();
+            xd.open("DELETE", "/api/layout", false);
+            xd.send();
+            console.info("[DEV] server layout file deleted — status: " + xd.status);
+          } catch (e) {
+            console.warn("[DEV] server layout delete failed", e);
+          }
+          if (st) { st.textContent = "cleared — reloading…"; st.style.color = "#fbbf24"; }
+          setTimeout(devClearReload, 400);
+        });
+      })();
+      window.CacheFilesExplorer?.wireOpenButton?.("dev-cache-files-open");
+      var devPoll = setInterval(function () {
+        if (!document.getElementById("dev-overlay")) {
+          clearInterval(devPoll);
+          return;
+        }
+        pullDevNavCacheStatus();
+      }, 20000);
+    } catch (error) { logClientOptionalErr(error); }
   };
   xhr.send();
 })();
@@ -8403,8 +7504,8 @@ function renderEconomicSection(data, filteredDays) {
   // Session-turn charts: lazy-load only when section is opened
   function fetchSessionTurns() {
     var mainPicker = document.getElementById("day-picker");
-    var selectedDate = (mainPicker && mainPicker.value) ? mainPicker.value
-      : (data.days && data.days.length) ? data.days[data.days.length - 1].date
+    var selectedDate = mainPicker?.value ? mainPicker.value
+      : data.days?.length ? data.days[data.days.length - 1].date
       : new Date().toISOString().slice(0, 10);
     if (sumEl) sumEl.textContent = tr("econSummaryLine", { sessions: "…", ratio: "…" });
     fetch("/api/session-turns?date=" + encodeURIComponent(selectedDate))
@@ -8415,8 +7516,8 @@ function renderEconomicSection(data, filteredDays) {
         var sel = sessPicker ? sessPicker.value : "";
         var session = findSession(stData, sel);
         if (session) {
-          renderWasteCurve(session);
           renderCacheExplosion(session);
+
           renderEfficiencyTimeline(stData);
           renderBudgetDrain(stData);
         }
@@ -8425,9 +7526,7 @@ function renderEconomicSection(data, filteredDays) {
           .then(function (r) { return r.json(); })
           .then(function (qdData) {
             _econQdData = qdData;
-            if (qdData && qdData.request_pairs && qdData.request_pairs.length > 0) {
-              renderBudgetDrain(stData, qdData);
-            }
+            renderBudgetDrain(stData, qdData);
           })
           .catch(function () { /* no proxy data — keep single-grid */ });
       })
@@ -8438,8 +7537,8 @@ function renderEconomicSection(data, filteredDays) {
 
   // Reset session data when day changes so lazy-load re-fetches
   var mainPicker2 = document.getElementById("day-picker");
-  var currentDay = (mainPicker2 && mainPicker2.value) ? mainPicker2.value : "";
-  if (_econData && _econData.date !== currentDay) _econData = null;
+  var currentDay = mainPicker2?.value ? mainPicker2.value : "";
+  if (_econData?.date !== currentDay) _econData = null;
 
   // Summary needs data even when collapsed; charts render on open
   if (!_econData) {
@@ -8456,8 +7555,8 @@ function renderEconomicSection(data, filteredDays) {
         var sel = sessPicker ? sessPicker.value : "";
         var session = findSession(_econData, sel);
         if (session) {
-          renderWasteCurve(session);
           renderCacheExplosion(session);
+
           renderEfficiencyTimeline(_econData);
           renderBudgetDrain(_econData, _econQdData);
         }
@@ -8471,7 +7570,6 @@ function renderEconomicSection(data, filteredDays) {
     mainPicker2.addEventListener("change", function () {
       _econData = null;
       if (sumEl) sumEl.textContent = "Loading sessions…";
-      if (collapse.open) setTimeout(fetchSessionTurns, 50);
     });
   }
 
@@ -8483,8 +7581,8 @@ function renderEconomicSection(data, filteredDays) {
       if (session) {
         var info = document.getElementById("econ-session-info");
         updateSessionInfo(session, info);
-        renderWasteCurve(session);
         renderCacheExplosion(session);
+        renderContextLoss(session);
       }
     }
     sessPicker.addEventListener("change", _onSessionChange);
@@ -8493,7 +7591,7 @@ function renderEconomicSection(data, filteredDays) {
 }
 
 function populateSessionPicker(stData, picker, infoEl, sumEl) {
-  if (!picker || !stData || !stData.sessions) return;
+  if (!picker || !stData?.sessions) return;
   picker.innerHTML = "";
   var sessions = stData.sessions;
   for (var i = 0; i < sessions.length; i++) {
@@ -8521,7 +7619,7 @@ function populateSessionPicker(stData, picker, infoEl, sumEl) {
 }
 
 function findSession(stData, hash) {
-  if (!stData || !stData.sessions) return null;
+  if (!stData?.sessions) return null;
   for (var i = 0; i < stData.sessions.length; i++) {
     if (stData.sessions[i].session_id_hash === hash) return stData.sessions[i];
   }
@@ -8541,7 +7639,11 @@ function updateSessionInfo(session, infoEl) {
 function renderWasteCurve(session) {
   if (typeof echarts === "undefined") return;
   var el = document.getElementById("chart-shell-econ-waste");
-  if (!el || !session || !session.turns || !session.turns.length) return;
+  if (!el || !session?.turns?.length) return;
+
+  var econLegFit = t("econLegendQuadraticFit");
+  var econLegAct = t("econLegendTotalActual");
+  var econLegProj = t("econLegendTotalProjected");
 
   var turns = session.turns;
   var n = turns.length;
@@ -8645,7 +7747,7 @@ function renderWasteCurve(session) {
     tooltip: {
       trigger: "axis",
       formatter: function (params) {
-        if (!params || !params.length) return "";
+        if (!params?.length) return "";
         var turnNum = params[0].value[0];
         var turnIdx = turnNum - 1;
         var lines = ["<b>Turn " + turnNum + "</b>"];
@@ -8675,7 +7777,7 @@ function renderWasteCurve(session) {
         return lines.join("<br>");
       }
     },
-    legend: { top: 4, textStyle: { color: "#94a3b8", fontSize: 11 } },
+    legend: { top: 4, textStyle: { color: "#94a3b8", fontSize: 11 }, data: [econLegFit, econLegAct, econLegProj] },
     grid: { top: 50, right: 20, bottom: 40, left: 60 },
     xAxis: {
       type: "value",
@@ -8694,7 +7796,7 @@ function renderWasteCurve(session) {
     },
     series: [
       {
-        name: "Quadratic fit",
+        name: econLegFit,
         type: "line",
         showSymbol: false,
         lineStyle: { color: "#ef4444", width: 2, type: "dotted" },
@@ -8763,7 +7865,7 @@ function renderWasteCurve(session) {
         })()
       },
       {
-        name: "Total (actual)",
+        name: econLegAct,
         type: "line",
         showSymbol: false,
         areaStyle: { color: "rgba(134,239,172,0.25)", origin: 0 },
@@ -8772,7 +7874,7 @@ function renderWasteCurve(session) {
         data: actualPairs
       },
       {
-        name: "Total (projected)",
+        name: econLegProj,
         type: "line",
         showSymbol: false,
         areaStyle: { color: "rgba(239,68,68,0.15)", origin: 0 },
@@ -8791,7 +7893,7 @@ function renderWasteCurve(session) {
   if (_forcedRestart) {
     // Find next session's warmup cost (first 10 turns total tokens)
     var _nextSession = null;
-    if (_econData && _econData.sessions && session.last_ts) {
+    if (_econData?.sessions && session.last_ts) {
       var _lastMs = new Date(session.last_ts).getTime();
       var _bestGap = Infinity;
       for (var nsi = 0; nsi < _econData.sessions.length; nsi++) {
@@ -8802,7 +7904,7 @@ function renderWasteCurve(session) {
       }
     }
     var rebuildCost = 0;
-    if (_nextSession && _nextSession.turns) {
+    if (_nextSession?.turns) {
       var warmupN = Math.min(10, _nextSession.turns.length);
       for (var wi2 = 0; wi2 < warmupN; wi2++) {
         var wt = _nextSession.turns[wi2];
@@ -8810,7 +7912,6 @@ function renderWasteCurve(session) {
       }
     }
     // Waste = rebuild cost + lost safe headroom (tokens you paid to build context but can't use)
-    var lastTurnCost = n > 1 ? cumTotal[n - 1] - cumTotal[n - 2] : cumTotal[0];
     var contextInvestment = cumTotal[n - 1] - (n * cumTotal[0]); // tokens above baseline = context you built
     infoLines.push("\u26a0 Forced End \u2192 " + _nextGapMin + "min \u2192 cold restart");
     infoLines.push("\u274c Context lost: " + fmt(contextInvestment));
@@ -8858,7 +7959,7 @@ function renderWasteCurve(session) {
 function renderCacheExplosion(session) {
   if (typeof echarts === "undefined") return;
   var el = document.getElementById("chart-shell-econ-explosion");
-  if (!el || !session || !session.turns || !session.turns.length) return;
+  if (!el || !session?.turns?.length) return;
 
   var turns = session.turns;
   var n = turns.length;
@@ -8994,6 +8095,52 @@ function renderCacheExplosion(session) {
     }
   }
 
+  // 7d. Build accumulated context-loss + cumulative usage data for lower grid
+  var hasCL = compactions.length > 0;
+  var cumLossData = [];
+  var cumTotalData = [];
+  var lossAtEvent = {};
+  var cumT = 0;
+  var cumL = 0;
+  for (var ldi = 0; ldi < n; ldi++) {
+    cumT += cost[ldi];
+    cumTotalData.push(cumT);
+    if (hasCL && isCompaction[ldi] && ldi > 0) {
+      var lprev = turns[ldi - 1].cache_read || 0;
+      var lcur = turns[ldi].cache_read || 0;
+      var ldiff = lprev - lcur;
+      if (ldiff > 0) {
+        cumL += ldiff;
+        lossAtEvent[ldi] = { loss: ldiff, prevCR: lprev, curCR: lcur, pct: lprev > 0 ? Math.round((ldiff / lprev) * 100) : 0 };
+      }
+    }
+    cumLossData.push(cumL);
+  }
+  var clMarkLines = [];
+  if (hasCL) {
+    for (var clmi = 0; clmi < compactions.length; clmi++) {
+      var clIdx = compactions[clmi];
+      var clEvt = lossAtEvent[clIdx];
+      if (clEvt) {
+        clMarkLines.push({
+          xAxis: clIdx,
+          lineStyle: { color: "rgba(239,68,68,0.6)", type: "solid", width: 1.5 },
+          label: {
+            formatter: "Lost " + fmt(clEvt.loss) + " (" + clEvt.pct + "%)",
+            color: "#ffffff",
+            fontSize: 10,
+            position: "insideStartTop",
+            rotate: 90,
+            distance: 4,
+            backgroundColor: "rgba(30,58,138,0.85)",
+            padding: [3, 5],
+            borderRadius: 2
+          }
+        });
+      }
+    }
+  }
+
   // 8. Zone label helpers
   var warmupLabel = t("econExplosionWarmup") || "Warmup";
   var linearLabel = t("econExplosionLinear") || "Linear";
@@ -9033,36 +8180,70 @@ function renderCacheExplosion(session) {
     }
   );
 
+  var legCostPerTurn = t("econLegendCostPerTurn");
+  var legQuadFitLine = t("econLegendQuadraticFitLine");
+  var legCtxSize = t("econLegendContextSize");
+  var legCostFactor = t("econLegendCostFactor");
+  var legTipMap = {};
+  legTipMap[legCostPerTurn] = t("econLegendTipCostPerTurn");
+  legTipMap[legQuadFitLine] = t("econLegendTipQuadraticFit");
+  legTipMap[legCtxSize] = t("econLegendTipContextSize");
+  legTipMap[legCostFactor] = t("econLegendTipCostFactor");
+
   var option = {
+    axisPointer: hasCL ? { link: [{ xAxisIndex: [0, 1] }] } : undefined,
     tooltip: {
       trigger: "axis",
       formatter: function (params) {
-        var idx = params[0].dataIndex;
+        // Find upper grid series (Cost/Turn) for the turn index
+        var idx = -1;
+        for (var fp = 0; fp < params.length; fp++) {
+          if (params[fp].seriesName === legCostPerTurn) { idx = params[fp].dataIndex; break; }
+        }
+        if (idx < 0) idx = params[0].dataIndex;
         var lines = ["Turn " + (idx + 1)];
-        var val = cost[idx];
-        var factor = (baseline > 0) ? (val / baseline).toFixed(1) : "-";
-        var zone = val <= threshYellow ? warmupLabel : val <= threshRed ? linearLabel : drainLabel;
-        lines.push("Cost: " + fmt(val) + " (" + factor + "\u00d7)");
-        if (idx < n) {
+        if (idx < n && cost[idx] != null) {
+          var val = cost[idx];
+          var factor = (baseline > 0) ? (val / baseline).toFixed(1) : "-";
+          var zone = val <= threshYellow ? warmupLabel : val <= threshRed ? linearLabel : drainLabel;
+          lines.push("Cost: " + fmt(val) + " (" + factor + "\u00d7)");
           var TT = turns[idx];
-          lines.push(
-            "out=" + fmt(TT.output || 0) + " cr=" + fmt(TT.cache_read || 0),
-            "cc=" + fmt(TT.cache_creation || 0) + " in=" + fmt(TT.input || 0)
-          );
-        }
-        if (isCompaction[idx]) {
-          var prevCR2 = idx > 0 ? (turns[idx - 1].cache_read || 0) : 0;
-          var curCR2 = turns[idx].cache_read || 0;
-          var lossP = prevCR2 > 0 ? Math.round((1 - curCR2 / prevCR2) * 100) : 0;
-          lines.push(
-            "<span style='color:#a855f7'>" + t("econCompactionLabel") + "</span>",
-            "<span style='color:#38bdf8'>Context lost: " + lossP + "% (" + fmt(prevCR2) + " \u2192 " + fmt(curCR2) + ")</span>"
-          );
+          if (TT) {
+            lines.push(
+              "out=" + fmt(TT.output || 0) + " cr=" + fmt(TT.cache_read || 0),
+              "cc=" + fmt(TT.cache_creation || 0) + " in=" + fmt(TT.input || 0)
+            );
+          }
+          if (isCompaction[idx]) {
+            var prevCR2 = idx > 0 ? (turns[idx - 1].cache_read || 0) : 0;
+            var curCR2 = turns[idx].cache_read || 0;
+            var lossP = prevCR2 > 0 ? Math.round((1 - curCR2 / prevCR2) * 100) : 0;
+            lines.push(
+              "<span style='color:#a855f7'>" + t("econCompactionLabel") + "</span>",
+              "<span style='color:#38bdf8'>Context lost: " + lossP + "% (" + fmt(prevCR2) + " \u2192 " + fmt(curCR2) + ")</span>"
+            );
+          } else {
+            lines.push("Zone: " + zone);
+          }
+          for (var pi = 1; pi < params.length; pi++) {
+            if (params[pi].seriesName === legQuadFitLine && params[pi].value != null) {
+              lines.push("Fit: " + fmt(params[pi].value));
+              break;
+            }
+          }
+          if (hasCL && cumLossData[idx] > 0 && cumTotalData[idx] > 0) {
+            var idealVal = cumTotalData[idx] - cumLossData[idx];
+            var wastePct = Math.round(cumLossData[idx] / cumTotalData[idx] * 100);
+            lines.push("<span style='color:#ef4444'>Overhead: " + fmt(cumLossData[idx]) + " (" + wastePct + "% wasted)</span>");
+            lines.push("<span style='color:#38bdf8'>Without loss: " + fmt(idealVal) + "</span>");
+          }
         } else {
-          lines.push("Zone: " + zone);
-        }
-        if (params.length > 1 && params[1].value != null) {
-          lines.push("Fit: " + fmt(params[1].value));
+          lines[0] = "Turn " + (idx + 1) + " <span style='color:#64748b'>(projected)</span>";
+          var projFit = Math.round(cumFitA * idx * idx + cumFitB * idx + cumFitC);
+          if (projFit > 0) lines.push("<span style='color:#ef4444'>Projected: " + fmt(projFit) + "</span>");
+          if (cumWallTurn > 0 && idx + 1 >= cumWallTurn) {
+            lines.push("<span style='color:#ef4444;font-weight:bold'>Burn Zone</span>");
+          }
         }
         return lines.join("<br>");
       }
@@ -9070,127 +8251,455 @@ function renderCacheExplosion(session) {
     legend: {
       top: 4,
       textStyle: { color: "#94a3b8", fontSize: 11 },
-      data: ["Cost / Turn", "Quadratic Fit", "Context Size", "Cost Factor"],
+      data: [legCostPerTurn, legQuadFitLine, legCtxSize, legCostFactor],
       tooltip: {
         show: true,
         formatter: function (p) {
-          var tips = {
-            "Cost / Turn": "Token cost per turn. Background zones: Green = cheap (< 1.5\u00d7 baseline), Yellow = linear growth (1.5\u20133\u00d7), Red = quadratic drain (> 3\u00d7)",
-            "Quadratic Fit": "Least-squares quadratic curve fitted to per-turn costs. Shows the acceleration trend.",
-            "Context Size": "Cache read size relative to peak. Drops = compaction events where 78\u201391% of context is lost and must be rebuilt.",
-            "Cost Factor": "Current turn cost divided by first turn cost. Shows how much more expensive each turn has become."
-          };
-          return tips[p.name] || "";
+          return legTipMap[p.name] || "";
         }
       }
     },
-    grid: { top: 50, right: 20, bottom: 40, left: 60 },
-    xAxis: {
-      type: "category",
-      data: xData,
-      axisLabel: {
-        color: "#64748b",
-        fontSize: 9,
-        interval: function (idx) { return idx % Math.ceil(n / 20) === 0; }
-      },
-      splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
-    },
-    yAxis: [
-      {
-        type: "value",
-        axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } },
+    grid: hasCL
+      ? [
+        { top: 50, right: 20, bottom: "35%", left: 60 },
+        { top: "72%", right: 20, bottom: 30, left: 60 }
+      ]
+      : [{ top: 50, right: 20, bottom: 40, left: 60 }],
+    xAxis: hasCL
+      ? [
+        { type: "category", gridIndex: 0, data: xData, axisLabel: { show: false }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+        { type: "category", gridIndex: 1, data: xData, axisLabel: { color: "#64748b", fontSize: 9, interval: function (idx) { return idx % Math.ceil(n / 20) === 0; } }, splitLine: { show: false } }
+      ]
+      : [{
+        type: "category", data: xData,
+        axisLabel: { color: "#64748b", fontSize: 9, interval: function (idx) { return idx % Math.ceil(n / 20) === 0; } },
         splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
-      },
-      {
-        type: "value",
-        position: "right",
-        axisLabel: { color: "#ec4899", fontSize: 9, inside: true, formatter: function (v) { return v.toFixed(0) + "\u00d7"; } },
-        splitLine: { show: false },
-        axisLine: { show: true, lineStyle: { color: "rgba(236,72,153,0.3)" } }
-      }
-    ],
-    series: [
-      {
-        name: "Cost / Turn",
-        type: "scatter",
-        yAxisIndex: 0,
-        symbolSize: 4,
-        data: scatterData,
-        markArea: { silent: true, data: markAreaData },
-        markLine: {
-          silent: true,
+      }],
+    yAxis: hasCL
+      ? [
+        { type: "value", gridIndex: 0, axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+        { type: "value", gridIndex: 0, position: "right", axisLabel: { color: "#ec4899", fontSize: 9, inside: true, formatter: function (v) { return v.toFixed(0) + "\u00d7"; } }, splitLine: { show: false }, axisLine: { show: true, lineStyle: { color: "rgba(236,72,153,0.3)" } } },
+        { type: "value", gridIndex: 1, axisLabel: { color: "#ef4444", fontSize: 9, formatter: function (v) { return v >= 1000 ? (v / 1000).toFixed(0) + "K" : String(v); } }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } }
+      ]
+      : [
+        { type: "value", axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+        { type: "value", position: "right", axisLabel: { color: "#ec4899", fontSize: 9, inside: true, formatter: function (v) { return v.toFixed(0) + "\u00d7"; } }, splitLine: { show: false }, axisLine: { show: true, lineStyle: { color: "rgba(236,72,153,0.3)" } } }
+      ],
+    series: (function () {
+      var s = [
+        {
+          name: legCostPerTurn,
+          type: "scatter",
+          xAxisIndex: 0, yAxisIndex: 0,
+          symbolSize: 4,
+          data: scatterData,
+          markArea: { silent: true, data: markAreaData },
+          markLine: { silent: true, symbol: "none", data: markLineData.concat(compactionLines) }
+        },
+        {
+          name: legQuadFitLine,
+          type: "line",
+          xAxisIndex: 0, yAxisIndex: 0,
+          lineStyle: { color: "rgba(251,191,36,0.7)", width: 2, type: "dashed" },
+          symbol: "none", data: fitLine, z: 5
+        },
+        {
+          name: legCtxSize,
+          type: "line",
+          xAxisIndex: 0, yAxisIndex: 1,
+          lineStyle: { color: "rgba(56,189,248,0.5)", width: 1, type: "dotted" },
+          areaStyle: { color: "rgba(56,189,248,0.05)" },
           symbol: "none",
-          data: markLineData.concat(compactionLines)
-        }
-      },
-      {
-        name: "Quadratic Fit",
-        type: "line",
-        yAxisIndex: 0,
-        lineStyle: { color: "rgba(251,191,36,0.7)", width: 2, type: "dashed" },
-        symbol: "none",
-        data: fitLine,
-        z: 5
-      },
-      {
-        name: "Context Size",
-        type: "line",
-        yAxisIndex: 1,
-        lineStyle: { color: "rgba(56,189,248,0.5)", width: 1, type: "dotted" },
-        areaStyle: { color: "rgba(56,189,248,0.05)" },
-        symbol: "none",
-        data: (function () {
-          // Cache health: cache_read / (cache_read + cache_creation) scaled to right axis
-          return turns.map(function (T) {
+          data: turns.map(function (T) {
             var cIO = (T.cache_read || 0) + (T.cache_creation || 0);
             var health = cIO > 0 ? (T.cache_read || 0) / cIO : 0;
             return +(health * 15).toFixed(1);
-          });
-        })(),
-        z: 2
-      },
-      {
-        name: "Cost Factor",
-        type: "line",
-        yAxisIndex: 1,
-        lineStyle: { color: "rgba(236,72,153,0.6)", width: 1.5 },
-        symbol: "none",
-        data: cost.map(function (v) { return +(v / (cost[0] || 1)).toFixed(1); }),
-        z: 4
-      },
-      {
-        name: "Context Loss",
-        type: "scatter",
-        yAxisIndex: 1,
-        symbol: "circle",
-        symbolSize: 10,
-        itemStyle: { color: "#38bdf8", borderColor: "#fff", borderWidth: 1.5 },
-        z: 15,
-        data: (function () {
-          var pts = [];
-          for (var cl2 = 1; cl2 < n; cl2++) {
-            var prevCR = turns[cl2 - 1].cache_read || 0;
-            var curCR = turns[cl2].cache_read || 0;
-            if (prevCR > 10000 && curCR < prevCR * 0.5) {
-              var cIO = curCR + (turns[cl2].cache_creation || 0);
-              var health = cIO > 0 ? curCR / cIO : 0;
-              var loss = Math.round((1 - curCR / prevCR) * 100);
-              pts.push({ value: [cl2, +(health * 15).toFixed(1)], loss: loss, prevCR: prevCR, curCR: curCR });
-            }
-          }
-          return pts;
-        })()
+          }),
+          z: 2
+        },
+        {
+          name: legCostFactor,
+          type: "line",
+          xAxisIndex: 0, yAxisIndex: 1,
+          lineStyle: { color: "rgba(236,72,153,0.6)", width: 1.5 },
+          symbol: "none",
+          data: cost.map(function (v) { return +(v / (cost[0] || 1)).toFixed(1); }),
+          z: 4
+        }
+      ];
+      if (hasCL) {
+        s.push({
+          name: "Accumulated Loss",
+          type: "line",
+          xAxisIndex: 1, yAxisIndex: 2,
+          step: "end",
+          areaStyle: { color: "rgba(239,68,68,0.15)" },
+          lineStyle: { color: "rgba(239,68,68,0.8)", width: 2 },
+          itemStyle: { color: "rgba(239,68,68,0.8)" },
+          symbol: "none",
+          data: cumLossData,
+          markLine: { silent: true, symbol: "none", data: clMarkLines }
+        });
       }
-    ]
+      return s;
+    })()
   };
 
+  el.style.height = hasCL ? "480px" : "300px";
   __effInitOrSet("econExplosion", el, option, true);
+
+  // Toggle switch: Context Loss ↔ Cumulative Usage in lower grid
+  if (hasCL) {
+    var toggleId = "econ-explosion-lower-toggle";
+    var existing = document.getElementById(toggleId);
+    if (existing) existing.remove();
+    var toggle = document.createElement("div");
+    toggle.id = toggleId;
+    toggle.style.cssText = "display:flex;gap:4px;margin:4px 0 0 60px;";
+    var btnLoss = document.createElement("button");
+    btnLoss.textContent = t("econBtnContextLoss") || "Context Loss";
+    btnLoss.className = "sidebar-btn-sm";
+    btnLoss.style.cssText = "font-size:10px;padding:2px 8px;border-radius:3px;";
+    var btnCum = document.createElement("button");
+    btnCum.textContent = t("econBtnCumulative") || "Cumulative";
+    btnCum.className = "sidebar-btn-sm";
+    btnCum.style.cssText = "font-size:10px;padding:2px 8px;border-radius:3px;opacity:0.5;";
+    toggle.appendChild(btnLoss);
+    toggle.appendChild(btnCum);
+
+    el.parentElement.insertBefore(toggle, el);
+
+    // Pre-build cumulative curve data (same as renderWasteCurve but for lower grid)
+    var cumFitA = 0, cumFitB = 0, cumFitC = 0;
+    (function () {
+      var cs1 = 0, cs2 = 0, cs3 = 0, cs4 = 0, csy = 0, cs1y = 0, cs2y = 0;
+      for (var cfi = 0; cfi < n; cfi++) {
+        var ct2 = cfi * cfi;
+        cs1 += cfi; cs2 += ct2; cs3 += ct2 * cfi; cs4 += ct2 * ct2;
+        csy += cumTotalData[cfi]; cs1y += cfi * cumTotalData[cfi]; cs2y += ct2 * cumTotalData[cfi];
+      }
+      var cdet = n * (cs2 * cs4 - cs3 * cs3) - cs1 * (cs1 * cs4 - cs3 * cs2) + cs2 * (cs1 * cs3 - cs2 * cs2);
+      if (Math.abs(cdet) > 1e-10) {
+        cumFitC = (csy * (cs2 * cs4 - cs3 * cs3) - cs1 * (cs1y * cs4 - cs2y * cs3) + cs2 * (cs1y * cs3 - cs2y * cs2)) / cdet;
+        cumFitB = (n * (cs1y * cs4 - cs2y * cs3) - csy * (cs1 * cs4 - cs3 * cs2) + cs2 * (cs1 * cs2y - cs1y * cs2)) / cdet;
+        cumFitA = (n * (cs2 * cs2y - cs3 * cs1y) - cs1 * (cs1 * cs2y - cs1y * cs2) + csy * (cs1 * cs3 - cs2 * cs2)) / cdet;
+      }
+    })();
+    var cumProjectN = Math.max(Math.round(n * 0.5), 20);
+    var cumTotalTurns = n + cumProjectN;
+    var cumActualPairs = [];
+    var cumProjectedPairs = [];
+    var cumFitPairs = [];
+    for (var cxi = 0; cxi < cumTotalTurns; cxi++) {
+      var ctn = cxi + 1;
+      var cfitted = Math.round(cumFitA * cxi * cxi + cumFitB * cxi + cumFitC);
+      cumFitPairs.push([ctn, cfitted]);
+      if (cxi < n) {
+        cumActualPairs.push([ctn, cumTotalData[cxi]]);
+        if (cxi === n - 1) cumProjectedPairs.push([ctn, cumTotalData[cxi]]);
+      } else {
+        cumProjectedPairs.push([ctn, cfitted]);
+      }
+    }
+    // Burn threshold: 1.5x current total
+    var cumCurrentTotal = cumTotalData[n - 1];
+    var cumBurnThresh = cumCurrentTotal * 1.5;
+    var cumWallTurn = -1;
+    for (var cwi = n; cwi < cumTotalTurns; cwi++) {
+      if (cumFitPairs[cwi] && cumFitPairs[cwi][1] >= cumBurnThresh) {
+        cumWallTurn = cwi + 1;
+        break;
+      }
+    }
+    // Safe/Burn zone areas
+    var cumZoneAreas = [];
+    // Green zone: from start to session end (actual data)
+    cumZoneAreas.push([
+      { xAxis: 1, itemStyle: { color: "rgba(34,197,94,0.06)" } },
+      { xAxis: n }
+    ]);
+    if (cumWallTurn > 0 && cumWallTurn > n + 1) {
+      // Yellow safe zone: session end to burn wall
+      cumZoneAreas.push([
+        { xAxis: n, name: "Safe (" + (cumWallTurn - n) + " turns)", itemStyle: { color: "rgba(250,204,21,0.12)" }, label: { color: "rgba(250,204,21,0.6)", fontSize: 10 } },
+        { xAxis: cumWallTurn }
+      ]);
+    }
+    if (cumWallTurn > 0) {
+      // Red burn zone: from wall to end
+      cumZoneAreas.push([
+        { xAxis: cumWallTurn, name: "Burn Zone", itemStyle: { color: "rgba(239,68,68,0.14)" }, label: { color: "rgba(239,68,68,0.5)", fontSize: 10 } },
+        { xAxis: cumTotalTurns }
+      ]);
+    }
+    var cumWallLine = cumWallTurn > 0 ? [{
+      xAxis: cumWallTurn,
+      lineStyle: { color: "#ef4444", type: "dashed", width: 1.5 },
+      label: { show: false }
+    }] : [];
+
+    var _lowerMode = "loss";
+    function _updateLower(mode) {
+      _lowerMode = mode;
+      btnLoss.style.opacity = mode === "loss" ? "1" : "0.5";
+      btnCum.style.opacity = mode === "cumulative" ? "1" : "0.5";
+      var chart = _effCharts.econExplosion;
+      if (!chart) return;
+      var isLoss = mode === "loss";
+      var lowerSeries = [];
+      var lowerXAxis, lowerYAxis;
+      if (isLoss) {
+        lowerXAxis = { type: "category", gridIndex: 1, data: xData, axisLabel: { color: "#64748b", fontSize: 9, interval: function (idx) { return idx % Math.ceil(n / 20) === 0; } }, splitLine: { show: false } };
+        lowerYAxis = {
+          type: "value", gridIndex: 1,
+          axisLabel: { color: "#ef4444", fontSize: 9, formatter: function (v) { return v >= 1000 ? (v / 1000).toFixed(0) + "K" : String(v); } },
+          splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
+        };
+        lowerSeries.push({
+          name: "Accumulated Loss",
+          type: "line", xAxisIndex: 1, yAxisIndex: 2,
+          step: "end",
+          areaStyle: { color: "rgba(239,68,68,0.15)" },
+          lineStyle: { color: "rgba(239,68,68,0.8)", width: 2 },
+          itemStyle: { color: "rgba(239,68,68,0.8)" },
+          symbol: "none", data: cumLossData,
+          markLine: { silent: true, symbol: "none", data: clMarkLines }
+        });
+      } else {
+        // Per-turn cache_read: Actual (saw-tooth) vs Envelope (no drops)
+        // Envelope includes rebuild multiplier M(t) = f(t) / f_avg(t)
+        // M(t) accounts for rebuilding at current cost what was built cheaply earlier
+        // f(t) = a*t² + b*t + c (current per-turn cost)
+        // f_avg(t) = a*t²/3 + b*t/2 + c (average historical cost)
+        var actualCR = [];
+        var envelopeCR = [];
+        var adjustment = 0;
+        var compMeta = {}; // per-turn compaction metadata for tooltip
+        for (var opi = 0; opi < n; opi++) {
+          var cr = turns[opi].cache_read || 0;
+          if (isCompaction[opi] && opi > 0) {
+            var prevCR = turns[opi - 1].cache_read || 0;
+            var drop = prevCR - cr;
+            if (drop > 0) {
+              var ft = a * opi * opi + b * opi + c;
+              var favg = (a * opi * opi / 3) + (b * opi / 2) + c;
+              var mt = favg > 0 ? ft / favg : 1;
+              if (mt < 1) mt = 1;
+              var mreal = 1 + mt;
+              adjustment += drop * mreal;
+              compMeta[opi] = { drop: drop, mt: mt, mreal: mreal, realCost: Math.round(drop * mreal), prevCR: prevCR, curCR: cr };
+            }
+          }
+          actualCR.push(cr);
+          envelopeCR.push(cr + adjustment);
+        }
+        var totalLostCR = adjustment;
+
+        lowerXAxis = { type: "category", gridIndex: 1, data: xData, axisLabel: { color: "#64748b", fontSize: 9, interval: function (idx) { return idx % Math.ceil(n / 20) === 0; } }, splitLine: { show: false } };
+        lowerYAxis = {
+          type: "value", gridIndex: 1,
+          axisLabel: { color: "#64748b", fontSize: 9, formatter: function (v) { return v >= 1000000 ? (v / 1000000).toFixed(1) + "M" : v >= 1000 ? (v / 1000).toFixed(0) + "K" : String(v); } },
+          splitLine: { lineStyle: { color: "rgba(51,65,85,.15)" } }
+        };
+        // Stack: Actual (base) + Delta (red fill on top) = Envelope
+        var deltaData = [];
+        for (var dli = 0; dli < n; dli++) {
+          deltaData.push(envelopeCR[dli] - actualCR[dli]);
+        }
+        lowerSeries.push(
+          {
+            name: t("econSeriesActualCR") || "Actual cache_read",
+            type: "line", xAxisIndex: 1, yAxisIndex: 2,
+            stack: "crStack",
+            showSymbol: false,
+            lineStyle: { color: "#94a3b8", width: 2 },
+            areaStyle: { color: "transparent" },
+            z: 2, data: actualCR
+          },
+          {
+            name: t("econSeriesLostContext") || "Lost context",
+            type: "line", xAxisIndex: 1, yAxisIndex: 2,
+            stack: "crStack",
+            showSymbol: false,
+            lineStyle: { color: "transparent", width: 0 },
+            areaStyle: { color: "rgba(239,68,68,0.25)" },
+            z: 2, data: deltaData
+          },
+          {
+            name: t("econSeriesWithoutLoss") || "Without loss",
+            type: "line", xAxisIndex: 1, yAxisIndex: 2,
+            showSymbol: false,
+            lineStyle: { color: "#86efac", width: 2 },
+            z: 3, data: envelopeCR,
+            markLine: (function () {
+              var cmLines = [];
+              var cmKeys = Object.keys(compMeta);
+              for (var cmi = 0; cmi < cmKeys.length; cmi++) {
+                var cmIdx = Number(cmKeys[cmi]);
+                var cm = compMeta[cmIdx];
+                cmLines.push({
+                  xAxis: cmIdx,
+                  lineStyle: { color: "rgba(168,85,247,0.5)", type: "solid", width: 1 },
+                  label: {
+                    formatter: fmt(cm.realCost) + " (" + cm.mreal.toFixed(1) + "\u00d7)",
+                    color: "#ffffff",
+                    fontSize: 9,
+                    position: "end",
+                    rotate: 0,
+                    distance: -14,
+                    backgroundColor: "rgba(168,85,247,0.8)",
+                    padding: [2, 4],
+                    borderRadius: 2
+                  }
+                });
+              }
+              return cmLines.length ? { silent: true, symbol: "none", data: cmLines } : undefined;
+            })(),
+            markArea: (function () {
+              // Zone boundaries from per-turn cost vs baseline thresholds
+              // First turn where quadratic fit crosses threshYellow / threshRed
+              var fitYellow = -1, fitRed = -1;
+              for (var bzi = 0; bzi < n; bzi++) {
+                var fitVal = a * bzi * bzi + b * bzi + c;
+                if (fitYellow < 0 && fitVal >= threshYellow) fitYellow = bzi;
+                if (fitRed < 0 && fitVal >= threshRed) fitRed = bzi;
+              }
+              var zones = [];
+              var zy = fitYellow > 0 ? fitYellow : n - 1;
+              zones.push([
+                { xAxis: 0, itemStyle: { color: "rgba(34,197,94,0.06)" } },
+                { xAxis: zy }
+              ]);
+              if (fitYellow > 0 && fitYellow < n) {
+                var zr = fitRed > 0 ? fitRed : n - 1;
+                zones.push([
+                  { xAxis: fitYellow, name: linearLabel, itemStyle: { color: "rgba(250,204,21,0.08)" }, label: { color: "rgba(250,204,21,0.5)", fontSize: 9, position: "insideTop", distance: 4 } },
+                  { xAxis: zr }
+                ]);
+                if (fitRed > 0 && fitRed < n) {
+                  zones.push([
+                    { xAxis: fitRed, name: drainLabel, itemStyle: { color: "rgba(239,68,68,0.12)" }, label: { color: "rgba(239,68,68,0.6)", fontSize: 9, position: "insideTop", distance: 4 } },
+                    { xAxis: n - 1 }
+                  ]);
+                }
+              }
+              return zones.length ? { silent: true, data: zones } : undefined;
+            })()
+          }
+        );
+      }
+      var ya = option.yAxis.slice(0, 2);
+      if (Array.isArray(lowerYAxis)) {
+        for (var yai = 0; yai < lowerYAxis.length; yai++) ya.push(lowerYAxis[yai]);
+      } else {
+        ya.push(lowerYAxis);
+      }
+      var xa = option.xAxis.slice(0, 1);
+      xa.push(lowerXAxis);
+      var upperSeries = option.series.slice(0, 4);
+      var newTooltip = isLoss ? option.tooltip : {
+        trigger: "axis",
+        formatter: function (params) {
+          var idx = params[0]?.dataIndex;
+          if (idx == null || idx < 0) return "";
+          var lines = ["<b>Turn " + (idx + 1) + "</b>"];
+          // Actual cache_read
+          var aCR = actualCR[idx] || 0;
+          var eCR = envelopeCR[idx] || 0;
+          var gap = eCR - aCR;
+          lines.push("cache_read: " + fmt(aCR));
+          if (gap > 0) {
+            lines.push("Envelope: " + fmt(eCR));
+            lines.push("<span style='color:#ef4444'>Gap: " + fmt(gap) + "</span>");
+          }
+          // Compaction detail with M_real
+          var cm = compMeta[idx];
+          if (cm) {
+            var ftVal = Math.round(a * idx * idx + b * idx + c);
+            var favgVal = Math.round((a * idx * idx / 3) + (b * idx / 2) + c);
+            lines.push("");
+            lines.push("<span style='color:#a855f7'>\u25c6 Compaction</span>");
+            lines.push(fmt(cm.prevCR) + " \u2192 " + fmt(cm.curCR) + " (Drop " + fmt(cm.drop) + ")");
+            lines.push("");
+            lines.push("<span style='color:#ef4444'>f(t) = " + fmt(ftVal) + "  (cost at turn " + (idx + 1) + ")</span>");
+            lines.push("<span style='color:#86efac'>f_avg = " + fmt(favgVal) + "  (avg cost turns 0-" + (idx + 1) + ")</span>");
+            lines.push("<span style='color:#fbbf24'>M(t) = " + fmt(ftVal) + " / " + fmt(favgVal) + " = " + cm.mt.toFixed(2) + "\u00d7</span>");
+            lines.push("<span style='color:#ef4444'>M_real = 1 + " + cm.mt.toFixed(2) + " = " + cm.mreal.toFixed(2) + "\u00d7</span>");
+            lines.push("");
+            lines.push("<span style='color:#ef4444;font-weight:bold'>Real cost: " + fmt(cm.drop) + " \u00d7 " + cm.mreal.toFixed(2) + " = " + fmt(cm.realCost) + "</span>");
+          }
+          return lines.join("<br>");
+        }
+      };
+      chart.setOption({
+        tooltip: newTooltip,
+        axisPointer: { link: [{ xAxisIndex: [0, 1] }] },
+        xAxis: xa,
+        yAxis: ya,
+        visualMap: [],
+        series: upperSeries.concat(lowerSeries)
+      }, { replaceMerge: ['series', 'xAxis', 'yAxis'] });
+    }
+    // Zone boundaries for cumulative view: ratio of actual (a*t²+b*t+c) vs linear (b*t+c)
+    // Safe: ratio < 1.5, Linear: ratio < 3, Burn: ratio >= 3
+    var zoneYellowTurn = -1, zoneRedTurn = -1;
+    for (var zi = 10; zi < n; zi++) {
+      var cumFit = a * zi * zi + b * zi + c;
+      var cumLin = b * zi + c;
+      var zRatio = cumLin > 0 ? cumFit / cumLin : 1;
+      if (zoneYellowTurn < 0 && zRatio >= 1.5) zoneYellowTurn = zi;
+      if (zoneRedTurn < 0 && zRatio >= 3) zoneRedTurn = zi;
+    }
+    var cumZoneAreas = [];
+    if (zoneYellowTurn > 0) {
+      cumZoneAreas.push([
+        { xAxis: 0, itemStyle: { color: "rgba(34,197,94,0.08)" } },
+        { xAxis: zoneYellowTurn }
+      ]);
+    }
+    if (zoneYellowTurn >= 0 && zoneRedTurn > zoneYellowTurn) {
+      cumZoneAreas.push([
+        { xAxis: zoneYellowTurn, itemStyle: { color: "rgba(250,204,21,0.08)" } },
+        { xAxis: zoneRedTurn }
+      ]);
+    }
+    if (zoneRedTurn >= 0) {
+      cumZoneAreas.push([
+        { xAxis: zoneRedTurn, itemStyle: { color: "rgba(239,68,68,0.08)" } },
+        { xAxis: n - 1 }
+      ]);
+    } else if (zoneYellowTurn < 0) {
+      // Entire session is Safe
+      cumZoneAreas.push([
+        { xAxis: 0, itemStyle: { color: "rgba(34,197,94,0.08)" } },
+        { xAxis: n - 1 }
+      ]);
+    }
+    var cumZoneLines = [];
+    if (zoneYellowTurn > 0) {
+      cumZoneLines.push({
+        xAxis: zoneYellowTurn,
+        lineStyle: { color: "rgba(250,204,21,0.5)", type: "dashed", width: 1 },
+        label: { formatter: warmupLabel + " / " + linearLabel, color: "#fbbf24", fontSize: 8, position: "insideEndTop" }
+      });
+    }
+    if (zoneRedTurn > 0) {
+      cumZoneLines.push({
+        xAxis: zoneRedTurn,
+        lineStyle: { color: "rgba(239,68,68,0.5)", type: "dashed", width: 1 },
+        label: { formatter: linearLabel + " / " + drainLabel, color: "#ef4444", fontSize: 8, position: "insideEndTop" }
+      });
+    }
+
+    btnLoss.addEventListener("click", function () { _updateLower("loss"); });
+    btnCum.addEventListener("click", function () { _updateLower("cumulative"); });
+  }
 }
 
 function renderEfficiencyTimeline(stData) {
   if (typeof echarts === "undefined") return;
   var el = document.getElementById("chart-shell-econ-efficiency");
-  if (!el || !stData || !stData.sessions) return;
+  if (!el || !stData?.sessions) return;
 
   // Aggregate all turns across sessions by hour
   var hourly = {};
@@ -9198,7 +8707,7 @@ function renderEfficiencyTimeline(stData) {
     var turns = stData.sessions[si].turns;
     for (var ti = 0; ti < turns.length; ti++) {
       var T = turns[ti];
-      var h = parseInt(T.ts.slice(11, 13), 10);
+      var h = Number.parseInt(T.ts.slice(11, 13), 10);
       if (!hourly[h]) hourly[h] = { output: 0, total: 0 };
       hourly[h].output += T.output;
       hourly[h].total += T.input + T.output + T.cache_read + T.cache_creation;
@@ -9269,6 +8778,24 @@ function renderEfficiencyTimeline(stData) {
 var _butterflyMode = "cache";
 var _butterflyDays = null;
 
+/** Linear regression helper: returns { data: [...], slope: number } */
+function __econLinReg(vals) {
+  var n = vals.length;
+  if (n < 2) return { data: vals.slice(), slope: 0 };
+  var sx = 0, sy = 0, sxy = 0, sxx = 0;
+  for (var k = 0; k < n; k++) {
+    sx += k;
+    sy += vals[k];
+    sxy += k * vals[k];
+    sxx += k * k;
+  }
+  var sl = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+  var ic = (sy - sl * sx) / n;
+  var line = [];
+  for (var j = 0; j < n; j++) line.push(Math.round((ic + sl * j) * 100) / 100);
+  return { data: line, slope: sl };
+}
+
 function renderMonthlyButterfly(days, mode) {
   if (typeof echarts === "undefined") return;
   var el = document.getElementById("chart-shell-econ-waste-month");
@@ -9282,19 +8809,6 @@ function renderMonthlyButterfly(days, mode) {
 
   // Update blurb text
   var blurbEl = document.getElementById("econ-waste-month-blurb");
-
-  // Linear regression helper: returns { data: [...], slope: number }
-  function linReg(vals) {
-    var n = vals.length;
-    if (n < 2) return { data: vals.slice(), slope: 0 };
-    var sx = 0, sy = 0, sxy = 0, sxx = 0;
-    for (var k = 0; k < n; k++) { sx += k; sy += vals[k]; sxy += k * vals[k]; sxx += k * k; }
-    var sl = (n * sxy - sx * sy) / (n * sxx - sx * sx);
-    var ic = (sy - sl * sx) / n;
-    var line = [];
-    for (var j = 0; j < n; j++) line.push(Math.round((ic + sl * j) * 100) / 100);
-    return { data: line, slope: sl };
-  }
 
   for (var i = 0; i < days.length; i++) {
     xData.push(days[i].date.slice(5));
@@ -9317,11 +8831,11 @@ function renderMonthlyButterfly(days, mode) {
 
     var cacheTrend = (function () {
       var n = ratioData.length;
-      if (n < 3) return linReg(ratioData);
+      if (n < 3) return __econLinReg(ratioData);
       var s1=0,s2=0,s3=0,s4=0,sy=0,s1y=0,s2y=0;
       for(var i=0;i<n;i++){var t2=i*i;s1+=i;s2+=t2;s3+=t2*i;s4+=t2*t2;sy+=ratioData[i];s1y+=i*ratioData[i];s2y+=t2*ratioData[i];}
       var det=n*(s2*s4-s3*s3)-s1*(s1*s4-s3*s2)+s2*(s1*s3-s2*s2);
-      if(Math.abs(det)<1e-10) return linReg(ratioData);
+      if(Math.abs(det)<1e-10) return __econLinReg(ratioData);
       var qc=(sy*(s2*s4-s3*s3)-s1*(s1y*s4-s2y*s3)+s2*(s1y*s3-s2y*s2))/det;
       var qb=(n*(s1y*s4-s2y*s3)-sy*(s1*s4-s3*s2)+s2*(s1*s2y-s1y*s2))/det;
       var qa=(n*(s2*s2y-s3*s1y)-s1*(s1*s2y-s1y*s2)+sy*(s1*s3-s2*s2))/det;
@@ -9411,8 +8925,8 @@ function renderMonthlyButterfly(days, mode) {
     var upNorm = upRaw.map(function (v) { return Math.round(v / maxUp * 1000) / 1000; });
     var downNorm = downRaw.map(function (v) { return -Math.round(v / maxDown * 1000) / 1000; });
 
-    var upTrend = linReg(upNorm);
-    var downTrend = linReg(downNorm);
+    var upTrend = __econLinReg(upNorm);
+    var downTrend = __econLinReg(downNorm);
 
     option = {
       tooltip: {
@@ -9607,17 +9121,31 @@ function renderDayComparison(days) {
 function renderBudgetDrain(stData, qdData) {
   if (typeof echarts === "undefined") return;
   var el = document.getElementById("chart-shell-econ-drain");
-  if (!el || !stData || !stData.sessions || !stData.sessions.length) return;
-  el.style.height = "650px";
+  if (!el || !stData?.sessions?.length) return;
   var drainH3 = document.getElementById("econ-drain-h3");
   if (drainH3) drainH3.textContent = t("econDrainTitle");
   var drainBlurb = document.getElementById("econ-drain-blurb");
   if (drainBlurb) drainBlurb.textContent = t("econDrainBlurb");
 
   var dateKey = stData.date || "";
+  var proxyMsgEl = document.getElementById("econ-drain-proxy-msg");
+  var q5PairsLen = qdData && Array.isArray(qdData.request_pairs) ? qdData.request_pairs.length : -1;
+  var hasQ5Overlay = q5PairsLen > 0;
+  var useDualGrid = hasQ5Overlay;
+  var msgDateStr = qdData?.requested_date ? qdData.requested_date : dateKey;
+  var showNoProxyMsg = !!(qdData && q5PairsLen === 0 && Array.isArray(qdData.request_pairs) && msgDateStr);
   var sessions = stData.sessions.slice().sort(function (a, b) { return a.first_ts < b.first_ts ? -1 : 1; });
   var dayTotal = sessions.reduce(function (s, x) { return s + x.total_all; }, 0);
   if (dayTotal === 0) return;
+
+  var econLQ5A = t("econLegendQ5Actual");
+  var econLQ5I = t("econLegendQ5Ideal");
+  var econLQ5PL = t("econLegendQ5PenaltyLower");
+  var econLTokVis = t("econLegendTokenVisible");
+  var econLCacheHealth = t("econLegendCacheHealth");
+  var econLCompaction = t("econLegendCompaction");
+  var econLColdCache = t("econLegendColdCache");
+  var econLQ5Pen = t("econLegendQ5Penalty");
 
   // 1. Group into quota windows (gap > 30 min)
   var windows = [];
@@ -9643,14 +9171,15 @@ function renderBudgetDrain(stData, qdData) {
   var totalRebuild = 0;
   var forcedCount = 0;
   var turnCounter = 0;
-  var sessionColors = ["rgba(59,130,246,0.10)", "rgba(34,197,94,0.10)", "rgba(250,204,21,0.10)", "rgba(168,85,247,0.10)", "rgba(236,72,153,0.10)"];
-  var sessionSpans = []; // {firstTurn, lastTurn, label, forced, color}
+  var sessionSpans = [];
   var rebuildMarkers = []; // {turn, cost} for graphic overlay
   var cacheRebuildData = []; // [turn, cacheCreationPct] for rebuild overlay series
 
   for (var wi = 0; wi < windows.length; wi++) {
     var win = windows[wi];
     var winTotal = win.reduce(function (s, x) { return s + x.total_all; }, 0);
+    if (winTotal <= 0) continue;
+
     var winConsumed = 0;
 
     for (var si = 0; si < win.length; si++) {
@@ -9764,37 +9293,107 @@ function renderBudgetDrain(stData, qdData) {
 
   // Resolve _rawTurn to xAxis value (direct turn number for value axis)
   for (var ri = 0; ri < sessionBoundaries.length; ri++) {
-    if (sessionBoundaries[ri]._rawTurn) {
+    if (typeof sessionBoundaries[ri]._rawTurn === "number") {
       sessionBoundaries[ri].xAxis = sessionBoundaries[ri]._rawTurn;
       delete sessionBoundaries[ri]._rawTurn;
     }
   }
 
+  if (turnCounter < 1) return;
+
+  var blurbOhEarly = document.getElementById("econ-overhead-blurb");
+  if (blurbOhEarly && !hasQ5Overlay) blurbOhEarly.textContent = "";
+
+  if (useDualGrid) el.style.height = "650px";
+  else el.style.height = "460px";
+
+  var gridCfg = useDualGrid
+    ? [
+      { top: 36, right: 52, bottom: "50%", left: 60 },
+      { top: "50%", right: 52, bottom: 18, left: 60 }
+    ]
+    : [{ top: 30, right: 20, bottom: 50, left: 60 }];
+  var drainMutedAxisLine = { color: "rgba(100,116,139,0.38)", width: 1 };
+  var xAxisCfg = useDualGrid
+    ? [
+      { type: "value", gridIndex: 0, min: 1, max: turnCounter, axisLabel: { show: false }, splitLine: { show: false }, axisLine: { show: true, lineStyle: drainMutedAxisLine } },
+      { type: "value", gridIndex: 1, min: 1, max: turnCounter, axisLabel: { color: "#64748b", fontSize: 9 }, splitLine: { show: false }, axisLine: { show: true, lineStyle: drainMutedAxisLine } }
+    ]
+    : [{ type: "value", gridIndex: 0, min: 1, max: turnCounter, axisLabel: { color: "#64748b", fontSize: 9 }, splitLine: { show: false } }];
+  var yAxisCfg = useDualGrid
+    ? [
+      {
+        type: "value",
+        gridIndex: 0,
+        min: 0,
+        max: 100,
+        axisLine: { show: true, lineStyle: drainMutedAxisLine },
+        axisLabel: { color: "#64748b", formatter: "{value}%" },
+        splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
+      },
+      { type: "value", gridIndex: 0, position: "right", min: 0, max: 100, axisLabel: { show: false }, splitLine: { show: false } },
+      {
+        type: "value",
+        gridIndex: 1,
+        position: "right",
+        axisLabel: { color: "#f97316", fontSize: 8, formatter: "{value}%", margin: 8 },
+        axisLine: { show: true, lineStyle: { color: "rgba(249,115,22,0.35)" } },
+        splitLine: { lineStyle: { color: "rgba(51,65,85,.2)" } }
+      },
+      {
+        type: "value",
+        gridIndex: 1,
+        position: "left",
+        min: 0,
+        max: 100,
+        axisLabel: { show: false },
+        axisTick: { show: false },
+        splitLine: { show: false },
+        minorSplitLine: { show: false },
+        axisLine: { show: true, lineStyle: drainMutedAxisLine },
+        axisPointer: { show: false }
+      }
+    ]
+    : [
+      { type: "value", gridIndex: 0, min: 0, max: 100, axisLabel: { color: "#64748b", formatter: "{value}%" }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+      { type: "value", gridIndex: 0, position: "right", min: 0, max: 100, axisLabel: { show: false }, splitLine: { show: false } }
+    ];
+  var legendCfg = useDualGrid
+    ? {
+      data: [econLQ5A, econLQ5I, econLQ5PL, econLTokVis],
+      top: 4,
+      left: "center",
+      itemGap: 10,
+      textStyle: { color: "#94a3b8", fontSize: 9 },
+      itemWidth: 14, itemHeight: 8
+    }
+    : { show: false };
+
   var option = {
     tooltip: {
       trigger: "axis",
       formatter: function (params) {
-        if (!params || !params.length) return "";
+        if (!params?.length) return "";
         var lines = [];
         for (var p = 0; p < params.length; p++) {
-          if (params[p].seriesName === "Compaction") {
+          if (params[p].seriesName === econLCompaction) {
             lines.push("<span style='color:#a855f7'>\u25c6 " + params[p].data[2] + "</span>");
-          } else if (params[p].seriesName === "Cache Health") {
+          } else if (params[p].seriesName === econLCacheHealth) {
             var chVal = params[p].data[1];
             var chLabel = chVal > 80 ? "Warm" : chVal > 40 ? "Cooling" : chVal > 10 ? "Cold" : "Frozen";
             lines.push("<span style='color:#f59e0b'>Cache: " + chVal + "% (" + chLabel + ")</span>");
-          } else if (params[p].seriesName === "Cold Cache") {
+          } else if (params[p].seriesName === econLColdCache) {
             lines.push("<span style='color:#f59e0b'>\u26a0 Cold Cache: " + params[p].data[1] + "% — rebuild in progress</span>");
             if (params[p].data[2]) lines.push("<span style='color:#94a3b8'>" + params[p].data[2] + "</span>");
-          } else if (params[p].seriesName === "Q5 Actual") {
+          } else if (params[p].seriesName === econLQ5A) {
             lines.push("<span style='color:#f97316'>Q5 Actual: " + params[p].data[1] + "%</span>");
-          } else if (params[p].seriesName === "Q5 Ideal") {
+          } else if (params[p].seriesName === econLQ5I) {
             lines.push("<span style='color:#34d399'>Q5 Ideal: " + params[p].data[1] + "%</span>");
-          } else if (params[p].seriesName === "Q5 Penalty Lower") {
+          } else if (params[p].seriesName === econLQ5PL) {
             lines.push("<span style='color:#ef4444'>\u26a0 Q5 Penalty: +" + params[p].data[1] + "%</span>");
-          } else if (params[p].seriesName === "Token Visible") {
+          } else if (params[p].seriesName === econLTokVis) {
             lines.push("<span style='color:#60a5fa'>Token (visible): " + params[p].data[1] + "%</span>");
-          } else if (params[p].seriesName === "Q5 Penalty") {
+          } else if (params[p].seriesName === econLQ5Pen) {
             var pd = params[p].data;
             lines.push("<span style='color:#ef4444'>\u25bc Q5 Penalty: +" + (pd._delta || "") + "%</span>");
           } else if (p === 0) {
@@ -9810,8 +9409,8 @@ function renderBudgetDrain(stData, qdData) {
         // Show Q5 gap if both present
         var qa = null, qi = null;
         for (var p2 = 0; p2 < params.length; p2++) {
-          if (params[p2].seriesName === "Q5 Actual") qa = params[p2].data[1];
-          if (params[p2].seriesName === "Q5 Ideal") qi = params[p2].data[1];
+          if (params[p2].seriesName === econLQ5A) qa = params[p2].data[1];
+          if (params[p2].seriesName === econLQ5I) qi = params[p2].data[1];
         }
         if (qa != null && qi != null) {
           lines.push("<b>Q5 Gap: " + (Math.round((qa - qi) * 10) / 10) + "% overhead</b>");
@@ -9823,26 +9422,10 @@ function renderBudgetDrain(stData, qdData) {
       link: [{ xAxisIndex: "all" }],
       lineStyle: { color: "#94a3b8", width: 1, type: "dashed" }
     },
-    legend: {
-      data: ["Q5 Actual", "Q5 Ideal", "Q5 Penalty Lower", "Token Visible"],
-      top: "48%",
-      right: 10,
-      textStyle: { color: "#94a3b8", fontSize: 9 },
-      itemWidth: 14, itemHeight: 8
-    },
-    grid: [
-      { top: 30, right: 20, height: "38%", left: 60 },
-      { top: "50%", right: 20, height: "42%", left: 60 }
-    ],
-    xAxis: [
-      { type: "value", gridIndex: 0, min: 1, max: turnCounter, axisLabel: { show: false }, splitLine: { show: false } },
-      { type: "value", gridIndex: 1, min: 1, max: turnCounter, axisLabel: { color: "#64748b", fontSize: 9 }, splitLine: { show: false } }
-    ],
-    yAxis: [
-      { type: "value", gridIndex: 0, min: 0, max: 100, axisLabel: { color: "#64748b", formatter: "{value}%" }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
-      { type: "value", gridIndex: 0, position: "right", min: 0, max: 100, axisLabel: { show: false }, splitLine: { show: false } },
-      { type: "value", gridIndex: 1, axisLabel: { color: "#f97316", fontSize: 8, formatter: "{value}%" }, splitLine: { lineStyle: { color: "rgba(51,65,85,.2)" } } }
-    ],
+    legend: legendCfg,
+    grid: gridCfg,
+    xAxis: xAxisCfg,
+    yAxis: yAxisCfg,
     series: (function () {
       var allSeries = [];
       // Per quota-window: one series with continuous green→red gradient
@@ -9855,7 +9438,7 @@ function renderBudgetDrain(stData, qdData) {
         // Find which window this session belongs to
         var wIdx = 0;
         for (var wwi = 0; wwi < windows.length; wwi++) {
-          if (windows[wwi].indexOf(sess) >= 0) { wIdx = wwi; break; }
+          if (windows[wwi].includes(sess)) { wIdx = wwi; break; }
         }
         if (!winDataMap[wIdx]) winDataMap[wIdx] = [];
         winDataMap[wIdx] = winDataMap[wIdx].concat(sData);
@@ -9865,9 +9448,10 @@ function renderBudgetDrain(stData, qdData) {
         var wData = winDataMap[winKeys[wki]];
         var isFirst = wki === 0;
         allSeries.push({
-          name: "W" + (parseInt(winKeys[wki]) + 1),
+          name: "W" + (Number.parseInt(winKeys[wki]) + 1),
           type: "line",
           showSymbol: false,
+          clip: false,
           areaStyle: {
             color: {
               type: "linear", x: 0, y: 0, x2: 1, y2: 0,
@@ -9884,10 +9468,22 @@ function renderBudgetDrain(stData, qdData) {
           markLine: isFirst ? { silent: true, symbol: "none", data: sessionBoundaries } : undefined,
           markArea: isFirst ? {
             silent: false,
-            label: { show: true, fontSize: 9, position: "insideTop" },
+            label: { show: true, fontSize: 8, position: "top", distance: 2 },
             data: rebuildAreas.concat(sessionSpans.map(function (sp2) {
               return [
-                { xAxis: sp2.firstTurn, yAxis: 100, name: sp2.label, itemStyle: { color: sp2.forced ? "rgba(239,68,68,0.06)" : "rgba(59,130,246,0.04)" }, label: { color: sp2.color, fontSize: 9, position: "insideTop", fontWeight: sp2.forced ? "bold" : "normal" } },
+                {
+                  xAxis: sp2.firstTurn,
+                  yAxis: 100,
+                  name: sp2.label,
+                  itemStyle: { color: sp2.forced ? "rgba(239,68,68,0.06)" : "rgba(59,130,246,0.04)" },
+                  label: {
+                    color: sp2.color,
+                    fontSize: 8,
+                    position: "top",
+                    distance: 2,
+                    fontWeight: sp2.forced ? "bold" : "normal"
+                  }
+                },
                 { xAxis: sp2.lastTurn, yAxis: 92 }
               ];
             }))
@@ -9913,7 +9509,7 @@ function renderBudgetDrain(stData, qdData) {
         }
       }
       allSeries.push({
-        name: "Cache Health",
+        name: econLCacheHealth,
         type: "line",
         yAxisIndex: 1,
         showSymbol: false,
@@ -9924,7 +9520,7 @@ function renderBudgetDrain(stData, qdData) {
       });
       // Cold cache spikes as hoverable points
       allSeries.push({
-        name: "Cold Cache",
+        name: econLColdCache,
         type: "scatter",
         yAxisIndex: 1,
         symbol: "circle",
@@ -9936,7 +9532,7 @@ function renderBudgetDrain(stData, qdData) {
 
       // Compaction scatter
       allSeries.push({
-        name: "Compaction",
+        name: econLCompaction,
         type: "scatter",
         symbol: "diamond",
         symbolSize: 10,
@@ -9950,10 +9546,14 @@ function renderBudgetDrain(stData, qdData) {
         if (allSeries[asi].xAxisIndex === undefined) allSeries[asi].xAxisIndex = 0;
       }
       // Q5 overhead curves in lower grid (if proxy data available)
-      if (qdData && qdData.request_pairs && qdData.request_pairs.length > 0) {
+      if (qdData?.request_pairs?.length > 0) {
         var ohPairs2 = qdData.request_pairs.slice().sort(function (a2, b2) { return a2.ts < b2.ts ? -1 : a2.ts > b2.ts ? 1 : 0; });
+        var co5 = qdData.carryover_q5;
+        var seedA = (co5 && typeof co5.actual === "number") ? co5.actual : 0;
+        var seedI = (co5 && typeof co5.ideal === "number") ? co5.ideal : 0;
         var q5a2 = [], q5i2 = [], q5sc2 = [];
-        var cq2 = 0, cqi2 = 0;
+        var cq2 = seedA;
+        var cqi2 = seedI;
         // Build turn timeline
         var tt2 = [];
         var ss2 = stData.sessions.slice().sort(function (a2, b2) { return a2.first_ts < b2.first_ts ? -1 : 1; });
@@ -9967,23 +9567,30 @@ function renderBudgetDrain(stData, qdData) {
         }
         for (var q2i = 0; q2i < ohPairs2.length; q2i++) {
           var qp2 = ohPairs2[q2i];
-          var qd2 = qp2.delta * 100;
-          cq2 += qd2;
-          var isOh2 = qp2.delta >= 0.03;
-          if (!isOh2) cqi2 += qd2;
-          else q5sc2.push([1, Math.round(cq2 * 10) / 10]); // placeholder turn
-          // Map timestamp to turn
           var qTs2 = qp2.ts.slice(0, 19);
           var qTurn2 = 1;
           for (var qt2 = 0; qt2 < tt2.length; qt2++) {
             if (tt2[qt2].slice(0, 19) <= qTs2) qTurn2 = qt2 + 1;
           }
+          if (q2i === 0 && tt2.length && (seedA !== 0 || seedI !== 0 || qTurn2 > 1)) {
+            q5a2.push([1, Math.round(cq2 * 10) / 10]);
+            q5i2.push([1, Math.round(cqi2 * 10) / 10]);
+            if (qTurn2 > 1) {
+              q5a2.push([qTurn2, Math.round(cq2 * 10) / 10]);
+              q5i2.push([qTurn2, Math.round(cqi2 * 10) / 10]);
+            }
+          }
+          var qd2 = qp2.delta * 100;
+          cq2 += qd2;
+          var isOh2 = qp2.delta >= 0.03;
+          if (!isOh2) cqi2 += qd2;
+          else q5sc2.push([1, Math.round(cq2 * 10) / 10]); // placeholder turn
           q5a2.push([qTurn2, Math.round(cq2 * 10) / 10]);
           q5i2.push([qTurn2, Math.round(cqi2 * 10) / 10]);
           if (isOh2) q5sc2[q5sc2.length - 1] = [qTurn2, Math.round(cq2 * 10) / 10];
         }
         allSeries.push({
-          name: "Q5 Actual", type: "line", xAxisIndex: 1, yAxisIndex: 2,
+          name: econLQ5A, type: "line", xAxisIndex: 1, yAxisIndex: 2,
           data: q5a2, smooth: false, symbol: "none",
           lineStyle: { color: "#f97316", width: 2 },
           areaStyle: { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1,
@@ -9991,12 +9598,12 @@ function renderBudgetDrain(stData, qdData) {
           }}
         });
         allSeries.push({
-          name: "Q5 Ideal", type: "line", xAxisIndex: 1, yAxisIndex: 2,
+          name: econLQ5I, type: "line", xAxisIndex: 1, yAxisIndex: 2,
           data: q5i2, smooth: false, symbol: "none",
           lineStyle: { color: "#34d399", width: 2, type: "dashed" }
         });
         allSeries.push({
-          name: "Q5 Penalty Lower", type: "scatter", xAxisIndex: 1, yAxisIndex: 2,
+          name: econLQ5PL, type: "scatter", xAxisIndex: 1, yAxisIndex: 2,
           data: q5sc2, symbolSize: 8,
           itemStyle: { color: "#ef4444" }, z: 10
         });
@@ -10015,11 +9622,11 @@ function renderBudgetDrain(stData, qdData) {
         }
         if (dayTokTotal > 0) {
           var tIdx = 0;
-          for (var s3i = 0; s3i < ss3.length; s3i++) {
-            var t3 = ss3[s3i].turns || [];
-            for (var t3i = 0; t3i < t3.length; t3i++) {
-              if (dateKey && t3[t3i].ts && t3[t3i].ts.slice(0, 10) !== dateKey) continue;
-              cumTok += (t3[t3i].cache_read || 0) + (t3[t3i].cache_creation || 0) + (t3[t3i].output || 0);
+          for (var s3j = 0; s3j < ss3.length; s3j++) {
+            var t3b = ss3[s3j].turns || [];
+            for (var t3jb = 0; t3jb < t3b.length; t3jb++) {
+              if (dateKey && t3b[t3jb].ts && t3b[t3jb].ts.slice(0, 10) !== dateKey) continue;
+              cumTok += (t3b[t3jb].cache_read || 0) + (t3b[t3jb].cache_creation || 0) + (t3b[t3jb].output || 0);
               tIdx++;
               if (tIdx % 5 === 0 || tIdx === 1) {
                 tokVis.push([tIdx, Math.round(cumTok / dayTokTotal * cq2 * 10) / 10]);
@@ -10027,19 +9634,20 @@ function renderBudgetDrain(stData, qdData) {
             }
           }
           allSeries.push({
-            name: "Token Visible", type: "line", xAxisIndex: 1, yAxisIndex: 2,
+            name: econLTokVis, type: "line", xAxisIndex: 1, yAxisIndex: 2,
             data: tokVis, smooth: false, symbol: "none",
             lineStyle: { color: "#60a5fa", width: 1.5, type: "dotted" }
           });
         }
 
-        // Update blurb
-        var gap2 = Math.round((cq2 - cqi2) * 10) / 10;
-        var ratio2 = cq2 > 0 ? Math.round((cq2 - cqi2) / cq2 * 100) : 0;
+        // Update blurb (today-only deltas; chart line includes prior-day carryover)
+        var cq2Day = cq2 - seedA;
+        var cqi2Day = cqi2 - seedI;
+        var gap2 = Math.round((cq2Day - cqi2Day) * 10) / 10;
+        var ratio2 = cq2Day > 0 ? Math.round((cq2Day - cqi2Day) / cq2Day * 100) : 0;
         var nOh2 = ohPairs2.filter(function (p) { return p.delta >= 0.03; }).length;
-        var tokOhPct = dayTokTotal > 0 ? Math.round((1 - cqi2 / cq2) * 3.5 * 10) / 10 : 0;
         var blurb2 = document.getElementById("econ-overhead-blurb");
-        if (blurb2) blurb2.textContent = tr("econOverheadSummary", { actual: Math.round(cq2), ideal: Math.round(cqi2), ratio: ratio2, gap: gap2, events: nOh2 });
+        if (blurb2) blurb2.textContent = tr("econOverheadSummary", { actual: Math.round(cq2Day), ideal: Math.round(cqi2Day), ratio: ratio2, gap: gap2, events: nOh2 });
       }
       return allSeries;
     })(),
@@ -10047,6 +9655,13 @@ function renderBudgetDrain(stData, qdData) {
   };
 
   __effInitOrSet("econDrain", el, option, true);
+  if (_effCharts.econDrain && typeof _effCharts.econDrain.resize === "function") {
+    try {
+      requestAnimationFrame(function () {
+        if (_effCharts.econDrain && typeof _effCharts.econDrain.resize === "function") _effCharts.econDrain.resize();
+      });
+    } catch (error) { logClientOptionalErr(error); }
+  }
 
   // HTML overlay for collapsible info box
   var existingOverlay = el.querySelector(".drain-info-overlay");
@@ -10076,6 +9691,18 @@ function renderBudgetDrain(stData, qdData) {
   });
   el.style.position = "relative";
   el.appendChild(overlay);
+
+  if (proxyMsgEl) {
+    if (showNoProxyMsg) {
+      proxyMsgEl.removeAttribute("hidden");
+      proxyMsgEl.classList.add("econ-drain-proxy-msg--visible");
+      proxyMsgEl.textContent = tr("econDrainNoProxyLogs", { date: msgDateStr });
+    } else {
+      proxyMsgEl.setAttribute("hidden", "hidden");
+      proxyMsgEl.classList.remove("econ-drain-proxy-msg--visible");
+      proxyMsgEl.textContent = "";
+    }
+  }
 }
 
 // ── Session Overhead — Heavy User Tax ────────────────────────────────
@@ -10085,8 +9712,8 @@ function renderEconOverhead(qdData, stData) {
   var el = document.getElementById("chart-shell-econ-overhead");
   if (!el) return;
 
-  var hasProxy = qdData && qdData.request_pairs && qdData.request_pairs.length > 0;
-  var hasJsonl = stData && stData.sessions && stData.sessions.length > 0;
+  var hasProxy = qdData?.request_pairs?.length > 0;
+  var hasJsonl = stData?.sessions?.length > 0;
 
   if (!hasProxy && !hasJsonl) {
     el.innerHTML = '<div style="color:#64748b;font-size:11px;padding:40px;text-align:center">No data available.</div>';
@@ -10149,22 +9776,17 @@ function renderEconOverhead(qdData, stData) {
   if (hasJsonl) {
     var sessions = stData.sessions.slice().sort(function (a, b) { return a.first_ts < b.first_ts ? -1 : 1; });
     // Day total for normalization
-    for (var si = 0; si < sessions.length; si++) {
-      var turns = sessions[si].turns || [];
-      for (var ti = 0; ti < turns.length; ti++) {
-        tokDayTotal += (turns[ti].cache_read || 0) + (turns[ti].cache_creation || 0) + (turns[ti].output || 0);
+    for (var siA = 0; siA < sessions.length; siA++) {
+      var turnsA = sessions[siA].turns || [];
+      for (var tiA = 0; tiA < turnsA.length; tiA++) {
+        tokDayTotal += (turnsA[tiA].cache_read || 0) + (turnsA[tiA].cache_creation || 0) + (turnsA[tiA].output || 0);
       }
     }
 
     var tokIdx = 0;
-    for (var si = 0; si < sessions.length; si++) {
-      var turns = sessions[si].turns || [];
+    for (var siB = 0; siB < sessions.length; siB++) {
+      var turns = sessions[siB].turns || [];
       var warmupDone = false, prevCR = 0, maxCR = 0, inRebuild = false, rebuildN = 0;
-      var forced = false;
-      if (si > 0) {
-        var gapMs = new Date(sessions[si].first_ts).getTime() - new Date(sessions[si - 1].last_ts).getTime();
-        forced = gapMs >= 0 && gapMs <= 300000;
-      }
       for (var ti = 0; ti < turns.length; ti++) {
         var T = turns[ti];
         var cc = T.cache_creation || 0, cr = T.cache_read || 0, out = T.output || 0;
@@ -10216,12 +9838,20 @@ function renderEconOverhead(qdData, stData) {
     blurb.textContent = q5Events + " overhead events consumed " + gapQ5 + "% Q5 (" + q5Ratio + "% of budget). Visible token overhead is only " + tokOverheadPct + "% \u2014 the gap reveals hidden costs (thinking tokens, internal overhead).";
   }
 
+  var ohQ5A = t("econLegendQ5Actual");
+  var ohQ5I = t("econLegendQ5Ideal");
+  var ohOverheadEv = t("econLegendOverheadEvent");
+  var ohTokA = t("econLegendTokenActual");
+  var ohTokI = t("econLegendTokenIdeal");
+  var ohAxisTurns = t("econAxisTurns");
+  var ohAxisPct = t("econAxisPctConsumed");
+
   // ── Build chart ──
   var series = [];
 
   if (hasProxy) {
     series.push({
-      name: "Q5 Actual",
+      name: ohQ5A,
       type: "line", data: q5Actual, smooth: false, symbol: "none",
       lineStyle: { color: "#f97316", width: 2 },
       areaStyle: {
@@ -10231,12 +9861,12 @@ function renderEconOverhead(qdData, stData) {
       }
     });
     series.push({
-      name: "Q5 Ideal",
+      name: ohQ5I,
       type: "line", data: q5Ideal, smooth: false, symbol: "none",
       lineStyle: { color: "#34d399", width: 2, type: "dashed" }
     });
     series.push({
-      name: "Overhead Event",
+      name: ohOverheadEv,
       type: "scatter", data: q5Scatter, symbolSize: 8,
       itemStyle: { color: "#ef4444" }, z: 10
     });
@@ -10244,12 +9874,12 @@ function renderEconOverhead(qdData, stData) {
 
   if (hasJsonl && hasProxy) {
     series.push({
-      name: "Token Actual",
+      name: ohTokA,
       type: "line", data: tokActual, smooth: false, symbol: "none",
       lineStyle: { color: "#60a5fa", width: 1.5, type: "dotted" }
     });
     series.push({
-      name: "Token Ideal",
+      name: ohTokI,
       type: "line", data: tokIdeal, smooth: false, symbol: "none",
       lineStyle: { color: "#a78bfa", width: 1.5, type: "dotted" }
     });
@@ -10261,7 +9891,7 @@ function renderEconOverhead(qdData, stData) {
     tooltip: {
       trigger: "axis",
       formatter: function (params) {
-        if (!params || !params.length) return "";
+        if (!params?.length) return "";
         var turnNum = params[0].value[0];
         var tip = '<div style="font-size:11px">Turn ' + turnNum;
         var q5a = null, q5i = null;
@@ -10269,8 +9899,8 @@ function renderEconOverhead(qdData, stData) {
           var pm = params[k];
           if (!pm.value) continue;
           tip += "<br>" + pm.marker + " " + pm.seriesName + ": " + pm.value[1] + "%";
-          if (pm.seriesName === "Q5 Actual") q5a = pm.value[1];
-          if (pm.seriesName === "Q5 Ideal") q5i = pm.value[1];
+          if (pm.seriesName === ohQ5A) q5a = pm.value[1];
+          if (pm.seriesName === ohQ5I) q5i = pm.value[1];
         }
         if (q5a != null && q5i != null) {
           tip += "<br><b>Q5 Gap: " + (Math.round((q5a - q5i) * 10) / 10) + "%</b>";
@@ -10298,14 +9928,14 @@ function renderEconOverhead(qdData, stData) {
     },
     grid: { left: 50, right: 20, top: 30, bottom: 25 },
     xAxis: {
-      type: "value", name: "Turns",
+      type: "value", name: ohAxisTurns,
       min: 1,
       nameTextStyle: { color: "#64748b", fontSize: 9 },
       axisLabel: { color: "#94a3b8", fontSize: 9 },
       splitLine: { lineStyle: { color: "rgba(100,116,139,0.15)" } }
     },
     yAxis: {
-      type: "value", name: "% consumed",
+      type: "value", name: ohAxisPct,
       nameTextStyle: { color: "#64748b", fontSize: 9 },
       axisLabel: { color: "#94a3b8", fontSize: 9, formatter: function (v) { return v + "%"; } },
       splitLine: { lineStyle: { color: "rgba(100,116,139,0.15)" } }
@@ -10462,13 +10092,13 @@ function renderEconOverhead(qdData, stData) {
     });
     var nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
-    for (const n of nodes) wrapTextNode(n);
+    for (var n of nodes) wrapTextNode(n);
   }
 
   function removeAllTips() {
     hidePop();
     var tips = document.querySelectorAll(".tt");
-    for (const span of tips) {
+    for (var span of tips) {
       span.removeEventListener("mouseenter", showPop);
       span.removeEventListener("mousemove", movePop);
       span.removeEventListener("mouseleave", hidePop);
@@ -10491,7 +10121,7 @@ function renderEconOverhead(qdData, stData) {
   function startObserver() {
     if (observer) return;
     observer = new MutationObserver(function (mutations) {
-      for (const mut of mutations) {
+      for (var mut of mutations) {
         if (mut.addedNodes.length || mut.type === "characterData") {
           debouncedScan();
           break;

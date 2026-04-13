@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Split DASHBOARD_HTML string literal from scripts/dashboard-server.js (legacy inline HTML) into tpl + public */
-var fs = require('fs');
-var path = require('path');
+var fs = require('node:fs');
+var path = require('node:path');
 
 /**
  * Raw interior of a JS single-quoted literal (as in source file), with line continuation
@@ -38,7 +38,7 @@ function parseSingleQuotedLiteralSource(rawInner) {
     if (d === 'u' && i + 4 < rawInner.length) {
       var hex = rawInner.slice(i + 1, i + 5);
       if (/^[0-9a-fA-F]{4}$/.test(hex)) {
-        out += String.fromCharCode(parseInt(hex, 16));
+        out += String.fromCharCode(Number.parseInt(hex, 16));
         i += 4;
         continue;
       }
@@ -102,6 +102,7 @@ var htmlShell =
   '\n' +
   i18nMark +
   '\n' +
+  '<script src="/assets/cache-files-explorer.js"></script>\n' +
   '<script src="/assets/dashboard.client.js"></script>\n' +
   bodyAfterScripts +
   '\n';

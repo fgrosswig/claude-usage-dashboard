@@ -3,10 +3,10 @@
  * Gemeinsame Logik: Scan-Wurzeln (~/.claude/projects + CLAUDE_USAGE_EXTRA_BASES),
  * JSONL-Sammeln. Von dashboard-server und token-forensics genutzt.
  */
-var fs = require('fs');
-var path = require('path');
-var os = require('os');
-var StringDecoder = require('string_decoder').StringDecoder;
+var fs = require('node:fs');
+var path = require('node:path');
+var os = require('node:os');
+var StringDecoder = require('node:string_decoder').StringDecoder;
 
 var HOME = process.env.USERPROFILE || process.env.HOME || os.homedir();
 var BASE = path.join(HOME, '.claude', 'projects');
@@ -16,7 +16,7 @@ function expandUserPath(p) {
   p = p.trim();
   if (!p) return '';
   if (p === '~') return HOME;
-  if (p.indexOf('~/') === 0 || p.indexOf('~\\') === 0) return path.join(HOME, p.slice(2));
+  if (p.startsWith('~/') || p.startsWith('~\\')) return path.join(HOME, p.slice(2));
   if (p.charAt(0) === '~' && (p.length === 1 || p.charAt(1) === path.sep)) {
     return path.join(HOME, p.slice(1).replace(/^[\/\\]+/, ''));
   }
@@ -29,13 +29,13 @@ function discoverHostImportDirs(parentDir) {
   var absParent = path.resolve(parentDir);
   try {
     var entries = fs.readdirSync(absParent, { withFileTypes: true });
-    for (var i = 0; i < entries.length; i++) {
-      if (!entries[i].isDirectory()) continue;
-      var name = entries[i].name;
+    for (var entry of entries) {
+      if (!entry.isDirectory()) continue;
+      var name = entry.name;
       if (!/^HOST-/i.test(name)) continue;
       out.push({ path: path.join(absParent, name), label: name });
     }
-  } catch (e) {}
+  } catch (error) { /* intentional */ }
   out.sort(function (a, b) {
     return a.label.localeCompare(b.label, undefined, { sensitivity: 'base' });
   });
@@ -58,17 +58,17 @@ function getScanRoots() {
     var autoRoot = rootRaw ? expandUserPath(rootRaw) : process.cwd();
     if (autoRoot) {
       var discovered = discoverHostImportDirs(autoRoot);
-      for (var di = 0; di < discovered.length; di++) {
-        roots.push(discovered[di]);
+      for (var disc of discovered) {
+        roots.push(disc);
       }
     }
     return roots;
   }
   var parts = raw.split(';');
-  for (var i = 0; i < parts.length; i++) {
-    var chunk = parts[i].trim();
-    if (!chunk) continue;
-    var abs = expandUserPath(chunk);
+  for (var chunk of parts) {
+    var trimChunk = chunk.trim();
+    if (!trimChunk) continue;
+    var abs = expandUserPath(trimChunk);
     if (!abs) continue;
     var baseName = path.basename(abs.replace(/[/\\]$/, ''));
     var label = baseName || 'extra-' + roots.length;
@@ -80,14 +80,16 @@ function getScanRoots() {
 /** Stabiler Schlüssel: aufgelöste Pfade, sortiert (Reihenfolge der Wurzeln darf sonst den Cache brechen). */
 function scanRootsCacheKey(roots) {
   var paths = [];
-  for (var ri = 0; ri < roots.length; ri++) {
+  for (var root of roots) {
     try {
-      paths.push(path.resolve(roots[ri].path));
+      paths.push(path.resolve(root.path));
     } catch (e) {
-      paths.push(String(roots[ri].path));
+      paths.push(String(root.path));
     }
   }
-  paths.sort();
+  paths.sort(function (a, b) {
+    return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+  });
   return paths.join('|');
 }
 
@@ -95,12 +97,12 @@ function walkJsonl(dir) {
   var files = [];
   try {
     var entries = fs.readdirSync(dir, { withFileTypes: true });
-    for (var i = 0; i < entries.length; i++) {
-      var fp = path.join(dir, entries[i].name);
-      if (entries[i].isDirectory()) files = files.concat(walkJsonl(fp));
-      else if (entries[i].name.endsWith('.jsonl')) files.push(fp);
+    for (var entry of entries) {
+      var fp = path.join(dir, entry.name);
+      if (entry.isDirectory()) files = files.concat(walkJsonl(fp));
+      else if (entry.name.endsWith('.jsonl')) files.push(fp);
     }
-  } catch (e) {}
+  } catch (error) { /* intentional */ }
   return files;
 }
 
@@ -109,8 +111,8 @@ var WALK_JSONL_READDIRS_PER_SLICE = 40;
 (function () {
   var e = process.env.CLAUDE_USAGE_WALK_SLICE;
   if (!e) return;
-  var n = parseInt(e, 10);
-  if (!isNaN(n) && n >= 5 && n <= 500) WALK_JSONL_READDIRS_PER_SLICE = n;
+  var n = Number.parseInt(e, 10);
+  if (!Number.isNaN(n) && n >= 5 && n <= 500) WALK_JSONL_READDIRS_PER_SLICE = n;
 })();
 
 /**
@@ -139,7 +141,7 @@ function walkJsonlYielding(startDir, cb) {
           if (entries[i].isDirectory()) stack.push(fp);
           else if (entries[i].name.endsWith('.jsonl')) files.push(fp);
         }
-      } catch (e2) {}
+      } catch (error) { /* intentional */ }
     }
     if (stack.length) setImmediate(pump);
     else cb(files);
@@ -151,22 +153,40 @@ function collectTaggedJsonlFiles() {
   var roots = getScanRoots();
   var seen = Object.create(null);
   var tagged = [];
-  for (var ri = 0; ri < roots.length; ri++) {
-    var R = roots[ri];
+  for (var R of roots) {
     var list;
     try {
       list = walkJsonl(R.path);
     } catch (e) {
       list = [];
     }
-    for (var fi = 0; fi < list.length; fi++) {
-      var fp = path.resolve(list[fi]);
+    for (var lf of list) {
+      var fp = path.resolve(lf);
       if (seen[fp]) continue;
       seen[fp] = true;
       tagged.push({ path: fp, label: R.label, rootPath: R.path });
     }
   }
   return { tagged: tagged, roots: roots };
+}
+
+/** mtimeMs + size aller JSONL (sortiert); gleicher String wie dashboard-server früher — für Disk-Cache / session-turns-warm-cache.py. */
+function buildTaggedJsonlFingerprintSync(tagged) {
+  var parts = [];
+  for (var ref of tagged) {
+    var p = typeof ref === 'string' ? ref : ref.path;
+    var abs = path.resolve(p);
+    try {
+      var st = fs.statSync(abs);
+      parts.push(abs + ':' + st.mtimeMs + ':' + st.size);
+    } catch (eSt) {
+      parts.push(abs + ':err');
+    }
+  }
+  parts.sort(function (a, b) {
+    return a.localeCompare(b);
+  });
+  return parts.join('\n');
 }
 
 /** Wie collectTaggedJsonlFiles, aber zwischen Wurzeln und readdir-Slices mit setImmediate — Server bleibt beim Start bedienbar. */
@@ -182,8 +202,8 @@ function collectTaggedJsonlFilesAsync(cb) {
     }
     var R = roots[ri++];
     walkJsonlYielding(R.path, function (list) {
-      for (var fi = 0; fi < list.length; fi++) {
-        var fp = path.resolve(list[fi]);
+      for (var lf of list) {
+        var fp = path.resolve(lf);
         if (seen[fp]) continue;
         seen[fp] = true;
         tagged.push({ path: fp, label: R.label, rootPath: R.path });
@@ -237,6 +257,7 @@ module.exports = {
   walkJsonl: walkJsonl,
   walkJsonlYielding: walkJsonlYielding,
   collectTaggedJsonlFiles: collectTaggedJsonlFiles,
+  buildTaggedJsonlFingerprintSync: buildTaggedJsonlFingerprintSync,
   collectTaggedJsonlFilesAsync: collectTaggedJsonlFilesAsync,
   forEachJsonlLineSync: forEachJsonlLineSync,
   getProxyLogDir: getProxyLogDir,
@@ -258,12 +279,14 @@ function collectProxyNdjsonFiles() {
   var files = [];
   try {
     var entries = fs.readdirSync(logDir, { withFileTypes: true });
-    for (var i = 0; i < entries.length; i++) {
-      if (entries[i].isFile() && entries[i].name.endsWith('.ndjson')) {
-        files.push(path.join(logDir, entries[i].name));
+    for (var entry of entries) {
+      if (entry.isFile() && entry.name.endsWith('.ndjson')) {
+        files.push(path.join(logDir, entry.name));
       }
     }
-  } catch (e) {}
-  files.sort();
+  } catch (error) { /* intentional */ }
+  files.sort(function (a, b) {
+    return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+  });
   return files;
 }

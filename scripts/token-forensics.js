@@ -1,8 +1,11 @@
-var fs = require('fs');
-var path = require('path');
+var fs = require('node:fs');
+var path = require('node:path');
 var usageScanRoots = require('./usage-scan-roots');
 var homeDir = usageScanRoots.HOME;
 var forEachJsonlLineSync = usageScanRoots.forEachJsonlLineSync;
+
+// Pre-declare loop variables used across multiple top-level for-of loops (S2814)
+var d, m, ld, t;
 
 // ─── Outage-Daten (Disk-Cache vom Dashboard oder frisch fetchen) ───
 var OUTAGE_DISK_CACHE = path.join(homeDir, '.claude', 'usage-dashboard-outages.json');
@@ -13,19 +16,18 @@ function loadOutageDaysMap() {
   try {
     var disk = JSON.parse(fs.readFileSync(OUTAGE_DISK_CACHE, 'utf8'));
     if (Array.isArray(disk.incidents)) incidents = disk.incidents;
-  } catch (e) {}
+  } catch (error) { /* intentional */ }
   return buildOutageDaysMap(incidents);
 }
 
 function buildOutageDaysMap(incidents) {
   var map = {};
-  for (var i = 0; i < incidents.length; i++) {
-    var inc = incidents[i];
+  for (var inc of incidents) {
     if (!inc.created_at) continue;
     var start = new Date(inc.created_at);
     var end = inc.resolved_at ? new Date(inc.resolved_at) : new Date();
-    if (isNaN(start.getTime())) continue;
-    if (isNaN(end.getTime()) || end <= start) end = new Date(start.getTime() + 3600000);
+    if (Number.isNaN(start.getTime())) continue;
+    if (Number.isNaN(end.getTime()) || end <= start) end = new Date(start.getTime() + 3600000);
     var cur = new Date(start);
     while (cur < end) {
       var dayStr = cur.toISOString().slice(0, 10);
@@ -37,15 +39,15 @@ function buildOutageDaysMap(incidents) {
       if (!map[dayStr]) map[dayStr] = { outage_hours: 0, incidents: [] };
       map[dayStr].outage_hours += hours;
       var found = false;
-      for (var fi = 0; fi < map[dayStr].incidents.length; fi++) {
-        if (map[dayStr].incidents[fi].name === inc.name) { found = true; break; }
+      for (var existing of map[dayStr].incidents) {
+        if (existing.name === inc.name) { found = true; break; }
       }
       if (!found) map[dayStr].incidents.push({ name: inc.name || '', impact: inc.impact || 'none' });
       cur = dayEnd;
     }
   }
   var keys = Object.keys(map);
-  for (var k = 0; k < keys.length; k++) map[keys[k]].outage_hours = Math.round(map[keys[k]].outage_hours * 10) / 10;
+  for (var key of keys) map[key].outage_hours = Math.round(map[key].outage_hours * 10) / 10;
   return map;
 }
 
@@ -65,15 +67,15 @@ function readUsageDayCache() {
 var CACHE_READ_FORENSIC_THRESH = 500000000;   // 500M
 
 function scanLineHitLimit(line) {
-  if (line.indexOf('rate_limit') >= 0) return true;
-  if (line.indexOf('RateLimit') >= 0) return true;
-  if (line.indexOf('rate limit') >= 0) return true;
-  if (line.indexOf('"status":429') >= 0) return true;
-  if (line.indexOf('"status_code":429') >= 0) return true;
-  if (line.indexOf('429') >= 0 && line.indexOf('error') >= 0) return true;
-  if (line.indexOf('overloaded') >= 0) return true;
-  if (line.indexOf('Too Many Requests') >= 0) return true;
-  if (line.indexOf('session') >= 0 && line.indexOf('limit') >= 0) return true;
+  if (line.includes('rate_limit')) return true;
+  if (line.includes('RateLimit')) return true;
+  if (line.includes('rate limit')) return true;
+  if (line.includes('"status":429')) return true;
+  if (line.includes('"status_code":429')) return true;
+  if (line.includes('429') && line.includes('error')) return true;
+  if (line.includes('overloaded')) return true;
+  if (line.includes('Too Many Requests')) return true;
+  if (line.includes('session') && line.includes('limit')) return true;
   return false;
 }
 
@@ -84,9 +86,8 @@ function emptySessionSignals() {
 function bumpSessionSignals(bucket, tagList) {
   if (!bucket.session_signals) bucket.session_signals = emptySessionSignals();
   var sig = bucket.session_signals;
-  for (var ti = 0; ti < tagList.length; ti++) {
-    var k = tagList[ti];
-    if (sig[k] != null) sig[k]++;
+  for (var tg of tagList) {
+    if (sig[tg] != null) sig[tg]++;
   }
 }
 
@@ -114,9 +115,9 @@ function classifyJsonlSessionSignals(line, rec) {
   ) {
     add('interrupt');
   }
-  if (rec && rec.message && rec.message.stop_reason) {
+  if (rec?.message?.stop_reason) {
     var sr = String(rec.message.stop_reason).toLowerCase();
-    if (sr.indexOf('cancel') >= 0 || sr === 'user_abort') add('interrupt');
+    if (sr.includes('cancel') || sr === 'user_abort') add('interrupt');
   }
   if (/retrying|will\s*retry|retries\s+exhausted|exponential\s*backoff|auto-?retry|retry\s+attempt/.test(lower)) {
     add('retry');
@@ -129,7 +130,7 @@ function classifyJsonlSessionSignals(line, rec) {
       var ej = JSON.stringify(rec.error).toLowerCase();
       if (/retry|429|rate|throttl|overloaded/.test(ej)) add('retry');
       if (/interrupt|cancel|abort/.test(ej)) add('interrupt');
-    } catch (eJ) {}
+    } catch (error) { /* intentional */ }
   }
   return tags;
 }
@@ -187,8 +188,7 @@ if (
 ) {
   // Vortage aus Cache laden
   usedCache = true;
-  for (var ci = 0; ci < cache.days.length; ci++) {
-    var cd = cache.days[ci];
+  for (var cd of cache.days) {
     if (cd.date === todayStr) continue;  // heute wird frisch geparst
     daily[cd.date] = cacheDayToDailyBucket(cd);
   }
@@ -199,9 +199,9 @@ if (
 // JSONL lesen: nur heute (bei Cache) oder alles (bei Vollscan)
 var onlyToday = usedCache ? todayStr : null;
 
-for (var fi = 0; fi < allFiles.length; fi++) {
-  var f = allFiles[fi].path;
-  var isSubagent = f.indexOf('subagent') >= 0;
+for (var af of allFiles) {
+  var f = af.path;
+  var isSubagent = f.includes('subagent');
   try {
     forEachJsonlLineSync(f, function(line) {
       if (!line.trim()) return;
@@ -234,9 +234,9 @@ for (var fi = 0; fi < allFiles.length; fi++) {
             if (!daily[lday]) daily[lday] = emptyDailyBucket();
             daily[lday].hit_limit++;
           }
-        } catch (e) {}
+        } catch (error) { /* intentional */ }
       }
-      if (line.indexOf('"usage"') < 0) return;
+      if (!line.includes('"usage"')) return;
       try {
         var d = JSON.parse(line);
         var u = d.message && d.message.usage;
@@ -248,7 +248,7 @@ for (var fi = 0; fi < allFiles.length; fi++) {
         messages.push({
           ts: ts,
           day: msgDay,
-          hour: parseInt(ts.slice(11, 13)),
+          hour: Number.parseInt(ts.slice(11, 13)),
           model: d.message.model || 'unknown',
           input: u.input_tokens || 0,
           output: u.output_tokens || 0,
@@ -256,9 +256,9 @@ for (var fi = 0; fi < allFiles.length; fi++) {
           cache_creation: u.cache_creation_input_tokens || 0,
           isSubagent: isSubagent,
         });
-      } catch (e) {}
+      } catch (error) { /* intentional */ }
     });
-  } catch (e) {}
+  } catch (error) { /* intentional */ }
 }
 
 messages.sort(function (a, b) {
@@ -266,8 +266,7 @@ messages.sort(function (a, b) {
 });
 
 // Aggregate daily (nur die frisch gelesenen messages)
-for (var i = 0; i < messages.length; i++) {
-  var m = messages[i];
+for (m of messages) {
   if (!daily[m.day]) daily[m.day] = emptyDailyBucket();
   var dd = daily[m.day];
   dd.input += m.input;
@@ -291,17 +290,19 @@ for (var i = 0; i < messages.length; i++) {
 function detectModelChanges(daily, days) {
   var changes = {};
   var prevSet = null;
-  for (var i = 0; i < days.length; i++) {
-    var curSet = Object.keys(daily[days[i]].models || {}).sort();
+  for (var day of days) {
+    var curSet = Object.keys(daily[day].models || {}).sort(function (a, b) {
+      return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+    });
     if (prevSet) {
       var added = [], removed = [];
-      for (var c = 0; c < curSet.length; c++) {
-        if (prevSet.indexOf(curSet[c]) < 0) added.push(curSet[c]);
+      for (var c of curSet) {
+        if (!prevSet.includes(c)) added.push(c);
       }
-      for (var p = 0; p < prevSet.length; p++) {
-        if (curSet.indexOf(prevSet[p]) < 0) removed.push(prevSet[p]);
+      for (var p of prevSet) {
+        if (!curSet.includes(p)) removed.push(p);
       }
-      if (added.length || removed.length) changes[days[i]] = { added: added, removed: removed };
+      if (added.length || removed.length) changes[day] = { added: added, removed: removed };
     }
     prevSet = curSet;
   }
@@ -315,9 +316,9 @@ function dayTotal(r) {
 
 function detectPeakDay(daily, days) {
   var peakDay = null, peakVal = 0;
-  for (var i = 0; i < days.length; i++) {
-    var t = dayTotal(daily[days[i]]);
-    if (t > peakVal) { peakVal = t; peakDay = days[i]; }
+  for (var day of days) {
+    t = dayTotal(daily[day]);
+    if (t > peakVal) { peakVal = t; peakDay = day; }
   }
   return peakDay;
 }
@@ -329,12 +330,12 @@ function detectLimitDays(daily, days) {
   // Schwache Signale (wenige HITs, wenig Aktivitaet) werden separat markiert.
   var HIT_MIN_THRESHOLD = 50;   // unter 50 HITs = wahrscheinlich False Positive
   var result = [];
-  for (var i = 0; i < days.length; i++) {
-    var r = daily[days[i]];
+  for (var day of days) {
+    var r = daily[day];
     var flags = [];
     if (r.hit_limit >= HIT_MIN_THRESHOLD) flags.push('HIT(' + r.hit_limit + ')');
     if (r.cache_read >= CACHE_READ_FORENSIC_THRESH) flags.push('CACHE>=500M');
-    if (flags.length > 0) result.push({ day: days[i], flags: flags });
+    if (flags.length > 0) result.push({ day: day, flags: flags });
   }
   return result;
 }
@@ -354,12 +355,14 @@ function findBestLimitDayForComparison(limitDays, daily) {
   return limitDays.length > 0 ? limitDays[limitDays.length - 1].day : null;
 }
 
-var days = Object.keys(daily).sort();
+var days = Object.keys(daily).sort(function (a, b) {
+  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+});
 var peakDay = detectPeakDay(daily, days);
 var limitDays = detectLimitDays(daily, days);
 var modelChanges = detectModelChanges(daily, days);
 var limitDaySet = {};
-for (var li = 0; li < limitDays.length; li++) limitDaySet[limitDays[li].day] = limitDays[li].flags;
+for (ld of limitDays) limitDaySet[ld.day] = ld.flags;
 var today = new Date().toISOString().slice(0, 10);
 
 function fmt(n) {
@@ -399,20 +402,20 @@ console.log('  Outage-Tage (status.claude.com): ' + (outageCount > 0 ? outageCou
 var mcKeys = Object.keys(modelChanges);
 if (mcKeys.length > 0) {
   console.log('  Model-Wechsel (' + mcKeys.length + ' Tage):');
-  for (var mci = 0; mci < mcKeys.length; mci++) {
-    var mc = modelChanges[mcKeys[mci]];
+  for (var mck of mcKeys) {
+    var mc = modelChanges[mck];
     var parts = [];
     if (mc.added.length) parts.push('+' + mc.added.join(', +'));
     if (mc.removed.length) parts.push('-' + mc.removed.join(', -'));
-    console.log('    ' + mcKeys[mci] + '  ' + parts.join('  '));
+    console.log('    ' + mck + '  ' + parts.join('  '));
   }
 } else {
   console.log('  Model-Wechsel: keine erkannt');
 }
 if (limitDays.length > 0) {
   console.log('  Limit-Tage (automatisch erkannt):');
-  for (var li = 0; li < limitDays.length; li++) {
-    console.log('    ' + limitDays[li].day + '  [' + limitDays[li].flags.join(', ') + ']');
+  for (ld of limitDays) {
+    console.log('    ' + ld.day + '  [' + ld.flags.join(', ') + ']');
   }
 } else {
   console.log('  Limit-Tage: keine erkannt');
@@ -433,8 +436,7 @@ console.log(
   '  -----------|-----------|------------|-----------|-------|-------|-------------|----------------',
 );
 
-for (var di = 0; di < days.length; di++) {
-  var d = days[di];
+for (d of days) {
   var r = daily[d];
   var activeH = Object.keys(r.hours).length;
   var cacheRatio = r.output > 0 ? Math.round(r.cache_read / r.output) : 0;
@@ -471,8 +473,7 @@ console.log('');
 console.log('  Datum      | Overhead | Output/h  | Total/h    | Subagent%');
 console.log('  -----------|----------|-----------|------------|----------');
 
-for (var di = 0; di < days.length; di++) {
-  var d = days[di];
+for (d of days) {
   var r = daily[d];
   var total = dayTotal(r);
   var activeH = Math.max(1, Object.keys(r.hours).length);
@@ -510,8 +511,7 @@ console.log(
   '  -----------|----------|----------|---------------|-------------|--------',
 );
 
-for (var di = 0; di < days.length; di++) {
-  var d = days[di];
+for (d of days) {
   var r = daily[d];
   var mainCalls = r.calls - r.subagent_calls;
   var subCachePct =
@@ -563,8 +563,8 @@ if (limitDays.length > 0 && peakDay) {
   var prevImpl = 0;
   var cleanLimitDays = [];
   var outageLimitDays = [];
-  for (var li = 0; li < limitDays.length; li++) {
-    var ld = limitDays[li].day;
+  for (var ldi of limitDays) {
+    ld = ldi.day;
     var lr = daily[ld];
     var lt = dayTotal(lr);
     var impl90 = Math.round(lt / 0.9);
@@ -582,8 +582,8 @@ if (limitDays.length > 0 && peakDay) {
 
     var outInfo = outageDays[ld] ? outageDays[ld].outage_hours + 'h' : '-';
     var isOutage = !!outageDays[ld];
-    if (isOutage) outageLimitDays.push(limitDays[li]);
-    else cleanLimitDays.push(limitDays[li]);
+    if (isOutage) outageLimitDays.push(ldi);
+    else cleanLimitDays.push(ldi);
 
     console.log(
       '  ' + ld +
@@ -593,7 +593,7 @@ if (limitDays.length > 0 && peakDay) {
       ' | ' + pad(Object.keys(lr.hours).length, 5) +
       ' | ' + pad(outPerH, 9) +
       ' | ' + pad(outInfo, 7) +
-      ' | ' + limitDays[li].flags.join(',') + (isOutage ? ' *OUT*' : '') + trend,
+      ' | ' + ldi.flags.join(',') + (isOutage ? ' *OUT*' : '') + trend,
     );
   }
 
@@ -607,8 +607,8 @@ if (limitDays.length > 0 && peakDay) {
   // Zusammenfassung: Median und Bereich (nur saubere Limit-Tage)
   var implValues = [];
   var sourceForMedian = cleanLimitDays.length > 0 ? cleanLimitDays : limitDays;
-  for (var li = 0; li < sourceForMedian.length; li++) {
-    var lr2 = daily[sourceForMedian[li].day];
+  for (var smd of sourceForMedian) {
+    var lr2 = daily[smd.day];
     // Nur Tage mit signifikanter Aktivitaet fuer Median
     if (lr2.calls >= FAZIT_MIN_CALLS && Object.keys(lr2.hours).length >= FAZIT_MIN_HOURS) {
       implValues.push(Math.round(dayTotal(lr2) / 0.9));
@@ -653,8 +653,7 @@ var todayMsgs = messages.filter(function (m) {
   return m.day === hourlyDay;
 });
 var hourly = {};
-for (var i = 0; i < todayMsgs.length; i++) {
-  var m = todayMsgs[i];
+for (m of todayMsgs) {
   if (!hourly[m.hour])
     hourly[m.hour] = {
       input: 0, output: 0, cache_read: 0, cache_creation: 0, calls: 0, sub: 0,
@@ -679,8 +678,7 @@ var cumTotal = 0;
 var hours = Object.keys(hourly).sort(function (a, b) {
   return a - b;
 });
-for (var hi = 0; hi < hours.length; hi++) {
-  var hh = hours[hi];
+for (var hh of hours) {
   var r = hourly[hh];
   var total = r.input + r.output + r.cache_read + r.cache_creation;
   cumTotal += total;
@@ -823,15 +821,14 @@ console.log('='.repeat(90));
 console.log('');
 
 var maxTotal = 0;
-for (var di = 0; di < days.length; di++) {
-  var t = dayTotal(daily[days[di]]);
+for (d of days) {
+  t = dayTotal(daily[d]);
   if (t > maxTotal) maxTotal = t;
 }
 
-for (var di = 0; di < days.length; di++) {
-  var d = days[di];
+for (d of days) {
   var r = daily[d];
-  var t = dayTotal(r);
+  t = dayTotal(r);
   var barLen = Math.round((t / maxTotal) * 60);
   var bar = '';
   var cachePortion = Math.round((r.cache_read / maxTotal) * 60);

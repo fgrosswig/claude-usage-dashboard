@@ -35,3 +35,33 @@
 - **마커:** 주로 **VS Code Marketplace** ([Version History](https://marketplace.visualstudio.com/items?itemName=anthropic.claude-code&ssr=false#version-history)) — `lastUpdated`, 최신 Semver; **UTC 달력일** 기준. 캐시: **`~/.claude/claude-code-marketplace-versions.json`**.
 - **Changelog:** **GitHub Releases** (최대 100개 항목), 캐시 **`~/.claude/claude-code-releases.json`**. 데이터: Marketplace ∪ GitHub 병합 (Marketplace 날짜 우선), 그 외 JSONL 폴백.
 - JSONL의 버전: **`major.minor.patch`** 로 정규화. 원시 키가 있는 오래된 Day-Cache의 경우: 한 번 전체 스캔 (`CLAUDE_USAGE_NO_CACHE=1` 또는 캐시 파일 삭제).
+
+## 차트 엔진 (v1.8.0 이후)
+
+- 모든 차트는 **ECharts** 를 사용합니다 (Chart.js 완전 제거).
+- 각 섹션에는 임의의 컨테이너에 독립 렌더링할 수 있는 **독립형 렌더 함수** (`window.renderXxx()`)가 있습니다.
+- 차트는 **위젯 레지스트리** (`public/js/widget-registry.js`)에 `engine: "echarts"`, `canvasId`, `renderFn`으로 등록되어 있습니다.
+
+## 섹션
+
+| 섹션 | 설명 |
+|------|------|
+| Health Score | 전체 점수 (0-10), KPI 칩, 주요 발견 사항 |
+| Token Stats | 일별/시간별 차트, 오버헤드, 캐시 비율 |
+| Forensic Analysis | 히트 리밋, 신호, 서비스 임팩트 |
+| User Profile | 버전, 진입점, 릴리스 안정성 |
+| Budget Efficiency | Sankey, 트렌드, 쿼터 이력 |
+| Proxy Analytics | 토큰, 지연시간, 모델, 오류 트렌드, 캐시 트렌드 |
+| Intelligence / Predictive | 포화도, 건강 점수, 서술, 계절성 (잠정) |
+| Economic Usage | 누적 곡선, 캐시 폭발, 버짓 드레인 |
+| Anthropic Status | 가동 시간, 사건, 장애 타임라인 |
+
+## 사이드바 설정
+
+- **레이아웃**: 섹션 표시/숨기기, 드래그로 순서 변경, 열 너비(span) 조정
+- **템플릿**: 저장된 레이아웃 불러오기/생성
+- **설정**: 언어, 플랜 (MAX5/MAX20/Pro/Free/API), 사용자 설정
+- **도구**: 파일 탐색기
+- **내보내기**: JSONL 내보내기, 템플릿 가져오기/내보내기
+
+위젯 시스템 상세: [11장](11-widget-system.md).

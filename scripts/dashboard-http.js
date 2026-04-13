@@ -3,8 +3,8 @@
  * HTTP helpers for the usage dashboard: static assets under /assets/ (served from ./public).
  * Paths are whitelisted; no directory traversal.
  */
-var fs = require('fs');
-var path = require('path');
+var fs = require('node:fs');
+var path = require('node:path');
 
 var MIME = {
   '.css': 'text/css; charset=utf-8',
@@ -14,6 +14,11 @@ var MIME = {
 /** pathname -> path segments relative to script root (must stay under public/) */
 var ASSET_ROUTES = {
   '/assets/dashboard.css': ['public', 'css', 'dashboard.css'],
+  '/assets/cache-files-explorer.js': ['public', 'js', 'cache-files-explorer.js'],
+  '/assets/widget-registry.js': ['public', 'js', 'widget-registry.js'],
+  '/assets/widget-dispatcher.js': ['public', 'js', 'widget-dispatcher.js'],
+  '/assets/dashboard-sections.js': ['public', 'js', 'dashboard-sections.js'],
+  '/assets/metrics-engine.js': ['public', 'js', 'metrics-engine.js'],
   '/assets/dashboard.client.js': ['public', 'js', 'dashboard.client.js']
 };
 
