@@ -2,6 +2,17 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-269",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "5a38db5",
+      "commit_full": "5a38db5b87f3db88bface1eb09fb64502872d777",
+      "status": "ABGESCHLOSSEN",
+      "description": "Merge branch 'feat/widget-dispatcher' into develop",
+      "detail": "# Conflicts:\n#\tlogs/transactions.json",
+      "changes": []
+    },
+    {
       "id": "TX-268",
       "timestamp": "2026-04-13",
       "session": "auto",
