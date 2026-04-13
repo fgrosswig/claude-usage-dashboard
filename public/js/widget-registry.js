@@ -370,6 +370,8 @@
           { id: 'proxy-kpi-quota-7d', titleKey: 'proxyCardQuota7d', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'proxy-kpi-quota-7d', widgetGroup: 'proxy-kpis', renderFn: 'renderProxyAnalysis' },
           { id: 'proxy-kpi-ttl-tier', titleKey: 'proxyTtlTier', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'proxy-kpi-ttl-tier', widgetGroup: 'proxy-kpis', renderFn: 'renderProxyAnalysis' },
           { id: 'proxy-kpi-peak-hours', titleKey: 'proxyDataSource', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'proxy-kpi-peak-hours', widgetGroup: 'proxy-kpis', renderFn: 'renderProxyAnalysis' },
+          { id: 'proxy-kpi-saturation', titleKey: 'proxySaturation', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'proxy-kpi-saturation', widgetGroup: 'proxy-kpis', renderFn: 'renderProxyAnalysis' },
+          { id: 'proxy-kpi-health', titleKey: 'proxyHealth', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'proxy-kpi-health', widgetGroup: 'proxy-kpis', renderFn: 'renderProxyAnalysis' },
           {
             id: 'proxy-tokens',
             titleKey: 'proxyTokenChartTitle',
@@ -432,6 +434,15 @@
             canvasId: 'c-proxy-cache-trend',
             size: { cols: 1, minHeight: 200 },
             renderFn: 'renderProxy_cacheTrend'
+          },
+          {
+            id: 'proxy-ttl-history',
+            titleKey: 'proxyTtlHistoryTitle',
+            type: 'bar-stacked',
+            engine: 'echarts',
+            canvasId: 'c-proxy-ttl-history',
+            size: { cols: 1, minHeight: 200 },
+            renderFn: 'renderProxy_ttlHistory'
           }
         ]
       },
@@ -481,33 +492,6 @@
             canvasId: 'c-outage-timeline',
             size: { cols: 1, minHeight: 260 },
             renderFn: 'renderStatus_outageTimeline'
-          }
-        ]
-      },
-
-      // ── Intelligence / Predictive Metrics ─────────────────────
-      {
-        id: 'intelligence',
-        titleKey: 'sectionIntelligence',
-        domId: 'intelligence-collapse',
-        sectionRenderFn: 'renderIntelligenceSection',
-        reorderable: true,
-        defaultOpen: false,
-        dataSource: '/api/usage',
-        requires: ['usage', 'proxy'],
-        charts: [
-          { id: 'intel-saturation', titleKey: 'intelSaturation', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'intel-saturation', widgetGroup: 'intel-scores', renderFn: 'renderIntelligenceSection' },
-          { id: 'intel-health', titleKey: 'intelHealth', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'intel-health', widgetGroup: 'intel-scores', renderFn: 'renderIntelligenceSection' },
-          { id: 'intel-quota-eta', titleKey: 'intelQuotaEta', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'intel-quota-eta', widgetGroup: 'intel-scores', renderFn: 'renderIntelligenceSection' },
-          { id: 'intel-narrative', titleKey: 'intelNarrative', kind: 'chip', type: 'cards', engine: 'html', canvasId: 'intel-narrative', renderFn: 'renderIntelligenceSection' },
-          {
-            id: 'intel-seasonality',
-            titleKey: 'intelSeasonality',
-            type: 'bar',
-            engine: 'echarts',
-            canvasId: 'c-intel-seasonality',
-            size: { cols: 1, minHeight: 200 },
-            renderFn: 'renderIntel_seasonality'
           }
         ]
       },

@@ -1922,7 +1922,7 @@ function renderDashboardCore(data) {
   // Section renders — dispatcher controls order + visibility
   renderProxyAnalysis(data);
   renderBudgetEfficiency(data);
-  renderIntelligenceSection(data);
+  // Intelligence section removed — Saturation/Health now in Proxy KPIs
   renderEconomicSection(data, getFilteredDays(data.days));
   renderUserProfileCharts(getFilteredDays(data.days));
   updateMetaDetailsSummary(data);
@@ -4472,6 +4472,91 @@ window.renderProxy_cacheTrend = function (sCtx) {
   renderProxyCacheTrend(sCtx.data);
 };
 
+/** Standalone: TTL tier history (1h vs 5m stacked bar over days). */
+window.renderProxy_ttlHistory = function (sCtx) {
+  sCtx = sCtx || window.__sectionCtx_proxy;
+  if (!sCtx) return;
+  var data = sCtx.data;
+  var el = document.getElementById("c-proxy-ttl-history");
+  if (!el) return;
+  var h3 = document.getElementById("proxy-ttl-history-h3");
+  if (h3) h3.textContent = t("proxyTtlHistoryTitle");
+  var blurb = document.getElementById("proxy-ttl-history-blurb");
+  if (blurb) blurb.textContent = t("proxyTtlHistoryBlurb");
+
+  var pd = data && data.proxy ? data.proxy.proxy_days || [] : [];
+  if (!pd.length) return;
+  // Match proxy days to JSONL days for interrupt overlay
+  var jsonlDays = data && data.days ? data.days : [];
+  var jsonlByDate = {};
+  for (var ji = 0; ji < jsonlDays.length; ji++) {
+    if (jsonlDays[ji].date) jsonlByDate[jsonlDays[ji].date] = jsonlDays[ji];
+  }
+  var labels = [], d1h = [], d5m = [], dUnk = [], dIntr = [], dCold = [];
+  for (var i = 0; i < pd.length; i++) {
+    var day = pd[i];
+    labels.push(day.date || "");
+    var ttl = day.ttl_tiers || {};
+    var t1h = ttl["1h"] || 0;
+    var t5m = ttl["5m"] || 0;
+    var tUnk = ttl.unknown || 0;
+    d1h.push(t1h);
+    d5m.push(t5m);
+    dUnk.push(tUnk);
+    var ttlTotal = t1h + t5m + tUnk;
+    dCold.push(ttlTotal > 0 ? Math.round(t5m / ttlTotal * 100) : 0);
+    var jd = jsonlByDate[day.date];
+    var sig = jd && jd.session_signals ? jd.session_signals : {};
+    dIntr.push((sig.interrupt || 0) + (sig.retry || 0));
+  }
+  if (!_proxyCharts.ttlHistory) _proxyCharts.ttlHistory = echarts.init(el, null, { renderer: "canvas" });
+  _proxyCharts.ttlHistory.setOption({
+    animation: false,
+    grid: { left: 50, right: 55, top: 36, bottom: 30 },
+    legend: { data: ["1h", "5m", "unknown", t("proxyTtlColdPct"), t("proxyTtlInterrupts")], textStyle: { color: "#cbd5e1", fontSize: 10 }, top: 4 },
+    tooltip: {
+      trigger: "axis",
+      backgroundColor: "rgba(15,23,42,0.95)",
+      borderColor: "#334155",
+      textStyle: { color: "#e2e8f0", fontSize: 12 },
+      formatter: function (params) {
+        var lines = [params[0].axisValueLabel];
+        var ttlTotal = 0;
+        for (var pi = 0; pi < params.length; pi++) {
+          if (params[pi].seriesType === "bar") ttlTotal += params[pi].value || 0;
+        }
+        for (var pj = 0; pj < params.length; pj++) {
+          var p = params[pj];
+          if (p.seriesType === "bar") {
+            var pct = ttlTotal > 0 ? Math.round(p.value / ttlTotal * 100) : 0;
+            lines.push(p.marker + " " + p.seriesName + ": " + p.value + " (" + pct + "%)");
+          } else {
+            lines.push(p.marker + " " + p.seriesName + ": " + p.value);
+          }
+        }
+        return lines.join("<br>");
+      }
+    },
+    xAxis: { type: "category", data: labels, axisLabel: { color: "#94a3b8", fontSize: 11 }, splitLine: { lineStyle: { color: "rgba(51,65,85,0.5)" } } },
+    yAxis: [
+      { type: "value", name: "Requests", nameTextStyle: { color: "#94a3b8", fontSize: 11 }, axisLabel: { color: "#94a3b8", fontSize: 11 }, splitLine: { lineStyle: { color: "rgba(51,65,85,0.5)" } } },
+      { type: "value", name: "Cold %", nameLocation: "center", nameGap: 35, nameRotate: 90, nameTextStyle: { color: "#fbbf24", fontSize: 11 }, min: 0, max: 100, axisLabel: { color: "#fbbf24", fontSize: 11, formatter: "{value}%" }, splitLine: { show: false } },
+      { type: "value", name: t("proxyTtlInterrupts"), nameLocation: "center", nameGap: 40, nameRotate: 90, nameTextStyle: { color: "#f87171", fontSize: 11 }, axisLabel: { show: false }, splitLine: { show: false }, show: false }
+    ],
+    series: [
+      { name: "1h", type: "bar", stack: "ttl", data: d1h, itemStyle: { color: "rgba(34,197,94,0.7)" }, barCategoryGap: "20%" },
+      { name: "5m", type: "bar", stack: "ttl", data: d5m, itemStyle: { color: "rgba(251,191,36,0.6)" }, barCategoryGap: "20%" },
+      { name: "unknown", type: "bar", stack: "ttl", data: dUnk, itemStyle: { color: "rgba(107,114,128,0.35)" }, barCategoryGap: "20%" },
+      { name: t("proxyTtlColdPct"), type: "line", yAxisIndex: 1, data: dCold, smooth: 0.25, symbol: "diamond", symbolSize: 6,
+        lineStyle: { color: "rgba(251,191,36,0.8)", width: 2 }, itemStyle: { color: "#fbbf24" },
+        markLine: { silent: true, symbol: "none", lineStyle: { color: "rgba(251,191,36,0.3)", type: "dashed" },
+          data: [{ yAxis: 20, label: { formatter: "20%", color: "#fbbf24", fontSize: 10 } }] } },
+      { name: t("proxyTtlInterrupts"), type: "bar", yAxisIndex: 2, data: dIntr, barCategoryGap: "60%",
+        itemStyle: { color: "rgba(248,113,113,0.45)" } }
+    ]
+  }, true);
+};
+
 function renderProxyAnalysis(data) {
   __bindProxyToggleResize();
   _computeProxyCtx(data);
@@ -4629,6 +4714,17 @@ function renderProxyAnalysis(data) {
       cls: ""
     });
   }
+  // Saturation + Health from metrics engine
+  var me = window.__metricsEngine;
+  if (me) {
+    var sat = me.calcSaturationScore(pd);
+    var hi = { error_rate: pd.error_rate || 0, avg_duration_ms: pd.avg_duration_ms || 0, cache_read_ratio: pd.cache_read_ratio || 0, cold_starts: 0, retry_rate: 0 };
+    var health = me.calcHealthScore(hi, pd);
+    var satCls = sat > 60 ? "danger" : sat > 30 ? "warn" : "ok";
+    var healthCls = health < 50 ? "danger" : health < 70 ? "warn" : "ok";
+    pcards.push({ wid: "proxy-kpi-saturation", label: t("proxySaturation"), value: sat + "/100", sub: t("proxySaturationSub"), cls: satCls, valueColor: sat > 60 ? "#ef4444" : sat > 30 ? "#f59e0b" : "#22c55e" });
+    pcards.push({ wid: "proxy-kpi-health", label: t("proxyHealth"), value: health + "/100", sub: t("proxyHealthSub"), cls: healthCls, valueColor: health < 50 ? "#ef4444" : health < 70 ? "#f59e0b" : "#22c55e" });
+  }
   if (cardsEl) {
     var ch2 = "";
     for (var pci = 0; pci < pcards.length; pci++) {
@@ -4681,6 +4777,7 @@ function renderProxyAnalysis(data) {
   renderProxyHourlyLatency(data);
   renderProxyErrorTrend(data);
   renderProxyCacheTrend(data);
+  if (typeof window.renderProxy_ttlHistory === 'function') window.renderProxy_ttlHistory();
   renderProxyEfficiencyTrend(data);
   var h3hl = document.getElementById("proxy-hourly-latency-h3");
   if (h3hl) h3hl.textContent = t("proxyHourlyLatencyTitle");

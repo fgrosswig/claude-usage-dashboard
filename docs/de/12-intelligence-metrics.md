@@ -61,14 +61,9 @@ Human-readable Statuszeilen mit farbigen Dots:
 
 Durchschnittliche Requests und Latenz pro Stunde (0-23h) — zeigt typische Tagesmuster.
 
-## Intelligence Section UI
+## Integration in Proxy-Section
 
-Die Section zeigt:
-
-- **3 KPI-Cards**: Saturation Score, Health Score, Quota ETA
-- **Narrative Box**: automatisch generierte Statusbeschreibung
-- **Root Cause Panel**: Top-Faktoren mit Prozent-Abweichung
-- **Seasonality Chart**: ECharts-Balkendiagramm (Requests pro Stunde)
+Seit v1.8.0 sind Saturation und Health als KPI-Chips direkt in der **Proxy-Analyse** Section integriert (nicht mehr als eigene Intelligence Section). Die eigenstaendige Intelligence Section wurde entfernt.
 
 ## Datenquellen
 
