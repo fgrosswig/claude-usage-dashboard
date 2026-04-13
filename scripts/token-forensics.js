@@ -1,5 +1,5 @@
-var fs = require('fs');
-var path = require('path');
+var fs = require('node:fs');
+var path = require('node:path');
 var usageScanRoots = require('./usage-scan-roots');
 var homeDir = usageScanRoots.HOME;
 var forEachJsonlLineSync = usageScanRoots.forEachJsonlLineSync;
@@ -13,7 +13,7 @@ function loadOutageDaysMap() {
   try {
     var disk = JSON.parse(fs.readFileSync(OUTAGE_DISK_CACHE, 'utf8'));
     if (Array.isArray(disk.incidents)) incidents = disk.incidents;
-  } catch (e) {}
+  } catch (_ignored) {}
   return buildOutageDaysMap(incidents);
 }
 
@@ -23,8 +23,8 @@ function buildOutageDaysMap(incidents) {
     if (!inc.created_at) continue;
     var start = new Date(inc.created_at);
     var end = inc.resolved_at ? new Date(inc.resolved_at) : new Date();
-    if (isNaN(start.getTime())) continue;
-    if (isNaN(end.getTime()) || end <= start) end = new Date(start.getTime() + 3600000);
+    if (Number.isNaN(start.getTime())) continue;
+    if (Number.isNaN(end.getTime()) || end <= start) end = new Date(start.getTime() + 3600000);
     var cur = new Date(start);
     while (cur < end) {
       var dayStr = cur.toISOString().slice(0, 10);
@@ -64,15 +64,15 @@ function readUsageDayCache() {
 var CACHE_READ_FORENSIC_THRESH = 500000000;   // 500M
 
 function scanLineHitLimit(line) {
-  if (line.indexOf('rate_limit') >= 0) return true;
-  if (line.indexOf('RateLimit') >= 0) return true;
-  if (line.indexOf('rate limit') >= 0) return true;
-  if (line.indexOf('"status":429') >= 0) return true;
-  if (line.indexOf('"status_code":429') >= 0) return true;
-  if (line.indexOf('429') >= 0 && line.indexOf('error') >= 0) return true;
-  if (line.indexOf('overloaded') >= 0) return true;
-  if (line.indexOf('Too Many Requests') >= 0) return true;
-  if (line.indexOf('session') >= 0 && line.indexOf('limit') >= 0) return true;
+  if (line.includes('rate_limit')) return true;
+  if (line.includes('RateLimit')) return true;
+  if (line.includes('rate limit')) return true;
+  if (line.includes('"status":429')) return true;
+  if (line.includes('"status_code":429')) return true;
+  if (line.includes('429') && line.includes('error')) return true;
+  if (line.includes('overloaded')) return true;
+  if (line.includes('Too Many Requests')) return true;
+  if (line.includes('session') && line.includes('limit')) return true;
   return false;
 }
 
@@ -112,9 +112,9 @@ function classifyJsonlSessionSignals(line, rec) {
   ) {
     add('interrupt');
   }
-  if (rec && rec.message && rec.message.stop_reason) {
+  if (rec?.message?.stop_reason) {
     var sr = String(rec.message.stop_reason).toLowerCase();
-    if (sr.indexOf('cancel') >= 0 || sr === 'user_abort') add('interrupt');
+    if (sr.includes('cancel') || sr === 'user_abort') add('interrupt');
   }
   if (/retrying|will\s*retry|retries\s+exhausted|exponential\s*backoff|auto-?retry|retry\s+attempt/.test(lower)) {
     add('retry');
@@ -127,7 +127,7 @@ function classifyJsonlSessionSignals(line, rec) {
       var ej = JSON.stringify(rec.error).toLowerCase();
       if (/retry|429|rate|throttl|overloaded/.test(ej)) add('retry');
       if (/interrupt|cancel|abort/.test(ej)) add('interrupt');
-    } catch (eJ) {}
+    } catch (_ignored) {}
   }
   return tags;
 }
@@ -198,7 +198,7 @@ var onlyToday = usedCache ? todayStr : null;
 
 for (var af of allFiles) {
   var f = af.path;
-  var isSubagent = f.indexOf('subagent') >= 0;
+  var isSubagent = f.includes('subagent');
   try {
     forEachJsonlLineSync(f, function(line) {
       if (!line.trim()) return;
@@ -231,9 +231,9 @@ for (var af of allFiles) {
             if (!daily[lday]) daily[lday] = emptyDailyBucket();
             daily[lday].hit_limit++;
           }
-        } catch (e) {}
+        } catch (_ignored) {}
       }
-      if (line.indexOf('"usage"') < 0) return;
+      if (!line.includes('"usage"')) return;
       try {
         var d = JSON.parse(line);
         var u = d.message && d.message.usage;
@@ -245,7 +245,7 @@ for (var af of allFiles) {
         messages.push({
           ts: ts,
           day: msgDay,
-          hour: parseInt(ts.slice(11, 13)),
+          hour: Number.parseInt(ts.slice(11, 13)),
           model: d.message.model || 'unknown',
           input: u.input_tokens || 0,
           output: u.output_tokens || 0,
@@ -253,9 +253,9 @@ for (var af of allFiles) {
           cache_creation: u.cache_creation_input_tokens || 0,
           isSubagent: isSubagent,
         });
-      } catch (e) {}
+      } catch (_ignored) {}
     });
-  } catch (e) {}
+  } catch (_ignored) {}
 }
 
 messages.sort(function (a, b) {
@@ -294,10 +294,10 @@ function detectModelChanges(daily, days) {
     if (prevSet) {
       var added = [], removed = [];
       for (var c of curSet) {
-        if (prevSet.indexOf(c) < 0) added.push(c);
+        if (!prevSet.includes(c)) added.push(c);
       }
       for (var p of prevSet) {
-        if (curSet.indexOf(p) < 0) removed.push(p);
+        if (!curSet.includes(p)) removed.push(p);
       }
       if (added.length || removed.length) changes[day] = { added: added, removed: removed };
     }

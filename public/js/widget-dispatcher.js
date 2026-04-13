@@ -41,7 +41,7 @@
     if (!li || !li.parentNode) return null;
     var n = li.nextSibling;
     while (n) {
-      if (n.nodeType === 1 && n.matches && n.matches('li.widget-tree-item[data-section]')) return n;
+      if (n.nodeType === 1 && n.matches?.('li.widget-tree-item[data-section]')) return n;
       n = n.nextSibling;
     }
     return null;
@@ -51,7 +51,7 @@
     if (!li || !li.parentNode) return null;
     var n = li.previousSibling;
     while (n) {
-      if (n.nodeType === 1 && n.matches && n.matches('li.widget-tree-item[data-section]')) return n;
+      if (n.nodeType === 1 && n.matches?.('li.widget-tree-item[data-section]')) return n;
       n = n.previousSibling;
     }
     return null;
@@ -179,7 +179,7 @@
       if (!tryAcceptPrefsPayload(o)) return;
       if (Array.isArray(o.hiddenCharts)) _prefs.hiddenCharts = o.hiddenCharts.slice();
       if (Array.isArray(o.hiddenSections)) _prefs.hiddenSections = o.hiddenSections.slice();
-    } catch (e) {}
+    } catch (_ignored) {}
   }
 
   function loadPrefs() {
@@ -190,7 +190,7 @@
         var p = JSON.parse(raw);
         fromLs = tryAcceptPrefsPayload(p);
       }
-    } catch (e) {}
+    } catch (_ignored) {}
 
     // Datei ist Single Source of Truth
     try {
@@ -205,12 +205,12 @@
             if (sp.v == null) sp.v = PREFS_VERSION;
             else sp.v = Number(sp.v);
             normalizePrefsShape(sp);
-            try { localStorage.setItem(PREFS_KEY, JSON.stringify(sp)); } catch (e3) {}
+            try { localStorage.setItem(PREFS_KEY, JSON.stringify(sp)); } catch (_ignored) {}
             return sp;
           }
         }
       }
-    } catch (e2) {}
+    } catch (_ignored) {}
     if (fromLs) return fromLs;
     return defaultPrefs();
   }
@@ -218,7 +218,7 @@
   function savePrefs() {
     if (!_prefs) return;
     var json = JSON.stringify(_prefs);
-    try { localStorage.setItem(PREFS_KEY, json); } catch (e) {}
+    try { localStorage.setItem(PREFS_KEY, json); } catch (_ignored) {}
     // PUT /api/layout synchron — Datei ist Single Source of Truth, muss vor Reload fertig sein.
     try {
       var xhrPut = new XMLHttpRequest();
@@ -229,7 +229,7 @@
         try {
           var mPut = xhrPut.getResponseHeader('X-Layout-Mtime');
           if (mPut) localStorage.setItem(LAYOUT_FILE_MTIME_KEY, mPut);
-        } catch (eM) {}
+        } catch (_ignored) {}
       }
     } catch (e) { /* offline */ }
   }
@@ -328,10 +328,10 @@
       return true;
     }
     if (secDef && secDef.parentSection) {
-      if (hs.indexOf(sectionId) !== -1) return false;
+      if (hs.includes(sectionId)) return false;
       return isSectionVisible(secDef.parentSection);
     }
-    if (hs.indexOf(sectionId) !== -1) return false;
+    if (hs.includes(sectionId)) return false;
     if (_prefs.widgets && _prefs.widgets.length) {
       var wi;
       for (wi = 0; wi < _prefs.widgets.length; wi++) {
@@ -361,7 +361,7 @@
     if (secId && !isSectionVisible(secId)) return false;
     var h = _prefs.hiddenCharts;
     if (!Array.isArray(h)) return true;
-    return h.indexOf(chartId) === -1;
+    return !h.includes(chartId);
   }
 
   function getWidgetSpan(sectionId) {
@@ -576,14 +576,14 @@
       var reg = getRegistry();
       if (reg) {
         for (var ek in extracted) {
-          if (!Object.prototype.hasOwnProperty.call(extracted, ek)) continue;
+          if (!Object.hasOwn(extracted, ek)) continue;
           var chartDef = reg.findChart(ek);
           if (!chartDef || !chartDef.renderFn) continue;
           var rf = global[chartDef.renderFn];
           if (typeof rf !== 'function') continue;
           try {
             invokeChartRenderFn(chartDef.renderFn, rf);
-          } catch (eRender) {}
+          } catch (_ignored) {}
         }
       }
     }
@@ -591,26 +591,26 @@
 
   /** Invoke a standalone chart render function with the correct context data. */
   function invokeChartRenderFn(rfName, rf) {
-    if (String(rfName).indexOf('renderProxy_') === 0) {
+    if (String(rfName).startsWith('renderProxy_')) {
       var dataP = global.__lastUsageData;
       if (dataP && typeof global._computeProxyCtx === 'function') global._computeProxyCtx(dataP);
       if (global.__sectionCtx_proxy) rf(global.__sectionCtx_proxy);
-    } else if (String(rfName).indexOf('renderForensic_') === 0) {
+    } else if (String(rfName).startsWith('renderForensic_')) {
       var fctx = global.__sectionCtx_forensic;
       if (fctx) rf(fctx);
-    } else if (String(rfName).indexOf('renderUserProfile_') === 0) {
+    } else if (String(rfName).startsWith('renderUserProfile_')) {
       var uctx = global.__sectionCtx_userProfile;
       if (uctx) rf(uctx);
-    } else if (String(rfName).indexOf('renderBudget_') === 0) {
+    } else if (String(rfName).startsWith('renderBudget_')) {
       var bctx = global.__sectionCtx_budget;
       if (!bctx && global.__lastUsageData && typeof global._computeBudgetCtx === 'function') {
         bctx = global._computeBudgetCtx(global.__lastUsageData);
       }
       if (bctx) rf(bctx);
-    } else if (String(rfName).indexOf('renderTokenStats_') === 0) {
+    } else if (String(rfName).startsWith('renderTokenStats_')) {
       var tsctx = global.__sectionCtx_tokenStats;
       if (tsctx) rf(tsctx);
-    } else if (String(rfName).indexOf('renderStatus_') === 0) {
+    } else if (String(rfName).startsWith('renderStatus_')) {
       rf();
     } else if (
       rfName === 'renderWasteCurve' || rfName === 'renderCacheExplosion' ||
@@ -845,7 +845,7 @@
     var needsHealth = false;
     for (var id0 of childIds) {
       if (!id0) continue;
-      if (id0.indexOf('health-kpi-') === 0 || id0.indexOf('health-finding-') === 0) {
+      if (id0.startsWith('health-kpi-') || id0.startsWith('health-finding-')) {
         needsHealth = true;
         break;
       }
@@ -918,8 +918,8 @@
     savePrefs();
     applyChartVisibility(chartId, visible);
     if (
-      chartId.indexOf('health-kpi-') === 0 ||
-      chartId.indexOf('health-finding-') === 0
+      chartId.startsWith('health-kpi-') ||
+      chartId.startsWith('health-finding-')
     ) {
       if (typeof global.invalidateHealthAndFindingsRender === 'function') {
         global.invalidateHealthAndFindingsRender();
@@ -1006,15 +1006,15 @@
       'token-stats-kpi-hosts'
     ];
     var changedTs = false;
-    if (_prefs.hiddenCharts.indexOf('ts-kpis') !== -1) {
+    if (_prefs.hiddenCharts.includes('ts-kpis')) {
       var merged = [];
       for (var tid of _prefs.hiddenCharts) {
         if (tid === 'ts-kpis') {
           for (var tsKpi of tsKpisAll) {
-            if (merged.indexOf(tsKpi) === -1) merged.push(tsKpi);
+            if (!merged.includes(tsKpi)) merged.push(tsKpi);
           }
           changedTs = true;
-        } else if (merged.indexOf(tid) === -1) merged.push(tid);
+        } else if (!merged.includes(tid)) merged.push(tid);
       }
       _prefs.hiddenCharts = merged;
     }
@@ -1135,7 +1135,7 @@
       setTimeout(function () { resizeAll(); }, 250);
     }
     // Original filters hidden via CSS (body.sidebar-open selector)
-    try { localStorage.setItem('cud_sidebar_open', _sidebarOpen ? '1' : '0'); } catch (e) {}
+    try { localStorage.setItem('cud_sidebar_open', _sidebarOpen ? '1' : '0'); } catch (_ignored) {}
   }
 
   function bindSidebarEvents() {
@@ -1155,7 +1155,7 @@
         _sidebarRestoreScheduled = true;
         setTimeout(function () { toggleSidebar(true); }, 100);
       }
-    } catch (e) {}
+    } catch (_ignored) {}
   }
 
   // ── Widget Tree (Layout section) ────────────────────────────────
@@ -1783,13 +1783,13 @@
     var hidden = tpl.hiddenSections || [];
     var widgets = [];
     for (var oItem of order) {
-      if (hidden.indexOf(oItem) === -1) {
+      if (!hidden.includes(oItem)) {
         widgets.push({ id: oItem, span: 12 });
       }
     }
     // Add any sections not in order and not hidden
     for (var sid of ALL_SECTION_IDS) {
-      if (order.indexOf(sid) === -1 && hidden.indexOf(sid) === -1) {
+      if (!order.includes(sid) && !hidden.includes(sid)) {
         widgets.push({ id: sid, span: 12 });
       }
     }
@@ -1807,21 +1807,21 @@
       if (xhrT.status === 200 && xhrT.responseText) {
         var parsed = JSON.parse(xhrT.responseText);
         if (parsed && Array.isArray(parsed.templates) && parsed.templates.length) {
-          try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(parsed.templates)); } catch (e3) {}
+          try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(parsed.templates)); } catch (_ignored) {}
           return parsed.templates;
         }
       }
-    } catch (e2) {}
+    } catch (_ignored) {}
     // Fallback to localStorage
     try {
       var raw = localStorage.getItem(TEMPLATES_KEY);
       if (raw) return JSON.parse(raw);
-    } catch (e) {}
+    } catch (_ignored) {}
     return [];
   }
 
   function saveTemplates(list) {
-    try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list)); } catch (e) {}
+    try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list)); } catch (_ignored) {}
     // Persist to server layout file
     if (_prefs) {
       _prefs.templates = list;
@@ -1830,11 +1830,11 @@
   }
 
   function getActiveTemplateName() {
-    try { return localStorage.getItem(ACTIVE_TPL_KEY) || ''; } catch (e) { return ''; }
+    try { return localStorage.getItem(ACTIVE_TPL_KEY) || ''; } catch (_ignored) { return ''; }
   }
 
   function setActiveTemplateName(name) {
-    try { localStorage.setItem(ACTIVE_TPL_KEY, name); } catch (e) {}
+    try { localStorage.setItem(ACTIVE_TPL_KEY, name); } catch (_ignored) {}
   }
 
   function getAllTemplates() {
@@ -1950,7 +1950,7 @@
       var child = children[ni];
       if (!child.id || !child.id.match(/-collapse$/)) {
         // Also skip standalone chart wrappers
-        if (child.id && child.id.indexOf('widget-') === 0) continue;
+        if (child.id?.startsWith('widget-')) continue;
         nonSectionNodes.push(child);
       }
     }
@@ -2063,7 +2063,7 @@
         var btn = e.target.closest('[data-tpl-action]');
         if (!btn) return;
         var action = btn.dataset.tplAction;
-        var idx = parseInt(btn.dataset.tplIdx, 10);
+        var idx = Number.parseInt(btn.dataset.tplIdx, 10);
         var all2 = getAllTemplates();
         if (idx < 0 || idx >= all2.length) return;
 
@@ -2088,7 +2088,7 @@
   }
 
   function escT(s) {
-    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return String(s == null ? '' : s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
   }
 
   // ── Export Section ──────────────────────────────────────────────
@@ -2333,7 +2333,7 @@
 
   function tbNewLayoutBlock(span) {
     _tbBlockSeq++;
-    var s = parseInt(span, 10) || 12;
+    var s = Number.parseInt(span, 10) || 12;
     if (s < 1) s = 1;
     if (s > 12) s = 12;
     return { type: 'block', span: s, bid: 'tbblk_' + _tbBlockSeq, children: [] };
@@ -2510,9 +2510,9 @@
     fromSi = typeof fromSi === 'number' ? fromSi : -1;
     fromPc = typeof fromPc === 'number' ? fromPc : -1;
     fromIx = typeof fromIx === 'number' ? fromIx : -1;
-    var toSi = parseInt(zone.dataset.sidx, 10);
+    var toSi = Number.parseInt(zone.dataset.sidx, 10);
     var inner = zone.classList.contains('tb-canvas-block-inner');
-    var toPc = inner ? parseInt(zone.dataset.pcidx, 10) : -1;
+    var toPc = inner ? Number.parseInt(zone.dataset.pcidx, 10) : -1;
     var ti = tbFindChildInsertBefore(zone, clientY);
     if (fromSi >= 0 && fromIx >= 0 && toSi === fromSi) {
       if (inner && fromPc === toPc) {
@@ -2532,12 +2532,12 @@
     if (!chartId) return 6;
     var sid = String(chartId);
     if (!reg || !reg.findChart) {
-      if (sid.indexOf('health-finding-') === 0) return 2;
-      if (sid.indexOf('health-kpi-') === 0) return 4;
-      if (sid.indexOf('token-stats-kpi-') === 0) return 2;
-      if (sid.indexOf('budget-kpi-') === 0) return 2;
-      if (sid.indexOf('proxy-kpi-') === 0) return 2;
-      if (sid.indexOf('forensic-card-') === 0) return 4;
+      if (sid.startsWith('health-finding-')) return 2;
+      if (sid.startsWith('health-kpi-')) return 4;
+      if (sid.startsWith('token-stats-kpi-')) return 2;
+      if (sid.startsWith('budget-kpi-')) return 2;
+      if (sid.startsWith('proxy-kpi-')) return 2;
+      if (sid.startsWith('forensic-card-')) return 4;
       if (sid === 'intel-saturation' || sid === 'intel-health' || sid === 'intel-quota-eta') return 4;
       return 6;
     }
@@ -2569,7 +2569,7 @@
       var ordered = getOrderedChartsForSection(part);
       for (var ch of ordered) {
         if (ch.visible === false) continue;
-        if (hidden.indexOf(ch.id) >= 0) continue;
+        if (hidden.includes(ch.id)) continue;
         out.push({ id: ch.id, span: tbPoolDefaultSpanForChart(reg, ch.id) });
       }
     }
@@ -3437,8 +3437,8 @@
     canvas.addEventListener('click', function (e) {
       var addBlk = e.target.closest('.tb-canvas-add-block');
       if (addBlk) {
-        var sbi = parseInt(addBlk.dataset.sidx, 10);
-        var spb = parseInt(addBlk.dataset.span, 10);
+        var sbi = Number.parseInt(addBlk.dataset.sidx, 10);
+        var spb = Number.parseInt(addBlk.dataset.span, 10);
         if (_tbWidgets[sbi]) {
           if (!_tbWidgets[sbi].children) _tbWidgets[sbi].children = [];
           _tbWidgets[sbi].children.push(tbNewLayoutBlock(spb));
@@ -3448,16 +3448,16 @@
       }
       var rmChild = e.target.closest('.tb-canvas-child-remove');
       if (rmChild) {
-        var si = parseInt(rmChild.dataset.sidx, 10);
+        var si = Number.parseInt(rmChild.dataset.sidx, 10);
         if (rmChild.dataset.pcidx !== undefined && rmChild.dataset.pcidx !== '') {
-          var pcR = parseInt(rmChild.dataset.pcidx, 10);
-          var iccR = parseInt(rmChild.dataset.icc, 10);
+          var pcR = Number.parseInt(rmChild.dataset.pcidx, 10);
+          var iccR = Number.parseInt(rmChild.dataset.icc, 10);
           var blkR = _tbWidgets[si] && _tbWidgets[si].children && _tbWidgets[si].children[pcR];
-          if (blkR && blkR.children && !isNaN(iccR)) {
+          if (blkR && blkR.children && !Number.isNaN(iccR)) {
             blkR.children.splice(iccR, 1);
           }
         } else {
-          var ci = parseInt(rmChild.dataset.cidx, 10);
+          var ci = Number.parseInt(rmChild.dataset.cidx, 10);
           if (_tbWidgets[si] && _tbWidgets[si].children) {
             _tbWidgets[si].children.splice(ci, 1);
           }
@@ -3468,7 +3468,7 @@
       var rmSec = e.target.closest('.tb-canvas-remove');
       if (rmSec) {
         e.stopPropagation();
-        var idx = parseInt(rmSec.dataset.sidx, 10);
+        var idx = Number.parseInt(rmSec.dataset.sidx, 10);
         _tbWidgets.splice(idx, 1);
         renderBuilderRows();
       }
@@ -3478,9 +3478,9 @@
     canvas.addEventListener('dragstart', function (e) {
       var ch = e.target.closest('.tb-canvas-child');
       if (ch) {
-        var siD = parseInt(ch.dataset.sidx, 10);
-        var pcD = ch.dataset.pcidx !== undefined && ch.dataset.pcidx !== '' ? parseInt(ch.dataset.pcidx, 10) : -1;
-        var ixD = pcD >= 0 ? parseInt(ch.dataset.icc, 10) : parseInt(ch.dataset.cidx, 10);
+        var siD = Number.parseInt(ch.dataset.sidx, 10);
+        var pcD = ch.dataset.pcidx !== undefined && ch.dataset.pcidx !== '' ? Number.parseInt(ch.dataset.pcidx, 10) : -1;
+        var ixD = pcD >= 0 ? Number.parseInt(ch.dataset.icc, 10) : Number.parseInt(ch.dataset.cidx, 10);
         _tbDrag = { kind: 'tbchild', si: siD, pc: pcD, ix: ixD };
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', 'tbchild:' + siD + ':' + pcD + ':' + ixD);
@@ -3489,7 +3489,7 @@
       }
       var sec = e.target.closest('.tb-canvas-section');
       if (!sec) return;
-      _tbDrag = { kind: 'section', fromIdx: parseInt(sec.dataset.sidx, 10) };
+      _tbDrag = { kind: 'section', fromIdx: Number.parseInt(sec.dataset.sidx, 10) };
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', 'section:' + sec.dataset.sidx);
       sec.classList.add('is-dragging');
@@ -3561,16 +3561,16 @@
       var targetSec = e.target.closest('.tb-canvas-section');
 
       // Reorder / move a chart or chip row on the canvas (section-level or inside layout block)
-      if (data.indexOf('tbchild:') === 0) {
+      if (data.startsWith('tbchild:')) {
         var rest = data.slice(8).split(':');
-        var fromSi = parseInt(rest[0], 10);
+        var fromSi = Number.parseInt(rest[0], 10);
         var fromPc = -1;
         var fromIx = 0;
         if (rest.length >= 3) {
-          fromPc = parseInt(rest[1], 10);
-          fromIx = parseInt(rest[2], 10);
+          fromPc = Number.parseInt(rest[1], 10);
+          fromIx = Number.parseInt(rest[2], 10);
         } else {
-          fromIx = parseInt(rest[1], 10);
+          fromIx = Number.parseInt(rest[1], 10);
         }
         var srcList = tbGetChildListByParent(fromSi, fromPc);
         if (!srcList || fromIx < 0 || fromIx >= srcList.length) {
@@ -3585,11 +3585,11 @@
           renderBuilderRows();
           return;
         }
-        var toSi = parseInt(zone.dataset.sidx, 10);
-        var toPc = innerDrop ? parseInt(zone.dataset.pcidx, 10) : -1;
+        var toSi = Number.parseInt(zone.dataset.sidx, 10);
+        var toPc = innerDrop ? Number.parseInt(zone.dataset.pcidx, 10) : -1;
         var ti = tbFindChildInsertBefore(zone, e.clientY);
         var toIx = ti.slot;
-        if (isNaN(toIx)) toIx = 0;
+        if (Number.isNaN(toIx)) toIx = 0;
         var moved = srcList.splice(fromIx, 1)[0];
         var tgtList = tbGetChildListByParent(toSi, toPc);
         if (!tgtList) {
@@ -3608,7 +3608,7 @@
       }
 
       // Drop from pool (copy): chart into a section, or add empty section
-      if (data.indexOf('pool:') === 0) {
+      if (data.startsWith('pool:')) {
         var parts = data.slice(5).split('|');
         var poolId = parts[0];
         var poolType = parts[1] || 'section';
@@ -3616,13 +3616,13 @@
         if (poolType === 'chart') {
           var innerPool = e.target.closest('.tb-canvas-block-inner');
           if (innerPool) {
-            var siIn = parseInt(innerPool.dataset.sidx, 10);
-            var pcIn = parseInt(innerPool.dataset.pcidx, 10);
+            var siIn = Number.parseInt(innerPool.dataset.sidx, 10);
+            var pcIn = Number.parseInt(innerPool.dataset.pcidx, 10);
             var listIn = tbGetChildListByParent(siIn, pcIn);
             if (listIn) {
               var tiIn = tbFindChildInsertBefore(innerPool, e.clientY);
               var slotIn = tiIn.slot;
-              if (isNaN(slotIn)) slotIn = 0;
+              if (Number.isNaN(slotIn)) slotIn = 0;
               if (slotIn < 0) slotIn = 0;
               if (slotIn > listIn.length) slotIn = listIn.length;
               listIn.splice(slotIn, 0, { id: poolId, span: tbPoolDefaultSpanForChart(regCanvas, poolId) });
@@ -3636,10 +3636,10 @@
           var sidx = -1;
           var toCi2 = 0;
           if (zone2) {
-            sidx = parseInt(zone2.dataset.sidx, 10);
+            sidx = Number.parseInt(zone2.dataset.sidx, 10);
             var ti2 = tbFindChildInsertBefore(zone2, e.clientY);
             toCi2 = ti2.slot;
-            if (isNaN(toCi2)) toCi2 = 0;
+            if (Number.isNaN(toCi2)) toCi2 = 0;
           } else if (_tbWidgets.length > 0) {
             sidx = _tbWidgets.length - 1;
             var allSecEls = canvas.querySelectorAll('.tb-canvas-section');
@@ -3651,7 +3651,7 @@
             } else {
               toCi2 = _tbWidgets[sidx].children ? _tbWidgets[sidx].children.length : 0;
             }
-            if (isNaN(toCi2)) toCi2 = 0;
+            if (Number.isNaN(toCi2)) toCi2 = 0;
           }
           if (sidx >= 0 && _tbWidgets[sidx]) {
             if (!_tbWidgets[sidx].children) _tbWidgets[sidx].children = [];
@@ -3679,8 +3679,8 @@
       }
 
       // Reorder sections within canvas
-      if (data.indexOf('section:') === 0) {
-        var fromIdx = parseInt(data.slice(8), 10);
+      if (data.startsWith('section:')) {
+        var fromIdx = Number.parseInt(data.slice(8), 10);
         if (fromIdx < 0 || fromIdx >= _tbWidgets.length) {
           renderBuilderRows();
           return;
@@ -3715,29 +3715,29 @@
       var handle = e.target.closest('.tb-canvas-resize');
       var childHandle = e.target.closest('.tb-canvas-child-resize');
       if (childHandle) {
-        var si = parseInt(childHandle.dataset.sidx, 10);
+        var si = Number.parseInt(childHandle.dataset.sidx, 10);
         if (childHandle.dataset.pcidx !== undefined && childHandle.dataset.pcidx !== '') {
-          var pcH = parseInt(childHandle.dataset.pcidx, 10);
-          var ixH = parseInt(childHandle.dataset.icc, 10);
+          var pcH = Number.parseInt(childHandle.dataset.pcidx, 10);
+          var ixH = Number.parseInt(childHandle.dataset.icc, 10);
           _resizeTarget = { type: 'childInner', si: si, pc: pcH, ix: ixH, maxSpan: 12 };
           var blkH = _tbWidgets[si] && _tbWidgets[si].children && _tbWidgets[si].children[pcH];
           var rowH = blkH && blkH.children && blkH.children[ixH];
           _resizeStartSpan = rowH ? rowH.span : 6;
         } else {
-          var ci = parseInt(childHandle.dataset.cidx, 10);
+          var ci = Number.parseInt(childHandle.dataset.cidx, 10);
           _resizeTarget = { type: 'child', si: si, ci: ci };
           _resizeStartSpan = (_tbWidgets[si] && _tbWidgets[si].children && _tbWidgets[si].children[ci]) ? _tbWidgets[si].children[ci].span : 6;
         }
         var childGrid = childHandle.closest('.tb-canvas-block-inner') || childHandle.closest('.tb-canvas-children');
         var gridCols = 12;
         if (childGrid && childGrid.classList.contains('tb-canvas-block-inner')) {
-          var icd = parseInt(childGrid.getAttribute('data-inner-cols'), 10);
-          if (!isNaN(icd) && icd >= 1 && icd <= 12) gridCols = icd;
+          var icd = Number.parseInt(childGrid.getAttribute('data-inner-cols'), 10);
+          if (!Number.isNaN(icd) && icd >= 1 && icd <= 12) gridCols = icd;
         }
         _colWidth = childGrid ? childGrid.offsetWidth / gridCols : canvas.offsetWidth / 12;
         if (_resizeTarget.type === 'childInner') _resizeTarget.maxSpan = gridCols;
       } else if (handle) {
-        var idx = parseInt(handle.dataset.sidx, 10);
+        var idx = Number.parseInt(handle.dataset.sidx, 10);
         _resizeTarget = { type: 'section', si: idx };
         _resizeStartSpan = _tbWidgets[idx] ? _tbWidgets[idx].span : 12;
         _colWidth = canvas.offsetWidth / 12;
@@ -4025,7 +4025,7 @@
         var inst0 = echarts.init(pvEl, null, { renderer: 'canvas' });
         var opts0 = origInst.getOption();
         if (opts0) inst0.setOption(opts0, true);
-      } catch (e0) {}
+      } catch (_ignored) {}
       return;
     }
 
@@ -4053,23 +4053,23 @@
       try {
         var ex1 = echarts.getInstanceByDom(pvEl);
         if (ex1) ex1.dispose();
-      } catch (e1) {}
+      } catch (_ignored) {}
 
-      if (String(rfName).indexOf('renderProxy_') === 0) {
+      if (String(rfName).startsWith('renderProxy_')) {
         var dataP = global.__lastUsageData;
         if (dataP && typeof global._computeProxyCtx === 'function') global._computeProxyCtx(dataP);
         if (global.__sectionCtx_proxy) rf(global.__sectionCtx_proxy);
       } else if (rfName === 'renderIntel_seasonality') {
         rf();
-      } else if (String(rfName).indexOf('renderStatus_') === 0) {
+      } else if (String(rfName).startsWith('renderStatus_')) {
         rf();
-      } else if (String(rfName).indexOf('renderForensic_') === 0) {
+      } else if (String(rfName).startsWith('renderForensic_')) {
         var fctx = global.__sectionCtx_forensic;
         if (fctx) rf(fctx);
-      } else if (String(rfName).indexOf('renderUserProfile_') === 0) {
+      } else if (String(rfName).startsWith('renderUserProfile_')) {
         var uctx = global.__sectionCtx_userProfile;
         if (uctx) rf(uctx);
-      } else if (String(rfName).indexOf('renderBudget_') === 0) {
+      } else if (String(rfName).startsWith('renderBudget_')) {
         var bctx = global.__sectionCtx_budget;
         if (!bctx && global.__lastUsageData && typeof global._computeBudgetCtx === 'function') {
           bctx = global._computeBudgetCtx(global.__lastUsageData);
@@ -4301,12 +4301,12 @@
       var containers = body.querySelectorAll('.tb-pv-chart-container');
       for (var ctr of containers) {
         var inst = echarts.getInstanceByDom(ctr);
-        if (inst) try { inst.dispose(); } catch (e) {}
+        if (inst) try { inst.dispose(); } catch (_ignored) {}
       }
     }
     // Preview may have repainted via temp canvas id swap — repaint core charts without full-page coalesce.
     if (typeof global.renderDashboardCore === 'function' && global.__lastUsageData) {
-      try { global.renderDashboardCore(global.__lastUsageData); } catch (eRe) {}
+      try { global.renderDashboardCore(global.__lastUsageData); } catch (_ignored) {}
     }
   }
 

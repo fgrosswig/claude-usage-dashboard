@@ -8,12 +8,12 @@
  *
  * tar: macOS/Linux im PATH; Windows oft nur unter System32 — siehe resolveTarBin().
  */
-var cp = require('child_process');
-var fs = require('fs');
-var path = require('path');
-var os = require('os');
-var http = require('http');
-var https = require('https');
+var cp = require('node:child_process');
+var fs = require('node:fs');
+var path = require('node:path');
+var os = require('node:os');
+var http = require('node:http');
+var https = require('node:https');
 
 function resolveTarBin() {
   var fromEnv = process.env.CLAUDE_SYNC_TAR;
@@ -79,7 +79,7 @@ if (includeProxyLogs) {
   var logsDir = path.join(claudeDir, 'anthropic-proxy-logs');
   try {
     if (fs.statSync(logsDir).isDirectory()) toPack.push('anthropic-proxy-logs');
-  } catch (e2) {}
+  } catch (_ignored) {}
 }
 
 var tmpTar = path.join(os.tmpdir(), 'claude-sync-out-' + process.pid + '-' + Date.now() + '.tgz');
@@ -106,21 +106,21 @@ tr.on('close', function (code) {
   } finally {
     try {
       fs.unlinkSync(tmpTar);
-    } catch (e4) {}
+    } catch (_ignored) {}
   }
 
   var u;
   try {
-    u = new URL(urlStr.indexOf('://') < 0 ? 'https://' + urlStr : urlStr);
+    u = new URL(urlStr.includes('://') ? urlStr : 'https://' + urlStr);
   } catch (e5) {
     console.error('claude-data-sync-client: bad URL');
     process.exit(1);
   }
   var isHttps = u.protocol === 'https:';
   var mod = isHttps ? https : http;
-  var port = u.port ? parseInt(u.port, 10) : isHttps ? 443 : 80;
+  var port = u.port ? Number.parseInt(u.port, 10) : isHttps ? 443 : 80;
   var pathname = (u.pathname || '/').replace(/\/$/, '') + '/api/claude-data-sync';
-  if (pathname.indexOf('//') === 0) pathname = pathname.slice(1);
+  if (pathname.startsWith('//')) pathname = pathname.slice(1);
 
   var opts = {
     hostname: u.hostname,
