@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-263",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "5e3bf67",
+      "commit_full": "5e3bf678b97021e269d570b8ec4a925ad96b9a8c",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(tb): load selected template from dropdown instead of always scaffold (#220)",
+      "detail": "tbLoadDefaultIntoBuilder now respects the template-select dropdown value.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-262",
       "timestamp": "2026-04-13",
       "session": "auto",
