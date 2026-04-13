@@ -12,7 +12,7 @@ function pct(a,b){return b>0?(a/b*100).toFixed(1)+"%":"-";}
 function escHtml(s){return String(s==null?"":s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll("\"","&quot;");}
 /** Sonar S2486: catch blocks must reference the exception. */
 function logClientOptionalErr(err) {
-  if (typeof console !== "undefined" && console.debug) console.debug("[dashboard]", err && err.message != null ? err.message : err);
+  if (typeof console !== "undefined" && console.debug) console.debug("[dashboard]", err?.message != null ? err.message : err);
 }
 /** Stunden mit Arbeit (tokens) ∪ Stunden mit JSONL-Session-Signalen, nach Log-Zeitstempel. */
 function unionWorkHourKeys(sd) {
@@ -360,9 +360,9 @@ function hourlyCacheOutRatioEst(day) {
 function dayNumericForMainCharts(d, hostKey, field) {
   if (hostKey) {
     var H = d.hosts?.[hostKey];
-    return H?.[field] != null ? Number(H[field]) || 0 : 0;
+    return H?.[field] == null ? 0 : Number(H[field]) || 0;
   }
-  return d[field] != null ? Number(d[field]) || 0 : 0;
+  return d[field] == null ? 0 : Number(d[field]) || 0;
 }
 function dayRatioCacheOutForMainCharts(d, hostKey) {
   if (!hostKey) return d.cache_output_ratio || 0;
@@ -1851,7 +1851,7 @@ function syncForensicHostFilterBar(data) {
         } catch (error) { logClientOptionalErr(error); }
         var nodes = chipsHost.querySelectorAll(".forensic-host-chip");
         for (var _node of nodes) {
-          var rv = _node.dataset.hostFilter != null ? String(_node.dataset.hostFilter) : "__ALL__";
+          var rv = _node.dataset.hostFilter == null ? "__ALL__" : String(_node.dataset.hostFilter);
           var nv = rv === "__ALL__" ? "" : rv;
           var on = nv === __forensicHostFilterSig;
           _node.classList.toggle("active", on);

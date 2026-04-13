@@ -38,7 +38,7 @@
   var _layoutTreeEditMode = false;
 
   function logWdOptionalErr(err) {
-    if (typeof console !== 'undefined' && console.debug) console.debug('[widget-dispatcher]', err && err.message != null ? err.message : err);
+    if (typeof console !== 'undefined' && console.debug) console.debug('[widget-dispatcher]', err?.message != null ? err.message : err);
   }
 
   function wtreeNextSectionLi(li) {

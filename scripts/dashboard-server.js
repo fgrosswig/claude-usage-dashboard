@@ -20,7 +20,7 @@ var os = require('node:os');
 var serviceLog = require('./service-logger');
 /** Sonar S2486: every catch must reference the exception (non-empty handling). */
 function logOptionalErr(err) {
-  serviceLog.debug('ignored', err && err.message ? err.message : String(err));
+  serviceLog.debug('ignored', err?.message ? err.message : String(err));
 }
 
 /** Optional absolute path to git (CI / non-default install). */
@@ -29,21 +29,21 @@ function resolveGitBinary() {
   if (override) return override;
   if (process.platform === 'win32') {
     var w = [
-      'C:\\Program Files\\Git\\cmd\\git.exe',
-      'C:\\Program Files\\Git\\bin\\git.exe',
-      'C:\\Program Files (x86)\\Git\\cmd\\git.exe'
+      String.raw`C:\Program Files\Git\cmd\git.exe`,
+      String.raw`C:\Program Files\Git\bin\git.exe`,
+      String.raw`C:\Program Files (x86)\Git\cmd\git.exe`
     ];
-    for (var wi = 0; wi < w.length; wi++) {
+    for (var wp of w) {
       try {
-        if (fs.existsSync(w[wi])) return w[wi];
+        if (fs.existsSync(wp)) return wp;
       } catch (error) { logOptionalErr(error); }
     }
     return 'git.exe';
   }
   var u = ['/usr/bin/git', '/usr/local/bin/git', '/opt/homebrew/bin/git'];
-  for (var ui = 0; ui < u.length; ui++) {
+  for (var up of u) {
     try {
-      if (fs.existsSync(u[ui])) return u[ui];
+      if (fs.existsSync(up)) return up;
     } catch (error) { logOptionalErr(error); }
   }
   return 'git';
@@ -55,13 +55,13 @@ function resolveGitBinary() {
 function gitExecFileTrimmed(gitArgs) {
   var cp = require('node:child_process');
   var isWin = process.platform === 'win32';
-  var safePath = isWin ? 'C:\\Windows\\System32;C:\\Windows' : '/usr/bin:/bin';
+  var safePath = isWin ? String.raw`C:\Windows\System32;C:\Windows` : '/usr/bin:/bin';
   var gitBin = resolveGitBinary();
   return cp.execFileSync(gitBin, gitArgs, {
     encoding: 'utf8',
     timeout: 3000,
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: Object.assign({}, process.env, { PATH: safePath })
+    env: { ...process.env, PATH: safePath }
   }).trim();
 }
 
@@ -604,6 +604,26 @@ function githubReleaseLinkForVersion(relMap, ver) {
 }
 
 /** Füllt Highlights aus allen Releases zwischen from und höchstem added; setzt github_release_links als Fallback. */
+function mergeHighlightsFromReleases(relMap, inter, existing) {
+  var mergedHi = (existing || []).slice();
+  var seenH = Object.create(null);
+  for (var hi of mergedHi) seenH[String(hi)] = true;
+  var prefixMulti = inter.length > 1;
+  for (var iv of inter) {
+    var ri = relMap[iv];
+    if (ri?.highlights?.length) {
+      for (var hl of ri.highlights) {
+        var line = (prefixMulti ? '[' + iv + '] ' : '') + hl;
+        if (seenH[line]) continue;
+        mergedHi.push(line);
+        seenH[line] = true;
+      }
+    }
+  }
+  if (mergedHi.length > 24) mergedHi.length = 24;
+  return mergedHi;
+}
+
 function enrichVersionChangeNotes(result) {
   var relMap = getReleasesMap();
   for (var entry of result) {
@@ -613,23 +633,7 @@ function enrichVersionChangeNotes(result) {
     var addedSorted = vc.added.slice().sort(semverCmp);
     var topN = addedSorted[addedSorted.length - 1];
     var inter = versionsInRelMapBetween(relMap, fromN, topN);
-    var mergedHi = (vc.highlights || []).slice();
-    var seenH = Object.create(null);
-    for (var hi of mergedHi) seenH[String(hi)] = true;
-    var prefixMulti = inter.length > 1;
-    for (var iv of inter) {
-      var ri = relMap[iv];
-      if (ri?.highlights?.length) {
-        for (var hl of ri.highlights) {
-          var line = (prefixMulti ? '[' + iv + '] ' : '') + hl;
-          if (seenH[line]) continue;
-          mergedHi.push(line);
-          seenH[line] = true;
-        }
-      }
-    }
-    if (mergedHi.length > 24) mergedHi.length = 24;
-    vc.highlights = mergedHi;
+    vc.highlights = mergeHighlightsFromReleases(relMap, inter, vc.highlights);
     var linkVers = uniqSortedSemvers(inter.concat(addedSorted));
     var links = [];
     var seenV = Object.create(null);
@@ -664,12 +668,13 @@ function buildByDateFromVersionTimelineItems(items) {
   for (var item of items) {
     var itemDk = isoToUtcYmd(item.when);
     if (!itemDk) continue;
-    if (!groups.length) groups.push([item]);
-    else {
+    if (groups.length) {
       var lastGrp = groups[groups.length - 1];
       var lastDk = isoToUtcYmd(lastGrp[0].when);
       if (lastDk === itemDk) lastGrp.push(item);
       else groups.push([item]);
+    } else {
+      groups.push([item]);
     }
   }
   if (!groups.length) return null;
@@ -2723,19 +2728,39 @@ function jsonForInlineI18nScript() {
   return c.inlineJson;
 }
 
-var __appVersionCache = '';
+var __appVersionHtmlCache = '';
 function getAppVersion() {
-  if (__appVersionCache) return __appVersionCache;
+  if (__appVersionHtmlCache) return __appVersionHtmlCache;
   try {
-    __appVersionCache = gitExecFileTrimmed(['describe', '--tags', '--abbrev=7']);
+    var envHtml = (process.env.APP_VERSION || '').trim();
+    if (envHtml) {
+      __appVersionHtmlCache = envHtml;
+      return __appVersionHtmlCache;
+    }
+  } catch (error) {
+    logOptionalErr(error);
+  }
+  try {
+    var fromVerFile = fs
+      .readFileSync(path.join(__dirname, '..', 'VERSION'), 'utf8')
+      .trim();
+    if (fromVerFile) {
+      __appVersionHtmlCache = fromVerFile;
+      return __appVersionHtmlCache;
+    }
+  } catch (error) {
+    logOptionalErr(error);
+  }
+  try {
+    __appVersionHtmlCache = gitExecFileTrimmed(['describe', '--tags', '--abbrev=7']);
   } catch (e) {
     try {
-      __appVersionCache = 'dev-' + gitExecFileTrimmed(['rev-parse', '--short=7', 'HEAD']);
+      __appVersionHtmlCache = 'dev-' + gitExecFileTrimmed(['rev-parse', '--short=7', 'HEAD']);
     } catch (e2) {
-      __appVersionCache = 'dev';
+      __appVersionHtmlCache = 'dev';
     }
   }
-  return __appVersionCache;
+  return __appVersionHtmlCache;
 }
 
 function getDashboardHtml() {
