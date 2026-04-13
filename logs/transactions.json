@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-256",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "ade257b",
+      "commit_full": "ade257bea7d984ca96c316e896d6e2307f4908b4",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(widgets): update dispatcher layout for intelligence removal and proxy extension",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-255",
       "timestamp": "2026-04-13",
       "session": "auto",
