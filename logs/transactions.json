@@ -2,6 +2,53 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-255",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "6a0fa55",
+      "commit_full": "6a0fa554b76b79d602d00ace1e715219125da18b",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(proxy): saturation/health KPI chips, TTL history chart, remove intelligence section",
+      "detail": "- Saturation + Health scores as KPI chips in proxy card grid (metrics engine)\n- Cache-TTL History: stacked bar (1h/5m/unknown) + Cache Cold % line + Interrupts overlay\n- TTL history registered in widget registry with standalone renderProxy_ttlHistory()\n- Intelligence section fully removed (HTML, registry, scaffold, render call)\n- Docs updated: chapter 12 reflects proxy integration\n- i18n keys DE/EN/KO: proxySaturation, proxyHealth, proxyTtlHistory, proxyTtlColdPct, proxyTtlInterrupts\n- metrics-engine: simplified quotaETA to linear best-case\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "docs/de/12-intelligence-metrics.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-registry.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-254",
       "timestamp": "2026-04-13",
       "session": "auto",
