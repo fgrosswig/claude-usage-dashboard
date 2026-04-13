@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-252",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "3639900",
+      "commit_full": "363990043c7f289dc3721774bd9da7e835ecfb87",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ui): remove live popup release badge JS code",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-251",
       "timestamp": "2026-04-13",
       "session": "auto",
