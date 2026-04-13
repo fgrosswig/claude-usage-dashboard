@@ -35,3 +35,33 @@
 - **Markers:** primarily **VS Code Marketplace** ([Version History](https://marketplace.visualstudio.com/items?itemName=anthropic.claude-code&ssr=false#version-history)) — `lastUpdated`, latest semver; aligned to **UTC calendar day**. Cache: **`~/.claude/claude-code-marketplace-versions.json`**.
 - **Changelog:** **GitHub Releases** (up to 100 entries), cache **`~/.claude/claude-code-releases.json`**. Data: merge Marketplace ∪ GitHub (Marketplace date takes precedence), otherwise JSONL fallback.
 - Version from JSONL: normalized to **`major.minor.patch`**. For old day caches with raw keys: run a full rescan (`CLAUDE_USAGE_NO_CACHE=1` or delete the cache file).
+
+## Chart Engine (since v1.8.0)
+
+- All charts use **ECharts** (Chart.js fully removed).
+- Each section has **standalone render functions** (`window.renderXxx()`) that can be rendered in isolation into any container.
+- Charts are registered in the **Widget Registry** (`public/js/widget-registry.js`) with `engine: "echarts"`, `canvasId`, `renderFn`.
+
+## Sections
+
+| Section | Description |
+|---------|-------------|
+| Health Score | Overall score (0-10), KPI chips, key findings |
+| Token Stats | Daily/hourly charts, overhead, cache ratio |
+| Forensic Analysis | Hit limit, signals, service impact |
+| User Profile | Versions, entrypoints, release stability |
+| Budget Efficiency | Sankey, trend, quota history |
+| Proxy Analytics | Tokens, latency, models, error trend, cache trend |
+| Intelligence / Predictive | Saturation, health score, narrative, seasonality (preliminary) |
+| Economic Usage | Cumulative curve, cache explosion, budget drain |
+| Anthropic Status | Uptime, incidents, outage timeline |
+
+## Sidebar Settings
+
+- **Layout**: show/hide sections, drag to reorder, adjust span (column width)
+- **Templates**: load/create saved layouts
+- **Settings**: language, plan (MAX5/MAX20/Pro/Free/API), user settings
+- **Tools**: file explorer
+- **Export**: JSONL export, template import/export
+
+Details on the widget system: [Chapter 11](11-widget-system.md).

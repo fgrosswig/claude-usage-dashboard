@@ -243,6 +243,44 @@ Bis dahin: **Format als "current main branch" behandeln**. Wer jetzt einen Adapt
 
 ---
 
+## Layout-Datei
+
+**Pfad:** `~/.claude/usage-dashboard-layout.json`
+
+Steuert Section-Reihenfolge, Sichtbarkeit und Spaltenbreite im 12-Spalten Grid. Wird ueber `GET/PUT /api/layout` gelesen/geschrieben.
+
+```json
+{
+  "v": 1,
+  "order": ["health", "token-stats", "forensic", ...],
+  "hiddenSections": [],
+  "hiddenCharts": ["health-kpi-false429"],
+  "widgets": [
+    { "id": "health", "span": 12 },
+    { "id": "token-stats", "span": 12 },
+    { "id": "proxy", "span": 6 },
+    { "id": "budget", "span": 6 }
+  ]
+}
+```
+
+- `widgets[]` ist die primaere Quelle fuer Reihenfolge und Span
+- `order[]` wird aus `widgets[]` synchronisiert (Kompatibilitaet)
+- `hiddenSections[]` / `hiddenCharts[]` steuern Sichtbarkeit unabhaengig von der Reihenfolge
+
+Details: [Kapitel 11 — Widget-System](11-widget-system.md)
+
+## Extract-Cache
+
+**Pfad:** `~/.claude/usage-dashboard-extract-cache/`
+
+Pre-extrahierte JSONL-Records (~150 Bytes statt 5-50 KB pro Record) fuer schnelle Session-Turns-Berechnung.
+
+- `*.jsonl` — extrahierte Records pro Quelldatei
+- `manifest.json` — mtime + size pro Datei fuer inkrementellen Sync
+- Erzeugt von `scripts/extract-cache.js`
+- Genutzt von `scripts/session-turns-core.js` (`pass1FromExtractCache`, `buildSessionTurnsFromCache`)
+
 ## Referenzen
 
 - Wahrheits-Quelle (JSONL-Konsum): `scripts/dashboard-server.js` Funktionen `parseAllUsageIncremental`, `extractCliVersion`, `extractEntrypoint`, `classifyJsonlSessionSignals`

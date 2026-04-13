@@ -35,3 +35,33 @@
 - **Marker:** primär **VS Code Marketplace** ([Version History](https://marketplace.visualstudio.com/items?itemName=anthropic.claude-code&ssr=false#version-history)) — `lastUpdated`, neueste Semver; auf **UTC-Kalendertag**. Cache: **`~/.claude/claude-code-marketplace-versions.json`**.
 - **Changelog:** **GitHub Releases** (bis 100 Einträge), Cache **`~/.claude/claude-code-releases.json`**. Daten: Merge Marketplace ∪ GitHub (Marketplace-Datum hat Vorrang), sonst JSONL-Fallback.
 - Version aus JSONL: normalisiert **`major.minor.patch`**. Bei alten Day-Caches mit rohen Keys: einmal Vollscan (`CLAUDE_USAGE_NO_CACHE=1` oder Cache-Datei löschen).
+
+## Chart-Engine (seit v1.8.0)
+
+- Alle Diagramme nutzen **ECharts** (Chart.js komplett entfernt).
+- Jede Section hat **standalone Render-Funktionen** (`window.renderXxx()`), die isoliert in beliebige Container gerendert werden koennen.
+- Charts sind im **Widget Registry** (`public/js/widget-registry.js`) registriert mit `engine: "echarts"`, `canvasId`, `renderFn`.
+
+## Sections
+
+| Section | Beschreibung |
+|---------|-------------|
+| Health Score | Gesamt-Score (0-10), KPI-Chips, Kernbefunde |
+| Token-Statistiken | Tages-/Stunden-Charts, Overhead, Cache-Ratio |
+| Forensische Analyse | Hit-Limit, Signale, Service Impact |
+| Benutzerprofil | Versionen, Entrypoints, Release-Stabilitaet |
+| Budget-Effizienz | Sankey, Trend, Quota-Verlauf |
+| Proxy-Analyse | Tokens, Latenz, Modelle, Fehler-Trend, Cache-Trend |
+| Intelligence / Predictive | Saturation, Health Score, Narrative, Seasonality (vorlaeufig) |
+| Oekonomische Nutzung | Kumulative Kurve, Cache-Explosion, Budget Drain |
+| Anthropic Status | Uptime, Incidents, Outage-Timeline |
+
+## Sidebar-Einstellungen
+
+- **Layout**: Sections ein-/ausblenden, Reihenfolge per Drag aendern, Span (Spaltenbreite) anpassen
+- **Vorlagen**: gespeicherte Layouts laden/erstellen
+- **Einstellungen**: Sprache, Plan (MAX5/MAX20/Pro/Free/API), Benutzer-Einstellungen
+- **Werkzeuge**: Datei-Explorer
+- **Export**: JSONL-Export, Template Import/Export
+
+Details zum Widget-System: [Kapitel 11](11-widget-system.md).
