@@ -5,12 +5,108 @@
       "id": "TX-254",
       "timestamp": "2026-04-13",
       "session": "auto",
-      "commit": "8ceabb0",
-      "commit_full": "8ceabb064edbdcbdb1fb40423367628a94fabb9d",
+      "commit": "5b5c528",
+      "commit_full": "5b5c528a38292322bd5c72d9817139a856d8c524",
       "status": "ABGESCHLOSSEN",
-      "description": "Merge branch 'feat/widget-dispatcher' into develop",
-      "detail": "# Conflicts:\n#\tlogs/transactions.json",
-      "changes": []
+      "description": "docs: add chapters 11 (widget system) + 12 (intelligence/metrics), update 03/07/09",
+      "detail": "- Chapter 11: Widget Registry, Dispatcher, Grid Layout, Template Builder (DE/EN/KO)\n- Chapter 12: Metrics Engine, Intelligence Section, Extract-Cache (DE/EN/KO)\n- Chapter 03: ECharts migration, sections table, sidebar settings\n- Chapter 07: new API endpoints (cache-files, cache-file-view, session-turns, layout)\n- Chapter 09: layout file format, extract-cache format\n- All READMEs updated with new chapters\n- metrics-engine: simplified quotaETA to linear best-case (curve is in Budget Drain chart)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "docs/de/03-ui-filter-i18n.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/de/07-umgebung-api-deployment-dev.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/de/09-datenformate.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/de/11-widget-system.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/de/12-intelligence-metrics.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/de/README.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/03-ui-and-i18n.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/07-config-api-deployment.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/09-data-formats.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/11-widget-system.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/12-intelligence-metrics.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/README.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/03-ui-and-i18n.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/07-config-api-deployment.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/09-data-formats.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/11-widget-system.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/12-intelligence-metrics.md",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/README.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/metrics-engine.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
     },
     {
       "id": "TX-253",

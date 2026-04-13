@@ -243,6 +243,44 @@ done < proxy-2026-04-07.ndjson
 
 ---
 
+## 레이아웃 파일
+
+**경로:** `~/.claude/usage-dashboard-layout.json`
+
+12열 그리드에서 섹션 순서, 가시성, 열 너비를 제어합니다. `GET/PUT /api/layout`으로 읽기/쓰기합니다.
+
+```json
+{
+  "v": 1,
+  "order": ["health", "token-stats", "forensic", ...],
+  "hiddenSections": [],
+  "hiddenCharts": ["health-kpi-false429"],
+  "widgets": [
+    { "id": "health", "span": 12 },
+    { "id": "token-stats", "span": 12 },
+    { "id": "proxy", "span": 6 },
+    { "id": "budget", "span": 6 }
+  ]
+}
+```
+
+- `widgets[]`가 순서와 span의 기본 소스
+- `order[]`는 `widgets[]`에서 동기화 (호환성)
+- `hiddenSections[]` / `hiddenCharts[]`는 순서와 독립적으로 가시성 제어
+
+상세: [11장 — 위젯 시스템](11-widget-system.md)
+
+## Extract-Cache
+
+**경로:** `~/.claude/usage-dashboard-extract-cache/`
+
+빠른 세션 턴 계산을 위해 사전 추출된 JSONL 레코드 (레코드당 5-50KB 대신 ~150바이트).
+
+- `*.jsonl` — 소스 파일당 추출된 레코드
+- `manifest.json` — 증분 동기화를 위한 파일별 mtime + size
+- `scripts/extract-cache.js`로 생성
+- `scripts/session-turns-core.js`에서 사용 (`pass1FromExtractCache`, `buildSessionTurnsFromCache`)
+
 ## 참조
 
 - 진실의 소스 (JSONL 소비): `scripts/dashboard-server.js`의 `parseAllUsageIncremental`, `extractCliVersion`, `extractEntrypoint`, `classifyJsonlSessionSignals` 함수

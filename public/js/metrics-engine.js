@@ -61,6 +61,11 @@
    * @param {object} pd - proxy day with rate_limit + q5_samples
    * @returns {{ minutesLeft: number, burnPerMin: number, confidence: string, pct5h: number }}
    */
+  /**
+   * Estimate remaining time until quota exhaustion (best-case, linear).
+   * For the real acceleration curve see the Budget Drain chart.
+   * Capped at 300 min (5h rolling window).
+   */
   function estimateQuotaETA(pd) {
     var result = { minutesLeft: -1, burnPerMin: 0, confidence: 'none', pct5h: 0 };
     if (!pd || !pd.rate_limit) return result;
@@ -68,35 +73,29 @@
     var rl = pd.rate_limit;
     var q5 = parseFloat(rl['anthropic-ratelimit-unified-5h-utilization'] || 0);
     result.pct5h = Math.round(q5 * 1000) / 10;
+    var remaining = (1 - q5) * 100;
 
+    // Best source: proxy q5_samples with timestamps
     var samples = Array.isArray(pd.q5_samples) ? pd.q5_samples : [];
-    if (samples.length < 2) {
-      // Fallback: estimate from active_hours
-      if (pd.active_hours > 0 && q5 > 0) {
-        var pctPerHour = (q5 * 100) / pd.active_hours;
-        result.burnPerMin = Math.round(pctPerHour / 60 * 100) / 100;
-        var remaining = (1 - q5) * 100;
-        result.minutesLeft = result.burnPerMin > 0 ? Math.round(remaining / result.burnPerMin) : -1;
-        result.confidence = 'low';
+    if (samples.length >= 2) {
+      var n = Math.min(samples.length, 10);
+      var recent = samples.slice(-n);
+      var tMin = (recent[recent.length - 1].ts - recent[0].ts) / 60000;
+      var pDelta = (recent[recent.length - 1].q5 - recent[0].q5) * 100;
+      if (tMin > 1 && pDelta > 0) {
+        result.burnPerMin = Math.round(pDelta / tMin * 100) / 100;
+        result.minutesLeft = Math.min(300, Math.round(remaining / result.burnPerMin));
+        result.confidence = n >= 5 ? 'high' : 'medium';
+        return result;
       }
-      return result;
     }
 
-    // Calculate burn rate from last N samples
-    var n = Math.min(samples.length, 10);
-    var recent = samples.slice(-n);
-    var firstS = recent[0];
-    var lastS = recent[recent.length - 1];
-    var timeDeltaMin = (lastS.ts - firstS.ts) / 60000;
-    var pctDelta = (lastS.q5 - firstS.q5) * 100;
-
-    if (timeDeltaMin > 0 && pctDelta > 0) {
-      result.burnPerMin = Math.round(pctDelta / timeDeltaMin * 100) / 100;
-      var remainingPct = (1 - q5) * 100;
-      result.minutesLeft = Math.round(remainingPct / result.burnPerMin);
-      result.confidence = n >= 5 ? 'high' : 'medium';
+    // Fallback: average over active hours
+    if (pd.active_hours > 0 && q5 > 0) {
+      result.burnPerMin = Math.round((q5 * 100) / (pd.active_hours * 60) * 100) / 100;
+      result.minutesLeft = result.burnPerMin > 0 ? Math.min(300, Math.round(remaining / result.burnPerMin)) : -1;
+      result.confidence = 'low';
     }
-
     return result;
   }
 

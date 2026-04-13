@@ -14,3 +14,5 @@
 | 8 | Screenshots & image gallery | [08-screenshots.md](08-screenshots.md) |
 | 9 | Data formats (JSONL session logs, Proxy NDJSON), adapter/converter guidance | [09-data-formats.md](09-data-formats.md) |
 | 10 | UDAA Field Study — Anonymized session export, data sharing | [10-udaa-field-study.md](10-udaa-field-study.md) |
+| 11 | Widget system, grid layout, template builder | [11-widget-system.md](11-widget-system.md) |
+| 12 | Intelligence section, metrics engine, extract-cache | [12-intelligence-metrics.md](12-intelligence-metrics.md) |
