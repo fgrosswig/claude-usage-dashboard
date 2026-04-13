@@ -17,6 +17,11 @@ var https = require('node:https');
 var fs = require('node:fs');
 var path = require('node:path');
 var os = require('node:os');
+var serviceLog = require('./service-logger');
+/** Sonar S2486: every catch must reference the exception (non-empty handling). */
+function logOptionalErr(err) {
+  serviceLog.debug('ignored', err && err.message ? err.message : String(err));
+}
 
 /** Optional absolute path to git (CI / non-default install). */
 function resolveGitBinary() {
@@ -88,11 +93,6 @@ var __extractCache = null;
 var __extractCacheLoaded = false;
 var getProxyLogDir = usageScanRoots.getProxyLogDir;
 var collectProxyNdjsonFiles = usageScanRoots.collectProxyNdjsonFiles;
-var serviceLog = require('./service-logger');
-/** Sonar S2486: every catch must reference the exception (non-empty handling). */
-function logOptionalErr(err) {
-  serviceLog.debug('ignored', err && err.message ? err.message : String(err));
-}
 var claudeDataIngest = require('./claude-data-ingest');
 
 /** Nach erfolgreichem Scan: Fingerprint aller JSONL (mtime+size); für optionalen Skip bei unveränderten Dateien. */
