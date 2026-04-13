@@ -4357,11 +4357,7 @@
   function bindTemplateBuilder() {
     var buildBtn = document.getElementById('sidebar-build-template');
     // Template Builder only in DEV_MODE
-    var isDevMode = !!(global.__lastUsageData && global.__lastUsageData.dev_source);
-    if (buildBtn && !isDevMode) {
-      buildBtn.style.display = 'none';
-    }
-    if (buildBtn && isDevMode && !buildBtn.dataset.bound) {
+    if (buildBtn && !buildBtn.dataset.bound) {
       buildBtn.dataset.bound = '1';
       buildBtn.style.display = '';
       buildBtn.textContent = _t('tbBuild');

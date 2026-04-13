@@ -60,15 +60,49 @@ Das Dashboard nutzt ein CSS-Grid mit 12 Spalten (`#layout-grid`). Jede Section b
 - **Reset**: erstellt Default-Widgets (alle Sections, span 12) und reloaded
 - Sidebar oeffnet sich automatisch wenn `cud_sidebar_open` in localStorage gesetzt ist
 
-## Template Builder (geplant, DEV_MODE)
+## Template Builder
 
-> **Status:** experimentell, nur im DEV_MODE sichtbar. Visueller Grid-Builder fuer benutzerdefinierte Layouts — wird in einer zukuenftigen Version fuer alle Nutzer freigegeben.
+Visueller Grid-Builder fuer benutzerdefinierte Dashboard-Layouts. Oeffnen ueber **"Template erstellen"** in der Sidebar.
 
-- 12-Spalten Canvas mit Drag-and-Drop fuer Sections und Charts
-- Widget Pool mit allen verfuegbaren Sections und Charts
-- Resize-Handles fuer Spaltenbreite (1-12)
-- Live Preview mit echten ECharts-Diagrammen
-- Templates werden in `localStorage` unter `cud_templates` gespeichert
+### Aufbau (3-Spalten-Layout)
+
+```text
+┌──────────────┬────────────────────────────┬──────────────┐
+│  CHART POOL  │       CANVAS (12-Grid)     │  CHIP / HTML │
+│              │                            │     POOL     │
+│  ECharts-    │  Sections (aufklappbar)    │  KPI-Karten  │
+│  Diagramme   │    └─ Layout-Bloecke       │  Health-     │
+│  per Drag    │       └─ Charts (span)     │  Badges      │
+│  ins Canvas  │                            │  Meta-Grids  │
+│  ziehen      │  Resize-Handles (1-12)     │              │
+│              │  Drag-Reorder              │              │
+└──────────────┴────────────────────────────┴──────────────┘
+```
+
+- **Links — Chart Pool**: alle ECharts-Diagramme aus der Registry, per Drag-and-Drop ins Canvas ziehbar
+- **Mitte — Canvas**: 12-Spalten Grid mit aufklappbaren Sections. Jede Section enthaelt Layout-Bloecke (Zeilen) mit Charts darin. Sections und Charts haben Resize-Handles (span 1-12) und koennen per Drag umsortiert werden
+- **Rechts — Chip/HTML Pool**: KPI-Karten, Health-Badges und andere HTML-Widgets (nicht-ECharts)
+
+### Bedienung
+
+1. **Template waehlen**: im Dropdown (Header) ein Built-in oder eigenes Template auswaehlen
+2. **"Layout uebernehmen"**: laedt das gewaehlte Template in den Canvas
+3. **Sections hinzufuegen**: aus dem Sections-Strip oberhalb des Canvas
+4. **Charts platzieren**: aus dem linken Pool per Drag in Layout-Bloecke ziehen
+5. **Layout-Bloecke**: ueber die Span-Buttons (1-12) unter jeder Section neue Zeilen anlegen
+6. **Resize**: Spaltenbreite per Klick auf die Span-Anzeige aendern (Section oder Chart)
+7. **Preview**: Vorschau mit echten ECharts-Diagrammen und KPI-Chips (responsive)
+8. **Save**: speichert als benanntes Template und wendet es sofort auf das Dashboard an
+
+### Templates
+
+- **Built-in**: Full (alle Sections), Performance (Forensic + Economic + Token-Stats), Cost (Economic + Budget + Proxy), Compact (6 Sections, gemischte Spans)
+- **Eigene Templates**: beim Speichern wird ein Name vergeben; erscheinen in der Sidebar unter "Vorlagen" und im Builder-Dropdown (mit `*` markiert)
+- **Persistence**: Templates werden serverseitig in der Layout-Datei (`~/.claude/usage-dashboard-layout.json`) unter dem Key `templates` persistiert (localStorage als Fallback)
+
+### Scaffold-Plan
+
+Beim ersten Besuch (keine Layout-Datei vorhanden) generiert `buildDefaultWidgetsFromScaffold()` automatisch ein Layout aus dem **Scaffold-Plan** (`TB_PAGE_SCAFFOLD_PLAN`). Dieser definiert pro Section die Layout-Bloecke (Zeilen mit 12-Spalten-Spans) und die Chart-Zuordnung. Der Scaffold dient auch als Basis wenn Built-in Templates in den Builder geladen werden.
 
 ## Standalone Chart-Funktionen
 

@@ -5,12 +5,33 @@
       "id": "TX-264",
       "timestamp": "2026-04-13",
       "session": "auto",
-      "commit": "4e45746",
-      "commit_full": "4e45746bfd12c665ea2bb4d1d3aa9fbccf03b23b",
+      "commit": "be115f5",
+      "commit_full": "be115f587cc93dacce16760fa4403b95620c019b",
       "status": "ABGESCHLOSSEN",
-      "description": "Merge branch 'feat/widget-dispatcher' into develop",
-      "detail": "# Conflicts:\n#\tlogs/transactions.json",
-      "changes": []
+      "description": "feat(tb): enable Template Builder for all users, docs update (DE/EN/KO)",
+      "detail": "- \"Template erstellen\" button no longer requires DEV_MODE\n- \"Layout uebernehmen\" respects dropdown selection\n- docs/*/11-widget-system.md: full TB documentation (3-column layout, usage, templates, scaffold)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "docs/de/11-widget-system.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/11-widget-system.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/11-widget-system.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
     },
     {
       "id": "TX-263",

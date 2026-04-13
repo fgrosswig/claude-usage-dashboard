@@ -60,15 +60,49 @@ The dashboard uses a CSS grid with 12 columns (`#layout-grid`). Each section get
 - **Reset**: creates default widgets (all sections, span 12) and reloads
 - Sidebar auto-opens if `cud_sidebar_open` is set in localStorage
 
-## Template Builder (planned, DEV_MODE)
+## Template Builder
 
-> **Status:** experimental, only visible in DEV_MODE. Visual grid builder for custom layouts — will be released for all users in a future version.
+Visual grid builder for custom dashboard layouts. Open via **"Template erstellen"** in the sidebar.
 
-- 12-column canvas with drag-and-drop for sections and charts
-- Widget pool with all available sections and charts
-- Resize handles for column width (1-12)
-- Live preview with real ECharts diagrams
-- Templates are stored in `localStorage` under `cud_templates`
+### Layout (3-Column)
+
+```text
+┌──────────────┬────────────────────────────┬──────────────┐
+│  CHART POOL  │       CANVAS (12-Grid)     │  CHIP / HTML │
+│              │                            │     POOL     │
+│  ECharts     │  Sections (collapsible)    │  KPI cards   │
+│  diagrams    │    └─ Layout blocks        │  Health      │
+│  drag into   │       └─ Charts (span)     │  badges      │
+│  canvas      │                            │  Meta grids  │
+│              │  Resize handles (1-12)     │              │
+│              │  Drag reorder              │              │
+└──────────────┴────────────────────────────┴──────────────┘
+```
+
+- **Left — Chart Pool**: all ECharts diagrams from the registry, drag-and-drop into the canvas
+- **Center — Canvas**: 12-column grid with collapsible sections. Each section contains layout blocks (rows) with charts inside. Sections and charts have resize handles (span 1-12) and can be reordered via drag
+- **Right — Chip/HTML Pool**: KPI cards, health badges and other HTML widgets (non-ECharts)
+
+### Usage
+
+1. **Select template**: choose a built-in or custom template from the dropdown (header)
+2. **"Load layout"**: loads the selected template into the canvas
+3. **Add sections**: from the sections strip above the canvas
+4. **Place charts**: drag from the left pool into layout blocks
+5. **Layout blocks**: create new rows via the span buttons (1-12) below each section
+6. **Resize**: change column width by clicking the span indicator (section or chart)
+7. **Preview**: preview with real ECharts diagrams and KPI chips (responsive)
+8. **Save**: saves as a named template and applies it to the dashboard immediately
+
+### Templates
+
+- **Built-in**: Full (all sections), Performance (Forensic + Economic + Token-Stats), Cost (Economic + Budget + Proxy), Compact (6 sections, mixed spans)
+- **Custom templates**: assigned a name on save; appear in the sidebar under "Templates" and in the builder dropdown (marked with `*`)
+- **Persistence**: templates are persisted server-side in the layout file (`~/.claude/usage-dashboard-layout.json`) under the `templates` key (localStorage as fallback)
+
+### Scaffold Plan
+
+On first visit (no layout file), `buildDefaultWidgetsFromScaffold()` automatically generates a layout from the **scaffold plan** (`TB_PAGE_SCAFFOLD_PLAN`). This defines per section the layout blocks (rows with 12-column spans) and chart assignments. The scaffold also serves as the base when built-in templates are loaded into the builder.
 
 ## Standalone Chart Functions
 
