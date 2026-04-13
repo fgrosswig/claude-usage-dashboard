@@ -508,15 +508,6 @@
         requires: ['sessions'],
         charts: [
           {
-            id: 'econ-cumulative',
-            titleKey: 'econWasteTitle',
-            type: 'line',
-            engine: 'echarts',
-            canvasId: 'chart-shell-econ-waste',
-            size: { cols: 1, minHeight: 350 },
-            renderFn: 'renderWasteCurve'
-          },
-          {
             id: 'econ-explosion',
             titleKey: 'econExplosionTitle',
             type: 'scatter',

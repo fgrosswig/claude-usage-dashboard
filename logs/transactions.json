@@ -2,15 +2,458 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-278",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "a873412",
+      "commit_full": "a8734121da43b0bfafa69b9b951c77a74a33f866",
+      "status": "ABGESCHLOSSEN",
+      "description": "Merge feat/widget-dispatcher: docs Ch.12 rewrite",
+      "detail": "# Conflicts:\n#\tlogs/transactions.json",
+      "changes": []
+    },
+    {
+      "id": "TX-277",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "53b8126",
+      "commit_full": "53b8126cd9de1357d5d4f996b021d3c12937ced5",
+      "status": "ABGESCHLOSSEN",
+      "description": "docs: Ch.12 rewrite — Economic Analysis, M_real, Q5 Penalty (DE/EN/KO)",
+      "detail": "Replace Intelligence Section docs with Economic Analysis and Compaction\nForensics. Covers M_real formula, Q5 penalty, restart economics,\nCache Explosion chart changes, and extract-cache performance.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "docs/de/12-intelligence-metrics.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/12-intelligence-metrics.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/12-intelligence-metrics.md",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-276",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "ea07eb8",
+      "commit_full": "ea07eb8eef6726aaba08b5e993ead335569b8049",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ci): restrict app pipeline to main+develop only",
+      "detail": "Feature/fix branches no longer trigger build+deploy on push.\nThey only get PR checks (sonar + k8s-verify via pr.yml).\nPrevents parallel Kaniko builds killing the server.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".woodpecker/app.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-275",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "867d296",
+      "commit_full": "867d2966da643ca0c0b5c75f12204cf5e0a2e9e3",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(economic): M_real compaction penalty chart, remove Cumulative Usage Curve",
+      "detail": "- Remove econ-cumulative (Cumulative Usage Curve) chart — replaced by\n  enhanced Cache Explosion lower grid\n- Cache Explosion now full width (span 12)\n- Cumulative toggle: Actual cache_read vs Envelope (without loss) with\n  M_real weighted rebuild cost per compaction event\n  Formula: Real_Cost = Drop × (1 + M(t)), M(t) = f(t) / f_avg(t)\n- Burn zone markAreas in cumulative view (per-turn fit vs baseline thresholds)\n- Purple badges at compaction events showing real cost + multiplier\n- Tooltip with full M_real calculation breakdown at compaction turns\n- axisPointer sync between upper and lower chart in both modes\n- replaceMerge for clean series swap between Context Loss / Cumulative\n- Guard renderTokenStatsSection + _computeForensicCtx against undefined selDay\n- Strip deprecated widget IDs (econ-cumulative) from saved prefs + templates\n- i18n: econBtnContextLoss, econBtnCumulative, econSeriesActualCR,\n  econSeriesLostContext, econSeriesWithoutLoss (DE/EN/KO)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard-sections.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-registry.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-274",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "b35c06f",
+      "commit_full": "b35c06f63c9c2f30f431036cb4b07a44e9cad358",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(sonar): last 2 S7735 negated conditions in log helpers",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-273",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "a359ade",
+      "commit_full": "a359aded0d6e3b1a93699b8792d68af1e995a369",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(server): load serviceLog before logOptionalErr for startup IIFE",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-272",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "6d46f21",
+      "commit_full": "6d46f21735ab758dadc106751aa71710db141d4b",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(sonar): address 34 new-code issues (S2486, S7735, S1940, S7764, S1126)",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-271",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "3025650",
+      "commit_full": "3025650edb685c3d8cb0d9ecfb0ab48463f91dc3",
+      "status": "ABGESCHLOSSEN",
+      "description": "Merge branch 'feat/widget-dispatcher' into develop",
+      "detail": "Made-with: Cursor",
+      "changes": []
+    },
+    {
+      "id": "TX-270",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "9b1e945",
+      "commit_full": "9b1e945990e8bc958a596307b9d77a1be8760b45",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(security): git via execFileSync and safe PATH (Sonar S4036)",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-269",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "79f73b8",
+      "commit_full": "79f73b8de763460e485b9c968b4190c21eb03f18",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(sonar): S2392 loop bindings and S3776 cognitive complexity",
+      "detail": "Made-with: Cursor",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-268",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "d68c3d6",
+      "commit_full": "d68c3d684fb4d70531b29f9a9282ea6e8938369b",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(sonar): resolve 25 new-code violations (S7761, S2004, S2814, S2392, S2310, S1854)",
+      "detail": "- S7761: .dataset instead of get/setAttribute\n- S2004: extract nested function to reduce depth\n- S2814/S2392: eliminate var redeclarations in top-level loops\n- S2310: avoid loop counter reassignment\n- S1854: remove unused chNameIn assignment\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/anthropic-proxy-core.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/token-forensics.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/usage-scan-roots.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-267",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "aae1b00",
+      "commit_full": "aae1b00bedda6760fabfb473dc4cdbd705013b49",
+      "status": "ABGESCHLOSSEN",
+      "description": "refactor: fix S2486 empty catch, S7718 catch naming, S6582 optional chaining (partial)",
+      "detail": "- S2486: all empty catch blocks → catch (error) { /* intentional */ }\n- S7718: catch params renamed to `error` (Sonar convention)\n- S6582: optional chaining in widget-dispatcher.js (Agent 1 complete)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/cache-files-explorer.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard-sections.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/metrics-engine.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/anthropic-proxy-core.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/claude-data-ingest.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/claude-data-sync-client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/extract-cache.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/service-logger.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/token-forensics.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/usage-scan-roots.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-266",
       "timestamp": "2026-04-13",
       "session": "auto",
-      "commit": "3319af3",
-      "commit_full": "3319af3b133ee7ea229ae33c24ad1618f826983b",
+      "commit": "6a9bf0f",
+      "commit_full": "6a9bf0ffa9ab66e879db47d2241e04add4501fea",
       "status": "ABGESCHLOSSEN",
-      "description": "Merge branch 'feat/widget-dispatcher' into develop",
-      "detail": "# Conflicts:\n#\tlogs/transactions.json",
-      "changes": []
+      "description": "refactor: fix SonarQube mechanical rules (S6582, S2486, S7773, S7765, S6557, S7781, S6653, S7772, S4138)",
+      "detail": "Optional chaining, empty catch blocks, Number.parseInt, .includes(),\n.startsWith(), .replaceAll(), Object.hasOwn, node: protocol, remaining for...of.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/cache-files-explorer.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard-sections.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/metrics-engine.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/anthropic-proxy-cli.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/anthropic-proxy-core.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/benchmark-session-turns.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/claude-data-ingest.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/claude-data-sync-client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-http.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/extract-cache.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/extract-dashboard-assets.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/service-logger.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/session-turns-core.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/token-forensics.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/usage-scan-roots.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "start.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
     },
     {
       "id": "TX-265",

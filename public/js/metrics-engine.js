@@ -37,7 +37,7 @@
   function calcSaturationScore(pd) {
     if (!pd) return 0;
     var rl = pd.rate_limit || {};
-    var q5 = parseFloat(rl['anthropic-ratelimit-unified-5h-utilization'] || 0);
+    var q5 = Number.parseFloat(rl['anthropic-ratelimit-unified-5h-utilization'] || 0);
 
     var latencyNorm = normalize(pd.avg_duration_ms || 0, 2000, 30000);
     var errorNorm   = normalize(pd.error_rate || 0, 0, 10);
@@ -68,10 +68,10 @@
    */
   function estimateQuotaETA(pd) {
     var result = { minutesLeft: -1, burnPerMin: 0, confidence: 'none', pct5h: 0 };
-    if (!pd || !pd.rate_limit) return result;
+    if (!pd?.rate_limit) return result;
 
     var rl = pd.rate_limit;
-    var q5 = parseFloat(rl['anthropic-ratelimit-unified-5h-utilization'] || 0);
+    var q5 = Number.parseFloat(rl['anthropic-ratelimit-unified-5h-utilization'] || 0);
     result.pct5h = Math.round(q5 * 1000) / 10;
     var remaining = (1 - q5) * 100;
 
@@ -108,7 +108,7 @@
    * @returns {number} smoothed latest value
    */
   function ewma(values, alpha) {
-    if (!values || !values.length) return 0;
+    if (!values?.length) return 0;
     if (alpha == null) alpha = 0.3;
     var s = values[0];
     for (var i = 1; i < values.length; i++) {
@@ -121,7 +121,7 @@
    * EWMA over full array (returns smoothed array).
    */
   function ewmaArray(values, alpha) {
-    if (!values || !values.length) return [];
+    if (!values?.length) return [];
     if (alpha == null) alpha = 0.3;
     var out = [values[0]];
     for (var i = 1; i < values.length; i++) {
@@ -206,14 +206,14 @@
     var yestModels  = yesterday.models || {};
     var todayOpus = 0, todayTotal = 0, yestOpus = 0, yestTotal = 0;
     for (var mk in todayModels) {
-      if (!Object.prototype.hasOwnProperty.call(todayModels, mk)) continue;
+      if (!Object.hasOwn(todayModels, mk)) continue;
       todayTotal += todayModels[mk].requests || 0;
-      if (mk.indexOf('opus') >= 0) todayOpus += todayModels[mk].requests || 0;
+      if (mk.includes('opus')) todayOpus += todayModels[mk].requests || 0;
     }
     for (var mk2 in yestModels) {
-      if (!Object.prototype.hasOwnProperty.call(yestModels, mk2)) continue;
+      if (!Object.hasOwn(yestModels, mk2)) continue;
       yestTotal += yestModels[mk2].requests || 0;
-      if (mk2.indexOf('opus') >= 0) yestOpus += yestModels[mk2].requests || 0;
+      if (mk2.includes('opus')) yestOpus += yestModels[mk2].requests || 0;
     }
     var todayOpusPct = todayTotal > 0 ? todayOpus / todayTotal : 0;
     var yestOpusPct  = yestTotal > 0 ? yestOpus / yestTotal : 0;
@@ -221,7 +221,7 @@
 
     // Sort by absolute delta magnitude
     factors.sort(function (a, b) {
-      return Math.abs(parseFloat(b.pct)) - Math.abs(parseFloat(a.pct));
+      return Math.abs(Number.parseFloat(b.pct)) - Math.abs(Number.parseFloat(a.pct));
     });
 
     return factors.slice(0, 5);
@@ -267,7 +267,7 @@
     }
 
     // Root cause
-    if (m.rootCause && m.rootCause.length && m.saturation >= 40) {
+    if (m.rootCause?.length && m.saturation >= 40) {
       var rc = m.rootCause[0];
       lines.push('Primary factor: ' + rc.factor + ' ' + rc.pct);
     }
@@ -333,7 +333,7 @@
    * @returns {object} all computed metrics
    */
   function computeAll(data, healthIndicators) {
-    var proxyDays = (data.proxy && data.proxy.proxy_days) || [];
+    var proxyDays = data.proxy?.proxy_days || [];
     var latestPd = proxyDays.length ? proxyDays[proxyDays.length - 1] : null;
     var prevPd   = proxyDays.length > 1 ? proxyDays[proxyDays.length - 2] : null;
 

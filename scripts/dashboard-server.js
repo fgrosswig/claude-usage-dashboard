@@ -12,23 +12,69 @@
 // Session-turns Disk-Cache (optional): CLAUDE_USAGE_SESSION_TURNS_CACHE_DIR=~/.cache/…  — JSON {fingerprint,result} pro Tag;
 //   vorab füllen: python3 scripts/session-turns-warm-cache.py --out-dir … (siehe Skript-Docstring).
 
-var http = require('http');
-var https = require('https');
-var fs = require('fs');
+var http = require('node:http');
+var https = require('node:https');
+var fs = require('node:fs');
+var path = require('node:path');
+var os = require('node:os');
+var serviceLog = require('./service-logger');
+/** Sonar S2486: every catch must reference the exception (non-empty handling). */
+function logOptionalErr(err) {
+  serviceLog.debug('ignored', err?.message ? err.message : String(err));
+}
+
+/** Optional absolute path to git (CI / non-default install). */
+function resolveGitBinary() {
+  var override = (process.env.CLAUDE_USAGE_GIT_PATH || process.env.GIT_BIN_PATH || '').trim();
+  if (override) return override;
+  if (process.platform === 'win32') {
+    var w = [
+      String.raw`C:\Program Files\Git\cmd\git.exe`,
+      String.raw`C:\Program Files\Git\bin\git.exe`,
+      String.raw`C:\Program Files (x86)\Git\cmd\git.exe`
+    ];
+    for (var wp of w) {
+      try {
+        if (fs.existsSync(wp)) return wp;
+      } catch (error) { logOptionalErr(error); }
+    }
+    return 'git.exe';
+  }
+  var u = ['/usr/bin/git', '/usr/local/bin/git', '/opt/homebrew/bin/git'];
+  for (var up of u) {
+    try {
+      if (fs.existsSync(up)) return up;
+    } catch (error) { logOptionalErr(error); }
+  }
+  return 'git';
+}
+
+/**
+ * Run git argv without shell; PATH limited to system dirs (Sonar S4036 / search-path injection).
+ */
+function gitExecFileTrimmed(gitArgs) {
+  var cp = require('node:child_process');
+  var isWin = process.platform === 'win32';
+  var safePath = isWin ? String.raw`C:\Windows\System32;C:\Windows` : '/usr/bin:/bin';
+  var gitBin = resolveGitBinary();
+  return cp.execFileSync(gitBin, gitArgs, {
+    encoding: 'utf8',
+    timeout: 3000,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, PATH: safePath }
+  }).trim();
+}
 
 // Resolve version from git tag at startup (no hardcoded version)
 var __appVersion = (function () {
   try {
-    // git tag --sort=-v:refname finds newest tag repo-wide (not just current branch)
-    var tag = require('child_process').execSync('git tag --sort=-v:refname 2>/dev/null', { encoding: 'utf8' }).trim().split('\n')[0];
+    var tagLines = gitExecFileTrimmed(['tag', '--sort=-v:refname']).split('\n');
+    var tag = tagLines[0] || '';
     if (tag) return tag;
-  } catch (e) {}
-  // In Docker (no git): read from VERSION file, or fallback
-  try { return fs.readFileSync(require('path').join(__dirname, '..', 'VERSION'), 'utf8').trim(); } catch (e2) {}
+  } catch (error) { logOptionalErr(error); }
+  try { return fs.readFileSync(path.join(__dirname, '..', 'VERSION'), 'utf8').trim(); } catch (error) { logOptionalErr(error); }
   return 'dev';
 })();
-var path = require('path');
-var os = require('os');
 var dashboardHttp = require('./dashboard-http');
 var usageScanRoots = require('./usage-scan-roots');
 var HOME = usageScanRoots.HOME;
@@ -47,7 +93,6 @@ var __extractCache = null;
 var __extractCacheLoaded = false;
 var getProxyLogDir = usageScanRoots.getProxyLogDir;
 var collectProxyNdjsonFiles = usageScanRoots.collectProxyNdjsonFiles;
-var serviceLog = require('./service-logger');
 var claudeDataIngest = require('./claude-data-ingest');
 
 /** Nach erfolgreichem Scan: Fingerprint aller JSONL (mtime+size); für optionalen Skip bei unveränderten Dateien. */
@@ -58,22 +103,22 @@ var REFRESH_SEC = 180;
 (function () {
   var e = process.env.CLAUDE_USAGE_SCAN_INTERVAL_SEC;
   if (!e) return;
-  var n = parseInt(e, 10);
-  if (!isNaN(n) && n >= 60) REFRESH_SEC = n;
+  var n = Number.parseInt(e, 10);
+  if (!Number.isNaN(n) && n >= 60) REFRESH_SEC = n;
 })();
 /** Erster JSONL-Scan erst nach dieser Verzögerung (ms), wenn Shell+Assets vorgeladen sind — damit Browser zuerst HTML/CSS/JS bedienen kann. 0–120000, Default 2000. */
 var PARSE_START_DELAY_MS = 2000;
 (function () {
   var e = process.env.CLAUDE_USAGE_PARSE_START_DELAY_MS;
   if (!e) return;
-  var n = parseInt(e, 10);
-  if (!isNaN(n) && n >= 0 && n <= 120000) PARSE_START_DELAY_MS = n;
+  var n = Number.parseInt(e, 10);
+  if (!Number.isNaN(n) && n >= 0 && n <= 120000) PARSE_START_DELAY_MS = n;
 })();
 process.argv.forEach(function(a) {
   var m = a.match(/--port=(\d+)/);
-  if (m) PORT = parseInt(m[1]);
+  if (m) PORT = Number.parseInt(m[1]);
   var r = a.match(/--refresh=(\d+)/);
-  if (r) REFRESH_SEC = Math.max(60, parseInt(r[1]));
+  if (r) REFRESH_SEC = Math.max(60, Number.parseInt(r[1]));
   var lv = a.match(/--log-level=(.+)$/);
   if (lv) process.env.CLAUDE_USAGE_LOG_LEVEL = lv[1].trim();
   var lf = a.match(/--log-file=(.+)$/);
@@ -101,7 +146,7 @@ var RELEASES_API_URL = 'https://api.github.com/repos/anthropics/claude-code/rele
 var lastClientGithubToken = null;
 
 function syncGithubTokenFromBrowserRequest(req) {
-  if (!req.headers || typeof req.headers['x-github-token'] === 'undefined') return;
+  if (typeof req.headers?.['x-github-token'] === 'undefined') return;
   var prev = lastClientGithubToken;
   var next = String(req.headers['x-github-token'] || '').trim();
   lastClientGithubToken = next;
@@ -142,16 +187,16 @@ var MARKETPLACE_POST_TIMEOUT_MS = 12000;
 (function () {
   var e = process.env.CLAUDE_USAGE_MARKETPLACE_TIMEOUT_MS;
   if (!e) return;
-  var n = parseInt(e, 10);
-  if (!isNaN(n) && n >= 3000 && n <= 120000) MARKETPLACE_POST_TIMEOUT_MS = n;
+  var n = Number.parseInt(e, 10);
+  if (!Number.isNaN(n) && n >= 3000 && n <= 120000) MARKETPLACE_POST_TIMEOUT_MS = n;
 })();
 /** Pause zwischen GitHub-Release-Backfill-Requests (ms), 0-5000. */
 var GITHUB_BACKFILL_TAG_DELAY_MS = 0;
 (function () {
   var e = process.env.CLAUDE_USAGE_GITHUB_BACKFILL_DELAY_MS;
   if (!e) return;
-  var n = parseInt(e, 10);
-  if (!isNaN(n) && n >= 0 && n <= 5000) GITHUB_BACKFILL_TAG_DELAY_MS = n;
+  var n = Number.parseInt(e, 10);
+  if (!Number.isNaN(n) && n >= 0 && n <= 5000) GITHUB_BACKFILL_TAG_DELAY_MS = n;
 })();
 
 var marketplaceQueryInFlight = false;
@@ -162,7 +207,7 @@ var releasesCache = { releases: [], fetchedAt: 0 };
 try {
   var diskRel = JSON.parse(fs.readFileSync(RELEASES_CACHE, 'utf8'));
   if (Array.isArray(diskRel)) releasesCache.releases = diskRel;
-} catch (e) {}
+} catch (error) { logOptionalErr(error); }
 
 var marketplaceVersionsCache = { items: [], fetchedAt: 0 };
 try {
@@ -171,7 +216,7 @@ try {
     marketplaceVersionsCache.items = diskMp.versions;
     marketplaceVersionsCache.fetchedAt = diskMp.fetchedAt || 0;
   }
-} catch (eMp) {}
+} catch (error) { logOptionalErr(error); }
 
 /** Nur Release-Tags anthropics/claude-code (SSRF-Schutz). */
 function isSafeGithubReleaseTagParam(s) {
@@ -184,7 +229,7 @@ function isSafeGithubReleaseTagParam(s) {
 function persistReleasesCacheToDisk() {
   try {
     fs.writeFileSync(RELEASES_CACHE, JSON.stringify(releasesCache.releases), 'utf8');
-  } catch (eW) {}
+  } catch (error) { logOptionalErr(error); }
 }
 
 /**
@@ -218,7 +263,7 @@ function httpsFetchGithubReleaseByTag(tag, cb) {
     ghRes.on('end', function () {
       try {
         var data = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-        if (ghRes.statusCode !== 200 || !data || !data.tag_name) {
+        if (ghRes.statusCode !== 200 || !data?.tag_name) {
           once(new Error('not found'), null);
           return;
         }
@@ -242,7 +287,7 @@ function httpsFetchGithubReleaseByTag(tag, cb) {
  * Fehlende Tags aus den Dashboard-Tagen per HTTPS nachladen, JSON-Cache mergen + Highlights neu ziehen.
  */
 function backfillReleaseBodiesForDashboardDays(days, cb) {
-  if (!days || !days.length) {
+  if (!days?.length) {
     process.nextTick(cb);
     return;
   }
@@ -250,7 +295,7 @@ function backfillReleaseBodiesForDashboardDays(days, cb) {
   var seen = Object.create(null);
   for (var day of days) {
     var vc = day.version_change;
-    if (!vc || !vc.github_release_links) continue;
+    if (!vc?.github_release_links) continue;
     for (var gl of vc.github_release_links) {
       var tg = gl.tag || 'v' + gl.version;
       if (tg && !seen[tg]) {
@@ -292,7 +337,7 @@ function backfillReleaseBodiesForDashboardDays(days, cb) {
     }
     serviceLog.debug('github', 'backfill release tag=' + t);
     httpsFetchGithubReleaseByTag(t, function (err, rel) {
-      if (!err && rel && rel.tag_name) {
+      if (!err && rel?.tag_name) {
         var dupe = false;
         for (var cachedRel of releasesCache.releases) {
           if (String(cachedRel.tag_name) === String(rel.tag_name)) {
@@ -323,7 +368,7 @@ function refreshReleasesCache() {
   var page = 1;
   var maxPages = 5;
   function fetchNext() {
-    var sep = RELEASES_API_URL.indexOf('?') >= 0 ? '&' : '?';
+    var sep = RELEASES_API_URL.includes('?') ? '&' : '?';
     var url = RELEASES_API_URL + sep + 'page=' + page;
     httpsGetJson(url, function (err, data) {
       if (err || !Array.isArray(data) || data.length === 0) {
@@ -336,7 +381,7 @@ function refreshReleasesCache() {
             ? ''
             : ' — bei Rate-Limit: PAT im Dashboard (Meta) oder GITHUB_TOKEN/GH_TOKEN (klassisch: repo:public nur nötig).';
           serviceLog.warn('releases', 'GitHub API: ' + err.message + relHint);
-        } else if (page === 1 && !err && (!data || !data.length)) {
+        } else if (page === 1 && !err && !data?.length) {
           serviceLog.warn('releases', 'GitHub API: leeres Array — kein Update');
         }
         finish();
@@ -360,13 +405,13 @@ function refreshReleasesCache() {
     var seen = Object.create(null);
     var merged = [];
     for (var item of all) {
-      var ta = item && item.tag_name;
+      var ta = item?.tag_name;
       if (ta) seen[String(ta)] = true;
       merged.push(item);
     }
     var prev = releasesCache.releases;
     for (var pb of prev) {
-      var tb = pb && pb.tag_name;
+      var tb = pb?.tag_name;
       if (tb && !seen[String(tb)]) {
         seen[String(tb)] = true;
         merged.push(pb);
@@ -423,8 +468,8 @@ function semverCmp(a, b) {
   var pa = String(a).split('.');
   var pb = String(b).split('.');
   for (var i = 0; i < 3; i++) {
-    var na = parseInt(pa[i], 10) || 0;
-    var nb = parseInt(pb[i], 10) || 0;
+    var na = Number.parseInt(pa[i], 10) || 0;
+    var nb = Number.parseInt(pb[i], 10) || 0;
     if (na < nb) return -1;
     if (na > nb) return 1;
   }
@@ -432,7 +477,7 @@ function semverCmp(a, b) {
 }
 
 function pad2Cal(n) {
-  var x = typeof n === 'number' ? n : parseInt(n, 10);
+  var x = typeof n === 'number' ? n : Number.parseInt(n, 10);
   return x < 10 ? '0' + x : String(x);
 }
 
@@ -440,7 +485,7 @@ function pad2Cal(n) {
 function isoToLocalYmd(iso) {
   if (!iso) return '';
   var d = new Date(iso);
-  if (isNaN(d.getTime())) return '';
+  if (Number.isNaN(d.getTime())) return '';
   return d.getFullYear() + '-' + pad2Cal(d.getMonth() + 1) + '-' + pad2Cal(d.getDate());
 }
 
@@ -451,7 +496,7 @@ function isoToLocalYmd(iso) {
 function isoToUtcYmd(iso) {
   if (!iso) return '';
   var d = new Date(iso);
-  if (isNaN(d.getTime())) return '';
+  if (Number.isNaN(d.getTime())) return '';
   return d.toISOString().slice(0, 10);
 }
 
@@ -459,7 +504,7 @@ function extractReleaseHighlights(body) {
   var raw = String(body || '');
   var slice = raw;
   var sec = raw.match(/^##\s*what[\u2019\x27]?s changed\b/im);
-  if (sec && sec.index != null) {
+  if (sec?.index != null) {
     var after = raw.indexOf('\n', sec.index + sec[0].length);
     slice = after >= 0 ? raw.slice(after + 1) : raw.slice(sec.index + sec[0].length);
   }
@@ -508,7 +553,7 @@ function getReleasesMap() {
     try {
       var diskR = JSON.parse(fs.readFileSync(RELEASES_CACHE, 'utf8'));
       if (Array.isArray(diskR)) releasesCache.releases = diskR;
-    } catch (eRel) {}
+    } catch (error) { logOptionalErr(error); }
   }
   var map = {};
   var rels = releasesCache.releases;
@@ -550,7 +595,7 @@ function githubReleaseLinkForVersion(relMap, ver) {
   var nk = normalizeCliSemver(ver);
   if (!nk) return { version: '', url: '', tag: '' };
   var ent = relMap[nk];
-  var tag = ent && ent.tag ? String(ent.tag).trim() : 'v' + nk;
+  var tag = ent?.tag ? String(ent.tag).trim() : 'v' + nk;
   return {
     version: nk,
     tag: tag,
@@ -559,32 +604,36 @@ function githubReleaseLinkForVersion(relMap, ver) {
 }
 
 /** Füllt Highlights aus allen Releases zwischen from und höchstem added; setzt github_release_links als Fallback. */
+function mergeHighlightsFromReleases(relMap, inter, existing) {
+  var mergedHi = (existing || []).slice();
+  var seenH = Object.create(null);
+  for (var hi of mergedHi) seenH[String(hi)] = true;
+  var prefixMulti = inter.length > 1;
+  for (var iv of inter) {
+    var ri = relMap[iv];
+    if (ri?.highlights?.length) {
+      for (var hl of ri.highlights) {
+        var line = (prefixMulti ? '[' + iv + '] ' : '') + hl;
+        if (seenH[line]) continue;
+        mergedHi.push(line);
+        seenH[line] = true;
+      }
+    }
+  }
+  if (mergedHi.length > 24) mergedHi.length = 24;
+  return mergedHi;
+}
+
 function enrichVersionChangeNotes(result) {
   var relMap = getReleasesMap();
   for (var entry of result) {
     var vc = entry.version_change;
-    if (!vc || !vc.added || !vc.added.length) continue;
+    if (!vc?.added?.length) continue;
     var fromN = vc.from ? normalizeCliSemver(vc.from) : '';
     var addedSorted = vc.added.slice().sort(semverCmp);
     var topN = addedSorted[addedSorted.length - 1];
     var inter = versionsInRelMapBetween(relMap, fromN, topN);
-    var mergedHi = (vc.highlights || []).slice();
-    var seenH = Object.create(null);
-    for (var hi of mergedHi) seenH[String(hi)] = true;
-    var prefixMulti = inter.length > 1;
-    for (var iv of inter) {
-      var ri = relMap[iv];
-      if (!ri || !ri.highlights || !ri.highlights.length) continue;
-      for (var hl of ri.highlights) {
-        var line = (prefixMulti ? '[' + iv + '] ' : '') + hl;
-        if (!seenH[line]) {
-          mergedHi.push(line);
-          seenH[line] = true;
-        }
-      }
-    }
-    if (mergedHi.length > 24) mergedHi.length = 24;
-    vc.highlights = mergedHi;
+    vc.highlights = mergeHighlightsFromReleases(relMap, inter, vc.highlights);
     var linkVers = uniqSortedSemvers(inter.concat(addedSorted));
     var links = [];
     var seenV = Object.create(null);
@@ -600,31 +649,32 @@ function enrichVersionChangeNotes(result) {
 
 function loadReleasesArrayForBuild() {
   var rels = releasesCache.releases;
-  if (!rels || !rels.length) {
+  if (!rels?.length) {
     try {
       var diskR = JSON.parse(fs.readFileSync(RELEASES_CACHE, 'utf8'));
       if (Array.isArray(diskR)) rels = diskR;
-    } catch (eDisk) {}
+    } catch (error) { logOptionalErr(error); }
   }
   return Array.isArray(rels) ? rels : [];
 }
 
 function buildByDateFromVersionTimelineItems(items) {
-  if (!items || !items.length) return null;
+  if (!items?.length) return null;
   items = items.slice().sort(function (a, b) {
     if (a.t !== b.t) return a.t - b.t;
     return semverCmp(a.ver, b.ver);
   });
   var groups = [];
   for (var item of items) {
-    var dk = isoToUtcYmd(item.when);
-    if (!dk) continue;
-    if (!groups.length) groups.push([item]);
-    else {
+    var itemDk = isoToUtcYmd(item.when);
+    if (!itemDk) continue;
+    if (groups.length) {
       var lastGrp = groups[groups.length - 1];
       var lastDk = isoToUtcYmd(lastGrp[0].when);
-      if (lastDk === dk) lastGrp.push(item);
+      if (lastDk === itemDk) lastGrp.push(item);
       else groups.push([item]);
+    } else {
+      groups.push([item]);
     }
   }
   if (!groups.length) return null;
@@ -656,7 +706,7 @@ function expandVersionByDateLocalAliases(byDate) {
   var initial = Object.keys(byDate);
   for (var dk of initial) {
     var ch = byDate[dk];
-    var w = ch && ch.booking_when;
+    var w = ch?.booking_when;
     if (!w) continue;
     var utcDk = isoToUtcYmd(w);
     var locDk = isoToLocalYmd(w);
@@ -671,7 +721,7 @@ function applyVersionChangeByDateMap(result, byDate) {
   if (!byDate) return false;
   var kc = 0;
   for (var kk in byDate) {
-    if (Object.prototype.hasOwnProperty.call(byDate, kk)) kc++;
+    if (Object.hasOwn(byDate, kk)) kc++;
   }
   if (!kc) return false;
   for (var row of result) {
@@ -701,7 +751,7 @@ function buildGitHubVersionTimelineItems() {
     var ver = normalizeCliSemver(r.tag_name || r.name || '');
     if (!ver || !r.published_at) continue;
     var t = new Date(r.published_at).getTime();
-    if (isNaN(t)) continue;
+    if (Number.isNaN(t)) continue;
     items.push({
       ver: ver,
       t: t,
@@ -723,7 +773,7 @@ function dedupeMarketplaceVersionsByVersion(rawVers) {
     var ver = normalizeCliSemver(v.version || '');
     if (!ver || !v.lastUpdated) continue;
     var t = new Date(v.lastUpdated).getTime();
-    if (isNaN(t)) continue;
+    if (Number.isNaN(t)) continue;
     if (!by[ver] || t > by[ver].t) {
       by[ver] = { ver: ver, lastUpdated: v.lastUpdated, t: t };
     }
@@ -738,14 +788,14 @@ function dedupeMarketplaceVersionsByVersion(rawVers) {
 
 function loadMarketplaceVersionsForBuild() {
   var arr = marketplaceVersionsCache.items;
-  if (!arr || !arr.length) {
+  if (!arr?.length) {
     try {
       var disk = JSON.parse(fs.readFileSync(MARKETPLACE_CACHE, 'utf8'));
       if (disk && Array.isArray(disk.versions)) {
         marketplaceVersionsCache.items = disk.versions;
         arr = disk.versions;
       }
-    } catch (eDisk) {}
+    } catch (error) { logOptionalErr(error); }
   }
   return Array.isArray(arr) ? arr : [];
 }
@@ -753,11 +803,11 @@ function loadMarketplaceVersionsForBuild() {
 /** Einmal pro Scan: verhindert Marker-Sprünge (z. B. 3.4. sichtbar, nach Scan weg), wenn parallel refreshMarketplace den Cache ersetzt. */
 function snapshotMarketplaceRowsForScan() {
   var cur = marketplaceVersionsCache.items;
-  if (cur && cur.length) return cur.slice();
+  if (cur?.length) return cur.slice();
   try {
     var disk = JSON.parse(fs.readFileSync(MARKETPLACE_CACHE, 'utf8'));
     if (disk && Array.isArray(disk.versions)) return disk.versions.slice();
-  } catch (e) {}
+  } catch (error) { logOptionalErr(error); }
   return undefined;
 }
 
@@ -770,7 +820,7 @@ function readMarketplaceVersionsDisk() {
   try {
     var disk = JSON.parse(fs.readFileSync(MARKETPLACE_CACHE, 'utf8'));
     if (disk && Array.isArray(disk.versions) && disk.versions.length) return disk.versions;
-  } catch (e) {}
+  } catch (error) { logOptionalErr(error); }
   return null;
 }
 
@@ -778,9 +828,9 @@ function mergeMarketplaceRowsPreferNewer(frozenMpRows) {
   var live = loadMarketplaceVersionsForBuild();
   var diskRows = readMarketplaceVersionsDisk();
   var rowsList = [];
-  if (frozenMpRows != null && frozenMpRows.length) rowsList.push(frozenMpRows);
-  if (live && live.length) rowsList.push(live);
-  if (diskRows && diskRows.length) rowsList.push(diskRows);
+  if (frozenMpRows?.length) rowsList.push(frozenMpRows);
+  if (live?.length) rowsList.push(live);
+  if (diskRows?.length) rowsList.push(diskRows);
   if (rowsList.length === 0) return [];
   if (rowsList.length === 1) return rowsList[0].slice();
   var byVer = Object.create(null);
@@ -789,7 +839,7 @@ function mergeMarketplaceRowsPreferNewer(frozenMpRows) {
       var ver = row.ver || normalizeCliSemver(row.version || '');
       if (!ver || !row.lastUpdated) continue;
       var t = new Date(row.lastUpdated).getTime();
-      if (isNaN(t)) continue;
+      if (Number.isNaN(t)) continue;
       var ex = byVer[ver];
       if (!ex || t > ex.t) byVer[ver] = { row: row, t: t };
     }
@@ -808,10 +858,10 @@ function buildMarketplaceVersionTimelineItems() {
     var ver = row.ver || normalizeCliSemver(row.version || '');
     if (!ver || !row.lastUpdated) continue;
     var t = new Date(row.lastUpdated).getTime();
-    if (isNaN(t)) continue;
+    if (Number.isNaN(t)) continue;
     var hi = [];
     var rm = relMap[ver];
-    if (rm && rm.highlights) hi = hi.concat(rm.highlights);
+    if (rm?.highlights) hi = hi.concat(rm.highlights);
     items.push({ ver: ver, t: t, when: row.lastUpdated, highlights: hi });
   }
   return items;
@@ -826,7 +876,7 @@ function buildMergedExtensionTimelineItems(frozenMpRows) {
   var byVer = Object.create(null);
   var ghItems = buildGitHubVersionTimelineItems();
   for (var g of ghItems) {
-    var ghHi = g.highlights && g.highlights.length ? g.highlights.slice() : [];
+    var ghHi = g.highlights?.length ? g.highlights.slice() : [];
     byVer[g.ver] = { ver: g.ver, t: g.t, when: g.when, highlights: ghHi };
   }
   var frozenArg = arguments.length >= 1 ? frozenMpRows : undefined;
@@ -838,19 +888,19 @@ function buildMergedExtensionTimelineItems(frozenMpRows) {
     var ver = row.ver || normalizeCliSemver(row.version || '');
     if (!ver || !row.lastUpdated) continue;
     var t = new Date(row.lastUpdated).getTime();
-    if (isNaN(t)) continue;
+    if (Number.isNaN(t)) continue;
     var hi = [];
     var rm = relMap[ver];
-    if (rm && rm.highlights) hi = hi.concat(rm.highlights);
+    if (rm?.highlights) hi = hi.concat(rm.highlights);
     var prev = byVer[ver];
-    if ((!hi || !hi.length) && prev && prev.highlights && prev.highlights.length) {
+    if (!hi?.length && prev?.highlights?.length) {
       hi = prev.highlights.slice();
     }
     byVer[ver] = { ver: ver, t: t, when: row.lastUpdated, highlights: hi };
   }
   var out = [];
   for (var vk in byVer) {
-    if (Object.prototype.hasOwnProperty.call(byVer, vk)) out.push(byVer[vk]);
+    if (Object.hasOwn(byVer, vk)) out.push(byVer[vk]);
   }
   return out;
 }
@@ -919,7 +969,7 @@ function applyJsonlGapVersionChanges(result) {
     var prevVers = Object.keys(result[vci - 1].versions || {}).sort(semverCmp);
     var vAdded = [];
     for (var cv of curVers) {
-      if (prevVers.indexOf(cv) < 0) vAdded.push(cv);
+      if (!prevVers.includes(cv)) vAdded.push(cv);
     }
     if (vAdded.length === 0) continue;
     vAdded.sort(semverCmp);
@@ -927,7 +977,7 @@ function applyJsonlGapVersionChanges(result) {
     for (var va of vAdded) {
       var vk = normalizeCliSemver(va);
       var ri = vk ? relMapJsonl[vk] : null;
-      if (ri && ri.highlights) relHighlights = relHighlights.concat(ri.highlights);
+      if (ri?.highlights) relHighlights = relHighlights.concat(ri.highlights);
     }
     var fromVer = prevVers.length > 0 ? prevVers[prevVers.length - 1] : null;
     result[vci].version_change = { added: vAdded, from: fromVer, highlights: relHighlights };
@@ -942,7 +992,7 @@ try {
     outageCache.incidents = diskOutage.incidents;
     outageCache.fetchedAt = diskOutage.fetchedAt || 0;
   }
-} catch (e) {}
+} catch (error) { logOptionalErr(error); }
 
 /**
  * GET + JSON. GitHub: githubApiRequestHeaders(); optional GITHUB_TOKEN / GH_TOKEN gegen Rate-Limit.
@@ -1082,7 +1132,7 @@ function refreshMarketplaceExtensionCache() {
     payload,
     function (err, data) {
       try {
-        if (err || !data || !data.results || !data.results[0] || !data.results[0].extensions || !data.results[0].extensions[0]) {
+        if (err || !data?.results?.[0]?.extensions?.[0]) {
           if (err) {
             serviceLog.warn('marketplace', 'extensionquery failed: ' + (err.message || err));
           } else {
@@ -1159,10 +1209,10 @@ function refreshOutageCache() {
 function classifyIncident(name, impact) {
   if (impact === 'none') return 'client';
   var n = (name || '').toLowerCase();
-  if (n.indexOf('desktop') >= 0) return 'client';
-  if (n.indexOf('dispatch') >= 0) return 'client';
-  if (n.indexOf('cowork') >= 0) return 'client';
-  if (n.indexOf('connector') >= 0) return 'client';
+  if (n.includes('desktop')) return 'client';
+  if (n.includes('dispatch')) return 'client';
+  if (n.includes('cowork')) return 'client';
+  if (n.includes('connector')) return 'client';
   return 'server';
 }
 
@@ -1194,8 +1244,8 @@ function getOutageDaysMap() {
     if (!inc.created_at) continue;
     var start = new Date(inc.created_at);
     var end = inc.resolved_at ? new Date(inc.resolved_at) : new Date();
-    if (isNaN(start.getTime())) continue;
-    if (isNaN(end.getTime()) || end <= start) end = new Date(start.getTime() + 3600000);
+    if (Number.isNaN(start.getTime())) continue;
+    if (Number.isNaN(end.getTime()) || end <= start) end = new Date(start.getTime() + 3600000);
 
     // Ueber Mitternacht: pro Kalender-Tag aufteilen
     var cur = new Date(start);
@@ -1261,28 +1311,28 @@ function displayScannedFileLine(entry) {
   var p = entry.path;
   var label = entry.label || 'local';
   var rel;
-  if (p.indexOf(HOME) === 0) {
+  if (p.startsWith(HOME)) {
     rel = displayPathForUi(p);
   } else if (entry.rootPath) {
     try {
-      rel = path.relative(entry.rootPath, p).replace(/\\/g, '/');
-      if (!rel || rel.indexOf('..') === 0) rel = p.replace(/\\/g, '/');
+      rel = path.relative(entry.rootPath, p).replaceAll('\\', '/');
+      if (!rel || rel.startsWith('..')) rel = p.replaceAll('\\', '/');
     } catch (e) {
-      rel = p.replace(/\\/g, '/');
+      rel = p.replaceAll('\\', '/');
     }
   } else {
-    rel = p.replace(/\\/g, '/');
+    rel = p.replaceAll('\\', '/');
   }
   return label + ' \u00b7 ' + rel;
 }
 
 function displayPathForUi(absPath) {
   if (typeof absPath !== 'string') return '';
-  if (absPath.indexOf(HOME) === 0) {
-    var rest = absPath.slice(HOME.length).replace(/\\/g, '/');
+  if (absPath.startsWith(HOME)) {
+    var rest = absPath.slice(HOME.length).replaceAll('\\', '/');
     return '~/' + rest.replace(/^\/+/, '');
   }
-  return absPath.replace(/\\/g, '/');
+  return absPath.replaceAll('\\', '/');
 }
 
 // ── JSONL Parser ────────────────────────────────────────────────────────
@@ -1295,15 +1345,15 @@ function isClaudeModel(model) {
 var CACHE_READ_FORENSIC_THRESH = 500000000;
 
 function scanLineHitLimit(line) {
-  if (line.indexOf('rate_limit') >= 0) return true;
-  if (line.indexOf('RateLimit') >= 0) return true;
-  if (line.indexOf('rate limit') >= 0) return true;
-  if (line.indexOf('"status":429') >= 0) return true;
-  if (line.indexOf('"status_code":429') >= 0) return true;
-  if (line.indexOf('429') >= 0 && line.indexOf('error') >= 0) return true;
-  if (line.indexOf('overloaded') >= 0) return true;
-  if (line.indexOf('Too Many Requests') >= 0) return true;
-  if (line.indexOf('session') >= 0 && line.indexOf('limit') >= 0) return true;
+  if (line.includes('rate_limit')) return true;
+  if (line.includes('RateLimit')) return true;
+  if (line.includes('rate limit')) return true;
+  if (line.includes('"status":429')) return true;
+  if (line.includes('"status_code":429')) return true;
+  if (line.includes('429') && line.includes('error')) return true;
+  if (line.includes('overloaded')) return true;
+  if (line.includes('Too Many Requests')) return true;
+  if (line.includes('session') && line.includes('limit')) return true;
   return false;
 }
 
@@ -1361,16 +1411,16 @@ var SCAN_FILES_PER_TICK = 3;
 (function () {
   var e = process.env.CLAUDE_USAGE_SCAN_FILES_PER_TICK;
   if (!e) return;
-  var n = parseInt(e, 10);
-  if (!isNaN(n) && n >= 1 && n <= 80) SCAN_FILES_PER_TICK = n;
+  var n = Number.parseInt(e, 10);
+  if (!Number.isNaN(n) && n >= 1 && n <= 80) SCAN_FILES_PER_TICK = n;
 })();
 /** Mindestabstand zwischen teuren buildUsageResult-Zwischenständen (SSE), Standard ~1,5s. */
 var SCAN_PARTIAL_EMIT_MIN_MS = 1500;
 (function () {
   var e = process.env.CLAUDE_USAGE_SCAN_PARTIAL_MIN_MS;
   if (!e) return;
-  var n = parseInt(e, 10);
-  if (!isNaN(n) && n >= 400 && n <= 60000) SCAN_PARTIAL_EMIT_MIN_MS = n;
+  var n = Number.parseInt(e, 10);
+  if (!Number.isNaN(n) && n >= 400 && n <= 60000) SCAN_PARTIAL_EMIT_MIN_MS = n;
 })();
 
 function pad2(n) {
@@ -1407,7 +1457,7 @@ function bumpSessionSignals(bucket, tagList) {
 
 /** Session-Signale nach JSONL-Stunde (0–23) — gleiche Zeitleiste wie usage hours. */
 function bumpHourSessionSignals(bucket, hourKeyStr, tagList) {
-  if (!hourKeyStr || !tagList || !tagList.length) return;
+  if (!hourKeyStr || !tagList?.length) return;
   if (!bucket.hour_signals) bucket.hour_signals = {};
   if (!bucket.hour_signals[hourKeyStr]) bucket.hour_signals[hourKeyStr] = emptySessionSignals();
   var sig = bucket.hour_signals[hourKeyStr];
@@ -1435,9 +1485,9 @@ function mergeHourSignalsInto(dst, src) {
 function unionHourKeyCount(hoursObj, hourSignalsObj) {
   var m = {};
   var k;
-  for (k in hoursObj || {}) if (Object.prototype.hasOwnProperty.call(hoursObj, k)) m[k] = true;
+  for (k in hoursObj || {}) if (Object.hasOwn(hoursObj, k)) m[k] = true;
   for (k in hourSignalsObj || {})
-    if (Object.prototype.hasOwnProperty.call(hourSignalsObj, k)) m[k] = true;
+    if (Object.hasOwn(hourSignalsObj, k)) m[k] = true;
   return Object.keys(m).length;
 }
 
@@ -1465,9 +1515,9 @@ function classifyJsonlSessionSignals(line, rec) {
   ) {
     add('interrupt');
   }
-  if (rec && rec.message && rec.message.stop_reason) {
+  if (rec?.message?.stop_reason) {
     var sr = String(rec.message.stop_reason).toLowerCase();
-    if (sr.indexOf('cancel') >= 0 || sr === 'user_abort') add('interrupt');
+    if (sr.includes('cancel') || sr === 'user_abort') add('interrupt');
   }
   if (/retrying|will\s*retry|retries\s+exhausted|exponential\s*backoff|auto-?retry|retry\s+attempt/.test(lower)) {
     add('retry');
@@ -1475,12 +1525,12 @@ function classifyJsonlSessionSignals(line, rec) {
   if (/\b429\b/.test(lower) && /retry|rate|limit|overloaded|throttl|too\s+many/.test(lower)) {
     add('retry');
   }
-  if (rec && rec.error) {
+  if (rec?.error) {
     try {
       var ej = JSON.stringify(rec.error).toLowerCase();
       if (/retry|429|rate|throttl|overloaded/.test(ej)) add('retry');
       if (/interrupt|cancel|abort/.test(ej)) add('interrupt');
-    } catch (eJ) {}
+    } catch (error) { logOptionalErr(error); }
   }
   // B5: Tool result truncation
   if (/["']is_truncated["']\s*:\s*true|["']truncated["']\s*:\s*true/.test(line)) {
@@ -1663,7 +1713,7 @@ function writeJsonlTodayIndexDisk(payload) {
   var dir = path.dirname(JSONL_TODAY_INDEX_FILE);
   try {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  } catch (e0) {}
+  } catch (error) { logOptionalErr(error); }
   var tmp = JSONL_TODAY_INDEX_FILE + '.tmp';
   var body = JSON.stringify(payload);
   fs.writeFileSync(tmp, body, 'utf8');
@@ -1677,7 +1727,7 @@ function writeJsonlTodayIndexDisk(payload) {
 function invalidateJsonlTodayIndexDisk() {
   try {
     if (fs.existsSync(JSONL_TODAY_INDEX_FILE)) fs.unlinkSync(JSONL_TODAY_INDEX_FILE);
-  } catch (e) {}
+  } catch (error) { logOptionalErr(error); }
 }
 
 function hostSliceFromRow(h) {
@@ -1769,7 +1819,7 @@ function writeUsageDayCache(payload) {
   var dir = path.dirname(USAGE_DAY_CACHE_FILE);
   try {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  } catch (e) {}
+  } catch (error) { logOptionalErr(error); }
   var tmp = USAGE_DAY_CACHE_FILE + '.tmp';
   var body = JSON.stringify(payload);
   fs.writeFileSync(tmp, body, 'utf8');
@@ -1792,7 +1842,7 @@ function targetDayBucket(daily, dayKey, onlyDate, isolateTodayFrag) {
 function processJsonlFile(fileRef, daily, onlyDate, isolateTodayFrag, fileTodayFrag, todayYmdForFrag) {
   var f = typeof fileRef === 'string' ? fileRef : fileRef.path;
   var hostLabel = typeof fileRef === 'string' ? 'local' : fileRef.label || 'local';
-  var isSub = f.indexOf('subagent') >= 0;
+  var isSub = f.includes('subagent');
   try {
     forEachJsonlLineSync(f, function(line) {
       if (!line.trim()) return;
@@ -1824,8 +1874,8 @@ function processJsonlFile(fileRef, daily, onlyDate, isolateTodayFrag, fileTodayF
             bumpSessionSignals(dSig.hosts[hostLabel], sigTags);
             var hourKeyStr = null;
             if (ts.length >= 13) {
-              var hiSig = parseInt(ts.slice(11, 13), 10);
-              if (!isNaN(hiSig) && hiSig >= 0 && hiSig <= 23) hourKeyStr = String(hiSig);
+              var hiSig = Number.parseInt(ts.slice(11, 13), 10);
+              if (!Number.isNaN(hiSig) && hiSig >= 0 && hiSig <= 23) hourKeyStr = String(hiSig);
             }
             if (hourKeyStr) {
               bumpHourSessionSignals(dSig, hourKeyStr, sigTags);
@@ -1871,14 +1921,14 @@ function processJsonlFile(fileRef, daily, onlyDate, isolateTodayFrag, fileTodayF
         }
       }
 
-      var u = rec.message && rec.message.usage;
+      var u = rec.message?.usage;
       if (!u) return;
-      var modelRaw = (rec.message && rec.message.model) || 'unknown';
+      var modelRaw = rec.message?.model || 'unknown';
       if (!isClaudeModel(modelRaw)) return;
       if (ts.length < 19) return;
       var day = ts.slice(0, 10);
       if (onlyDate && day !== onlyDate) return;
-      var hour = parseInt(ts.slice(11, 13));
+      var hour = Number.parseInt(ts.slice(11, 13));
       var dd = targetDayBucket(daily, day, onlyDate, isolateTodayFrag);
       if (!dd.hosts) dd.hosts = {};
       if (!dd.hosts[hostLabel]) dd.hosts[hostLabel] = emptyHostSlice();
@@ -1913,7 +1963,7 @@ function processJsonlFile(fileRef, daily, onlyDate, isolateTodayFrag, fileTodayF
       dd.models[model].output += outTok;
       dd.models[model].cache_read += crTok;
       // Stop-reason tracking
-      var stopR = (rec.message && rec.message.stop_reason) || 'unknown';
+      var stopR = rec.message?.stop_reason || 'unknown';
       dd.stop_reasons[stopR] = (dd.stop_reasons[stopR] || 0) + 1;
       var cliVer = extractCliVersion(rec);
       if (cliVer) {
@@ -2190,10 +2240,10 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
     var added = [];
     var removed = [];
     for (var cm of curModels) {
-      if (prevModels.indexOf(cm) < 0) added.push(cm);
+      if (!prevModels.includes(cm)) added.push(cm);
     }
     for (var pm of prevModels) {
-      if (curModels.indexOf(pm) < 0) removed.push(pm);
+      if (!curModels.includes(pm)) removed.push(pm);
     }
     if (added.length > 0 || removed.length > 0) {
       result[mci].model_change = { added: added, removed: removed };
@@ -2202,7 +2252,7 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
 
   // Extension-Updates: Marketplace/GitHub nach Kalendertag; JSONL füllt Lücken (z. B. nach 27.3. wenn
   // VSIX-Datum ≠ erster Log-Tag der neuen Version — sonst fehlen Marker trotz sichtbarer Version in den Logs).
-  var mpFrozen = buildOpts && buildOpts.marketplaceRows;
+  var mpFrozen = buildOpts?.marketplaceRows;
   applyExtensionVersionMarkers(result, mpFrozen);
   applyJsonlGapVersionChanges(result);
 
@@ -2239,7 +2289,7 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
 
   var scanned = [];
   var tagged = filePaths;
-  if (tagged && tagged.length) {
+  if (tagged?.length) {
     for (var tf of tagged) {
       scanned.push(displayScannedFileLine(tf));
     }
@@ -2251,7 +2301,7 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
     byLabel[lb] = (byLabel[lb] || 0) + 1;
   }
   var scan_sources = [];
-  if (roots && roots.length) {
+  if (roots?.length) {
     for (var root of roots) {
       var rl = root.label;
       scan_sources.push({
@@ -2263,7 +2313,7 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
   }
 
   var host_labels = [];
-  if (roots && roots.length) {
+  if (roots?.length) {
     for (var rt of roots) {
       host_labels.push(rt.label);
     }
@@ -2322,9 +2372,7 @@ function parseAllUsageIncremental(done, onProgress) {
   if (
     skipIdentScan &&
     scanFpForPersist === __lastScanJsonlFingerprint &&
-    cachedData &&
-    cachedData.days &&
-    cachedData.days.length > 0 &&
+    cachedData?.days?.length > 0 &&
     !cachedData.scan_error
   ) {
     serviceLog.info('scan', 'skip parse identical jsonl fingerprint files=' + tagged.length);
@@ -2348,8 +2396,7 @@ function parseAllUsageIncremental(done, onProgress) {
   var useTodayOnly = false;
   // Exakte Treffer: sonst Vollscan (neue/entfernte .jsonl oder andere Wurzeln).
   if (
-    cache &&
-    cache.version === USAGE_DAY_CACHE_VERSION &&
+    cache?.version === USAGE_DAY_CACHE_VERSION &&
     cache.jsonl_file_count === tagged.length &&
     cache.scan_roots_key === rootsKey &&
     Array.isArray(cache.days) &&
@@ -2393,8 +2440,7 @@ function parseAllUsageIncremental(done, onProgress) {
   if (useTodayOnly && !TODAY_INDEX_DISABLED) {
     var rawIdx = readJsonlTodayIndexDisk();
     var idxOk =
-      rawIdx &&
-      rawIdx.version === JSONL_TODAY_INDEX_VERSION &&
+      rawIdx?.version === JSONL_TODAY_INDEX_VERSION &&
       rawIdx.calendar_day === todayStr &&
       rawIdx.jsonl_file_count === tagged.length &&
       rawIdx.scan_roots_key === rootsKey &&
@@ -2430,8 +2476,9 @@ function parseAllUsageIncremental(done, onProgress) {
         var stOne;
         try {
           stOne = fs.statSync(absOne);
-        } catch (eStat) {
+        } catch (error) {
           stOne = null;
+          logOptionalErr(error);
         }
         var entOne = todayIndexCtx.valid ? todayIndexCtx.files[absOne] : null;
         if (
@@ -2485,7 +2532,7 @@ function parseAllUsageIncremental(done, onProgress) {
             todayStr: todayStr,
             marketplaceRows: frozenMpRows
           });
-        } catch (eProg1) {}
+        } catch (error) { logOptionalErr(error); }
       }
       setImmediate(tick);
     } else {
@@ -2675,27 +2722,45 @@ function jsonForInlineI18nScript() {
   var c = __i18nPageCache;
   if (c.inlineJson) return c.inlineJson;
   c.inlineJson = JSON.stringify(c.bundles)
-    .replace(/\u2028/g, '\\u2028')
-    .replace(/\u2029/g, '\\u2029')
-    .replace(/</g, '\\u003c');
+    .replaceAll('\u2028', '\\u2028')
+    .replaceAll('\u2029', '\\u2029')
+    .replaceAll('<', '\\u003c');
   return c.inlineJson;
 }
 
-var __appVersionCache = '';
+var __appVersionHtmlCache = '';
 function getAppVersion() {
-  if (__appVersionCache) return __appVersionCache;
+  if (__appVersionHtmlCache) return __appVersionHtmlCache;
   try {
-    var execSync = require('child_process').execSync;
-    __appVersionCache = execSync('git describe --tags --abbrev=7', { encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+    var envHtml = (process.env.APP_VERSION || '').trim();
+    if (envHtml) {
+      __appVersionHtmlCache = envHtml;
+      return __appVersionHtmlCache;
+    }
+  } catch (error) {
+    logOptionalErr(error);
+  }
+  try {
+    var fromVerFile = fs
+      .readFileSync(path.join(__dirname, '..', 'VERSION'), 'utf8')
+      .trim();
+    if (fromVerFile) {
+      __appVersionHtmlCache = fromVerFile;
+      return __appVersionHtmlCache;
+    }
+  } catch (error) {
+    logOptionalErr(error);
+  }
+  try {
+    __appVersionHtmlCache = gitExecFileTrimmed(['describe', '--tags', '--abbrev=7']);
   } catch (e) {
     try {
-      __appVersionCache = execSync('git rev-parse --short=7 HEAD', { encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }).trim();
-      __appVersionCache = 'dev-' + __appVersionCache;
+      __appVersionHtmlCache = 'dev-' + gitExecFileTrimmed(['rev-parse', '--short=7', 'HEAD']);
     } catch (e2) {
-      __appVersionCache = 'dev';
+      __appVersionHtmlCache = 'dev';
     }
   }
-  return __appVersionCache;
+  return __appVersionHtmlCache;
 }
 
 function getDashboardHtml() {
@@ -2789,7 +2854,7 @@ function broadcastSse() {
 
 /** Nach Marketplace-Refresh: Marker neu auf cachedData.days ohne JSONL-Vollscan. */
 function reapplyExtensionMarkersOnCachedDataAndBroadcast(reason) {
-  if (!cachedData || !cachedData.days || !cachedData.days.length) return;
+  if (!cachedData?.days?.length) return;
   if (scanInProgress) {
     serviceLog.debug('markers', 'skip reapply: scan in progress (' + reason + ')');
     return;
@@ -2803,7 +2868,7 @@ function reapplyExtensionMarkersOnCachedDataAndBroadcast(reason) {
     broadcastSse();
     serviceLog.info('markers', 'extension markers refreshed (' + reason + ')');
   } catch (e) {
-    serviceLog.error('markers', 'reapply failed: ' + (e && e.message ? e.message : String(e)));
+    serviceLog.error('markers', 'reapply failed: ' + (e?.message ? e.message : String(e)));
   }
 }
 
@@ -2835,9 +2900,9 @@ function handleUsageScanParseSuccess(data) {
 }
 
 function handleUsageScanParseError(e) {
-  serviceLog.error('scan', 'parse failed: ' + (e && e.message ? e.message : String(e)));
-  var msg = e && e.message ? e.message : String(e);
-  if (!cachedData || !cachedData.days || cachedData.days.length === 0) {
+  serviceLog.error('scan', 'parse failed: ' + (e?.message ? e.message : String(e)));
+  var msg = e?.message ? e.message : String(e);
+  if (!cachedData?.days || cachedData.days.length === 0) {
     cachedData = makeStubCachedData();
   }
   cachedData.scanning = false;
@@ -2856,7 +2921,7 @@ function finalizeUsageScanIncremental(err, data) {
     scanInProgress = false;
     broadcastSse();
     scheduleIdleSessionTurnsPreloadIfNeeded(scanOk);
-    if (scanOk && cachedData && cachedData.days && cachedData.days.length) {
+    if (scanOk && cachedData?.days?.length) {
       backfillReleaseBodiesForDashboardDays(cachedData.days, function () {
         cachedData.generated = new Date().toISOString();
         broadcastSse();
@@ -2897,7 +2962,7 @@ function runScanAndBroadcast() {
       partial.generated = new Date().toISOString();
       cachedData = partial;
       broadcastSse();
-    } catch (pe) {}
+    } catch (error) { logOptionalErr(error); }
   }
   parseAllUsageIncremental(finalizeUsageScanIncremental, applyIncrementalProgress);
 }
@@ -2957,8 +3022,8 @@ function handleClaudeDataSyncRequest(req, res) {
     return;
   }
   claudeDataSyncBusy = true;
-  var maxMb = parseInt(process.env.CLAUDE_USAGE_SYNC_MAX_MB || '512', 10);
-  if (isNaN(maxMb) || maxMb < 1) maxMb = 512;
+  var maxMb = Number.parseInt(process.env.CLAUDE_USAGE_SYNC_MAX_MB || '512', 10);
+  if (Number.isNaN(maxMb) || maxMb < 1) maxMb = 512;
   var maxBytes = maxMb * 1024 * 1024;
   var tmpPath = path.join(os.tmpdir(), 'claude-sync-' + process.pid + '-' + Date.now() + '.tgz');
   var ws = fs.createWriteStream(tmpPath);
@@ -2979,10 +3044,10 @@ function handleClaudeDataSyncRequest(req, res) {
       aborted = true;
       try {
         req.destroy();
-      } catch (de) {}
+      } catch (error) { logOptionalErr(error); }
       try {
         ws.destroy();
-      } catch (we) {}
+      } catch (error) { logOptionalErr(error); }
       failSync(413, { ok: false, error: 'payload_too_large', max_mb: maxMb }, true);
       return;
     }
@@ -2993,7 +3058,7 @@ function handleClaudeDataSyncRequest(req, res) {
     aborted = true;
     try {
       ws.destroy();
-    } catch (we2) {}
+    } catch (error) { logOptionalErr(error); }
     fs.unlink(tmpPath, function () {});
     claudeDataSyncBusy = false;
   });
@@ -3004,7 +3069,7 @@ function handleClaudeDataSyncRequest(req, res) {
   ws.on('error', function (e) {
     if (aborted) return;
     aborted = true;
-    failSync(500, { ok: false, error: 'write_failed', detail: String(e && e.message ? e.message : e) }, true);
+    failSync(500, { ok: false, error: 'write_failed', detail: String(e?.message ? e.message : e) }, true);
   });
   ws.on('finish', function () {
     if (aborted) {
@@ -3039,7 +3104,7 @@ function primeDashboardAndScheduleFirstScan() {
   } catch (primeErr) {
     serviceLog.warn(
       'server',
-      'dashboard prime: ' + (primeErr && primeErr.message ? primeErr.message : String(primeErr))
+      'dashboard prime: ' + (primeErr?.message ? primeErr.message : String(primeErr))
     );
   }
   var pending = 2;
@@ -3132,6 +3197,141 @@ function computeQ5Consumption(samples) {
   return { consumed: consumed, tokens: tokens, count: sorted.length };
 }
 
+/** Request counts, duration, status, false-429, hourly volume — one NDJSON line. */
+function proxyNdjsonAccumulateRequestDuration(dd, rec, tsEnd) {
+  dd.requests++;
+  var dur = rec.duration_ms || 0;
+  dd.total_duration_ms += dur;
+  if (dur < dd.min_duration_ms) dd.min_duration_ms = dur;
+  if (dur > dd.max_duration_ms) dd.max_duration_ms = dur;
+
+  var status = rec.upstream_status || 0;
+  dd.status_codes[status] = (dd.status_codes[status] || 0) + 1;
+  if (status >= 400) dd.errors++;
+
+  // B3: False 429 — client-generated rate limit (no cf-ray = not from Anthropic)
+  if (status === 429) {
+    var rah = rec.response_anthropic_headers || {};
+    if (!rah['cf-ray']) dd.false_429s++;
+  }
+
+  if (tsEnd.length >= 13) {
+    var hour = Number.parseInt(tsEnd.slice(11, 13), 10);
+    if (!Number.isNaN(hour) && hour >= 0 && hour <= 23) {
+      dd.hours[hour] = (dd.hours[hour] || 0) + 1;
+    }
+  }
+  return { dur: dur, status: status };
+}
+
+/** Usage tokens, context-reset heuristic, cache health, cold starts, per-hour latency. */
+function proxyNdjsonAccumulateUsageCacheLatency(dd, rec, tsEnd, dur, status, u) {
+  if (u) {
+    dd.input_tokens += (u.input_tokens || 0);
+    dd.output_tokens += (u.output_tokens || 0);
+    dd.cache_read_tokens += (u.cache_read_input_tokens || 0);
+    dd.cache_creation_tokens += (u.cache_creation_input_tokens || 0);
+  }
+
+  // B4: Context Reset heuristic — cache_creation spikes after high cache_read phase
+  if (u && status === 200) {
+    var crt = u.cache_read_input_tokens || 0;
+    var cct = u.cache_creation_input_tokens || 0;
+    if (crt > 100000) dd._prev_cache_read_high = true;
+    if (dd._prev_cache_read_high && cct > 0 && crt < cct) {
+      dd.context_resets++;
+      dd._prev_cache_read_high = false;
+    }
+  }
+
+  var ch = rec.cache_health || 'na';
+  if (dd.cache_health[ch] !== undefined) dd.cache_health[ch]++;
+  else dd.cache_health.na++;
+
+  var crr = rec.cache_read_ratio;
+  if (typeof crr === 'number' && u && status === 200) {
+    dd.cache_ratios.push(crr);
+    if (crr < 0.5) dd.cold_starts++;
+  }
+
+  if (tsEnd.length >= 13 && dur > 0 && status === 200) {
+    var lhour = Number.parseInt(tsEnd.slice(11, 13), 10);
+    if (!Number.isNaN(lhour) && lhour >= 0 && lhour <= 23) {
+      if (!dd.per_hour_latency[lhour]) dd.per_hour_latency[lhour] = { sum: 0, count: 0, max: 0 };
+      dd.per_hour_latency[lhour].sum += dur;
+      dd.per_hour_latency[lhour].count++;
+      if (dur > dd.per_hour_latency[lhour].max) dd.per_hour_latency[lhour].max = dur;
+    }
+  }
+}
+
+/** Models, stop reasons, rate-limit snapshot + q5 samples, cache-fix interop fields. */
+function proxyNdjsonAccumulateModelsRateInterop(dd, rec, tsEnd, u, dur) {
+  var model = rec.request_hints?.model || 'unknown';
+  if (!dd.models[model]) dd.models[model] = { requests: 0, avg_duration_ms: 0, total_duration_ms: 0, output_tokens: 0 };
+  dd.models[model].requests++;
+  dd.models[model].total_duration_ms += dur;
+  if (u) dd.models[model].output_tokens += (u.output_tokens || 0);
+
+  var rh2 = rec.response_hints || {};
+  if (rh2.stop_reason) {
+    if (!dd.stop_reasons) dd.stop_reasons = {};
+    dd.stop_reasons[rh2.stop_reason] = (dd.stop_reasons[rh2.stop_reason] || 0) + 1;
+  }
+
+  var rlh = rec.response_anthropic_headers;
+  if (rlh) {
+    var snap = {};
+    var hasRl = false;
+    for (var rk in rlh) {
+      if (rk.startsWith('anthropic-ratelimit')) {
+        snap[rk] = rlh[rk];
+        hasRl = true;
+      }
+    }
+    if (hasRl) {
+      snap._ts = tsEnd;
+      dd.rate_limit_snapshots = [snap];
+
+      var q5Str = snap['anthropic-ratelimit-unified-5h-utilization'];
+      if (q5Str != null) {
+        var q5Num = Number.parseFloat(q5Str);
+        if (!Number.isNaN(q5Num) && q5Num >= 0) {
+          dd.q5_samples.push({
+            ts: tsEnd,
+            q5: q5Num,
+            tokens: (u?.input_tokens || 0) + (u?.output_tokens || 0),
+            cache_read: u?.cache_read_input_tokens || 0,
+            cache_creation: u?.cache_creation_input_tokens || 0
+          });
+        }
+      }
+    }
+  }
+
+  var ttl = rec.ttl_tier || 'unknown';
+  if (dd.ttl_tiers[ttl] !== undefined) dd.ttl_tiers[ttl]++;
+  else dd.ttl_tiers.unknown++;
+
+  dd.ephemeral_1h_tokens += (rec.ephemeral_1h_input_tokens || 0);
+  dd.ephemeral_5m_tokens += (rec.ephemeral_5m_input_tokens || 0);
+
+  if (rec.peak_hour === true) {
+    dd.peak_hour_requests++;
+  } else if (rec.peak_hour === false) {
+    dd.off_peak_requests++;
+  } else if (tsEnd.length >= 13) {
+    var phDate = new Date(tsEnd);
+    var phUtcH = phDate.getUTCHours();
+    var phUtcD = phDate.getUTCDay();
+    if (phUtcD >= 1 && phUtcD <= 5 && phUtcH >= 13 && phUtcH < 19) dd.peak_hour_requests++;
+    else dd.off_peak_requests++;
+  }
+
+  var src = rec.source || 'proxy';
+  dd.data_sources[src] = (dd.data_sources[src] || 0) + 1;
+}
+
 function parseProxyNdjsonFiles() {
   var files = collectProxyNdjsonFiles();
   var daily = {};
@@ -3153,146 +3353,10 @@ function parseProxyNdjsonFiles() {
         if (!daily[dayKey]) daily[dayKey] = emptyProxyDayBucket();
         var dd = daily[dayKey];
 
-        dd.requests++;
-        var dur = rec.duration_ms || 0;
-        dd.total_duration_ms += dur;
-        if (dur < dd.min_duration_ms) dd.min_duration_ms = dur;
-        if (dur > dd.max_duration_ms) dd.max_duration_ms = dur;
-
-        var status = rec.upstream_status || 0;
-        dd.status_codes[status] = (dd.status_codes[status] || 0) + 1;
-        if (status >= 400) dd.errors++;
-
-        // B3: False 429 — client-generated rate limit (no cf-ray = not from Anthropic)
-        if (status === 429) {
-          var rah = rec.response_anthropic_headers || {};
-          if (!rah['cf-ray']) dd.false_429s++;
-        }
-
-        // Hour tracking
-        if (tsEnd.length >= 13) {
-          var hour = parseInt(tsEnd.slice(11, 13), 10);
-          if (!isNaN(hour) && hour >= 0 && hour <= 23) {
-            dd.hours[hour] = (dd.hours[hour] || 0) + 1;
-          }
-        }
-
-        // Usage from proxy (already extracted from Anthropic response)
+        var durStatus = proxyNdjsonAccumulateRequestDuration(dd, rec, tsEnd);
         var u = rec.usage;
-        if (u) {
-          dd.input_tokens += (u.input_tokens || 0);
-          dd.output_tokens += (u.output_tokens || 0);
-          dd.cache_read_tokens += (u.cache_read_input_tokens || 0);
-          dd.cache_creation_tokens += (u.cache_creation_input_tokens || 0);
-        }
-
-        // B4: Context Reset heuristic — cache_creation spikes after high cache_read phase
-        if (u && status === 200) {
-          var crt = u.cache_read_input_tokens || 0;
-          var cct = u.cache_creation_input_tokens || 0;
-          if (crt > 100000) dd._prev_cache_read_high = true;
-          if (dd._prev_cache_read_high && cct > 0 && crt < cct) {
-            dd.context_resets++;
-            dd._prev_cache_read_high = false;
-          }
-        }
-
-        // Cache health
-        var ch = rec.cache_health || 'na';
-        if (dd.cache_health[ch] !== undefined) dd.cache_health[ch]++;
-        else dd.cache_health.na++;
-
-        // Cold-start detection: cache_read_ratio < 0.5 on a 200 request with usage
-        var crr = rec.cache_read_ratio;
-        if (typeof crr === 'number' && u && status === 200) {
-          dd.cache_ratios.push(crr);
-          if (crr < 0.5) dd.cold_starts++;
-        }
-
-        // Per-hour latency tracking for heatmap
-        if (tsEnd.length >= 13 && dur > 0 && status === 200) {
-          var lhour = parseInt(tsEnd.slice(11, 13), 10);
-          if (!isNaN(lhour) && lhour >= 0 && lhour <= 23) {
-            if (!dd.per_hour_latency[lhour]) dd.per_hour_latency[lhour] = { sum: 0, count: 0, max: 0 };
-            dd.per_hour_latency[lhour].sum += dur;
-            dd.per_hour_latency[lhour].count++;
-            if (dur > dd.per_hour_latency[lhour].max) dd.per_hour_latency[lhour].max = dur;
-          }
-        }
-
-        // Model from request hints
-        var model = (rec.request_hints && rec.request_hints.model) || 'unknown';
-        if (!dd.models[model]) dd.models[model] = { requests: 0, avg_duration_ms: 0, total_duration_ms: 0, output_tokens: 0 };
-        dd.models[model].requests++;
-        dd.models[model].total_duration_ms += dur;
-        if (u) dd.models[model].output_tokens += (u.output_tokens || 0);
-
-        // Stop-reason from proxy (SSE + JSON responses)
-        var rh2 = rec.response_hints || {};
-        if (rh2.stop_reason) {
-          if (!dd.stop_reasons) dd.stop_reasons = {};
-          dd.stop_reasons[rh2.stop_reason] = (dd.stop_reasons[rh2.stop_reason] || 0) + 1;
-        }
-
-        // Rate limit snapshot (keep last per day, not all)
-        var rlh = rec.response_anthropic_headers;
-        if (rlh) {
-          var snap = {};
-          var hasRl = false;
-          for (var rk in rlh) {
-            if (rk.indexOf('anthropic-ratelimit') === 0) {
-              snap[rk] = rlh[rk];
-              hasRl = true;
-            }
-          }
-          if (hasRl) {
-            snap._ts = tsEnd;
-            // Keep only latest snapshot per day (overwrite)
-            dd.rate_limit_snapshots = [snap];
-
-            // Cumulative q5 tracking for tokens-per-pct (see computeQ5Consumption)
-            var q5Str = snap['anthropic-ratelimit-unified-5h-utilization'];
-            if (q5Str != null) {
-              var q5Num = Number.parseFloat(q5Str);
-              if (!Number.isNaN(q5Num) && q5Num >= 0) {
-                dd.q5_samples.push({
-                  ts: tsEnd,
-                  q5: q5Num,
-                  tokens: (u?.input_tokens || 0) + (u?.output_tokens || 0),
-                  cache_read: u?.cache_read_input_tokens || 0,
-                  cache_creation: u?.cache_creation_input_tokens || 0
-                });
-              }
-            }
-          }
-        }
-
-        // ── claude-code-cache-fix interop fields ──────────────────────
-        // TTL tier (from cache-fix interceptor, absent in native proxy)
-        var ttl = rec.ttl_tier || 'unknown';
-        if (dd.ttl_tiers[ttl] !== undefined) dd.ttl_tiers[ttl]++;
-        else dd.ttl_tiers.unknown++;
-
-        // Ephemeral token breakdown by TTL tier
-        dd.ephemeral_1h_tokens += (rec.ephemeral_1h_input_tokens || 0);
-        dd.ephemeral_5m_tokens += (rec.ephemeral_5m_input_tokens || 0);
-
-        // Peak hour (prefer flag from cache-fix, fallback: compute from ts)
-        if (rec.peak_hour === true) {
-          dd.peak_hour_requests++;
-        } else if (rec.peak_hour === false) {
-          dd.off_peak_requests++;
-        } else if (tsEnd.length >= 13) {
-          var phDate = new Date(tsEnd);
-          var phUtcH = phDate.getUTCHours();
-          var phUtcD = phDate.getUTCDay();
-          if (phUtcD >= 1 && phUtcD <= 5 && phUtcH >= 13 && phUtcH < 19) dd.peak_hour_requests++;
-          else dd.off_peak_requests++;
-        }
-
-        // Data source tracking
-        var src = rec.source || 'proxy';
-        dd.data_sources[src] = (dd.data_sources[src] || 0) + 1;
+        proxyNdjsonAccumulateUsageCacheLatency(dd, rec, tsEnd, durStatus.dur, durStatus.status, u);
+        proxyNdjsonAccumulateModelsRateInterop(dd, rec, tsEnd, u, durStatus.dur);
       });
     } catch (e) {
       serviceLog.warn('proxy-parse', 'ndjson read failed ' + file + ': ' + (e.message || e));
@@ -3392,8 +3456,8 @@ var __devProxyPending = !!__devSource && (__devMode === 'proxy' || __devMode ===
 /** Outgoing DEV fetch to remote /api/session-turns (ms). Default 180s so reverse proxies stay below client abort. */
 var SESSION_TURNS_REMOTE_TIMEOUT_MS = (function () {
   var ev = String(process.env.CLAUDE_USAGE_SESSION_TURNS_REMOTE_TIMEOUT_MS || '').trim();
-  var n = parseInt(ev, 10);
-  return !isNaN(n) && n >= 30000 ? n : 180000;
+  var n = Number.parseInt(ev, 10);
+  return !Number.isNaN(n) && n >= 30000 ? n : 180000;
 })();
 
 function mergeLocalOutageIntoRemoteDays(remoteDays, localOutage) {
@@ -3442,7 +3506,7 @@ function devRemoteApplyProxyLogsBody(body, cb) {
       }
       serviceLog.info('dev', 'session-turns preloaded: ' + stKeys.length + ' days from remote');
     }
-    var proxyDaysLen = remote.proxy && remote.proxy.proxy_days ? remote.proxy.proxy_days.length : 0;
+    var proxyDaysLen = remote.proxy?.proxy_days ? remote.proxy.proxy_days.length : 0;
     serviceLog.info('dev', 'remote data fetched: ' + (remote.days || []).length + ' days, proxy_days=' + proxyDaysLen);
     broadcastSse();
   } catch (e) {
@@ -3458,7 +3522,7 @@ function devFetchRemoteUsage(cb, retryCount) {
   var retryDelayMs = 5000;
   var url = __devSource.replace(/\/$/, '') + '/api/debug/proxy-logs';
   if (retryCount === 0) serviceLog.info('dev', 'fetching remote data from ' + url);
-  var proto = url.startsWith('https') ? require('https') : require('http');
+  var proto = url.startsWith('https') ? require('node:https') : require('node:http');
   proto.get(url, function (resp) {
     var body = '';
     resp.on('data', function (chunk) { body += chunk; });
@@ -3497,7 +3561,7 @@ function devFetchProxyLogs(cb) {
 
   var url = source.replace(/\/$/, '') + '/api/debug/proxy-logs';
   serviceLog.info('dev', 'fetching proxy logs from ' + url);
-  var proto = url.startsWith('https') ? require('https') : require('http');
+  var proto = url.startsWith('https') ? require('node:https') : require('node:http');
   proto.get(url, function (resp) {
     var body = '';
     resp.on('data', function (chunk) { body += chunk; });
@@ -3529,7 +3593,7 @@ function resolveSessionTurnsCacheDir() {
   try {
     var ex = usageScanRoots.expandUserPath(raw);
     if (ex) return ex;
-  } catch (e0) {}
+  } catch (error) { logOptionalErr(error); }
   try {
     return path.resolve(raw);
   } catch (e1) {
@@ -3559,8 +3623,8 @@ var _sessionTurnsCache = Object.create(null);
 var IDLE_SESSION_PRELOAD_MS = (function () {
   var ev = String(process.env.CLAUDE_USAGE_IDLE_SESSION_PRELOAD_MS || '').trim();
   if (ev === '0' || ev === 'off' || ev === 'false') return 0;
-  var n = parseInt(ev, 10);
-  return !isNaN(n) && n >= 0 ? n : 20000;
+  var n = Number.parseInt(ev, 10);
+  return !Number.isNaN(n) && n >= 0 ? n : 20000;
 })();
 var __sessionTurnsIdlePreloadScheduled = false;
 
@@ -3582,7 +3646,7 @@ function getSessionTurnsCached(dateKey) {
     if (!noCache) _sessionTurnsCache[dateKey] = { result: fromDisk, fingerprint: fp };
     return fromDisk;
   }
-  if (cached && cached.fingerprint === fp) {
+  if (cached?.fingerprint === fp) {
     serviceLog.info('session-turns', 'date=' + dateKey + ' fingerprint HIT (' + fpMs + 'ms stat)');
     return cached.result;
   }
@@ -3644,7 +3708,7 @@ function readJsonBodyMax(req, maxBytes, cb) {
     if (total > maxBytes) {
       try {
         req.destroy();
-      } catch (eD) {}
+      } catch (error) { logOptionalErr(error); }
       cb(new Error('payload_too_large'));
       return;
     }
@@ -3675,7 +3739,7 @@ function isPathUnderDirectory(fileAbs, dirAbs) {
   var f = path.resolve(fileAbs);
   var d = path.resolve(dirAbs);
   if (f === d) return true;
-  return f.indexOf(d + path.sep) === 0;
+  return f.startsWith(d + path.sep);
 }
 
 function debugTaggedJsonlMatchesAbs(abs, tagged) {
@@ -3697,7 +3761,7 @@ function debugPathAllowedForRead(absPath) {
   try {
     var collected = collectTaggedJsonlFiles();
     if (debugTaggedJsonlMatchesAbs(abs, collected.tagged)) return true;
-  } catch (e0) {}
+  } catch (error) { logOptionalErr(error); }
   if (path.resolve(USAGE_DAY_CACHE_FILE) === abs) return true;
   if (path.resolve(JSONL_TODAY_INDEX_FILE) === abs) return true;
   if (path.resolve(RELEASES_CACHE) === abs) return true;
@@ -3707,11 +3771,11 @@ function debugPathAllowedForRead(absPath) {
   try {
     var proxyPaths = collectProxyNdjsonFiles();
     if (debugProxyNdjsonMatchesAbs(abs, proxyPaths)) return true;
-  } catch (e1) {}
+  } catch (error) { logOptionalErr(error); }
   var stDir = resolveSessionTurnsCacheDir();
   if (stDir && isPathUnderDirectory(abs, stDir)) {
     var bn = path.basename(abs);
-    if (bn.indexOf('..') >= 0) return false;
+    if (bn.includes('..')) return false;
     if (bn.length > 5 && bn.slice(-5) === '.json') return true;
   }
   return false;
@@ -3740,7 +3804,7 @@ function tryPushDebugCacheKnownPath(out, kind, p) {
       size: st2.size,
       mtime_ms: Math.floor(st2.mtimeMs)
     });
-  } catch (e2) {}
+  } catch (error) { logOptionalErr(error); }
 }
 
 function compareDebugCacheFileRows(a, b) {
@@ -3767,9 +3831,9 @@ function appendProxyNdjsonDebugEntries(out) {
           size: stp.size,
           mtime_ms: Math.floor(stp.mtimeMs)
         });
-      } catch (e3) {}
+      } catch (error) { logOptionalErr(error); }
     }
-  } catch (e4) {}
+  } catch (error) { logOptionalErr(error); }
 }
 
 function appendSessionTurnsDiskDebugEntries(out, stDir) {
@@ -3792,9 +3856,9 @@ function appendSessionTurnsDiskDebugEntries(out, stDir) {
           size: st3.size,
           mtime_ms: Math.floor(st3.mtimeMs)
         });
-      } catch (e5) {}
+      } catch (error) { logOptionalErr(error); }
     }
-  } catch (e6) {}
+  } catch (error) { logOptionalErr(error); }
 }
 
 function collectDebugCacheFilesPayload() {
@@ -3815,7 +3879,7 @@ function collectDebugCacheFilesPayload() {
         size: st.size,
         mtime_ms: Math.floor(st.mtimeMs)
       });
-    } catch (e1) {}
+    } catch (error) { logOptionalErr(error); }
   }
   tryPushDebugCacheKnownPath(out, 'day_cache', USAGE_DAY_CACHE_FILE);
   tryPushDebugCacheKnownPath(out, 'jsonl_today_index', JSONL_TODAY_INDEX_FILE);
@@ -3839,7 +3903,7 @@ function devProxyFetchRemoteSessionTurns(remoteBase, dateStr, timeoutMs, cb) {
   var stRemoteUrl = remoteBase.replace(/\/$/, '') + '/api/debug/session-turns?date=' + encodeURIComponent(dateStr);
   var stT0r = Date.now();
   serviceLog.info('session-turns', 'REMOTE → ' + stRemoteUrl);
-  var stProto = stRemoteUrl.startsWith('https') ? require('https') : require('http');
+  var stProto = stRemoteUrl.startsWith('https') ? require('node:https') : require('node:http');
   var stReq = stProto.get(stRemoteUrl, { timeout: timeoutMs }, function (stResp) {
     var stBody = '';
     stResp.on('data', function (ch) { stBody += ch; });
@@ -3871,8 +3935,8 @@ function createQuotaDivisorLineProcessor(PRICE, qfDate, requestPairs) {
     var rah = rec.response_anthropic_headers || {};
     var q5Str = rah['anthropic-ratelimit-unified-5h-utilization'];
     if (q5Str == null) return;
-    var q5 = parseFloat(q5Str);
-    if (isNaN(q5) || q5 < 0) return;
+    var q5 = Number.parseFloat(q5Str);
+    if (Number.isNaN(q5) || q5 < 0) return;
 
     var u = rec.usage;
     var cr = u.cache_read_input_tokens || 0;
@@ -3911,10 +3975,10 @@ function createQuotaDivisorLineProcessor(PRICE, qfDate, requestPairs) {
 function calendarPrevDateYmd(ymd) {
   var parts = String(ymd).split('-');
   if (parts.length !== 3) return null;
-  var y = parseInt(parts[0], 10);
-  var m = parseInt(parts[1], 10) - 1;
-  var d = parseInt(parts[2], 10);
-  if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
+  var y = Number.parseInt(parts[0], 10);
+  var m = Number.parseInt(parts[1], 10) - 1;
+  var d = Number.parseInt(parts[2], 10);
+  if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) return null;
   var dt = new Date(Date.UTC(y, m, d));
   dt.setUTCDate(dt.getUTCDate() - 1);
   return dt.toISOString().slice(0, 10);
@@ -3927,7 +3991,7 @@ function q5CarryoverTotalsFromPairs(pairs) {
   for (var pair of pairs) {
     var dltPct = pair.delta * 100;
     csum += dltPct;
-    if (!(pair.delta >= 0.03)) cisum += dltPct;
+    if (pair.delta < 0.03) cisum += dltPct;
   }
   return { actual: Math.round(csum * 10) / 10, ideal: Math.round(cisum * 10) / 10 };
 }
@@ -4146,8 +4210,8 @@ var server = http.createServer(function (req, res) {
         res.end(JSON.stringify({ ok: false, error: 'invalid_json' }));
         return;
       }
-      var n = body?.days_back != null ? parseInt(body.days_back, 10) : 8;
-      if (isNaN(n) || n < 1) n = 8;
+      var n = body?.days_back != null ? Number.parseInt(body.days_back, 10) : 8;
+      if (Number.isNaN(n) || n < 1) n = 8;
       if (n > 31) n = 31;
       var dateKeys = benchmarkSessionTurns.resolveDateKeys(n, '');
       serviceLog.info('session-turns-bench', 'POST /api/debug/benchmark-session-turns start days_back=' + n);
@@ -4192,7 +4256,7 @@ var server = http.createServer(function (req, res) {
     // DEV_MODE: merge remote cache-files list (prod pod has files we don't have locally)
     if (__devSource && __devMode) {
       try {
-        var remProto = __devSource.startsWith('https') ? require('https') : require('http');
+        var remProto = __devSource.startsWith('https') ? require('node:https') : require('node:http');
         var remUrl = __devSource.replace(/\/$/, '') + '/api/debug/cache-files';
         var remReq = remProto.get(remUrl, { timeout: 5000 }, function (remResp) {
           var remBody = '';
@@ -4207,7 +4271,7 @@ var server = http.createServer(function (req, res) {
                   if (!localKinds[rf.kind + ':' + rf.path_abs]) listCf.push(rf);
                 });
               }
-            } catch (eR) {}
+            } catch (error) { logOptionalErr(error); }
             res.writeHead(200, corsCf);
             res.end(JSON.stringify({ ok: true, files: listCf }));
           });
@@ -4217,7 +4281,7 @@ var server = http.createServer(function (req, res) {
           res.end(JSON.stringify({ ok: true, files: listCf }));
         });
         return;
-      } catch (eRem) {}
+      } catch (error) { logOptionalErr(error); }
     }
     res.writeHead(200, corsCf);
     res.end(JSON.stringify({ ok: true, files: listCf }));
@@ -4263,12 +4327,12 @@ var server = http.createServer(function (req, res) {
 
       // DEV_MODE: proxy view to remote if file doesn't exist locally
       var _localFileExists = false;
-      try { _localFileExists = fs.statSync(target).isFile(); } catch (_eL) {}
+      try { _localFileExists = fs.statSync(target).isFile(); } catch (error) { logOptionalErr(error); }
       if (!_localFileExists && __devSource && __devMode) {
         var pBody = JSON.stringify({ path_abs: rawPath });
         var pUrl = new URL(__devSource.replace(/\/$/, '') + '/api/debug/cache-file-view');
         var pOpts = { method: 'POST', hostname: pUrl.hostname, port: pUrl.port, path: pUrl.pathname, headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(pBody) }, timeout: 15000 };
-        var pProto = pUrl.protocol === 'https:' ? require('https') : require('http');
+        var pProto = pUrl.protocol === 'https:' ? require('node:https') : require('node:http');
         var pReq = pProto.request(pOpts, function (pResp) {
           var pData = '';
           pResp.on('data', function (ch) { pData += ch; });
@@ -4374,7 +4438,7 @@ var server = http.createServer(function (req, res) {
       if (qdDate && qfDate !== qdDate) continue;
       try {
         forEachJsonlLineSync(pf, createQuotaDivisorLineProcessor(PRICE, qfDate, requestPairs));
-      } catch (_e) { /* skip */ }
+      } catch (error) { logOptionalErr(error); }
     }
 
     var carryoverQ5 = null;
@@ -4387,7 +4451,7 @@ var server = http.createServer(function (req, res) {
           var prevPairsCar = [];
           try {
             forEachJsonlLineSync(pfCar, createQuotaDivisorLineProcessor(PRICE, qfDateCar, prevPairsCar));
-          } catch (_eCar) { /* skip */ }
+          } catch (error) { logOptionalErr(error); }
           if (prevPairsCar.length) {
             var carSums = q5CarryoverTotalsFromPairs(prevPairsCar);
             carryoverQ5 = { actual: carSums.actual, ideal: carSums.ideal, from_date: prevYmd };

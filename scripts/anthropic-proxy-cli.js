@@ -4,8 +4,8 @@
  * CLI für den Anthropic-Monitor-Proxy (Kernlogik: ./anthropic-proxy-core.js).
  * Start: node start.js proxy   oder   node anthropic-proxy.js
  */
-var path = require('path');
-var os = require('os');
+var path = require('node:path');
+var os = require('node:os');
 var core = require('./anthropic-proxy-core');
 
 var HOME = process.env.USERPROFILE || process.env.HOME || os.homedir();
@@ -18,7 +18,7 @@ var align = null;
 for (var i = 2; i < process.argv.length; i++) {
   var a = process.argv[i];
   var pm = a.match(/^--port=(\d+)$/);
-  if (pm) port = parseInt(pm[1], 10);
+  if (pm) port = Number.parseInt(pm[1], 10);
   var um = a.match(/^--upstream=(.+)$/);
   if (um) upstream = um[1].trim();
   if (a === '--align-jsonl') align = true;
@@ -49,7 +49,7 @@ for (var i = 2; i < process.argv.length; i++) {
   }
 }
 
-if (isNaN(port) || port < 1 || port > 65535) {
+if (Number.isNaN(port) || port < 1 || port > 65535) {
   console.error('anthropic-proxy: invalid --port');
   process.exit(1);
 }

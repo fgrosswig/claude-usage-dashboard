@@ -3,8 +3,8 @@
  * HTTP helpers for the usage dashboard: static assets under /assets/ (served from ./public).
  * Paths are whitelisted; no directory traversal.
  */
-var fs = require('fs');
-var path = require('path');
+var fs = require('node:fs');
+var path = require('node:path');
 
 var MIME = {
   '.css': 'text/css; charset=utf-8',

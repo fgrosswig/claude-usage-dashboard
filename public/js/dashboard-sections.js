@@ -63,8 +63,9 @@
     var multiHost = ctx.multiHost;
 
     // --- Summary cards (gewaehlter Tag im Dropdown); Host-Filter steuert Tages-/Peak-/Forensic-Kennzahlen ---
+    if (!selDay) return;
     var fhCard = getForensicHostFilterForCharts();
-    var hSlicePick = fhCard && selDay.hosts && selDay.hosts[fhCard] ? selDay.hosts[fhCard] : null;
+    var hSlicePick = fhCard && selDay.hosts?.[fhCard] ? selDay.hosts[fhCard] : null;
     var emptyHostDay = {
       output: 0,
       cache_read: 0,
@@ -81,7 +82,7 @@
     var totalCache = fhCard ? sumHostNumericField(days, fhCard, "cache_read") : days.reduce(function (s, d) { return s + d.cache_read; }, 0);
     var totalAll = fhCard
       ? days.reduce(function (s, d) {
-          var hh = d.hosts && d.hosts[fhCard];
+          var hh = d.hosts?.[fhCard];
           return s + (hh ? hh.total || 0 : 0);
         }, 0)
       : days.reduce(function (s, d) { return s + d.total; }, 0);
@@ -97,7 +98,7 @@
     var hitSel = fhCard ? (hSlicePick ? hSlicePick.hit_limit || 0 : 0) : selDay.hit_limit || 0;
     var hitAll = fhCard
       ? days.reduce(function (s, d) {
-          var hh = d.hosts && d.hosts[fhCard];
+          var hh = d.hosts?.[fhCard];
           return s + (hh ? hh.hit_limit || 0 : 0);
         }, 0)
       : days.reduce(function (s, d) { return s + (d.hit_limit || 0); }, 0);
@@ -217,7 +218,7 @@
     var dayForHourly = selDay;
     var fhForMainCharts = getForensicHostFilterForCharts();
     var mainHostKey =
-      multiHost && fhForMainCharts && hLabs.indexOf(fhForMainCharts) >= 0 ? fhForMainCharts : "";
+      multiHost && fhForMainCharts && hLabs.includes(fhForMainCharts) ? fhForMainCharts : "";
     var c4TimelineHostStack = multiHost && !mainHostKey;
     var tokenStatsHostTrioRow = multiHost && !hourlyMode && !mainHostKey;
     var c3PairGridTop = tokenStatsHostTrioRow ? 36 : 20;
@@ -229,7 +230,7 @@
       try {
         if (typeof _charts.c1hosts.dispose === 'function') _charts.c1hosts.dispose();
         else if (typeof _charts.c1hosts.destroy === 'function') _charts.c1hosts.destroy();
-      } catch (eHs) {}
+      } catch (error) { /* intentional */ }
       _charts.c1hosts = null;
     }
 
@@ -238,11 +239,11 @@
       var cr = document.getElementById("charts");
       var pair = document.getElementById("charts-host-sub");
       if (!cr || !pair) return;
-      var c1b = document.getElementById("c1") && document.getElementById("c1").closest(".chart-box");
-      var c2b = document.getElementById("c2") && document.getElementById("c2").closest(".chart-box");
-      var c3b = document.getElementById("c3") && document.getElementById("c3").closest(".chart-box");
+      var c1b = document.getElementById("c1")?.closest(".chart-box");
+      var c2b = document.getElementById("c2")?.closest(".chart-box");
+      var c3b = document.getElementById("c3")?.closest(".chart-box");
       var hb = document.getElementById("chart-host-wrap");
-      var c4b = document.getElementById("c4") && document.getElementById("c4").closest(".chart-box");
+      var c4b = document.getElementById("c4")?.closest(".chart-box");
       if (c1b) cr.appendChild(c1b);
       if (c2b) cr.appendChild(c2b);
       if (hb) pair.appendChild(hb);
@@ -251,13 +252,13 @@
     })();
 
     var elc1 = document.getElementById("c1");
-    if (elc1 && elc1.previousElementSibling && elc1.previousElementSibling.tagName === "H3") {
+    if (elc1?.previousElementSibling?.tagName === "H3") {
       elc1.previousElementSibling.textContent = hourlyMode
         ? t("chartDailyTokenHourly") + " (" + pick + ")"
         : t("chartDailyToken");
     }
     var elc2 = document.getElementById("c2");
-    if (elc2 && elc2.previousElementSibling && elc2.previousElementSibling.tagName === "H3") {
+    if (elc2?.previousElementSibling?.tagName === "H3") {
       elc2.previousElementSibling.textContent = hourlyMode ? t("chartCacheRatioHourly") : t("chartCacheRatio");
     }
 
@@ -337,7 +338,7 @@
           var lb0 = hLabs[hli];
           hostSeries.push({
             name: lb0, type: 'bar', stack: 'h', barCategoryGap: '8%',
-            data: days.map(function(d) { var x = d.hosts && d.hosts[lb0]; return x ? (x.total || 0) : 0; }),
+            data: days.map(function(d) { var x = d.hosts?.[lb0]; return x ? (x.total || 0) : 0; }),
             itemStyle: { color: hostBarColors[hli % hostBarColors.length] }
           });
         }
@@ -365,7 +366,7 @@
       }
     } else {
       if (_charts.c1hosts) {
-        try { _charts.c1hosts.dispose(); } catch (eH0) {}
+        try { _charts.c1hosts.dispose(); } catch (error) { /* intentional */ }
         _charts.c1hosts = null;
       }
       var chw2 = document.getElementById("chart-host-wrap");
@@ -391,7 +392,7 @@
           else {
             var d2 = days[p.dataIndex];
             if (d2) {
-              var hx = mainHostKey && d2.hosts && d2.hosts[mainHostKey] ? d2.hosts[mainHostKey] : d2;
+              var hx = mainHostKey && d2.hosts?.[mainHostKey] ? d2.hosts[mainHostKey] : d2;
               line += '<br>' + tr("chartTooltipOutCacheDay", { out: fmt(hx.output), cache: fmt(hx.cache_read) });
             }
           }
@@ -410,12 +411,12 @@
 
     var elc3 = document.getElementById("c3");
     if (elc3) elc3.classList.add("token-stats-pair-echart");
-    if (elc3 && elc3.previousElementSibling && elc3.previousElementSibling.tagName === "H3") {
+    if (elc3?.previousElementSibling?.tagName === "H3") {
       elc3.previousElementSibling.textContent = hourlyMode ? t("chartOutPerHourHourly") : t("chartOutPerHour");
     }
     var elc4 = document.getElementById("c4");
     if (elc4) elc4.classList.add("token-stats-pair-echart");
-    if (elc4 && elc4.previousElementSibling && elc4.previousElementSibling.tagName === "H3") {
+    if (elc4?.previousElementSibling?.tagName === "H3") {
       elc4.previousElementSibling.textContent = hourlyMode ? t("chartSubCachePctHourly") : t("chartSubCachePct");
     }
 
@@ -425,8 +426,8 @@
     if (hourlyMode) {
       var hwC = mainHostKey
         ? dayHourCallWeights({
-            hours: (dayForHourly.hosts && dayForHourly.hosts[mainHostKey] && dayForHourly.hosts[mainHostKey].hours) || {},
-            calls: dayForHourly.hosts && dayForHourly.hosts[mainHostKey] && dayForHourly.hosts[mainHostKey].calls != null
+            hours: (dayForHourly.hosts?.[mainHostKey]?.hours) || {},
+            calls: dayForHourly.hosts?.[mainHostKey]?.calls != null
               ? dayForHourly.hosts[mainHostKey].calls : dayForHourly.calls || 0
           })
         : dayHourCallWeights(dayForHourly);
@@ -474,7 +475,7 @@
         c4Leg.push(lb4);
         c4Series.push({
           name: lb4, type: 'bar', stack: 'subcache', barCategoryGap: '8%',
-          data: days.map(function (d) { var cr = d.cache_read || 0; var x = d.hosts && d.hosts[lb4]; if (!x || cr <= 0) return 0; return Math.round(((x.sub_cache || 0) / cr) * 100); }),
+          data: days.map(function (d) { var cr = d.cache_read || 0; var x = d.hosts?.[lb4]; if (!x || cr <= 0) return 0; return Math.round(((x.sub_cache || 0) / cr) * 100); }),
           itemStyle: { color: hostBarColors[c4i % hostBarColors.length] }
         });
       }
@@ -563,7 +564,7 @@
     var tbody=document.querySelector("#tbl tbody");
     tbody.innerHTML="";
     var filteredHost = window.__usageDetailHost;
-    var fhDay = filteredHost && selDay.hosts && selDay.hosts[filteredHost] ? selDay.hosts[filteredHost] : null;
+    var fhDay = filteredHost && selDay.hosts?.[filteredHost] ? selDay.hosts[filteredHost] : null;
     var tableRows = fhDay
       ? [{
           date: pick,
@@ -665,8 +666,10 @@
    */
   window._computeForensicCtx = function (ctx, tokenStatsResult) {
     var data = ctx.data;
+    if (!data) return null;
     var days = ctx.days;
     var selDay = ctx.selDay;
+    if (!selDay) return null;
     var pick = ctx.pick;
 
     var fc, fwarn, impl90, forensicHintF, budgetRatio, peak, fhCard, labels;
@@ -681,7 +684,7 @@
       labels = tokenStatsResult.labels;
     } else {
       fhCard = getForensicHostFilterForCharts();
-      var hSlicePick = fhCard && selDay.hosts && selDay.hosts[fhCard] ? selDay.hosts[fhCard] : null;
+      var hSlicePick = fhCard && selDay.hosts?.[fhCard] ? selDay.hosts[fhCard] : null;
       var emptyHostDay = {
         output: 0, cache_read: 0, total: 0, calls: 0, active_hours: 0,
         cache_output_ratio: 0, overhead: 0, hit_limit: 0,
@@ -743,7 +746,7 @@
     var labels = sCtx.labels;
     function hitLimitBarForChart(d) {
       if (!fhForensic) return d.hit_limit || 0;
-      var H = d.hosts && d.hosts[fhForensic];
+      var H = d.hosts?.[fhForensic];
       return H ? H.hit_limit || 0 : 0;
     }
     function forensicScoreDay(d) {
@@ -896,6 +899,7 @@
    * ================================================================ */
   window.renderForensicSection = function (ctx, tokenStatsResult) {
     var sCtx = window._computeForensicCtx(ctx, tokenStatsResult);
+    if (!sCtx) return;
 
     // --- Forensic summary line ---
     var sumEl = document.getElementById("forensic-summary-line");
