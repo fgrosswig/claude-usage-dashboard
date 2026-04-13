@@ -136,10 +136,12 @@
     if (!p || typeof p !== 'object') return p;
     if (!Array.isArray(p.hiddenSections)) p.hiddenSections = [];
     if (!Array.isArray(p.hiddenCharts)) p.hiddenCharts = [];
-    // Strip empty layout blocks (legacy from pre-filter saves)
+    // Strip empty layout blocks (legacy from pre-filter saves) + deprecated widgets
     if (Array.isArray(p.widgets)) {
       p.widgets = p.widgets.filter(function (w) {
-        return w.type !== 'layout' || !Array.isArray(w.nested) || w.nested.length > 0;
+        if (w.type === 'layout' && Array.isArray(w.nested) && w.nested.length === 0) return false;
+        if (DEPRECATED_WIDGETS && DEPRECATED_WIDGETS.indexOf(w.id) !== -1) return false;
+        return true;
       });
     }
     return p;
@@ -613,7 +615,7 @@
       if (stEcon) rf(stEcon, global._econQdData || undefined);
       return;
     }
-    if (rfName === 'renderWasteCurve' || rfName === 'renderCacheExplosion') {
+    if (rfName === 'renderCacheExplosion') {
       var sessEl = document.getElementById('econ-session-picker');
       var selV = sessEl ? sessEl.value : '';
       var sessE = null;
@@ -661,7 +663,7 @@
       return;
     }
     if (
-      rfName === 'renderWasteCurve' || rfName === 'renderCacheExplosion' ||
+      rfName === 'renderCacheExplosion' ||
       rfName === 'renderBudgetDrain' || rfName === 'renderEfficiencyTimeline' ||
       rfName === 'renderMonthlyButterfly' || rfName === 'renderDayComparison'
     ) {
@@ -1599,7 +1601,7 @@
       'proxy-tokens', 'proxy-latency', 'proxy-hourly', 'proxy-models', 'proxy-hourly-latency', 'proxy-error-trend', 'proxy-cache-trend'
     ],
     'anthropic-status': ['status-uptime', 'status-incidents', 'status-outage-scatter', 'status-outage-timeline'],
-    economic: ['econ-cumulative', 'econ-explosion', 'econ-budget-drain'],
+    economic: ['econ-explosion', 'econ-budget-drain'],
     'efficiency-range': ['eff-efficiency-timeline', 'eff-monthly-butterfly', 'eff-day-comparison']
   };
 
@@ -1790,6 +1792,14 @@
     }
   ];
 
+  /** Remove deprecated widget IDs from templates */
+  var DEPRECATED_WIDGETS = ['econ-cumulative'];
+  function stripDeprecatedWidgets(tpl) {
+    if (!tpl.widgets) return tpl;
+    tpl.widgets = tpl.widgets.filter(function (w) { return DEPRECATED_WIDGETS.indexOf(w.id) === -1; });
+    return tpl;
+  }
+
   /** Migrate v2 template to v3 (adds type field, supports chart-level widgets) */
   function migrateTemplateV2toV3(tpl) {
     if (tpl.version >= 3) return tpl;
@@ -1800,7 +1810,7 @@
     for (var wItem of w) {
       out.widgets.push({ id: wItem.id, span: wItem.span || 12, type: wItem.type || 'section' });
     }
-    return out;
+    return stripDeprecatedWidgets(out);
   }
 
   /** Migrate v1 template (order/hiddenSections) to v2 (widgets[]) */
@@ -1835,14 +1845,14 @@
         var parsed = JSON.parse(xhrT.responseText);
         if (parsed && Array.isArray(parsed.templates) && parsed.templates.length) {
           try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(parsed.templates)); } catch (error) { logWdOptionalErr(error); }
-          return parsed.templates;
+          return parsed.templates.map(stripDeprecatedWidgets);
         }
       }
     } catch (error) { logWdOptionalErr(error); }
     // Fallback to localStorage
     try {
       var raw = localStorage.getItem(TEMPLATES_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) return JSON.parse(raw).map(stripDeprecatedWidgets);
     } catch (error) { logWdOptionalErr(error); }
     return [];
   }
@@ -2785,9 +2795,8 @@
     },
     {
       id: 'economic',
-      blocks: [4, 8, 12, 12],
+      blocks: [12, 12, 12],
       slotChartIds: [
-        ['econ-cumulative'],
         ['econ-explosion'],
         ['econ-budget-drain'],
         ['eff-efficiency-timeline', 'eff-monthly-butterfly', 'eff-day-comparison']
@@ -4103,7 +4112,6 @@
         }
         if (bctx) rf(bctx);
       } else if (
-        rfName === 'renderWasteCurve' ||
         rfName === 'renderCacheExplosion' ||
         rfName === 'renderBudgetDrain' ||
         rfName === 'renderEfficiencyTimeline' ||

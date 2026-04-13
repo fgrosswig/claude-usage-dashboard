@@ -63,6 +63,7 @@
     var multiHost = ctx.multiHost;
 
     // --- Summary cards (gewaehlter Tag im Dropdown); Host-Filter steuert Tages-/Peak-/Forensic-Kennzahlen ---
+    if (!selDay) return;
     var fhCard = getForensicHostFilterForCharts();
     var hSlicePick = fhCard && selDay.hosts?.[fhCard] ? selDay.hosts[fhCard] : null;
     var emptyHostDay = {
@@ -665,8 +666,10 @@
    */
   window._computeForensicCtx = function (ctx, tokenStatsResult) {
     var data = ctx.data;
+    if (!data) return null;
     var days = ctx.days;
     var selDay = ctx.selDay;
+    if (!selDay) return null;
     var pick = ctx.pick;
 
     var fc, fwarn, impl90, forensicHintF, budgetRatio, peak, fhCard, labels;
@@ -896,6 +899,7 @@
    * ================================================================ */
   window.renderForensicSection = function (ctx, tokenStatsResult) {
     var sCtx = window._computeForensicCtx(ctx, tokenStatsResult);
+    if (!sCtx) return;
 
     // --- Forensic summary line ---
     var sumEl = document.getElementById("forensic-summary-line");

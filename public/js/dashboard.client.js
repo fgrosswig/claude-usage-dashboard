@@ -7516,8 +7516,8 @@ function renderEconomicSection(data, filteredDays) {
         var sel = sessPicker ? sessPicker.value : "";
         var session = findSession(stData, sel);
         if (session) {
-          renderWasteCurve(session);
           renderCacheExplosion(session);
+
           renderEfficiencyTimeline(stData);
           renderBudgetDrain(stData);
         }
@@ -7555,8 +7555,8 @@ function renderEconomicSection(data, filteredDays) {
         var sel = sessPicker ? sessPicker.value : "";
         var session = findSession(_econData, sel);
         if (session) {
-          renderWasteCurve(session);
           renderCacheExplosion(session);
+
           renderEfficiencyTimeline(_econData);
           renderBudgetDrain(_econData, _econQdData);
         }
@@ -7581,8 +7581,8 @@ function renderEconomicSection(data, filteredDays) {
       if (session) {
         var info = document.getElementById("econ-session-info");
         updateSessionInfo(session, info);
-        renderWasteCurve(session);
         renderCacheExplosion(session);
+        renderContextLoss(session);
       }
     }
     sessPicker.addEventListener("change", _onSessionChange);
@@ -8095,6 +8095,52 @@ function renderCacheExplosion(session) {
     }
   }
 
+  // 7d. Build accumulated context-loss + cumulative usage data for lower grid
+  var hasCL = compactions.length > 0;
+  var cumLossData = [];
+  var cumTotalData = [];
+  var lossAtEvent = {};
+  var cumT = 0;
+  var cumL = 0;
+  for (var ldi = 0; ldi < n; ldi++) {
+    cumT += cost[ldi];
+    cumTotalData.push(cumT);
+    if (hasCL && isCompaction[ldi] && ldi > 0) {
+      var lprev = turns[ldi - 1].cache_read || 0;
+      var lcur = turns[ldi].cache_read || 0;
+      var ldiff = lprev - lcur;
+      if (ldiff > 0) {
+        cumL += ldiff;
+        lossAtEvent[ldi] = { loss: ldiff, prevCR: lprev, curCR: lcur, pct: lprev > 0 ? Math.round((ldiff / lprev) * 100) : 0 };
+      }
+    }
+    cumLossData.push(cumL);
+  }
+  var clMarkLines = [];
+  if (hasCL) {
+    for (var clmi = 0; clmi < compactions.length; clmi++) {
+      var clIdx = compactions[clmi];
+      var clEvt = lossAtEvent[clIdx];
+      if (clEvt) {
+        clMarkLines.push({
+          xAxis: clIdx,
+          lineStyle: { color: "rgba(239,68,68,0.6)", type: "solid", width: 1.5 },
+          label: {
+            formatter: "Lost " + fmt(clEvt.loss) + " (" + clEvt.pct + "%)",
+            color: "#ffffff",
+            fontSize: 10,
+            position: "insideStartTop",
+            rotate: 90,
+            distance: 4,
+            backgroundColor: "rgba(30,58,138,0.85)",
+            padding: [3, 5],
+            borderRadius: 2
+          }
+        });
+      }
+    }
+  }
+
   // 8. Zone label helpers
   var warmupLabel = t("econExplosionWarmup") || "Warmup";
   var linearLabel = t("econExplosionLinear") || "Linear";
@@ -8145,35 +8191,59 @@ function renderCacheExplosion(session) {
   legTipMap[legCostFactor] = t("econLegendTipCostFactor");
 
   var option = {
+    axisPointer: hasCL ? { link: [{ xAxisIndex: [0, 1] }] } : undefined,
     tooltip: {
       trigger: "axis",
       formatter: function (params) {
-        var idx = params[0].dataIndex;
+        // Find upper grid series (Cost/Turn) for the turn index
+        var idx = -1;
+        for (var fp = 0; fp < params.length; fp++) {
+          if (params[fp].seriesName === legCostPerTurn) { idx = params[fp].dataIndex; break; }
+        }
+        if (idx < 0) idx = params[0].dataIndex;
         var lines = ["Turn " + (idx + 1)];
-        var val = cost[idx];
-        var factor = (baseline > 0) ? (val / baseline).toFixed(1) : "-";
-        var zone = val <= threshYellow ? warmupLabel : val <= threshRed ? linearLabel : drainLabel;
-        lines.push("Cost: " + fmt(val) + " (" + factor + "\u00d7)");
-        if (idx < n) {
+        if (idx < n && cost[idx] != null) {
+          var val = cost[idx];
+          var factor = (baseline > 0) ? (val / baseline).toFixed(1) : "-";
+          var zone = val <= threshYellow ? warmupLabel : val <= threshRed ? linearLabel : drainLabel;
+          lines.push("Cost: " + fmt(val) + " (" + factor + "\u00d7)");
           var TT = turns[idx];
-          lines.push(
-            "out=" + fmt(TT.output || 0) + " cr=" + fmt(TT.cache_read || 0),
-            "cc=" + fmt(TT.cache_creation || 0) + " in=" + fmt(TT.input || 0)
-          );
-        }
-        if (isCompaction[idx]) {
-          var prevCR2 = idx > 0 ? (turns[idx - 1].cache_read || 0) : 0;
-          var curCR2 = turns[idx].cache_read || 0;
-          var lossP = prevCR2 > 0 ? Math.round((1 - curCR2 / prevCR2) * 100) : 0;
-          lines.push(
-            "<span style='color:#a855f7'>" + t("econCompactionLabel") + "</span>",
-            "<span style='color:#38bdf8'>Context lost: " + lossP + "% (" + fmt(prevCR2) + " \u2192 " + fmt(curCR2) + ")</span>"
-          );
+          if (TT) {
+            lines.push(
+              "out=" + fmt(TT.output || 0) + " cr=" + fmt(TT.cache_read || 0),
+              "cc=" + fmt(TT.cache_creation || 0) + " in=" + fmt(TT.input || 0)
+            );
+          }
+          if (isCompaction[idx]) {
+            var prevCR2 = idx > 0 ? (turns[idx - 1].cache_read || 0) : 0;
+            var curCR2 = turns[idx].cache_read || 0;
+            var lossP = prevCR2 > 0 ? Math.round((1 - curCR2 / prevCR2) * 100) : 0;
+            lines.push(
+              "<span style='color:#a855f7'>" + t("econCompactionLabel") + "</span>",
+              "<span style='color:#38bdf8'>Context lost: " + lossP + "% (" + fmt(prevCR2) + " \u2192 " + fmt(curCR2) + ")</span>"
+            );
+          } else {
+            lines.push("Zone: " + zone);
+          }
+          for (var pi = 1; pi < params.length; pi++) {
+            if (params[pi].seriesName === legQuadFitLine && params[pi].value != null) {
+              lines.push("Fit: " + fmt(params[pi].value));
+              break;
+            }
+          }
+          if (hasCL && cumLossData[idx] > 0 && cumTotalData[idx] > 0) {
+            var idealVal = cumTotalData[idx] - cumLossData[idx];
+            var wastePct = Math.round(cumLossData[idx] / cumTotalData[idx] * 100);
+            lines.push("<span style='color:#ef4444'>Overhead: " + fmt(cumLossData[idx]) + " (" + wastePct + "% wasted)</span>");
+            lines.push("<span style='color:#38bdf8'>Without loss: " + fmt(idealVal) + "</span>");
+          }
         } else {
-          lines.push("Zone: " + zone);
-        }
-        if (params.length > 1 && params[1].value != null) {
-          lines.push("Fit: " + fmt(params[1].value));
+          lines[0] = "Turn " + (idx + 1) + " <span style='color:#64748b'>(projected)</span>";
+          var projFit = Math.round(cumFitA * idx * idx + cumFitB * idx + cumFitC);
+          if (projFit > 0) lines.push("<span style='color:#ef4444'>Projected: " + fmt(projFit) + "</span>");
+          if (cumWallTurn > 0 && idx + 1 >= cumWallTurn) {
+            lines.push("<span style='color:#ef4444;font-weight:bold'>Burn Zone</span>");
+          }
         }
         return lines.join("<br>");
       }
@@ -8189,107 +8259,441 @@ function renderCacheExplosion(session) {
         }
       }
     },
-    grid: { top: 50, right: 20, bottom: 40, left: 60 },
-    xAxis: {
-      type: "category",
-      data: xData,
-      axisLabel: {
-        color: "#64748b",
-        fontSize: 9,
-        interval: function (idx) { return idx % Math.ceil(n / 20) === 0; }
-      },
-      splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
-    },
-    yAxis: [
-      {
-        type: "value",
-        axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } },
+    grid: hasCL
+      ? [
+        { top: 50, right: 20, bottom: "35%", left: 60 },
+        { top: "72%", right: 20, bottom: 30, left: 60 }
+      ]
+      : [{ top: 50, right: 20, bottom: 40, left: 60 }],
+    xAxis: hasCL
+      ? [
+        { type: "category", gridIndex: 0, data: xData, axisLabel: { show: false }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+        { type: "category", gridIndex: 1, data: xData, axisLabel: { color: "#64748b", fontSize: 9, interval: function (idx) { return idx % Math.ceil(n / 20) === 0; } }, splitLine: { show: false } }
+      ]
+      : [{
+        type: "category", data: xData,
+        axisLabel: { color: "#64748b", fontSize: 9, interval: function (idx) { return idx % Math.ceil(n / 20) === 0; } },
         splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
-      },
-      {
-        type: "value",
-        position: "right",
-        axisLabel: { color: "#ec4899", fontSize: 9, inside: true, formatter: function (v) { return v.toFixed(0) + "\u00d7"; } },
-        splitLine: { show: false },
-        axisLine: { show: true, lineStyle: { color: "rgba(236,72,153,0.3)" } }
-      }
-    ],
-    series: [
-      {
-        name: legCostPerTurn,
-        type: "scatter",
-        yAxisIndex: 0,
-        symbolSize: 4,
-        data: scatterData,
-        markArea: { silent: true, data: markAreaData },
-        markLine: {
-          silent: true,
+      }],
+    yAxis: hasCL
+      ? [
+        { type: "value", gridIndex: 0, axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+        { type: "value", gridIndex: 0, position: "right", axisLabel: { color: "#ec4899", fontSize: 9, inside: true, formatter: function (v) { return v.toFixed(0) + "\u00d7"; } }, splitLine: { show: false }, axisLine: { show: true, lineStyle: { color: "rgba(236,72,153,0.3)" } } },
+        { type: "value", gridIndex: 1, axisLabel: { color: "#ef4444", fontSize: 9, formatter: function (v) { return v >= 1000 ? (v / 1000).toFixed(0) + "K" : String(v); } }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } }
+      ]
+      : [
+        { type: "value", axisLabel: { color: "#64748b", formatter: function (v) { return fmt(v); } }, splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } } },
+        { type: "value", position: "right", axisLabel: { color: "#ec4899", fontSize: 9, inside: true, formatter: function (v) { return v.toFixed(0) + "\u00d7"; } }, splitLine: { show: false }, axisLine: { show: true, lineStyle: { color: "rgba(236,72,153,0.3)" } } }
+      ],
+    series: (function () {
+      var s = [
+        {
+          name: legCostPerTurn,
+          type: "scatter",
+          xAxisIndex: 0, yAxisIndex: 0,
+          symbolSize: 4,
+          data: scatterData,
+          markArea: { silent: true, data: markAreaData },
+          markLine: { silent: true, symbol: "none", data: markLineData.concat(compactionLines) }
+        },
+        {
+          name: legQuadFitLine,
+          type: "line",
+          xAxisIndex: 0, yAxisIndex: 0,
+          lineStyle: { color: "rgba(251,191,36,0.7)", width: 2, type: "dashed" },
+          symbol: "none", data: fitLine, z: 5
+        },
+        {
+          name: legCtxSize,
+          type: "line",
+          xAxisIndex: 0, yAxisIndex: 1,
+          lineStyle: { color: "rgba(56,189,248,0.5)", width: 1, type: "dotted" },
+          areaStyle: { color: "rgba(56,189,248,0.05)" },
           symbol: "none",
-          data: markLineData.concat(compactionLines)
-        }
-      },
-      {
-        name: legQuadFitLine,
-        type: "line",
-        yAxisIndex: 0,
-        lineStyle: { color: "rgba(251,191,36,0.7)", width: 2, type: "dashed" },
-        symbol: "none",
-        data: fitLine,
-        z: 5
-      },
-      {
-        name: legCtxSize,
-        type: "line",
-        yAxisIndex: 1,
-        lineStyle: { color: "rgba(56,189,248,0.5)", width: 1, type: "dotted" },
-        areaStyle: { color: "rgba(56,189,248,0.05)" },
-        symbol: "none",
-        data: (function () {
-          // Cache health: cache_read / (cache_read + cache_creation) scaled to right axis
-          return turns.map(function (T) {
+          data: turns.map(function (T) {
             var cIO = (T.cache_read || 0) + (T.cache_creation || 0);
             var health = cIO > 0 ? (T.cache_read || 0) / cIO : 0;
             return +(health * 15).toFixed(1);
-          });
-        })(),
-        z: 2
-      },
-      {
-        name: legCostFactor,
-        type: "line",
-        yAxisIndex: 1,
-        lineStyle: { color: "rgba(236,72,153,0.6)", width: 1.5 },
-        symbol: "none",
-        data: cost.map(function (v) { return +(v / (cost[0] || 1)).toFixed(1); }),
-        z: 4
-      },
-      {
-        name: "Context Loss",
-        type: "scatter",
-        yAxisIndex: 1,
-        symbol: "circle",
-        symbolSize: 10,
-        itemStyle: { color: "#38bdf8", borderColor: "#fff", borderWidth: 1.5 },
-        z: 15,
-        data: (function () {
-          var pts = [];
-          for (var cl2 = 1; cl2 < n; cl2++) {
-            var prevCR = turns[cl2 - 1].cache_read || 0;
-            var curCR = turns[cl2].cache_read || 0;
-            if (prevCR > 10000 && curCR < prevCR * 0.5) {
-              var cIO = curCR + (turns[cl2].cache_creation || 0);
-              var health = cIO > 0 ? curCR / cIO : 0;
-              var loss = Math.round((1 - curCR / prevCR) * 100);
-              pts.push({ value: [cl2, +(health * 15).toFixed(1)], loss: loss, prevCR: prevCR, curCR: curCR });
-            }
-          }
-          return pts;
-        })()
+          }),
+          z: 2
+        },
+        {
+          name: legCostFactor,
+          type: "line",
+          xAxisIndex: 0, yAxisIndex: 1,
+          lineStyle: { color: "rgba(236,72,153,0.6)", width: 1.5 },
+          symbol: "none",
+          data: cost.map(function (v) { return +(v / (cost[0] || 1)).toFixed(1); }),
+          z: 4
+        }
+      ];
+      if (hasCL) {
+        s.push({
+          name: "Accumulated Loss",
+          type: "line",
+          xAxisIndex: 1, yAxisIndex: 2,
+          step: "end",
+          areaStyle: { color: "rgba(239,68,68,0.15)" },
+          lineStyle: { color: "rgba(239,68,68,0.8)", width: 2 },
+          itemStyle: { color: "rgba(239,68,68,0.8)" },
+          symbol: "none",
+          data: cumLossData,
+          markLine: { silent: true, symbol: "none", data: clMarkLines }
+        });
       }
-    ]
+      return s;
+    })()
   };
 
+  el.style.height = hasCL ? "480px" : "300px";
   __effInitOrSet("econExplosion", el, option, true);
+
+  // Toggle switch: Context Loss ↔ Cumulative Usage in lower grid
+  if (hasCL) {
+    var toggleId = "econ-explosion-lower-toggle";
+    var existing = document.getElementById(toggleId);
+    if (existing) existing.remove();
+    var toggle = document.createElement("div");
+    toggle.id = toggleId;
+    toggle.style.cssText = "display:flex;gap:4px;margin:4px 0 0 60px;";
+    var btnLoss = document.createElement("button");
+    btnLoss.textContent = t("econBtnContextLoss") || "Context Loss";
+    btnLoss.className = "sidebar-btn-sm";
+    btnLoss.style.cssText = "font-size:10px;padding:2px 8px;border-radius:3px;";
+    var btnCum = document.createElement("button");
+    btnCum.textContent = t("econBtnCumulative") || "Cumulative";
+    btnCum.className = "sidebar-btn-sm";
+    btnCum.style.cssText = "font-size:10px;padding:2px 8px;border-radius:3px;opacity:0.5;";
+    toggle.appendChild(btnLoss);
+    toggle.appendChild(btnCum);
+
+    el.parentElement.insertBefore(toggle, el);
+
+    // Pre-build cumulative curve data (same as renderWasteCurve but for lower grid)
+    var cumFitA = 0, cumFitB = 0, cumFitC = 0;
+    (function () {
+      var cs1 = 0, cs2 = 0, cs3 = 0, cs4 = 0, csy = 0, cs1y = 0, cs2y = 0;
+      for (var cfi = 0; cfi < n; cfi++) {
+        var ct2 = cfi * cfi;
+        cs1 += cfi; cs2 += ct2; cs3 += ct2 * cfi; cs4 += ct2 * ct2;
+        csy += cumTotalData[cfi]; cs1y += cfi * cumTotalData[cfi]; cs2y += ct2 * cumTotalData[cfi];
+      }
+      var cdet = n * (cs2 * cs4 - cs3 * cs3) - cs1 * (cs1 * cs4 - cs3 * cs2) + cs2 * (cs1 * cs3 - cs2 * cs2);
+      if (Math.abs(cdet) > 1e-10) {
+        cumFitC = (csy * (cs2 * cs4 - cs3 * cs3) - cs1 * (cs1y * cs4 - cs2y * cs3) + cs2 * (cs1y * cs3 - cs2y * cs2)) / cdet;
+        cumFitB = (n * (cs1y * cs4 - cs2y * cs3) - csy * (cs1 * cs4 - cs3 * cs2) + cs2 * (cs1 * cs2y - cs1y * cs2)) / cdet;
+        cumFitA = (n * (cs2 * cs2y - cs3 * cs1y) - cs1 * (cs1 * cs2y - cs1y * cs2) + csy * (cs1 * cs3 - cs2 * cs2)) / cdet;
+      }
+    })();
+    var cumProjectN = Math.max(Math.round(n * 0.5), 20);
+    var cumTotalTurns = n + cumProjectN;
+    var cumActualPairs = [];
+    var cumProjectedPairs = [];
+    var cumFitPairs = [];
+    for (var cxi = 0; cxi < cumTotalTurns; cxi++) {
+      var ctn = cxi + 1;
+      var cfitted = Math.round(cumFitA * cxi * cxi + cumFitB * cxi + cumFitC);
+      cumFitPairs.push([ctn, cfitted]);
+      if (cxi < n) {
+        cumActualPairs.push([ctn, cumTotalData[cxi]]);
+        if (cxi === n - 1) cumProjectedPairs.push([ctn, cumTotalData[cxi]]);
+      } else {
+        cumProjectedPairs.push([ctn, cfitted]);
+      }
+    }
+    // Burn threshold: 1.5x current total
+    var cumCurrentTotal = cumTotalData[n - 1];
+    var cumBurnThresh = cumCurrentTotal * 1.5;
+    var cumWallTurn = -1;
+    for (var cwi = n; cwi < cumTotalTurns; cwi++) {
+      if (cumFitPairs[cwi] && cumFitPairs[cwi][1] >= cumBurnThresh) {
+        cumWallTurn = cwi + 1;
+        break;
+      }
+    }
+    // Safe/Burn zone areas
+    var cumZoneAreas = [];
+    // Green zone: from start to session end (actual data)
+    cumZoneAreas.push([
+      { xAxis: 1, itemStyle: { color: "rgba(34,197,94,0.06)" } },
+      { xAxis: n }
+    ]);
+    if (cumWallTurn > 0 && cumWallTurn > n + 1) {
+      // Yellow safe zone: session end to burn wall
+      cumZoneAreas.push([
+        { xAxis: n, name: "Safe (" + (cumWallTurn - n) + " turns)", itemStyle: { color: "rgba(250,204,21,0.12)" }, label: { color: "rgba(250,204,21,0.6)", fontSize: 10 } },
+        { xAxis: cumWallTurn }
+      ]);
+    }
+    if (cumWallTurn > 0) {
+      // Red burn zone: from wall to end
+      cumZoneAreas.push([
+        { xAxis: cumWallTurn, name: "Burn Zone", itemStyle: { color: "rgba(239,68,68,0.14)" }, label: { color: "rgba(239,68,68,0.5)", fontSize: 10 } },
+        { xAxis: cumTotalTurns }
+      ]);
+    }
+    var cumWallLine = cumWallTurn > 0 ? [{
+      xAxis: cumWallTurn,
+      lineStyle: { color: "#ef4444", type: "dashed", width: 1.5 },
+      label: { show: false }
+    }] : [];
+
+    var _lowerMode = "loss";
+    function _updateLower(mode) {
+      _lowerMode = mode;
+      btnLoss.style.opacity = mode === "loss" ? "1" : "0.5";
+      btnCum.style.opacity = mode === "cumulative" ? "1" : "0.5";
+      var chart = _effCharts.econExplosion;
+      if (!chart) return;
+      var isLoss = mode === "loss";
+      var lowerSeries = [];
+      var lowerXAxis, lowerYAxis;
+      if (isLoss) {
+        lowerXAxis = { type: "category", gridIndex: 1, data: xData, axisLabel: { color: "#64748b", fontSize: 9, interval: function (idx) { return idx % Math.ceil(n / 20) === 0; } }, splitLine: { show: false } };
+        lowerYAxis = {
+          type: "value", gridIndex: 1,
+          axisLabel: { color: "#ef4444", fontSize: 9, formatter: function (v) { return v >= 1000 ? (v / 1000).toFixed(0) + "K" : String(v); } },
+          splitLine: { lineStyle: { color: "rgba(51,65,85,.3)" } }
+        };
+        lowerSeries.push({
+          name: "Accumulated Loss",
+          type: "line", xAxisIndex: 1, yAxisIndex: 2,
+          step: "end",
+          areaStyle: { color: "rgba(239,68,68,0.15)" },
+          lineStyle: { color: "rgba(239,68,68,0.8)", width: 2 },
+          itemStyle: { color: "rgba(239,68,68,0.8)" },
+          symbol: "none", data: cumLossData,
+          markLine: { silent: true, symbol: "none", data: clMarkLines }
+        });
+      } else {
+        // Per-turn cache_read: Actual (saw-tooth) vs Envelope (no drops)
+        // Envelope includes rebuild multiplier M(t) = f(t) / f_avg(t)
+        // M(t) accounts for rebuilding at current cost what was built cheaply earlier
+        // f(t) = a*t² + b*t + c (current per-turn cost)
+        // f_avg(t) = a*t²/3 + b*t/2 + c (average historical cost)
+        var actualCR = [];
+        var envelopeCR = [];
+        var adjustment = 0;
+        var compMeta = {}; // per-turn compaction metadata for tooltip
+        for (var opi = 0; opi < n; opi++) {
+          var cr = turns[opi].cache_read || 0;
+          if (isCompaction[opi] && opi > 0) {
+            var prevCR = turns[opi - 1].cache_read || 0;
+            var drop = prevCR - cr;
+            if (drop > 0) {
+              var ft = a * opi * opi + b * opi + c;
+              var favg = (a * opi * opi / 3) + (b * opi / 2) + c;
+              var mt = favg > 0 ? ft / favg : 1;
+              if (mt < 1) mt = 1;
+              var mreal = 1 + mt;
+              adjustment += drop * mreal;
+              compMeta[opi] = { drop: drop, mt: mt, mreal: mreal, realCost: Math.round(drop * mreal), prevCR: prevCR, curCR: cr };
+            }
+          }
+          actualCR.push(cr);
+          envelopeCR.push(cr + adjustment);
+        }
+        var totalLostCR = adjustment;
+
+        lowerXAxis = { type: "category", gridIndex: 1, data: xData, axisLabel: { color: "#64748b", fontSize: 9, interval: function (idx) { return idx % Math.ceil(n / 20) === 0; } }, splitLine: { show: false } };
+        lowerYAxis = {
+          type: "value", gridIndex: 1,
+          axisLabel: { color: "#64748b", fontSize: 9, formatter: function (v) { return v >= 1000000 ? (v / 1000000).toFixed(1) + "M" : v >= 1000 ? (v / 1000).toFixed(0) + "K" : String(v); } },
+          splitLine: { lineStyle: { color: "rgba(51,65,85,.15)" } }
+        };
+        // Stack: Actual (base) + Delta (red fill on top) = Envelope
+        var deltaData = [];
+        for (var dli = 0; dli < n; dli++) {
+          deltaData.push(envelopeCR[dli] - actualCR[dli]);
+        }
+        lowerSeries.push(
+          {
+            name: t("econSeriesActualCR") || "Actual cache_read",
+            type: "line", xAxisIndex: 1, yAxisIndex: 2,
+            stack: "crStack",
+            showSymbol: false,
+            lineStyle: { color: "#94a3b8", width: 2 },
+            areaStyle: { color: "transparent" },
+            z: 2, data: actualCR
+          },
+          {
+            name: t("econSeriesLostContext") || "Lost context",
+            type: "line", xAxisIndex: 1, yAxisIndex: 2,
+            stack: "crStack",
+            showSymbol: false,
+            lineStyle: { color: "transparent", width: 0 },
+            areaStyle: { color: "rgba(239,68,68,0.25)" },
+            z: 2, data: deltaData
+          },
+          {
+            name: t("econSeriesWithoutLoss") || "Without loss",
+            type: "line", xAxisIndex: 1, yAxisIndex: 2,
+            showSymbol: false,
+            lineStyle: { color: "#86efac", width: 2 },
+            z: 3, data: envelopeCR,
+            markLine: (function () {
+              var cmLines = [];
+              var cmKeys = Object.keys(compMeta);
+              for (var cmi = 0; cmi < cmKeys.length; cmi++) {
+                var cmIdx = Number(cmKeys[cmi]);
+                var cm = compMeta[cmIdx];
+                cmLines.push({
+                  xAxis: cmIdx,
+                  lineStyle: { color: "rgba(168,85,247,0.5)", type: "solid", width: 1 },
+                  label: {
+                    formatter: fmt(cm.realCost) + " (" + cm.mreal.toFixed(1) + "\u00d7)",
+                    color: "#ffffff",
+                    fontSize: 9,
+                    position: "end",
+                    rotate: 0,
+                    distance: -14,
+                    backgroundColor: "rgba(168,85,247,0.8)",
+                    padding: [2, 4],
+                    borderRadius: 2
+                  }
+                });
+              }
+              return cmLines.length ? { silent: true, symbol: "none", data: cmLines } : undefined;
+            })(),
+            markArea: (function () {
+              // Zone boundaries from per-turn cost vs baseline thresholds
+              // First turn where quadratic fit crosses threshYellow / threshRed
+              var fitYellow = -1, fitRed = -1;
+              for (var bzi = 0; bzi < n; bzi++) {
+                var fitVal = a * bzi * bzi + b * bzi + c;
+                if (fitYellow < 0 && fitVal >= threshYellow) fitYellow = bzi;
+                if (fitRed < 0 && fitVal >= threshRed) fitRed = bzi;
+              }
+              var zones = [];
+              var zy = fitYellow > 0 ? fitYellow : n - 1;
+              zones.push([
+                { xAxis: 0, itemStyle: { color: "rgba(34,197,94,0.06)" } },
+                { xAxis: zy }
+              ]);
+              if (fitYellow > 0 && fitYellow < n) {
+                var zr = fitRed > 0 ? fitRed : n - 1;
+                zones.push([
+                  { xAxis: fitYellow, name: linearLabel, itemStyle: { color: "rgba(250,204,21,0.08)" }, label: { color: "rgba(250,204,21,0.5)", fontSize: 9, position: "insideTop", distance: 4 } },
+                  { xAxis: zr }
+                ]);
+                if (fitRed > 0 && fitRed < n) {
+                  zones.push([
+                    { xAxis: fitRed, name: drainLabel, itemStyle: { color: "rgba(239,68,68,0.12)" }, label: { color: "rgba(239,68,68,0.6)", fontSize: 9, position: "insideTop", distance: 4 } },
+                    { xAxis: n - 1 }
+                  ]);
+                }
+              }
+              return zones.length ? { silent: true, data: zones } : undefined;
+            })()
+          }
+        );
+      }
+      var ya = option.yAxis.slice(0, 2);
+      if (Array.isArray(lowerYAxis)) {
+        for (var yai = 0; yai < lowerYAxis.length; yai++) ya.push(lowerYAxis[yai]);
+      } else {
+        ya.push(lowerYAxis);
+      }
+      var xa = option.xAxis.slice(0, 1);
+      xa.push(lowerXAxis);
+      var upperSeries = option.series.slice(0, 4);
+      var newTooltip = isLoss ? option.tooltip : {
+        trigger: "axis",
+        formatter: function (params) {
+          var idx = params[0]?.dataIndex;
+          if (idx == null || idx < 0) return "";
+          var lines = ["<b>Turn " + (idx + 1) + "</b>"];
+          // Actual cache_read
+          var aCR = actualCR[idx] || 0;
+          var eCR = envelopeCR[idx] || 0;
+          var gap = eCR - aCR;
+          lines.push("cache_read: " + fmt(aCR));
+          if (gap > 0) {
+            lines.push("Envelope: " + fmt(eCR));
+            lines.push("<span style='color:#ef4444'>Gap: " + fmt(gap) + "</span>");
+          }
+          // Compaction detail with M_real
+          var cm = compMeta[idx];
+          if (cm) {
+            var ftVal = Math.round(a * idx * idx + b * idx + c);
+            var favgVal = Math.round((a * idx * idx / 3) + (b * idx / 2) + c);
+            lines.push("");
+            lines.push("<span style='color:#a855f7'>\u25c6 Compaction</span>");
+            lines.push(fmt(cm.prevCR) + " \u2192 " + fmt(cm.curCR) + " (Drop " + fmt(cm.drop) + ")");
+            lines.push("");
+            lines.push("<span style='color:#ef4444'>f(t) = " + fmt(ftVal) + "  (cost at turn " + (idx + 1) + ")</span>");
+            lines.push("<span style='color:#86efac'>f_avg = " + fmt(favgVal) + "  (avg cost turns 0-" + (idx + 1) + ")</span>");
+            lines.push("<span style='color:#fbbf24'>M(t) = " + fmt(ftVal) + " / " + fmt(favgVal) + " = " + cm.mt.toFixed(2) + "\u00d7</span>");
+            lines.push("<span style='color:#ef4444'>M_real = 1 + " + cm.mt.toFixed(2) + " = " + cm.mreal.toFixed(2) + "\u00d7</span>");
+            lines.push("");
+            lines.push("<span style='color:#ef4444;font-weight:bold'>Real cost: " + fmt(cm.drop) + " \u00d7 " + cm.mreal.toFixed(2) + " = " + fmt(cm.realCost) + "</span>");
+          }
+          return lines.join("<br>");
+        }
+      };
+      chart.setOption({
+        tooltip: newTooltip,
+        axisPointer: { link: [{ xAxisIndex: [0, 1] }] },
+        xAxis: xa,
+        yAxis: ya,
+        visualMap: [],
+        series: upperSeries.concat(lowerSeries)
+      }, { replaceMerge: ['series', 'xAxis', 'yAxis'] });
+    }
+    // Zone boundaries for cumulative view: ratio of actual (a*t²+b*t+c) vs linear (b*t+c)
+    // Safe: ratio < 1.5, Linear: ratio < 3, Burn: ratio >= 3
+    var zoneYellowTurn = -1, zoneRedTurn = -1;
+    for (var zi = 10; zi < n; zi++) {
+      var cumFit = a * zi * zi + b * zi + c;
+      var cumLin = b * zi + c;
+      var zRatio = cumLin > 0 ? cumFit / cumLin : 1;
+      if (zoneYellowTurn < 0 && zRatio >= 1.5) zoneYellowTurn = zi;
+      if (zoneRedTurn < 0 && zRatio >= 3) zoneRedTurn = zi;
+    }
+    var cumZoneAreas = [];
+    if (zoneYellowTurn > 0) {
+      cumZoneAreas.push([
+        { xAxis: 0, itemStyle: { color: "rgba(34,197,94,0.08)" } },
+        { xAxis: zoneYellowTurn }
+      ]);
+    }
+    if (zoneYellowTurn >= 0 && zoneRedTurn > zoneYellowTurn) {
+      cumZoneAreas.push([
+        { xAxis: zoneYellowTurn, itemStyle: { color: "rgba(250,204,21,0.08)" } },
+        { xAxis: zoneRedTurn }
+      ]);
+    }
+    if (zoneRedTurn >= 0) {
+      cumZoneAreas.push([
+        { xAxis: zoneRedTurn, itemStyle: { color: "rgba(239,68,68,0.08)" } },
+        { xAxis: n - 1 }
+      ]);
+    } else if (zoneYellowTurn < 0) {
+      // Entire session is Safe
+      cumZoneAreas.push([
+        { xAxis: 0, itemStyle: { color: "rgba(34,197,94,0.08)" } },
+        { xAxis: n - 1 }
+      ]);
+    }
+    var cumZoneLines = [];
+    if (zoneYellowTurn > 0) {
+      cumZoneLines.push({
+        xAxis: zoneYellowTurn,
+        lineStyle: { color: "rgba(250,204,21,0.5)", type: "dashed", width: 1 },
+        label: { formatter: warmupLabel + " / " + linearLabel, color: "#fbbf24", fontSize: 8, position: "insideEndTop" }
+      });
+    }
+    if (zoneRedTurn > 0) {
+      cumZoneLines.push({
+        xAxis: zoneRedTurn,
+        lineStyle: { color: "rgba(239,68,68,0.5)", type: "dashed", width: 1 },
+        label: { formatter: linearLabel + " / " + drainLabel, color: "#ef4444", fontSize: 8, position: "insideEndTop" }
+      });
+    }
+
+    btnLoss.addEventListener("click", function () { _updateLower("loss"); });
+    btnCum.addEventListener("click", function () { _updateLower("cumulative"); });
+  }
 }
 
 function renderEfficiencyTimeline(stData) {
