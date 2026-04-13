@@ -113,15 +113,15 @@ function buildSessionSignalsStackedByDay(days, hostLabel) {
     if (rowSum > maxSig) maxSig = rowSum;
   }
   var maxOut = 0;
-  for (var oi = 0; oi < outageH.length; oi++) {
-    if (outageH[oi] > maxOut) maxOut = outageH[oi];
+  for (var _oh of outageH) {
+    if (_oh > maxOut) maxOut = _oh;
   }
   var OUTAGE_VIS_FRAC = 0.22;
   var maxSigEff = maxSig > 0 ? maxSig : maxOut > 1e-9 ? 100 : 1;
   var outageScale = maxOut > 1e-9 ? (OUTAGE_VIS_FRAC * maxSigEff) / maxOut : 1;
   var outageBar = [];
-  for (var bi = 0; bi < outageH.length; bi++) {
-    outageBar.push(Math.round(outageH[bi] * outageScale * 100) / 100);
+  for (var _ohv of outageH) {
+    outageBar.push(Math.round(_ohv * outageScale * 100) / 100);
   }
   return {
     cont: cont,
@@ -145,8 +145,8 @@ function detectLang() {
   } catch (e0) {}
   var langs = navigator.languages;
   if (langs && langs.length) {
-    for (var li = 0; li < langs.length; li++) {
-      var x = String(langs[li] || "").toLowerCase();
+    for (var _lng of langs) {
+      var x = String(_lng || "").toLowerCase();
       if (x.startsWith("ko")) return "ko";
       if (x.startsWith("de")) return "de";
     }
@@ -212,8 +212,7 @@ function activeHourKeysCount(hours) {
 function findHostPeakAcrossDays(daysArr, hostKey) {
   var bestD = "";
   var bestT = -1;
-  for (var i = 0; i < daysArr.length; i++) {
-    var d = daysArr[i];
+  for (var d of daysArr) {
     var hh = d.hosts && d.hosts[hostKey];
     if (!hh) continue;
     var tot = (hh.input || 0) + (hh.output || 0) + (hh.cache_read || 0) + (hh.cache_creation || 0);
@@ -282,8 +281,8 @@ function forensicScoreForChartDay(day, daysArr, hostFilter) {
 }
 function sumHostNumericField(daysArr, hostK, field) {
   var s = 0;
-  for (var i = 0; i < daysArr.length; i++) {
-    var hh = daysArr[i].hosts && daysArr[i].hosts[hostK];
+  for (var _day of daysArr) {
+    var hh = _day.hosts && _day.hosts[hostK];
     s += hh ? hh[field] || 0 : 0;
   }
   return s;
@@ -474,8 +473,7 @@ function syncMainChartsScopeUi() {
   if (lbl) lbl.textContent = t("mainChartsScopeLabel");
   wrap.setAttribute("aria-label", t("mainChartsScopeAria"));
   var nodes = chips.querySelectorAll(".main-charts-scope-chip");
-  for (var ni = 0; ni < nodes.length; ni++) {
-    var nb = nodes[ni];
+  for (var nb of nodes) {
     var on = nb.dataset.scope === cur;
     nb.classList.toggle("active", on);
     nb.setAttribute("aria-pressed", on ? "true" : "false");
@@ -483,8 +481,7 @@ function syncMainChartsScopeUi() {
 }
 function updateLangButtons() {
   var picks = document.querySelectorAll(".lang-switch .lang-btn[data-lang], #us-lang-body .lang-btn[data-lang]");
-  for (var i = 0; i < picks.length; i++) {
-    var b = picks[i];
+  for (var b of picks) {
     var code = b.getAttribute("data-lang") || "";
     var on = code === __lang;
     b.classList.toggle("active", on);
@@ -523,8 +520,7 @@ function mergeExtensionTimelineIntoUsage(data) {
   var p = __extensionTimelinePayload;
   if (!data || !data.days || !p || !p.by_date) return;
   var bd = p.by_date;
-  for (var i = 0; i < data.days.length; i++) {
-    var d = data.days[i];
+  for (var d of data.days) {
     var dt = d.date;
     if (!dt || !bd[dt]) continue;
     d.version_change = cloneVersionChangeForMerge(bd[dt]);
@@ -710,12 +706,12 @@ function fillInitialShellText() {
     ["c3", "chartOutPerHour"],
     ["c4", "chartSubCachePct"]
   ];
-  for (var ci = 0; ci < chartPairs.length; ci++) {
-    var cv = document.getElementById(chartPairs[ci][0]);
+  for (var _cp of chartPairs) {
+    var cv = document.getElementById(_cp[0]);
     if (!cv) continue;
     var hx = cv.previousElementSibling;
     if (hx && hx.tagName === "H3" && (coldStart || !String(hx.textContent || "").replace(/\s/g, "")))
-      hx.textContent = t(chartPairs[ci][1]);
+      hx.textContent = t(_cp[1]);
   }
 }
 
@@ -908,10 +904,10 @@ function connectUsageStream() {
               var block = buf.slice(0, ix);
               buf = buf.slice(ix + 2);
               var lines = block.split("\n");
-              for (var li = 0; li < lines.length; li++) {
-                if (lines[li].indexOf("data: ") === 0) {
+              for (var _line of lines) {
+                if (_line.indexOf("data: ") === 0) {
                   try {
-                    renderDashboard(JSON.parse(lines[li].slice(6)), false);
+                    renderDashboard(JSON.parse(_line.slice(6)), false);
                   } catch (err) {
                     console.error(err);
                   }
@@ -1073,8 +1069,8 @@ function updateScanSourcesRow(data) {
   var srcs = data && data.scan_sources;
   if (srcs && srcs.length > 1) {
     var parts = [];
-    for (var si = 0; si < srcs.length; si++) {
-      parts.push(srcs[si].label + " (" + (srcs[si].jsonl_files || 0) + " .jsonl)");
+    for (var _src of srcs) {
+      parts.push(_src.label + " (" + (_src.jsonl_files || 0) + " .jsonl)");
     }
     el.textContent = t("scanSourcesPrefix") + parts.join(" · ");
     el.title = srcs.map(function (s) { return s.label + ": " + (s.path_hint || ""); }).join("\n");
@@ -1163,9 +1159,9 @@ function updateLiveFilesPanel(data) {
   if (pairs.length > maxBars) pairs = pairs.slice(pairs.length - maxBars);
   var names = [];
   var vals = [];
-  for (var pi = 0; pi < pairs.length; pi++) {
-    names.push(pairs[pi].name);
-    vals.push(pairs[pi].value);
+  for (var _pair of pairs) {
+    names.push(_pair.name);
+    vals.push(_pair.value);
   }
   var cw = host.clientWidth || host.offsetWidth;
   var ch = host.clientHeight || host.offsetHeight;
@@ -1245,8 +1241,7 @@ function updateLiveFilesPanel(data) {
             }
             var rh = "";
             var isFirst = true;
-            for (var rxi = 0; rxi < releases.length; rxi++) {
-              var rel = releases[rxi];
+            for (var rel of releases) {
               var rDate = rel.published_at ? rel.published_at.slice(0, 10) : "";
               var rBody2 = (rel.body || "").replace(/^## .+\n?/m, "");
               rh += "<details class=\"release-modal-item\"" + (isFirst ? " open" : "") + ">";
@@ -1307,14 +1302,12 @@ function updateLiveOutageAndExtensionSections(data) {
   var days = (data && data.days) ? data.days : [];
   ol.innerHTML = "";
   var hasOut = false;
-  for (var di = 0; di < days.length; di++) {
-    var d = days[di];
+  for (var d of days) {
     var incs = d.outage_incidents || [];
     if (!incs.length) continue;
     hasOut = true;
     var seen = {};
-    for (var oi = 0; oi < incs.length; oi++) {
-      var inc = incs[oi];
+    for (var inc of incs) {
       var key = (inc.name || "") + "|" + String(inc.created_at || "") + "|" + String(inc.resolved_at || "");
       if (seen[key]) continue;
       seen[key] = true;
@@ -1475,8 +1468,7 @@ function appendDayDiagnosticSlideoutSection(bodyEl, d) {
       ulI.style.fontSize = "0.72rem";
       ulI.style.lineHeight = "1.45";
       ulI.style.color = "#e2e8f0";
-      for (var ii = 0; ii < incs.length; ii++) {
-        var inc = incs[ii];
+      for (var inc of incs) {
         var li = document.createElement("li");
         var imp = String(inc.impact || "none").toUpperCase();
         var k = inc.kind ? " (" + inc.kind + ")" : "";
@@ -1512,8 +1504,7 @@ function appendDayDiagnosticSlideoutSection(bodyEl, d) {
       ulS.style.fontSize = "0.68rem";
       ulS.style.lineHeight = "1.45";
       ulS.style.color = "#94a3b8";
-      for (var sj = 0; sj < spans.length; sj++) {
-        var sp = spans[sj];
+      for (var sp of spans) {
         var liS = document.createElement("li");
         var impS = String(sp.impact || "none").toUpperCase();
         var kS = sp.kind ? " (" + sp.kind + ")" : "";
@@ -1614,11 +1605,11 @@ function openUpdateSlideout(dayIndex) {
       var ulg = document.createElement("ul");
       ulg.style.marginTop = "6px";
       ulg.style.paddingLeft = "1.2em";
-      for (var gi = 0; gi < gl.length; gi++) {
+      for (var _glItem of gl) {
         var gli = document.createElement("li");
         var a = document.createElement("a");
-        a.href = gl[gi].url;
-        a.textContent = "v" + gl[gi].version;
+        a.href = _glItem.url;
+        a.textContent = "v" + _glItem.version;
         a.target = "_blank";
         a.rel = "noopener noreferrer";
         a.style.color = "#93c5fd";
@@ -1714,11 +1705,11 @@ function getFilteredDays(days) {
   var endVal = endEl ? endEl.value : "";
   if (!startVal && !endVal) return days;
   var filtered = [];
-  for (var i = 0; i < days.length; i++) {
-    var d = days[i].date;
+  for (var _dy of days) {
+    var d = _dy.date;
     if (startVal && d < startVal) continue;
     if (endVal && d > endVal) continue;
-    filtered.push(days[i]);
+    filtered.push(_dy);
   }
   return filtered.length ? filtered : days;
 }
@@ -1731,7 +1722,7 @@ function getFilterHost() {
     var opts = sel.selectedOptions;
     if (!opts || !opts.length) return "";
     var vals = [];
-    for (var i = 0; i < opts.length; i++) vals.push(opts[i].value);
+    for (var _opt of opts) vals.push(_opt.value);
     if (vals.indexOf("") >= 0) return "";
     return vals.join(",");
   }
@@ -1853,13 +1844,12 @@ function syncForensicHostFilterBar(data) {
         else sessionStorage.removeItem("usageForensicHostFilter");
       } catch (e2) {}
       var nodes = chipsHost.querySelectorAll(".forensic-host-chip");
-      for (var ni = 0; ni < nodes.length; ni++) {
-        var b = nodes[ni];
-        var rv = b.dataset.hostFilter != null ? String(b.dataset.hostFilter) : "__ALL__";
+      for (var _node of nodes) {
+        var rv = _node.dataset.hostFilter != null ? String(_node.dataset.hostFilter) : "__ALL__";
         var nv = rv === "__ALL__" ? "" : rv;
         var on = nv === __forensicHostFilterSig;
-        b.classList.toggle("active", on);
-        b.setAttribute("aria-pressed", on ? "true" : "false");
+        _node.classList.toggle("active", on);
+        _node.setAttribute("aria-pressed", on ? "true" : "false");
       }
       if (hint) {
         if (__forensicHostFilterSig) {
@@ -1885,13 +1875,12 @@ function syncForensicHostFilterBar(data) {
       chipsHost.appendChild(b);
     }
     addChip("", t("forensicHostFilterAll"));
-    for (var hi = 0; hi < hLabs.length; hi++) {
-      addChip(hLabs[hi], hLabs[hi]);
+    for (var _hl of hLabs) {
+      addChip(_hl, _hl);
     }
   }
   var btns = chipsHost.querySelectorAll(".forensic-host-chip");
-  for (var bi = 0; bi < btns.length; bi++) {
-    var bb = btns[bi];
+  for (var bb of btns) {
     var rv2 = bb.dataset.hostFilter != null ? String(bb.dataset.hostFilter) : "__ALL__";
     var nv2 = rv2 === "__ALL__" ? "" : rv2;
     var active = nv2 === __forensicHostFilterSig;
@@ -2003,7 +1992,7 @@ function renderDashboardCore(data) {
     try { prevSel = sessionStorage.getItem("usageDashboardDay") || ""; } catch (e) {}
   }
   var valid = {};
-  for (var vi = 0; vi < days.length; vi++) valid[days[vi].date] = true;
+  for (var _vd of days) valid[_vd.date] = true;
   var pick = prevSel;
   if (selEl) {
     selEl.innerHTML = "";
@@ -2045,8 +2034,8 @@ function renderDashboardCore(data) {
     }
   }
   var selDay = null;
-  for (var sj = 0; sj < days.length; sj++) {
-    if (days[sj].date === pick) { selDay = days[sj]; break; }
+  for (var _sd of days) {
+    if (_sd.date === pick) { selDay = _sd; break; }
   }
   if (!selDay) selDay = days[days.length - 1];
   var hLabs = data.host_labels || [];
@@ -2163,8 +2152,7 @@ function generateForensicReportMd(data) {
 
   // Detect peak + limit days
   var peakDay = null, peakVal = 0;
-  for (var _dyi = 0; _dyi < days.length; _dyi++) {
-    var dy = days[_dyi];
+  for (var dy of days) {
     var tt = __rptDayTotal(dy);
     if (tt > peakVal) {
       peakVal = tt;
@@ -2172,8 +2160,7 @@ function generateForensicReportMd(data) {
     }
   }
   var limitDays = [];
-  for (var _dyi2 = 0; _dyi2 < days.length; _dyi2++) {
-    var dy2 = days[_dyi2];
+  for (var dy2 of days) {
     var fl = [];
     if ((dy2.hit_limit || 0) >= HIT_MIN) fl.push("HIT(" + dy2.hit_limit + ")");
     if ((dy2.cache_read || 0) >= CACHE_THRESH) fl.push("CACHE\u2265500M");
@@ -2193,8 +2180,7 @@ function generateForensicReportMd(data) {
     "|------------|----------|------------|--------|-------|-------|-------------|--------|"
   );
 
-  for (var _dyi3 = 0; _dyi3 < days.length; _dyi3++) {
-    var dy3 = days[_dyi3];
+  for (var dy3 of days) {
     var cr = dy3.output > 0 ? Math.round(dy3.cache_read / dy3.output) : 0;
     var lim = "\u2014";
     if ((dy3.hit_limit || 0) >= HIT_MIN) lim = "HIT(" + dy3.hit_limit + ")";
@@ -2211,8 +2197,7 @@ function generateForensicReportMd(data) {
     "| " + (isDE ? "Datum" : "Date") + " | Overhead | Output/h | Total/h | Subagent% |",
     "|------------|----------|----------|---------|-----------|"
   );
-  for (var _dyi4 = 0; _dyi4 < days.length; _dyi4++) {
-    var dy4 = days[_dyi4];
+  for (var dy4 of days) {
     var tot2 = __rptDayTotal(dy4);
     var ah = Math.max(1, dy4.active_hours || 1);
     var oh = dy4.output > 0 ? (tot2 / dy4.output).toFixed(0) + "x" : "\u2014";
@@ -2228,8 +2213,7 @@ function generateForensicReportMd(data) {
     "| "+(isDE?"Datum":"Date")+" | "+(isDE?"Aufrufe":"Calls")+" | Sub | Sub-Cache | Sub-Cache% |",
     "|------------|--------|------|-----------|------------|"
   );
-  for (var _dyi5 = 0; _dyi5 < days.length; _dyi5++) {
-    var dy5 = days[_dyi5];
+  for (var dy5 of days) {
     var sc = dy5.sub_cache || 0;
     var scp = (dy5.sub_cache_pct || 0) + "%";
     md.push("| " + dy5.date + " | " + dy5.calls + " | " + (dy5.sub_calls || 0) + " | " + fmt(sc) + " | " + scp + " |");
@@ -2247,8 +2231,7 @@ function generateForensicReportMd(data) {
       "|------------|---------|----------|---------|-------|--------|"
     );
     var prevI = 0;
-    for (var _ldi = 0; _ldi < limitDays.length; _ldi++) {
-      var ld = limitDays[_ldi];
+    for (var ld of limitDays) {
       var tot4 = __rptDayTotal(ld.d);
       var impl = Math.round(tot4 / 0.9);
       var vsp = peakVal > 0 ? (peakVal / impl).toFixed(1) + "x" : "\u2014";
@@ -2265,8 +2248,7 @@ function generateForensicReportMd(data) {
 
     // Median
     var ivs=[];
-    for (var _ldi2 = 0; _ldi2 < limitDays.length; _ldi2++) {
-      var ld2 = limitDays[_ldi2];
+    for (var ld2 of limitDays) {
       if (ld2.d.calls >= 50 && (ld2.d.active_hours || 0) >= 2) ivs.push(Math.round(__rptDayTotal(ld2.d) / 0.9));
     }
     if(ivs.length>=2){
@@ -2771,15 +2753,13 @@ var __versionHealthMetrics = [
 function __stackedHBarXMax(datasets) {
   if (!datasets?.length) return undefined;
   var len = 0;
-  for (var _dsi = 0; _dsi < datasets.length; _dsi++) {
-    var ds0 = datasets[_dsi];
+  for (var ds0 of datasets) {
     var d = ds0.data;
     if (d && d.length > len) len = d.length;
   }
   if (!len) return undefined;
   var sums = new Array(len).fill(0);
-  for (var _dsi2 = 0; _dsi2 < datasets.length; _dsi2++) {
-    var ds = datasets[_dsi2];
+  for (var ds of datasets) {
     var row = ds.data || [];
     for (var j = 0; j < len; j++) sums[j] += Number(row[j]) || 0;
   }
@@ -3404,8 +3384,7 @@ function __budgetSankeyWeights(src) {
 function __budgetKpiCardsHtml(days, tot, outputPct, overheadFactor, cacheMissRate, lostSignals) {
   var totalOutageH = 0;
   var totalTruncated = 0;
-  for (var _dbi = 0; _dbi < days.length; _dbi++) {
-    var d = days[_dbi];
+  for (var d of days) {
     totalOutageH += d.outage_hours || 0;
     totalTruncated += d.session_signals?.truncated || 0;
   }
@@ -3418,8 +3397,7 @@ function __budgetKpiCardsHtml(days, tot, outputPct, overheadFactor, cacheMissRat
     { wid: "budget-kpi-truncated", label: t("budgetCardTruncated"), value: String(totalTruncated), sub: t("budgetCardTruncatedSub"), cls: totalTruncated > 50 ? "warn" : "" }
   ];
   var ch = "";
-  for (var bci = 0; bci < cards.length; bci++) {
-    var c = cards[bci];
+  for (var c of cards) {
     ch +=
       '<div class="chart-box chart-box--kpi" id="' +
       c.wid +
@@ -3946,8 +3924,8 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
   var nodeSet = {};
   var links = [];
   var palette = ['#94a3b8', '#22c55e', '#3b82f6', '#22d3ee', '#f59e0b', '#f87171', '#a855f7', '#8b5cf6'];
-  for (var ri = 0; ri < rows.length; ri++) {
-    var from = rows[ri][0], to = rows[ri][1], weight = rows[ri][2];
+  for (var _row of rows) {
+    var from = _row[0], to = _row[1], weight = _row[2];
     if (!nodeSet[from]) nodeSet[from] = { name: from, itemStyle: { color: palette[Object.keys(nodeSet).length % palette.length] } };
     if (!nodeSet[to]) nodeSet[to] = { name: to, itemStyle: { color: palette[Object.keys(nodeSet).length % palette.length] } };
     links.push({ source: from, target: to, value: weight });
@@ -4020,7 +3998,7 @@ function __budgetTrendAxisLabel(dateStr) {
 
 function __budgetTrendAxisLabelsFromDates(labels) {
   var out = [];
-  for (var i = 0; i < labels.length; i++) out.push(__budgetTrendAxisLabel(labels[i]));
+  for (var _lbl of labels) out.push(__budgetTrendAxisLabel(_lbl));
   return out;
 }
 
@@ -4042,8 +4020,7 @@ function __budgetDrawTrendEfficiencyChart(el, labels, dailyTrend, t) {
         var ix = params[0].dataIndex;
         var head = dailyTrend[ix] && dailyTrend[ix].date ? dailyTrend[ix].date : params[0].axisValueLabel;
         var lines = [head];
-        for (var i = 0; i < params.length; i++) {
-          var p = params[i];
+        for (var p of params) {
           var val = p.value;
           if (val == null) continue;
           var fmt = p.seriesIndex === 1 ? Math.abs(val) + 'x' : val + '%';
@@ -4135,8 +4112,7 @@ function __budgetDrawQuotaUsageChart(el2, labels, qDatasets) {
   _budgetCharts.quota = chart;
   var series = [];
   var legendNames = [];
-  for (var i = 0; i < qDatasets.length; i++) {
-    var ds = qDatasets[i];
+  for (var ds of qDatasets) {
     legendNames.push(ds.label);
     var s = {
       name: ds.label,
@@ -4165,9 +4141,9 @@ function __budgetDrawQuotaUsageChart(el2, labels, qDatasets) {
         var ixq = params[0].dataIndex;
         var headQ = (ixq >= 0 && ixq < labels.length && labels[ixq]) ? labels[ixq] : params[0].axisValueLabel;
         var lines = [headQ];
-        for (var pi = 0; pi < params.length; pi++) {
-          if (params[pi].value == null) continue;
-          lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + params[pi].value + '%');
+        for (var _pm of params) {
+          if (_pm.value == null) continue;
+          lines.push(_pm.marker + ' ' + _pm.seriesName + ': ' + _pm.value + '%');
         }
         return lines.join('<br>');
       }
@@ -4238,8 +4214,7 @@ function renderIntelligenceSection(data) {
       { wid: 'intel-quota-eta', label: t('intelQuotaEta'), value: etaVal, sub: metrics.quotaETA.pct5h + '% used' + (metrics.quotaETA.confidence !== 'none' ? ' (' + metrics.quotaETA.confidence + ')' : ''), cls: etaCls }
     ];
     var ch = '';
-    for (var ci = 0; ci < cards.length; ci++) {
-      var c = cards[ci];
+    for (var c of cards) {
       ch += '<div class="chart-box chart-box--kpi" id="' + c.wid + '"><div class="card ' + c.cls + '">' +
         '<div class="label">' + escHtml(c.label) + '</div>' +
         '<div class="value">' + escHtml(c.value) + '</div>' +
@@ -4359,9 +4334,9 @@ function __budgetResizeAll() {
 }
 function __mainChartsResizeAll() {
   var keys = ['c1', 'c2', 'c3', 'c4', 'c1hosts', 'cForensic', 'cForensicSignals', 'cService'];
-  for (var mi = 0; mi < keys.length; mi++) {
-    if (_charts[keys[mi]] && typeof _charts[keys[mi]].resize === 'function') {
-      try { _charts[keys[mi]].resize(); } catch (e) { /* detached */ }
+  for (var _ck of keys) {
+    if (_charts[_ck] && typeof _charts[_ck].resize === 'function') {
+      try { _charts[_ck].resize(); } catch (e) { /* detached */ }
     }
   }
 }
@@ -4493,12 +4468,11 @@ window.renderProxy_ttlHistory = function (sCtx) {
   // Match proxy days to JSONL days for interrupt overlay
   var jsonlDays = data && data.days ? data.days : [];
   var jsonlByDate = {};
-  for (var ji = 0; ji < jsonlDays.length; ji++) {
-    if (jsonlDays[ji].date) jsonlByDate[jsonlDays[ji].date] = jsonlDays[ji];
+  for (var _jd of jsonlDays) {
+    if (_jd.date) jsonlByDate[_jd.date] = _jd;
   }
   var labels = [], d1h = [], d5m = [], dUnk = [], dIntr = [], dCold = [];
-  for (var i = 0; i < pd.length; i++) {
-    var day = pd[i];
+  for (var day of pd) {
     labels.push(day.date || "");
     var ttl = day.ttl_tiers || {};
     var t1h = ttl["1h"] || 0;
@@ -4526,11 +4500,10 @@ window.renderProxy_ttlHistory = function (sCtx) {
       formatter: function (params) {
         var lines = [params[0].axisValueLabel];
         var ttlTotal = 0;
-        for (var pi = 0; pi < params.length; pi++) {
-          if (params[pi].seriesType === "bar") ttlTotal += params[pi].value || 0;
+        for (var _pt of params) {
+          if (_pt.seriesType === "bar") ttlTotal += _pt.value || 0;
         }
-        for (var pj = 0; pj < params.length; pj++) {
-          var p = params[pj];
+        for (var p of params) {
           if (p.seriesType === "bar") {
             var pct = ttlTotal > 0 ? Math.round(p.value / ttlTotal * 100) : 0;
             lines.push(p.marker + " " + p.seriesName + ": " + p.value + " (" + pct + "%)");
@@ -4623,8 +4596,8 @@ function renderProxyAnalysis(data) {
   var scKeys = Object.keys(sc).sort(function (a, b) {
     return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
   });
-  for (var si = 0; si < scKeys.length; si++) {
-    if (scKeys[si] !== "200" && sc[scKeys[si]] > 0) scParts.push(scKeys[si] + ":" + sc[scKeys[si]]);
+  for (var _sk of scKeys) {
+    if (_sk !== "200" && sc[_sk] > 0) scParts.push(_sk + ":" + sc[_sk]);
   }
   var reqSub = tr("proxyCardRequestsSub", { errs: pd.errors || 0, rate: (pd.error_rate || 0).toFixed(1) });
   if (scParts.length) reqSub += " (" + scParts.join(", ") + ")";
@@ -4731,8 +4704,7 @@ function renderProxyAnalysis(data) {
   }
   if (cardsEl) {
     var ch2 = "";
-    for (var pci = 0; pci < pcards.length; pci++) {
-      var c = pcards[pci];
+    for (var c of pcards) {
       var valStyle = c.valueColor ? " style=\"color:" + c.valueColor + "\"" : "";
       var w = c.wid || "proxy-kpi";
       ch2 +=
@@ -4827,7 +4799,7 @@ function renderProxyTokenChart(data) {
     tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
       formatter: function(params) {
         var lines = [params[0].axisValueLabel];
-        for (var pi = 0; pi < params.length; pi++) lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + fmt(params[pi].value));
+        for (var _pm of params) lines.push(_pm.marker + ' ' + _pm.seriesName + ': ' + fmt(_pm.value));
         return lines.join('<br>');
       }
     },
@@ -4869,7 +4841,7 @@ function renderProxyLatencyChart(data) {
     tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
       formatter: function(params) {
         var lines = [params[0].axisValueLabel];
-        for (var pi = 0; pi < params.length; pi++) lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + __fmtMsShort(params[pi].value));
+        for (var _pm of params) lines.push(_pm.marker + ' ' + _pm.seriesName + ': ' + __fmtMsShort(_pm.value));
         return lines.join('<br>');
       }
     },
@@ -4989,8 +4961,7 @@ function renderProxyModelChart(data) {
     tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
       formatter: function(params) {
         var lines = [params[0].axisValueLabel];
-        for (var pi = 0; pi < params.length; pi++) {
-          var p = params[pi];
+        for (var p of params) {
           lines.push(p.marker + ' ' + p.seriesName + ': ' + (p.seriesType === 'line' ? __fmtMsShort(p.value) : p.value));
         }
         return lines.join('<br>');
@@ -5013,7 +4984,7 @@ function renderProxyColdStart(pd) {
   var ratios = pd.cache_ratios || [];
   if (!ratios.length) { el.textContent = ""; return; }
   var avgRatio = 0;
-  for (var i = 0; i < ratios.length; i++) avgRatio += ratios[i];
+  for (var _rv of ratios) avgRatio += _rv;
   avgRatio = avgRatio / ratios.length;
   var minRatio = ratios[0];
   for (var j = 1; j < ratios.length; j++) { if (ratios[j] < minRatio) minRatio = ratios[j]; }
@@ -5136,7 +5107,7 @@ function renderProxyHourlyLatency(data) {
     tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
       formatter: function(params) {
         var lines = [params[0].axisValueLabel + ':00'];
-        for (var pi = 0; pi < params.length; pi++) lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + __fmtMsShort(params[pi].value));
+        for (var _pm of params) lines.push(_pm.marker + ' ' + _pm.seriesName + ': ' + __fmtMsShort(_pm.value));
         return lines.join('<br>');
       }
     },
@@ -5179,7 +5150,7 @@ function renderProxyErrorTrend(data) {
     tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
       formatter: function(params) {
         var lines = [params[0].axisValueLabel];
-        for (var pi = 0; pi < params.length; pi++) lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + params[pi].value.toFixed(1) + '%');
+        for (var _pm of params) lines.push(_pm.marker + ' ' + _pm.seriesName + ': ' + _pm.value.toFixed(1) + '%');
         return lines.join('<br>');
       }
     },
@@ -5217,8 +5188,7 @@ function renderProxyCacheTrend(data) {
     tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
       formatter: function(params) {
         var lines = [params[0].axisValueLabel];
-        for (var pi = 0; pi < params.length; pi++) {
-          var p = params[pi];
+        for (var p of params) {
           lines.push(p.marker + ' ' + p.seriesName + ': ' + (p.seriesType === 'line' ? p.value.toFixed(1) + '%' : p.value));
         }
         return lines.join('<br>');
@@ -5606,9 +5576,9 @@ function computeHealthIndicators(data) {
 
   // Averages from JSONL
   var totalHits = 0, totalInterrupts = 0, totalRetries = 0;
-  for (var i = 0; i < days.length; i++) {
-    totalHits += (days[i].hit_limit || 0);
-    var ss = days[i].session_signals || {};
+  for (var _hd of days) {
+    totalHits += (_hd.hit_limit || 0);
+    var ss = _hd.session_signals || {};
     totalInterrupts += (ss.interrupt || 0);
     totalRetries += (ss.retry || 0);
   }
@@ -5625,8 +5595,8 @@ function computeHealthIndicators(data) {
       var tgPd = pdAll[tgi];
       if (!(tgPd.total_tokens > 0)) continue;
       var tgJsonl = null;
-      for (var tgj = 0; tgj < days.length; tgj++) {
-        if (days[tgj].date === tgPd.date && (days[tgj].total || 0) > 0) { tgJsonl = days[tgj]; break; }
+      for (var _tgd of days) {
+        if (_tgd.date === tgPd.date && (_tgd.total || 0) > 0) { tgJsonl = _tgd; break; }
       }
       if (tgJsonl) {
         thinkingGap = tgJsonl.total / tgPd.total_tokens;
@@ -5652,8 +5622,8 @@ function computeHealthIndicators(data) {
   var truncPerDay = 0;
   if (days.length) {
     var truncTotal = 0;
-    for (var tri = 0; tri < days.length; tri++) {
-      var trSig = days[tri].session_signals;
+    for (var _trd of days) {
+      var trSig = _trd.session_signals;
       if (trSig) truncTotal += (trSig.truncated || 0);
     }
     truncPerDay = Math.round(truncTotal / days.length);
@@ -5662,8 +5632,8 @@ function computeHealthIndicators(data) {
   // Stop-reason anomalies: count non-standard stop reasons
   var anomalStops = 0;
   if (days.length) {
-    for (var sri = 0; sri < days.length; sri++) {
-      var sr = days[sri].stop_reasons || {};
+    for (var _srd of days) {
+      var sr = _srd.stop_reasons || {};
       for (var srk in sr) {
         if (srk !== "end_turn" && srk !== "tool_use" && srk !== "max_tokens" && srk !== "unknown") {
           anomalStops += sr[srk];
@@ -5716,19 +5686,19 @@ function renderHealthScore(data) {
   var indicators = computeHealthIndicators(data);
   var dispH = window.__widgetDispatcher;
   var visInd = [];
-  for (var vj = 0; vj < indicators.length; vj++) {
-    var kpiId = "health-kpi-" + indicators[vj].id;
+  for (var _ind of indicators) {
+    var kpiId = "health-kpi-" + _ind.id;
     if (dispH && typeof dispH.isChartVisible === "function" && !dispH.isChartVisible(kpiId)) continue;
-    visInd.push(indicators[vj]);
+    visInd.push(_ind);
   }
   var totalPts = 0, warns = 0, crits = 0;
   var score = 0;
   var scoreColor = "#64748b";
   if (visInd.length) {
-    for (var i = 0; i < visInd.length; i++) {
-      totalPts += healthPoints(visInd[i].color);
-      if (visInd[i].color === "yellow") warns++;
-      if (visInd[i].color === "red") crits++;
+    for (var _vi of visInd) {
+      totalPts += healthPoints(_vi.color);
+      if (_vi.color === "yellow") warns++;
+      if (_vi.color === "red") crits++;
     }
     var denom = visInd.length * 2;
     score = denom > 0 ? Math.round(totalPts / denom * 10) : 0;
@@ -5750,8 +5720,7 @@ function renderHealthScore(data) {
   if (smCircle) { smCircle.style.background = scoreColor; smCircle.textContent = score; }
   if (smText) {
     var sh = "";
-    for (var si = 0; si < visInd.length; si++) {
-      var ind = visInd[si];
+    for (var ind of visInd) {
       var dc = ind.color === "red" ? "#ef4444" : ind.color === "yellow" ? "#f59e0b" : "#22c55e";
       sh += '<span class="hs-inline-badge"><span class="hs-inline-dot" style="background:' + dc + '"></span>' + escHtml(ind.label) + ' <strong>' + escHtml(ind.display) + '</strong></span>';
     }
@@ -5765,8 +5734,7 @@ function renderHealthScore(data) {
 
   // Grid (one host per KPI for visibility sync)
   var gh = "";
-  for (var gi = 0; gi < indicators.length; gi++) {
-    var ind = indicators[gi];
+  for (var ind of indicators) {
     var hostId = "health-kpi-" + ind.id;
     gh += "<div class=\"chart-box chart-box--kpi\" id=\"" + hostId + "\">";
     gh += "<div class=\"health-badge health-badge--" + ind.color + "\">";
@@ -5782,8 +5750,8 @@ function renderHealthScore(data) {
   if (hintAll) {
     var anyK = false;
     var wd = window.__widgetDispatcher;
-    for (var hk = 0; hk < indicators.length; hk++) {
-      var kpid = "health-kpi-" + indicators[hk].id;
+    for (var _hki of indicators) {
+      var kpid = "health-kpi-" + _hki.id;
       if (!wd || typeof wd.isChartVisible !== "function" || wd.isChartVisible(kpid)) {
         anyK = true;
         break;
@@ -5813,8 +5781,7 @@ function computeKeyFindings(data) {
   var totalOut = 0, totalCache = 0, totalAll = 0, totalCalls = 0;
   var totalHits = 0, totalRetries = 0, totalInterrupts = 0, totalContinue = 0;
   var peakDay = null, peakTotal = 0;
-  for (var i = 0; i < days.length; i++) {
-    var d = days[i];
+  for (var d of days) {
     totalOut += (d.output || 0);
     totalCache += (d.cache_read || 0);
     totalAll += (d.total || 0);
@@ -5830,7 +5797,7 @@ function computeKeyFindings(data) {
   // 1. Thinking Token Gap
   if (pd && days.length) {
     var todayJ = null;
-    for (var j = 0; j < days.length; j++) { if (days[j].date === pd.date) { todayJ = days[j]; break; } }
+    for (var _dj of days) { if (_dj.date === pd.date) { todayJ = _dj; break; } }
     if (todayJ && pd.total_tokens > 0) {
       var gap = (todayJ.total || 0) / pd.total_tokens;
       findings.push({
@@ -6007,19 +5974,18 @@ function renderKeyFindings(data) {
   }
   if (headerEl) {
     var reds = 0, yellows = 0, visTotal = 0;
-    for (var c = 0; c < findings.length; c++) {
-      if (!findingShown(findings[c])) continue;
+    for (var _fg of findings) {
+      if (!findingShown(_fg)) continue;
       visTotal++;
-      if (findings[c].icon === "red") reds++;
-      if (findings[c].icon === "yellow") yellows++;
+      if (_fg.icon === "red") reds++;
+      if (_fg.icon === "yellow") yellows++;
     }
     headerEl.innerHTML = "<strong>" + escHtml(t("findingsTitle")) + "</strong> <span style=\"font-size:.78rem;color:#94a3b8\">" +
       escHtml(tr("findingsSummary", { total: visTotal, reds: reds, yellows: yellows })) + "</span>";
   }
 
   var html = "";
-  for (var fi = 0; fi < findings.length; fi++) {
-    var f = findings[fi];
+  for (var f of findings) {
     if (!findingShown(f)) continue;
     var wid = f.widgetId || "";
     var dot = f.icon === "red" ? "#ef4444" : f.icon === "yellow" ? "#f59e0b" : "#22c55e";
@@ -6062,7 +6028,7 @@ function initFilterBar(data) {
   if (startEl && endEl && days.length && !startEl.dataset.bound) {
     startEl.dataset.bound = '1';
     var opts = '';
-    for (var di = 0; di < days.length; di++) opts += '<option value="' + escHtml(days[di].date) + '">' + escHtml(days[di].date) + '</option>';
+    for (var _od of days) opts += '<option value="' + escHtml(_od.date) + '">' + escHtml(_od.date) + '</option>';
     startEl.innerHTML = opts;
     endEl.innerHTML = opts;
     startEl.value = days[0].date;
@@ -6084,8 +6050,8 @@ function initFilterBar(data) {
       var existing = document.getElementById('main-charts-scope-chips');
       if (existing) {
         var btns = existing.querySelectorAll('[data-scope]');
-        for (var i = 0; i < btns.length; i++) {
-          if (btns[i].dataset.scope === btn.dataset.scope) btns[i].click();
+        for (var _btn of btns) {
+          if (_btn.dataset.scope === btn.dataset.scope) _btn.click();
         }
       }
     });
@@ -6096,8 +6062,8 @@ function initFilterBar(data) {
   if (hostContainer && days.length && !hostContainer.dataset.bound) {
     hostContainer.dataset.bound = '1';
     var hosts = {};
-    for (var hdi = 0; hdi < days.length; hdi++) {
-      var dh = days[hdi].hosts || {};
+    for (var _hdd of days) {
+      var dh = _hdd.hosts || {};
       for (var hk in dh) { if (Object.prototype.hasOwnProperty.call(dh, hk)) hosts[hk] = true; }
     }
     var hkeys = Object.keys(hosts).sort(function (a, b) { return a.localeCompare(b); });
@@ -6105,8 +6071,8 @@ function initFilterBar(data) {
       // Chips mode
       var hhtml = '<div class="filter-chips">';
       hhtml += '<button type="button" class="filter-chip active" data-host="">' + escHtml(t('filterHostAll')) + '</button>';
-      for (var hci = 0; hci < hkeys.length; hci++) {
-        hhtml += '<button type="button" class="filter-chip" data-host="' + escHtml(hkeys[hci]) + '">' + escHtml(hkeys[hci]) + '</button>';
+      for (var _hk of hkeys) {
+        hhtml += '<button type="button" class="filter-chip" data-host="' + escHtml(_hk) + '">' + escHtml(_hk) + '</button>';
       }
       hhtml += '</div>';
       hostContainer.innerHTML = hhtml;
@@ -6127,8 +6093,8 @@ function initFilterBar(data) {
     } else {
       // Multi-select mode
       var hopts = '<option value="" selected>' + escHtml(t('filterHostAll')) + '</option>';
-      for (var hsi = 0; hsi < hkeys.length; hsi++) {
-        hopts += '<option value="' + escHtml(hkeys[hsi]) + '">' + escHtml(hkeys[hsi]) + '</option>';
+      for (var _hk2 of hkeys) {
+        hopts += '<option value="' + escHtml(_hk2) + '">' + escHtml(_hk2) + '</option>';
       }
       hostContainer.innerHTML = '<select class="filter-input" multiple size="' + Math.min(hkeys.length + 1, 6) + '">' + hopts + '</select>';
       hostContainer.querySelector('select').addEventListener('change', function() {
@@ -6225,7 +6191,7 @@ function computeHealthScoreForDay(dayData, proxyDay) {
     healthColor(retries, 50, 200)
   ];
   var pts = 0;
-  for (var i = 0; i < colors.length; i++) pts += healthPoints(colors[i]);
+  for (var _clr of colors) pts += healthPoints(_clr);
   return Math.round(pts / (colors.length * 2) * 10);
 }
 
@@ -6233,10 +6199,10 @@ function buildHealthScoreHistory(data) {
   var days = getFilteredDays(data.days || []);
   var proxyDays = data.proxy?.proxy_days || [];
   var proxyByDate = {};
-  for (var pi = 0; pi < proxyDays.length; pi++) proxyByDate[proxyDays[pi].date] = proxyDays[pi];
+  for (var _pd of proxyDays) proxyByDate[_pd.date] = _pd;
   var scores = [];
-  for (var di = 0; di < days.length; di++) {
-    scores.push(computeHealthScoreForDay(days[di], proxyByDate[days[di].date] || null));
+  for (var _hsd of days) {
+    scores.push(computeHealthScoreForDay(_hsd, proxyByDate[_hsd.date] || null));
   }
   return scores;
 }
@@ -6252,15 +6218,15 @@ function renderUptimeChart(data) {
   // Apply month filter (same as outage timeline)
   var srcDays = _outageTimelineMonthFilter ? (data.days || []) : getFilteredDays(data.days || []);
   var filtDays = [];
-  for (var fi = 0; fi < srcDays.length; fi++) {
-    if (_outageTimelineMonthFilter && srcDays[fi].date && srcDays[fi].date.slice(0, 7) !== _outageTimelineMonthFilter) continue;
-    filtDays.push(srcDays[fi]);
+  for (var _sfd of srcDays) {
+    if (_outageTimelineMonthFilter && _sfd.date && _sfd.date.slice(0, 7) !== _outageTimelineMonthFilter) continue;
+    filtDays.push(_sfd);
   }
   if (filtDays.length < 1) filtDays = getFilteredDays(data.days || []);
 
   // Pad month with empty days
   var dayMap = {};
-  for (var dm = 0; dm < filtDays.length; dm++) dayMap[filtDays[dm].date] = filtDays[dm];
+  for (var _fdm of filtDays) dayMap[_fdm.date] = _fdm;
   var days = [];
   if (_outageTimelineMonthFilter) {
     var parts = _outageTimelineMonthFilter.split("-");
@@ -6277,8 +6243,7 @@ function renderUptimeChart(data) {
 
   var labels = [], opData = [], degData = [], partData = [], outData = [], greyData = [];
 
-  for (var di = 0; di < days.length; di++) {
-    var d = days[di];
+  for (var d of days) {
     labels.push(d.date.slice(5));
     if (d._empty) {
       opData.push(0); degData.push(0); partData.push(0); outData.push(0); greyData.push(24);
@@ -6288,9 +6253,9 @@ function renderUptimeChart(data) {
 
     // Total hours by comp_status (unfiltered)
     var totalByStatus = { major_outage: 0, partial_outage: 0, degraded_performance: 0 };
-    for (var sa = 0; sa < spans.length; sa++) {
-      var aCs = spans[sa].comp_status || "degraded_performance";
-      var aDur = (spans[sa].to || 0) - (spans[sa].from || 0);
+    for (var _sp of spans) {
+      var aCs = _sp.comp_status || "degraded_performance";
+      var aDur = (_sp.to || 0) - (_sp.from || 0);
       if (aDur < 0) aDur = 0;
       if (totalByStatus[aCs] !== undefined) totalByStatus[aCs] += aDur;
       else totalByStatus.degraded_performance += aDur;
@@ -6333,7 +6298,7 @@ function renderUptimeChart(data) {
     tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0', fontSize: _cf().tooltip },
       formatter: function(params) {
         var lines = [params[0].axisValueLabel];
-        for (var pi = 0; pi < params.length; pi++) { if (params[pi].seriesName) lines.push(params[pi].marker + ' ' + params[pi].seriesName + ': ' + params[pi].value + 'h'); }
+        for (var _pm of params) { if (_pm.seriesName) lines.push(_pm.marker + ' ' + _pm.seriesName + ': ' + _pm.value + 'h'); }
         return lines.join('<br>');
       }
     },
@@ -6362,9 +6327,9 @@ function renderIncidentHistory(data) {
 
   var srcDays = _outageTimelineMonthFilter ? (data.days || []) : getFilteredDays(data.days || []);
   var days = [];
-  for (var fi = 0; fi < srcDays.length; fi++) {
-    if (_outageTimelineMonthFilter && srcDays[fi].date && srcDays[fi].date.slice(0, 7) !== _outageTimelineMonthFilter) continue;
-    days.push(srcDays[fi]);
+  for (var _sfd2 of srcDays) {
+    if (_outageTimelineMonthFilter && _sfd2.date && _sfd2.date.slice(0, 7) !== _outageTimelineMonthFilter) continue;
+    days.push(_sfd2);
   }
   if (days.length < 1) days = getFilteredDays(data.days || []);
   if (days.length < 2) return;
@@ -6373,18 +6338,17 @@ function renderIncidentHistory(data) {
   var critH = [], majorH = [], minorH = [], greyH = [];
   var hitLimits = [];
 
-  for (var i = 0; i < days.length; i++) {
-    var d = days[i];
+  for (var d of days) {
     labels.push(d.date.slice(5));
     hitLimits.push(d.hit_limit || 0);
 
     var spans = d.outage_spans || [];
     var bySev = { critical: 0, major: 0, minor: 0 };
     var excludedH = 0;
-    for (var si = 0; si < spans.length; si++) {
-      var imp = spans[si].impact || "none";
+    for (var _sp2 of spans) {
+      var imp = _sp2.impact || "none";
       if (imp === "none") continue;
-      var dur = (spans[si].to || 0) - (spans[si].from || 0);
+      var dur = (_sp2.to || 0) - (_sp2.from || 0);
       if (dur < 0) dur = 0;
       if (_outageImpactExclude[imp]) { excludedH += dur; continue; }
       if (bySev[imp] !== undefined) bySev[imp] += dur;

@@ -293,8 +293,7 @@
       hourBuckets.push({ totalReqs: 0, totalLatency: 0, latencyCount: 0, dayCount: 0 });
     }
 
-    for (var di = 0; di < proxyDays.length; di++) {
-      var pd = proxyDays[di];
+    for (var pd of proxyDays) {
       var hours = pd.hours || {};
       var latH  = pd.per_hour_latency || {};
 

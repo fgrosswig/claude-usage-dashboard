@@ -97,8 +97,7 @@ function msToS(ms) {
 // Gleiche Regel wie pass1: Vereinigung (Vortag, Tag, Folgetag) pro dateKey.
 function countAllowedTurnDays(dateKeys) {
   var allowedDays = Object.create(null);
-  for (var di = 0; di < dateKeys.length; di++) {
-    var dk = dateKeys[di];
+  for (var dk of dateKeys) {
     var d = new Date(dk + 'T00:00:00Z');
     var prevDay = new Date(d.getTime() - 86400000).toISOString().slice(0, 10);
     var nextDay = new Date(d.getTime() + 86400000).toISOString().slice(0, 10);
@@ -147,8 +146,7 @@ function runOnce(dateKeys) {
   );
   var t2 = perf.now();
   var results = Object.create(null);
-  for (var i = 0; i < dateKeys.length; i++) {
-    var dk = dateKeys[i];
+  for (var dk of dateKeys) {
     results[dk] = sessionTurnsCore.finalizeSessionTurnsForDate(dk, allSessions);
   }
   var t3 = perf.now();
@@ -196,7 +194,7 @@ function formatBenchmarkReport(repoDir, last, dateKeys, modeLine, iterations, to
   var iters = iterations || 1;
   if (iters > 1 && totals?.length) {
     var sum = 0;
-    for (var ti = 0; ti < totals.length; ti++) sum += totals[ti];
+    for (var tot of totals) sum += tot;
     var avg = sum / totals.length;
     var mn = totals[0];
     var mx = totals[0];
@@ -208,8 +206,7 @@ function formatBenchmarkReport(repoDir, last, dateKeys, modeLine, iterations, to
       '  iterations=' + iters + ' total_s: min=' + mn.toFixed(3) + ' avg=' + avg.toFixed(3) + ' max=' + mx.toFixed(3)
     );
   }
-  for (var di = 0; di < dateKeys.length; di++) {
-    var dk2 = dateKeys[di];
+  for (var dk2 of dateKeys) {
     var r = last.results[dk2];
     lines.push('  ' + dk2 + '  sessions=' + r.session_count + ' total_turns=' + r.total_turns);
   }

@@ -115,10 +115,10 @@ function walkJsonl(dir, acc) {
   acc = acc || [];
   try {
     var entries = fs.readdirSync(dir, { withFileTypes: true });
-    for (var i = 0; i < entries.length; i++) {
-      var fp = path.join(dir, entries[i].name);
-      if (entries[i].isDirectory()) walkJsonl(fp, acc);
-      else if (entries[i].name.endsWith('.jsonl')) acc.push(fp);
+    for (var entry of entries) {
+      var fp = path.join(dir, entry.name);
+      if (entry.isDirectory()) walkJsonl(fp, acc);
+      else if (entry.name.endsWith('.jsonl')) acc.push(fp);
     }
   } catch (e) {}
   return acc;
@@ -129,8 +129,8 @@ function getAlignRoots() {
   var raw = (process.env.ANTHROPIC_PROXY_JSONL_ROOTS || '').trim();
   if (raw) {
     var parts = raw.split(';');
-    for (var i = 0; i < parts.length; i++) {
-      var t = parts[i].trim();
+    for (var t of parts) {
+      t = t.trim();
       if (t) {
         if (t[0] === '~') t = path.join(HOME, t.slice(1).replace(/^\/|\\+/, ''));
         roots.push(path.resolve(t));
@@ -171,8 +171,8 @@ function alignToJsonl(proxyEndIso, usage, roots, opts) {
   var tout = usage.output_tokens != null ? usage.output_tokens : 0;
   var tin = usage.input_tokens != null ? usage.input_tokens : 0;
   var files = [];
-  for (var r = 0; r < roots.length; r++) {
-    walkJsonl(roots[r], files);
+  for (var root of roots) {
+    walkJsonl(root, files);
   }
   files.sort(function (a, b) {
     try {
@@ -186,11 +186,10 @@ function alignToJsonl(proxyEndIso, usage, roots, opts) {
   var best = null;
   var bestRank = -1e18;
 
-  for (var fi = 0; fi < files.length; fi++) {
-    var tail = readTailUtf8(files[fi], tailBytes);
+  for (var file of files) {
+    var tail = readTailUtf8(file, tailBytes);
     var lines = tail.split('\n');
-    for (var li = 0; li < lines.length; li++) {
-      var line = lines[li];
+    for (var line of lines) {
       if (line.indexOf('"usage"') < 0) continue;
       var rec;
       try {
@@ -211,16 +210,16 @@ function alignToJsonl(proxyEndIso, usage, roots, opts) {
       var tokenMatch =
         o === tout && inp === tin ? 3 : Math.abs(o - tout) + Math.abs(inp - tin) <= 24 ? 2 : 1;
       if (tokenMatch === 1 && delta > 45000) continue;
-      var rank = tokenMatch * 1e12 - delta + (files[fi].indexOf('subagent') >= 0 ? 0.5 : 0);
+      var rank = tokenMatch * 1e12 - delta + (file.indexOf('subagent') >= 0 ? 0.5 : 0);
       if (rank > bestRank) {
         bestRank = rank;
         best = {
-          file: files[fi],
+          file: file,
           jsonl_timestamp: ts,
           delta_ms: tms - proxyMs,
           jsonl_output_tokens: o,
           jsonl_input_tokens: inp,
-          is_subagent_path: files[fi].toLowerCase().indexOf('subagent') >= 0,
+          is_subagent_path: file.toLowerCase().indexOf('subagent') >= 0,
           match_strength: tokenMatch === 3 ? 'exact_tokens' : tokenMatch === 2 ? 'near_tokens' : 'time_only'
         };
       }
@@ -256,8 +255,7 @@ function mergeUsage(into, add) {
     'ephemeral_1h_input_tokens',
     'ephemeral_5m_input_tokens'
   ];
-  for (var i = 0; i < keys.length; i++) {
-    var k = keys[i];
+  for (var k of keys) {
     if (add[k] != null) into[k] = add[k];
   }
   return into;
@@ -270,8 +268,7 @@ function usageFromBuffer(buf, contentType) {
   if (ct.indexOf('text/event-stream') >= 0) {
     var s = buf.toString('utf8');
     var lines = s.split(/\r?\n/);
-    for (var i = 0; i < lines.length; i++) {
-      var line = lines[i];
+    for (var line of lines) {
       if (line.indexOf('data:') !== 0) continue;
       var json = line.slice(5).trim();
       if (!json || json === '[DONE]') continue;
@@ -325,8 +322,7 @@ function responseHintsFromBuffer(buf, contentType) {
     var lines = s.split(/\r?\n/);
     var hints = {};
     var toolUse = 0, toolResult = 0, text = 0;
-    for (var si = 0; si < lines.length; si++) {
-      var sline = lines[si];
+    for (var sline of lines) {
       if (sline.indexOf('data:') !== 0) continue;
       var sjson = sline.slice(5).trim();
       if (!sjson || sjson === '[DONE]') continue;
@@ -360,8 +356,7 @@ function responseHintsFromBuffer(buf, contentType) {
     var content = o.content;
     if (Array.isArray(content)) {
       var jToolUse = 0, jToolResult = 0, jText = 0;
-      for (var i = 0; i < content.length; i++) {
-        var b = content[i];
+      for (var b of content) {
         if (!b || !b.type) continue;
         if (b.type === 'tool_use') jToolUse++;
         else if (b.type === 'tool_result') jToolResult++;

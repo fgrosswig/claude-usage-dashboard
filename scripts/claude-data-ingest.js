@@ -46,8 +46,7 @@ function walkFilesSync(rootDir) {
     } catch (e) {
       return;
     }
-    for (var i = 0; i < list.length; i++) {
-      var ent = list[i];
+    for (var ent of list) {
       var full = path.join(d, ent.name);
       if (ent.isDirectory()) walk(full);
       else if (ent.isFile()) out.push(full);
@@ -94,8 +93,7 @@ function extractTarGzIntoClaudeRoot(tarGzPath, claudeRoot, cb) {
     try {
       var absRoot = path.resolve(claudeRoot);
       var files = walkFilesSync(staging);
-      for (var fi = 0; fi < files.length; fi++) {
-        var absFile = files[fi];
+      for (var absFile of files) {
         var rel = path.relative(staging, absFile);
         var targetRel = mapStagingRelToTargetRel(rel);
         if (!targetRel || targetRel.indexOf('..') >= 0) continue;

@@ -248,11 +248,10 @@ function backfillReleaseBodiesForDashboardDays(days, cb) {
   }
   var tags = [];
   var seen = Object.create(null);
-  for (var di = 0; di < days.length; di++) {
-    var vc = days[di].version_change;
+  for (var day of days) {
+    var vc = day.version_change;
     if (!vc || !vc.github_release_links) continue;
-    for (var li = 0; li < vc.github_release_links.length; li++) {
-      var gl = vc.github_release_links[li];
+    for (var gl of vc.github_release_links) {
       var tg = gl.tag || 'v' + gl.version;
       if (tg && !seen[tg]) {
         seen[tg] = true;
@@ -262,14 +261,14 @@ function backfillReleaseBodiesForDashboardDays(days, cb) {
   }
   function hasTagInCache(tag) {
     var rels = releasesCache.releases;
-    for (var i = 0; i < rels.length; i++) {
-      if (String(rels[i].tag_name || '') === tag) return true;
+    for (var rel of rels) {
+      if (String(rel.tag_name || '') === tag) return true;
     }
     return false;
   }
   var missing = [];
-  for (var m = 0; m < tags.length; m++) {
-    if (!hasTagInCache(tags[m])) missing.push(tags[m]);
+  for (var tag of tags) {
+    if (!hasTagInCache(tag)) missing.push(tag);
   }
   if (!missing.length) {
     enrichVersionChangeNotes(days);
@@ -295,8 +294,8 @@ function backfillReleaseBodiesForDashboardDays(days, cb) {
     httpsFetchGithubReleaseByTag(t, function (err, rel) {
       if (!err && rel && rel.tag_name) {
         var dupe = false;
-        for (var j = 0; j < releasesCache.releases.length; j++) {
-          if (String(releasesCache.releases[j].tag_name) === String(rel.tag_name)) {
+        for (var cachedRel of releasesCache.releases) {
+          if (String(cachedRel.tag_name) === String(rel.tag_name)) {
             dupe = true;
             break;
           }
@@ -343,7 +342,7 @@ function refreshReleasesCache() {
         finish();
         return;
       }
-      for (var i = 0; i < data.length; i++) all.push(data[i]);
+      for (var datum of data) all.push(datum);
       if (data.length < 100 || page >= maxPages) {
         finish();
         return;
@@ -360,14 +359,13 @@ function refreshReleasesCache() {
     }
     var seen = Object.create(null);
     var merged = [];
-    for (var a = 0; a < all.length; a++) {
-      var ta = all[a] && all[a].tag_name;
+    for (var item of all) {
+      var ta = item && item.tag_name;
       if (ta) seen[String(ta)] = true;
-      merged.push(all[a]);
+      merged.push(item);
     }
     var prev = releasesCache.releases;
-    for (var b = 0; b < prev.length; b++) {
-      var pb = prev[b];
+    for (var pb of prev) {
       var tb = pb && pb.tag_name;
       if (tb && !seen[String(tb)]) {
         seen[String(tb)] = true;
@@ -514,8 +512,7 @@ function getReleasesMap() {
   }
   var map = {};
   var rels = releasesCache.releases;
-  for (var i = 0; i < rels.length; i++) {
-    var r = rels[i];
+  for (var r of rels) {
     var nk = normalizeCliSemver(r.tag_name || r.name || '');
     var date = isoToUtcYmd(r.published_at || '');
     if (nk) map[nk] = { tag: r.tag_name, date: date, highlights: extractReleaseHighlights(r.body) };
@@ -529,8 +526,7 @@ function versionsInRelMapBetween(relMap, fromNorm, toNorm) {
   var keys = Object.keys(relMap);
   keys.sort(semverCmp);
   var out = [];
-  for (var i = 0; i < keys.length; i++) {
-    var k = keys[i];
+  for (var k of keys) {
     if (!k) continue;
     if (fromNorm && semverCmp(k, fromNorm) <= 0) continue;
     if (semverCmp(k, toNorm) > 0) continue;
@@ -541,8 +537,8 @@ function versionsInRelMapBetween(relMap, fromNorm, toNorm) {
 
 function uniqSortedSemvers(vers) {
   var o = Object.create(null);
-  for (var i = 0; i < vers.length; i++) {
-    var n = normalizeCliSemver(vers[i]);
+  for (var v of vers) {
+    var n = normalizeCliSemver(v);
     if (n) o[n] = true;
   }
   var ks = Object.keys(o);
@@ -565,8 +561,8 @@ function githubReleaseLinkForVersion(relMap, ver) {
 /** Füllt Highlights aus allen Releases zwischen from und höchstem added; setzt github_release_links als Fallback. */
 function enrichVersionChangeNotes(result) {
   var relMap = getReleasesMap();
-  for (var ei = 0; ei < result.length; ei++) {
-    var vc = result[ei].version_change;
+  for (var entry of result) {
+    var vc = entry.version_change;
     if (!vc || !vc.added || !vc.added.length) continue;
     var fromN = vc.from ? normalizeCliSemver(vc.from) : '';
     var addedSorted = vc.added.slice().sort(semverCmp);
@@ -574,14 +570,13 @@ function enrichVersionChangeNotes(result) {
     var inter = versionsInRelMapBetween(relMap, fromN, topN);
     var mergedHi = (vc.highlights || []).slice();
     var seenH = Object.create(null);
-    for (var mi = 0; mi < mergedHi.length; mi++) seenH[String(mergedHi[mi])] = true;
+    for (var hi of mergedHi) seenH[String(hi)] = true;
     var prefixMulti = inter.length > 1;
-    for (var ii = 0; ii < inter.length; ii++) {
-      var iv = inter[ii];
+    for (var iv of inter) {
       var ri = relMap[iv];
       if (!ri || !ri.highlights || !ri.highlights.length) continue;
-      for (var h = 0; h < ri.highlights.length; h++) {
-        var line = (prefixMulti ? '[' + iv + '] ' : '') + ri.highlights[h];
+      for (var hl of ri.highlights) {
+        var line = (prefixMulti ? '[' + iv + '] ' : '') + hl;
         if (!seenH[line]) {
           mergedHi.push(line);
           seenH[line] = true;
@@ -593,8 +588,7 @@ function enrichVersionChangeNotes(result) {
     var linkVers = uniqSortedSemvers(inter.concat(addedSorted));
     var links = [];
     var seenV = Object.create(null);
-    for (var lj = 0; lj < linkVers.length; lj++) {
-      var vj = linkVers[lj];
+    for (var vj of linkVers) {
       if (seenV[vj]) continue;
       seenV[vj] = true;
       var gl = githubReleaseLinkForVersion(relMap, vj);
@@ -622,15 +616,15 @@ function buildByDateFromVersionTimelineItems(items) {
     return semverCmp(a.ver, b.ver);
   });
   var groups = [];
-  for (var k = 0; k < items.length; k++) {
-    var dk = isoToUtcYmd(items[k].when);
+  for (var item of items) {
+    var dk = isoToUtcYmd(item.when);
     if (!dk) continue;
-    if (!groups.length) groups.push([items[k]]);
+    if (!groups.length) groups.push([item]);
     else {
       var lastGrp = groups[groups.length - 1];
       var lastDk = isoToUtcYmd(lastGrp[0].when);
-      if (lastDk === dk) lastGrp.push(items[k]);
-      else groups.push([items[k]]);
+      if (lastDk === dk) lastGrp.push(item);
+      else groups.push([item]);
     }
   }
   if (!groups.length) return null;
@@ -641,9 +635,9 @@ function buildByDateFromVersionTimelineItems(items) {
     var prevVer = g > 0 ? groups[g - 1][groups[g - 1].length - 1].ver : null;
     var added = [];
     var hi = [];
-    for (var u = 0; u < grp.length; u++) {
-      added.push(grp[u].ver);
-      hi = hi.concat(grp[u].highlights || []);
+    for (var gu of grp) {
+      added.push(gu.ver);
+      hi = hi.concat(gu.highlights || []);
     }
     added.sort(semverCmp);
     byDate[dk] = {
@@ -660,8 +654,7 @@ function buildByDateFromVersionTimelineItems(items) {
 /** Wenn UTC-Tag und lokaler Tag (Server) auseinanderfallen: gleichen Marker auch unter lokalem YMD buchen, falls frei — sonst wirkt ein 3.4.-Release „hinter“ 1.4. nur auf 4.4.-Balken oder fehlt. */
 function expandVersionByDateLocalAliases(byDate) {
   var initial = Object.keys(byDate);
-  for (var i = 0; i < initial.length; i++) {
-    var dk = initial[i];
+  for (var dk of initial) {
     var ch = byDate[dk];
     var w = ch && ch.booking_when;
     if (!w) continue;
@@ -681,14 +674,14 @@ function applyVersionChangeByDateMap(result, byDate) {
     if (Object.prototype.hasOwnProperty.call(byDate, kk)) kc++;
   }
   if (!kc) return false;
-  for (var ri = 0; ri < result.length; ri++) {
-    result[ri].version_change = null;
+  for (var row of result) {
+    row.version_change = null;
   }
-  for (var ri2 = 0; ri2 < result.length; ri2++) {
-    var ch = byDate[result[ri2].date];
+  for (var row2 of result) {
+    var ch = byDate[row2.date];
     if (ch) {
       var bw = ch.booking_when || '';
-      result[ri2].version_change = {
+      row2.version_change = {
         added: ch.added,
         from: ch.from,
         highlights: ch.highlights,
@@ -704,8 +697,7 @@ function applyVersionChangeByDateMap(result, byDate) {
 function buildGitHubVersionTimelineItems() {
   var rels = loadReleasesArrayForBuild();
   var items = [];
-  for (var i = 0; i < rels.length; i++) {
-    var r = rels[i];
+  for (var r of rels) {
     var ver = normalizeCliSemver(r.tag_name || r.name || '');
     if (!ver || !r.published_at) continue;
     var t = new Date(r.published_at).getTime();
@@ -727,8 +719,7 @@ function buildGitHubVersionTimelineItems() {
  */
 function dedupeMarketplaceVersionsByVersion(rawVers) {
   var by = Object.create(null);
-  for (var i = 0; i < rawVers.length; i++) {
-    var v = rawVers[i];
+  for (var v of rawVers) {
     var ver = normalizeCliSemver(v.version || '');
     if (!ver || !v.lastUpdated) continue;
     var t = new Date(v.lastUpdated).getTime();
@@ -739,8 +730,8 @@ function dedupeMarketplaceVersionsByVersion(rawVers) {
   }
   var keys = Object.keys(by).sort(semverCmp);
   var out = [];
-  for (var j = 0; j < keys.length; j++) {
-    out.push({ ver: keys[j], lastUpdated: by[keys[j]].lastUpdated });
+  for (var key of keys) {
+    out.push({ ver: key, lastUpdated: by[key].lastUpdated });
   }
   return out;
 }
@@ -793,10 +784,8 @@ function mergeMarketplaceRowsPreferNewer(frozenMpRows) {
   if (rowsList.length === 0) return [];
   if (rowsList.length === 1) return rowsList[0].slice();
   var byVer = Object.create(null);
-  for (var rli = 0; rli < rowsList.length; rli++) {
-    var rows = rowsList[rli];
-    for (var i = 0; i < rows.length; i++) {
-      var row = rows[i];
+  for (var rowSet of rowsList) {
+    for (var row of rowSet) {
       var ver = row.ver || normalizeCliSemver(row.version || '');
       if (!ver || !row.lastUpdated) continue;
       var t = new Date(row.lastUpdated).getTime();
@@ -807,7 +796,7 @@ function mergeMarketplaceRowsPreferNewer(frozenMpRows) {
   }
   var keys = Object.keys(byVer).sort(semverCmp);
   var out = [];
-  for (var j = 0; j < keys.length; j++) out.push(byVer[keys[j]].row);
+  for (var key of keys) out.push(byVer[key].row);
   return out;
 }
 
@@ -815,8 +804,7 @@ function buildMarketplaceVersionTimelineItems() {
   var rows = loadMarketplaceVersionsForBuild();
   var relMap = getReleasesMap();
   var items = [];
-  for (var i = 0; i < rows.length; i++) {
-    var row = rows[i];
+  for (var row of rows) {
     var ver = row.ver || normalizeCliSemver(row.version || '');
     if (!ver || !row.lastUpdated) continue;
     var t = new Date(row.lastUpdated).getTime();
@@ -837,8 +825,7 @@ function buildMergedExtensionTimelineItems(frozenMpRows) {
   var relMap = getReleasesMap();
   var byVer = Object.create(null);
   var ghItems = buildGitHubVersionTimelineItems();
-  for (var gi = 0; gi < ghItems.length; gi++) {
-    var g = ghItems[gi];
+  for (var g of ghItems) {
     var ghHi = g.highlights && g.highlights.length ? g.highlights.slice() : [];
     byVer[g.ver] = { ver: g.ver, t: g.t, when: g.when, highlights: ghHi };
   }
@@ -847,8 +834,7 @@ function buildMergedExtensionTimelineItems(frozenMpRows) {
     frozenArg !== undefined
       ? mergeMarketplaceRowsPreferNewer(frozenArg)
       : loadMarketplaceVersionsForBuild();
-  for (var ri = 0; ri < rows.length; ri++) {
-    var row = rows[ri];
+  for (var row of rows) {
     var ver = row.ver || normalizeCliSemver(row.version || '');
     if (!ver || !row.lastUpdated) continue;
     var t = new Date(row.lastUpdated).getTime();
@@ -892,8 +878,7 @@ function buildExtensionTimelineApiResponse() {
       return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
     });
     var synthetic = [];
-    for (var i = 0; i < keys.length; i++) {
-      var dk = keys[i];
+    for (var dk of keys) {
       var ch = byDateRaw[dk];
       var bw = ch.booking_when || '';
       synthetic.push({
@@ -909,9 +894,8 @@ function buildExtensionTimelineApiResponse() {
       });
     }
     enrichVersionChangeNotes(synthetic);
-    for (var j = 0; j < synthetic.length; j++) {
-      var row = synthetic[j];
-      if (row.version_change) byDateOut[row.date] = row.version_change;
+    for (var synRow of synthetic) {
+      if (synRow.version_change) byDateOut[synRow.date] = synRow.version_change;
     }
   }
   return {
@@ -934,14 +918,14 @@ function applyJsonlGapVersionChanges(result) {
     if (vci === 0) continue;
     var prevVers = Object.keys(result[vci - 1].versions || {}).sort(semverCmp);
     var vAdded = [];
-    for (var cvi = 0; cvi < curVers.length; cvi++) {
-      if (prevVers.indexOf(curVers[cvi]) < 0) vAdded.push(curVers[cvi]);
+    for (var cv of curVers) {
+      if (prevVers.indexOf(cv) < 0) vAdded.push(cv);
     }
     if (vAdded.length === 0) continue;
     vAdded.sort(semverCmp);
     var relHighlights = [];
-    for (var rhi = 0; rhi < vAdded.length; rhi++) {
-      var vk = normalizeCliSemver(vAdded[rhi]);
+    for (var va of vAdded) {
+      var vk = normalizeCliSemver(va);
       var ri = vk ? relMapJsonl[vk] : null;
       if (ri && ri.highlights) relHighlights = relHighlights.concat(ri.highlights);
     }
@@ -976,7 +960,7 @@ function httpsGetJson(urlStr, cb) {
   if (isGithubApi) {
     var gh = githubApiRequestHeaders();
     var gk = Object.keys(gh);
-    for (var gi = 0; gi < gk.length; gi++) headers[gk[gi]] = gh[gk[gi]];
+    for (var gKey of gk) headers[gKey] = gh[gKey];
   }
   var mod = parsed.protocol === 'https:' ? https : http;
   var opts = {
@@ -1189,11 +1173,11 @@ function worstComponentStatus(inc) {
   var worst = 'operational';
   var hasComps = false;
   var updates = inc.incident_updates || [];
-  for (var u = 0; u < updates.length; u++) {
-    var comps = updates[u].affected_components || [];
-    for (var c = 0; c < comps.length; c++) {
+  for (var upd of updates) {
+    var comps = upd.affected_components || [];
+    for (var comp of comps) {
       hasComps = true;
-      var s = comps[c].new_status || comps[c].old_status || 'operational';
+      var s = comp.new_status || comp.old_status || 'operational';
       if ((_statusRank[s] || 0) > (_statusRank[worst] || 0)) worst = s;
     }
   }
@@ -1206,8 +1190,7 @@ function worstComponentStatus(inc) {
 function getOutageDaysMap() {
   var map = {};
   var incs = outageCache.incidents;
-  for (var i = 0; i < incs.length; i++) {
-    var inc = incs[i];
+  for (var inc of incs) {
     if (!inc.created_at) continue;
     var start = new Date(inc.created_at);
     var end = inc.resolved_at ? new Date(inc.resolved_at) : new Date();
@@ -1236,8 +1219,8 @@ function getOutageDaysMap() {
       map[dayStr].spans.push({ from: Math.round(startH * 100) / 100, to: Math.round(endH * 100) / 100, name: inc.name || '', impact: incImpact, kind: incKind, comp_status: incCompStatus });
       // Incident-Name nur einmal pro Tag
       var found = false;
-      for (var fi = 0; fi < map[dayStr].incidents.length; fi++) {
-        if (map[dayStr].incidents[fi].name === inc.name) { found = true; break; }
+      for (var existing of map[dayStr].incidents) {
+        if (existing.name === inc.name) { found = true; break; }
       }
       if (!found) map[dayStr].incidents.push({ name: inc.name || '', impact: incImpact, kind: incKind, created_at: inc.created_at, resolved_at: inc.resolved_at || null });
       cur = dayEnd;
@@ -1245,10 +1228,10 @@ function getOutageDaysMap() {
   }
   // Stunden auf 1 Dezimale runden
   var keys = Object.keys(map);
-  for (var k = 0; k < keys.length; k++) {
-    map[keys[k]].outage_hours = Math.round(map[keys[k]].outage_hours * 10) / 10;
-    map[keys[k]].server_hours = Math.round(map[keys[k]].server_hours * 10) / 10;
-    map[keys[k]].client_hours = Math.round(map[keys[k]].client_hours * 10) / 10;
+  for (var key of keys) {
+    map[key].outage_hours = Math.round(map[key].outage_hours * 10) / 10;
+    map[key].server_hours = Math.round(map[key].server_hours * 10) / 10;
+    map[key].client_hours = Math.round(map[key].client_hours * 10) / 10;
   }
   return map;
 }
@@ -1417,9 +1400,8 @@ function emptySessionSignals() {
 function bumpSessionSignals(bucket, tagList) {
   if (!bucket.session_signals) bucket.session_signals = emptySessionSignals();
   var sig = bucket.session_signals;
-  for (var ti = 0; ti < tagList.length; ti++) {
-    var k = tagList[ti];
-    if (sig[k] != null) sig[k]++;
+  for (var tg of tagList) {
+    if (sig[tg] != null) sig[tg]++;
   }
 }
 
@@ -1429,9 +1411,8 @@ function bumpHourSessionSignals(bucket, hourKeyStr, tagList) {
   if (!bucket.hour_signals) bucket.hour_signals = {};
   if (!bucket.hour_signals[hourKeyStr]) bucket.hour_signals[hourKeyStr] = emptySessionSignals();
   var sig = bucket.hour_signals[hourKeyStr];
-  for (var ti = 0; ti < tagList.length; ti++) {
-    var k = tagList[ti];
-    if (sig[k] != null) sig[k]++;
+  for (var tg of tagList) {
+    if (sig[tg] != null) sig[tg]++;
   }
 }
 
@@ -1439,8 +1420,7 @@ function mergeHourSignalsInto(dst, src) {
   if (!src || typeof src !== 'object') return;
   if (!dst.hour_signals) dst.hour_signals = {};
   var ks = Object.keys(src);
-  for (var i = 0; i < ks.length; i++) {
-    var k = ks[i];
+  for (var k of ks) {
     var sk = src[k];
     if (!sk || typeof sk !== 'object') continue;
     if (!dst.hour_signals[k]) dst.hour_signals[k] = emptySessionSignals();
@@ -1561,8 +1541,7 @@ function emptyDailyBucket() {
 function mergeHoursInto(dst, src) {
   if (!src || typeof src !== 'object') return;
   var ks = Object.keys(src);
-  for (var i = 0; i < ks.length; i++) {
-    var k = ks[i];
+  for (var k of ks) {
     dst[k] = (dst[k] || 0) + (src[k] || 0);
   }
 }
@@ -1599,8 +1578,8 @@ function mergeStopReasons(dst, src) {
   if (!src.stop_reasons) return;
   if (!dst.stop_reasons) dst.stop_reasons = {};
   var sk = Object.keys(src.stop_reasons);
-  for (var si = 0; si < sk.length; si++) {
-    dst.stop_reasons[sk[si]] = (dst.stop_reasons[sk[si]] || 0) + (src.stop_reasons[sk[si]] || 0);
+  for (var srk of sk) {
+    dst.stop_reasons[srk] = (dst.stop_reasons[srk] || 0) + (src.stop_reasons[srk] || 0);
   }
 }
 
@@ -1621,14 +1600,12 @@ function mergeDayBucketInto(target, src) {
   mergeTopSessionSignalsInto(target, src.session_signals);
   mergeStopReasons(target, src);
   var hk = Object.keys(src.hosts || {});
-  for (var hi = 0; hi < hk.length; hi++) {
-    var lab = hk[hi];
+  for (var lab of hk) {
     if (!target.hosts[lab]) target.hosts[lab] = emptyHostSlice();
     mergeHostSliceInto(target.hosts[lab], src.hosts[lab]);
   }
   var mk = Object.keys(src.models || {});
-  for (var mi = 0; mi < mk.length; mi++) {
-    var m = mk[mi];
+  for (var m of mk) {
     var sm = src.models[m];
     if (!sm || typeof sm !== 'object') continue;
     if (!target.models[m]) target.models[m] = { calls: 0, output: 0, cache_read: 0 };
@@ -1637,13 +1614,12 @@ function mergeDayBucketInto(target, src) {
     target.models[m].cache_read += sm.cache_read || 0;
   }
   var vk = Object.keys(src.versions || {});
-  for (var vi = 0; vi < vk.length; vi++) {
-    var v = vk[vi];
+  for (var v of vk) {
     target.versions[v] = (target.versions[v] || 0) + (src.versions[v] || 0);
   }
   var epKeys = Object.keys(src.entrypoints || {});
-  for (var ei = 0; ei < epKeys.length; ei++) {
-    target.entrypoints[epKeys[ei]] = (target.entrypoints[epKeys[ei]] || 0) + (src.entrypoints[epKeys[ei]] || 0);
+  for (var epk of epKeys) {
+    target.entrypoints[epk] = (target.entrypoints[epk] || 0) + (src.entrypoints[epk] || 0);
   }
   mergeVersionStatsInto(target, src.version_stats);
 }
@@ -1651,8 +1627,8 @@ function mergeDayBucketInto(target, src) {
 function mergeEntrypointsInto(tgt, srcEntrypoints) {
   if (!tgt.entrypoints) tgt.entrypoints = {};
   var ekKeys = Object.keys(srcEntrypoints || {});
-  for (var eki = 0; eki < ekKeys.length; eki++) {
-    tgt.entrypoints[ekKeys[eki]] = (tgt.entrypoints[ekKeys[eki]] || 0) + (srcEntrypoints[ekKeys[eki]] || 0);
+  for (var ek of ekKeys) {
+    tgt.entrypoints[ek] = (tgt.entrypoints[ek] || 0) + (srcEntrypoints[ek] || 0);
   }
 }
 
@@ -1660,13 +1636,12 @@ function mergeVersionStatsInto(target, srcVersionStats) {
   if (!srcVersionStats) return;
   if (!target.version_stats) target.version_stats = {};
   var vsKeys = Object.keys(srcVersionStats);
-  for (var vsi = 0; vsi < vsKeys.length; vsi++) {
-    var vsKey = vsKeys[vsi];
+  for (var vsKey of vsKeys) {
     if (!target.version_stats[vsKey]) target.version_stats[vsKey] = emptyVersionStats();
     var tgt = target.version_stats[vsKey];
     var srcVs = srcVersionStats[vsKey];
     var fKeys = Object.keys(srcVs);
-    for (var fki = 0; fki < fKeys.length; fki++) { var f = fKeys[fki];
+    for (var f of fKeys) {
       if (f === 'entrypoints') {
         mergeEntrypointsInto(tgt, srcVs.entrypoints);
       } else {
@@ -1737,17 +1712,17 @@ function rowToDailyEntry(row) {
   var hosts = {};
   if (row.hosts && typeof row.hosts === 'object') {
     var hk = Object.keys(row.hosts);
-    for (var i = 0; i < hk.length; i++) {
-      hosts[hk[i]] = hostSliceFromRow(row.hosts[hk[i]]);
+    for (var hKey of hk) {
+      hosts[hKey] = hostSliceFromRow(row.hosts[hKey]);
     }
   }
   var versNorm = {};
   var versIn = row.versions && typeof row.versions === 'object' ? row.versions : {};
   var vkeys = Object.keys(versIn);
-  for (var vi = 0; vi < vkeys.length; vi++) {
-    var nk = normalizeCliSemver(vkeys[vi]);
+  for (var vkey of vkeys) {
+    var nk = normalizeCliSemver(vkey);
     if (!nk) continue;
-    versNorm[nk] = (versNorm[nk] || 0) + (versIn[vkeys[vi]] || 0);
+    versNorm[nk] = (versNorm[nk] || 0) + (versIn[vkey] || 0);
   }
   var ss0 = row.session_signals && typeof row.session_signals === 'object' ? row.session_signals : null;
   var sigRow = emptySessionSignals();
@@ -1840,8 +1815,8 @@ function processJsonlFile(fileRef, daily, onlyDate, isolateTodayFrag, fileTodayF
               if (!dSig.version_stats) dSig.version_stats = {};
               if (!dSig.version_stats[sigVer]) dSig.version_stats[sigVer] = emptyVersionStats();
               var svs = dSig.version_stats[sigVer];
-              for (var sti2 = 0; sti2 < sigTags.length; sti2++) {
-                if (svs[sigTags[sti2]] != null) svs[sigTags[sti2]]++;
+              for (var st of sigTags) {
+                if (svs[st] != null) svs[st]++;
               }
             }
             if (!dSig.hosts) dSig.hosts = {};
@@ -2033,8 +2008,8 @@ function __releaseParseTagEntry(r) {
   var patch = Number.parseInt(parts[2], 10) || 0;
   var body = (r.body || '').toLowerCase();
   var matchedKeywords = [];
-  for (var kwi = 0; kwi < REVERT_KEYWORDS.length; kwi++) {
-    if (body.includes(REVERT_KEYWORDS[kwi])) matchedKeywords.push(REVERT_KEYWORDS[kwi]);
+  for (var kw of REVERT_KEYWORDS) {
+    if (body.includes(kw)) matchedKeywords.push(kw);
   }
   return {
     tag: r.tag_name || '',
@@ -2050,8 +2025,8 @@ function __releaseParseTagEntry(r) {
 
 function __releaseBuildEntries(sorted) {
   var entries = [];
-  for (var ri = 0; ri < sorted.length; ri++) {
-    var ent = __releaseParseTagEntry(sorted[ri]);
+  for (var sr of sorted) {
+    var ent = __releaseParseTagEntry(sr);
     if (ent) entries.push(ent);
   }
   return entries;
@@ -2145,8 +2120,7 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
     return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
   });
   var result = [];
-  for (var di = 0; di < days.length; di++) {
-    var key = days[di];
+  for (var key of days) {
     var r = daily[key];
     var total = r.input + r.output + r.cache_read + r.cache_creation;
     var activeH = unionHourKeyCount(r.hours, r.hour_signals);
@@ -2155,8 +2129,8 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
     var hKeys = Object.keys(hostsRaw).sort(function (a, b) {
       return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
     });
-    for (var hi = 0; hi < hKeys.length; hi++) {
-      hostsApi[hKeys[hi]] = hostSliceToApi(hostsRaw[hKeys[hi]]);
+    for (var hk of hKeys) {
+      hostsApi[hk] = hostSliceToApi(hostsRaw[hk]);
     }
     var rsig = r.session_signals && typeof r.session_signals === 'object' ? r.session_signals : emptySessionSignals();
     result.push({
@@ -2215,11 +2189,11 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
     result[mci].model_set = curModels;
     var added = [];
     var removed = [];
-    for (var cmi = 0; cmi < curModels.length; cmi++) {
-      if (prevModels.indexOf(curModels[cmi]) < 0) added.push(curModels[cmi]);
+    for (var cm of curModels) {
+      if (prevModels.indexOf(cm) < 0) added.push(cm);
     }
-    for (var pmi = 0; pmi < prevModels.length; pmi++) {
-      if (curModels.indexOf(prevModels[pmi]) < 0) removed.push(prevModels[pmi]);
+    for (var pm of prevModels) {
+      if (curModels.indexOf(pm) < 0) removed.push(pm);
     }
     if (added.length > 0 || removed.length > 0) {
       result[mci].model_change = { added: added, removed: removed };
@@ -2236,16 +2210,15 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
 
   var peakDate = '';
   var peakTotal = 0;
-  for (var pi = 0; pi < result.length; pi++) {
-    if (result[pi].total > peakTotal) {
-      peakTotal = result[pi].total;
-      peakDate = result[pi].date;
+  for (var pr of result) {
+    if (pr.total > peakTotal) {
+      peakTotal = pr.total;
+      peakDate = pr.date;
     }
   }
   // Forensic + Outage pro Tag
   var outageDays = getOutageDaysMap();
-  for (var qi = 0; qi < result.length; qi++) {
-    var row = result[qi];
+  for (var row of result) {
     var rr = daily[row.date];
     if (!rr) continue;
     var f = computeForensicForDay(row.date, rr, peakDate, peakTotal);
@@ -2267,32 +2240,32 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
   var scanned = [];
   var tagged = filePaths;
   if (tagged && tagged.length) {
-    for (var si = 0; si < tagged.length; si++) {
-      scanned.push(displayScannedFileLine(tagged[si]));
+    for (var tf of tagged) {
+      scanned.push(displayScannedFileLine(tf));
     }
   }
 
   var byLabel = Object.create(null);
-  for (var bi = 0; bi < (tagged || []).length; bi++) {
-    var lb = tagged[bi].label || 'local';
+  for (var tg of (tagged || [])) {
+    var lb = tg.label || 'local';
     byLabel[lb] = (byLabel[lb] || 0) + 1;
   }
   var scan_sources = [];
   if (roots && roots.length) {
-    for (var ri = 0; ri < roots.length; ri++) {
-      var rl = roots[ri].label;
+    for (var root of roots) {
+      var rl = root.label;
       scan_sources.push({
         label: rl,
         jsonl_files: byLabel[rl] || 0,
-        path_hint: displayPathForUi(roots[ri].path)
+        path_hint: displayPathForUi(root.path)
       });
     }
   }
 
   var host_labels = [];
   if (roots && roots.length) {
-    for (var rj = 0; rj < roots.length; rj++) {
-      host_labels.push(roots[rj].label);
+    for (var rt of roots) {
+      host_labels.push(rt.label);
     }
   }
 
@@ -2323,8 +2296,8 @@ function parseAllUsage() {
   var coll = collectTaggedJsonlFiles();
   var tagged = coll.tagged;
   var daily = {};
-  for (var fi = 0; fi < tagged.length; fi++) {
-    processJsonlFile(tagged[fi], daily, null, null, null, null);
+  for (var tf of tagged) {
+    processJsonlFile(tf, daily, null, null, null, null);
   }
   return buildUsageResult(daily, tagged.length, tagged, coll.roots);
 }
@@ -2408,9 +2381,9 @@ function parseAllUsageIncremental(done, onProgress) {
 
   var daily = {};
   if (useTodayOnly) {
-    for (var ci = 0; ci < cache.days.length; ci++) {
-      if (cache.days[ci].date === todayStr) continue;
-      daily[cache.days[ci].date] = rowToDailyEntry(cache.days[ci]);
+    for (var cd of cache.days) {
+      if (cd.date === todayStr) continue;
+      daily[cd.date] = rowToDailyEntry(cd);
     }
     daily[todayStr] = emptyDailyBucket();
   }
@@ -3163,9 +3136,9 @@ function parseProxyNdjsonFiles() {
   var files = collectProxyNdjsonFiles();
   var daily = {};
 
-  for (var fi = 0; fi < files.length; fi++) {
+  for (var file of files) {
     try {
-      forEachJsonlLineSync(files[fi], function(line) {
+      forEachJsonlLineSync(file, function(line) {
         if (!line.trim()) return;
         var rec;
         try { rec = JSON.parse(line); } catch (e) { return; }
@@ -3322,7 +3295,7 @@ function parseProxyNdjsonFiles() {
         dd.data_sources[src] = (dd.data_sources[src] || 0) + 1;
       });
     } catch (e) {
-      serviceLog.warn('proxy-parse', 'ndjson read failed ' + files[fi] + ': ' + (e.message || e));
+      serviceLog.warn('proxy-parse', 'ndjson read failed ' + file + ': ' + (e.message || e));
     }
   }
 
@@ -3331,13 +3304,12 @@ function parseProxyNdjsonFiles() {
     return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
   });
   var result = [];
-  for (var di = 0; di < days.length; di++) {
-    var key = days[di];
+  for (var key of days) {
     var d = daily[key];
     // Compute model averages
     var modelKeys = Object.keys(d.models);
-    for (var mi = 0; mi < modelKeys.length; mi++) {
-      var m = d.models[modelKeys[mi]];
+    for (var mk of modelKeys) {
+      var m = d.models[mk];
       m.avg_duration_ms = m.requests > 0 ? Math.round(m.total_duration_ms / m.requests) : 0;
     }
     result.push({
@@ -3425,14 +3397,14 @@ var SESSION_TURNS_REMOTE_TIMEOUT_MS = (function () {
 })();
 
 function mergeLocalOutageIntoRemoteDays(remoteDays, localOutage) {
-  for (var rd = 0; rd < remoteDays.length; rd++) {
-    var lo = localOutage[remoteDays[rd].date];
+  for (var rd of remoteDays) {
+    var lo = localOutage[rd.date];
     if (!lo) continue;
-    remoteDays[rd].outage_spans = lo.spans;
-    remoteDays[rd].outage_hours = lo.outage_hours;
-    remoteDays[rd].outage_server_hours = lo.server_hours;
-    remoteDays[rd].outage_client_hours = lo.client_hours;
-    remoteDays[rd].outage_incidents = lo.incidents;
+    rd.outage_spans = lo.spans;
+    rd.outage_hours = lo.outage_hours;
+    rd.outage_server_hours = lo.server_hours;
+    rd.outage_client_hours = lo.client_hours;
+    rd.outage_incidents = lo.incidents;
   }
 }
 
@@ -3448,8 +3420,8 @@ function devRemoteApplyProxyLogsBody(body, cb) {
     if (remoteFiles.length > 0) {
       var logDir = path.join(os.tmpdir(), 'claude-proxy-logs-dev');
       if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
-      for (var pfi = 0; pfi < remoteFiles.length; pfi++) {
-        fs.writeFileSync(path.join(logDir, remoteFiles[pfi].name), remoteFiles[pfi].content, 'utf8');
+      for (var rf of remoteFiles) {
+        fs.writeFileSync(path.join(logDir, rf.name), rf.content, 'utf8');
       }
       process.env.ANTHROPIC_PROXY_LOG_DIR = logDir;
       serviceLog.info('dev', 'persisted ' + remoteFiles.length + ' proxy log files to ' + logDir);
@@ -3465,8 +3437,8 @@ function devRemoteApplyProxyLogsBody(body, cb) {
     var remoteSt = parsed.session_turns;
     if (remoteSt) {
       var stKeys = Object.keys(remoteSt);
-      for (var sti = 0; sti < stKeys.length; sti++) {
-        _sessionTurnsCache[stKeys[sti]] = { result: remoteSt[stKeys[sti]], fingerprint: 'remote' };
+      for (var stk of stKeys) {
+        _sessionTurnsCache[stk] = { result: remoteSt[stk], fingerprint: 'remote' };
       }
       serviceLog.info('dev', 'session-turns preloaded: ' + stKeys.length + ' days from remote');
     }
@@ -3533,8 +3505,8 @@ function devFetchProxyLogs(cb) {
       try {
         var parsed = JSON.parse(body);
         var files = parsed.files || [];
-        for (var i = 0; i < files.length; i++) {
-          fs.writeFileSync(path.join(logDir, files[i].name), files[i].content, 'utf8');
+        for (var fl of files) {
+          fs.writeFileSync(path.join(logDir, fl.name), fl.content, 'utf8');
         }
         serviceLog.info('dev', 'fetched ' + files.length + ' proxy log files to ' + logDir);
       } catch (e) {
@@ -3655,8 +3627,7 @@ function populateSessionTurnsCacheForDates(dateKeys, collectedTagged, fp) {
     allSessions = sessionTurnsCore.pass1CollectSessionsForDayWindowFromFiles(dateKeys, collectedTagged, forEachJsonlLineSync);
   }
   var stByDate = {};
-  for (var i = 0; i < dateKeys.length; i++) {
-    var dk = dateKeys[i];
+  for (var dk of dateKeys) {
     var result = sessionTurnsCore.finalizeSessionTurnsForDate(dk, allSessions);
     stByDate[dk] = result;
     if (!noCache) _sessionTurnsCache[dk] = { result: result, fingerprint: fp };
@@ -3708,15 +3679,15 @@ function isPathUnderDirectory(fileAbs, dirAbs) {
 }
 
 function debugTaggedJsonlMatchesAbs(abs, tagged) {
-  for (var i = 0; i < tagged.length; i++) {
-    if (path.resolve(tagged[i].path) === abs) return true;
+  for (var tf of tagged) {
+    if (path.resolve(tf.path) === abs) return true;
   }
   return false;
 }
 
 function debugProxyNdjsonMatchesAbs(abs, proxyPaths) {
-  for (var pi = 0; pi < proxyPaths.length; pi++) {
-    if (path.resolve(proxyPaths[pi]) === abs) return true;
+  for (var pp of proxyPaths) {
+    if (path.resolve(pp) === abs) return true;
   }
   return false;
 }
@@ -3781,16 +3752,16 @@ function compareDebugCacheFileRows(a, b) {
 function appendProxyNdjsonDebugEntries(out) {
   try {
     var pxs = collectProxyNdjsonFiles();
-    for (var pxi = 0; pxi < pxs.length; pxi++) {
+    for (var px of pxs) {
       try {
-        var stp = fs.statSync(pxs[pxi]);
-        var absP = path.resolve(pxs[pxi]);
+        var stp = fs.statSync(px);
+        var absP = path.resolve(px);
         var metaP = debugCacheFolderAndFile(absP);
         out.push({
           kind: 'proxy_ndjson',
-          label: path.basename(pxs[pxi]),
+          label: path.basename(px),
           path_abs: absP,
-          path_ui: displayPathForUi(pxs[pxi]),
+          path_ui: displayPathForUi(px),
           folder_ui: metaP.folder_ui,
           file_name: metaP.file_name,
           size: stp.size,
@@ -3804,16 +3775,16 @@ function appendProxyNdjsonDebugEntries(out) {
 function appendSessionTurnsDiskDebugEntries(out, stDir) {
   try {
     var names = fs.readdirSync(stDir);
-    for (var ni = 0; ni < names.length; ni++) {
-      if (names[ni].length < 6 || names[ni].slice(-5) !== '.json') continue;
-      var fp = path.join(stDir, names[ni]);
+    for (var nm of names) {
+      if (nm.length < 6 || nm.slice(-5) !== '.json') continue;
+      var fp = path.join(stDir, nm);
       try {
         var st3 = fs.statSync(fp);
         var absS = path.resolve(fp);
         var metaS = debugCacheFolderAndFile(absS);
         out.push({
           kind: 'session_turns_disk',
-          label: names[ni],
+          label: nm,
           path_abs: absS,
           path_ui: displayPathForUi(fp),
           folder_ui: metaS.folder_ui,
@@ -3829,8 +3800,7 @@ function appendSessionTurnsDiskDebugEntries(out, stDir) {
 function collectDebugCacheFilesPayload() {
   var out = [];
   var collected = collectTaggedJsonlFiles();
-  for (var fi = 0; fi < collected.tagged.length; fi++) {
-    var t = collected.tagged[fi];
+  for (var t of collected.tagged) {
     try {
       var st = fs.statSync(t.path);
       var absJ = path.resolve(t.path);
@@ -3954,10 +3924,10 @@ function calendarPrevDateYmd(ymd) {
 function q5CarryoverTotalsFromPairs(pairs) {
   var csum = 0;
   var cisum = 0;
-  for (var pi = 0; pi < pairs.length; pi++) {
-    var dltPct = pairs[pi].delta * 100;
+  for (var pair of pairs) {
+    var dltPct = pair.delta * 100;
     csum += dltPct;
-    if (!(pairs[pi].delta >= 0.03)) cisum += dltPct;
+    if (!(pair.delta >= 0.03)) cisum += dltPct;
   }
   return { actual: Math.round(csum * 10) / 10, ideal: Math.round(cisum * 10) / 10 };
 }
@@ -4080,7 +4050,7 @@ var server = http.createServer(function (req, res) {
     });
     var proxyNdjsonExport = [];
     var proxyPathsExport = collectProxyNdjsonFiles();
-    for (var pxi = 0; pxi < proxyPathsExport.length; pxi++) { var proxyPath = proxyPathsExport[pxi];
+    for (var proxyPath of proxyPathsExport) {
       try {
         proxyNdjsonExport.push({
           name: path.basename(proxyPath),
@@ -4186,8 +4156,7 @@ var server = http.createServer(function (req, res) {
       var report = benchmarkSessionTurns.formatBenchmarkReport(process.cwd(), last, dateKeys, modeLine, 1, []);
       logBenchmarkReportBlock(report);
       var byDay = [];
-      for (var bi = 0; bi < dateKeys.length; bi++) {
-        var dk0 = dateKeys[bi];
+      for (var dk0 of dateKeys) {
         var rr = last.results[dk0];
         byDay.push({ date: dk0, session_count: rr.session_count, total_turns: rr.total_turns });
       }
@@ -4400,11 +4369,11 @@ var server = http.createServer(function (req, res) {
     var proxyFiles = collectProxyNdjsonFiles();
     var requestPairs = []; // { date, ts, q5, q5_prev, delta, cost, tokens }
 
-    for (var qfi = 0; qfi < proxyFiles.length; qfi++) {
-      var qfDate = path.basename(proxyFiles[qfi]).replace('proxy-', '').replace('.ndjson', '');
+    for (var pf of proxyFiles) {
+      var qfDate = path.basename(pf).replace('proxy-', '').replace('.ndjson', '');
       if (qdDate && qfDate !== qdDate) continue;
       try {
-        forEachJsonlLineSync(proxyFiles[qfi], createQuotaDivisorLineProcessor(PRICE, qfDate, requestPairs));
+        forEachJsonlLineSync(pf, createQuotaDivisorLineProcessor(PRICE, qfDate, requestPairs));
       } catch (_e) { /* skip */ }
     }
 
@@ -4412,12 +4381,12 @@ var server = http.createServer(function (req, res) {
     if (qdDate) {
       var prevYmd = calendarPrevDateYmd(qdDate);
       if (prevYmd) {
-        for (var qfCar = 0; qfCar < proxyFiles.length; qfCar++) {
-          var qfDateCar = path.basename(proxyFiles[qfCar]).replace('proxy-', '').replace('.ndjson', '');
+        for (var pfCar of proxyFiles) {
+          var qfDateCar = path.basename(pfCar).replace('proxy-', '').replace('.ndjson', '');
           if (qfDateCar !== prevYmd) continue;
           var prevPairsCar = [];
           try {
-            forEachJsonlLineSync(proxyFiles[qfCar], createQuotaDivisorLineProcessor(PRICE, qfDateCar, prevPairsCar));
+            forEachJsonlLineSync(pfCar, createQuotaDivisorLineProcessor(PRICE, qfDateCar, prevPairsCar));
           } catch (_eCar) { /* skip */ }
           if (prevPairsCar.length) {
             var carSums = q5CarryoverTotalsFromPairs(prevPairsCar);
@@ -4430,8 +4399,7 @@ var server = http.createServer(function (req, res) {
 
     // Aggregate by date
     var byDate = {};
-    for (var rp = 0; rp < requestPairs.length; rp++) {
-      var pair = requestPairs[rp];
+    for (var pair of requestPairs) {
       if (!byDate[pair.date]) byDate[pair.date] = { pairs: [], divisors: [], costs: [], deltas: [] };
       byDate[pair.date].pairs.push(pair);
       byDate[pair.date].divisors.push(pair.implied_divisor);
@@ -4443,13 +4411,13 @@ var server = http.createServer(function (req, res) {
     var dateKeys = Object.keys(byDate).sort(function (a, b) {
       return a.localeCompare(b);
     });
-    for (var dk = 0; dk < dateKeys.length; dk++) {
-      var bd = byDate[dateKeys[dk]];
+    for (var dkey of dateKeys) {
+      var bd = byDate[dkey];
       var divs = bd.divisors.slice().sort(function(a, b) { return a - b; });
       var totalCost = bd.costs.reduce(function(s, c) { return s + c; }, 0);
       var totalDelta = bd.deltas.reduce(function(s, d) { return s + d; }, 0);
       dateSummaries.push({
-        date: dateKeys[dk],
+        date: dkey,
         request_pairs: bd.pairs.length,
         weighted_divisor: totalDelta > 0 ? Math.round(totalCost / totalDelta * 100) / 100 : null,
         median_divisor: divs.length > 0 ? divs[Math.floor(divs.length / 2)] : null,

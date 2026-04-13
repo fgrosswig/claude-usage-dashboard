@@ -5,12 +5,73 @@
       "id": "TX-265",
       "timestamp": "2026-04-13",
       "session": "auto",
-      "commit": "c70aa71",
-      "commit_full": "c70aa7193b4180f0d9924522f159eac0d81aba0d",
+      "commit": "f927416",
+      "commit_full": "f927416a2480e2dd4a90a23eeae1a516b3852818",
       "status": "ABGESCHLOSSEN",
-      "description": "Merge branch 'feat/widget-dispatcher' into develop",
-      "detail": "# Conflicts:\n#\tlogs/transactions.json",
-      "changes": []
+      "description": "refactor: convert ~320 indexed for-loops to for...of (S4138)",
+      "detail": "SonarQube rule javascript:S4138 — \"for...of should be used with Iterables\".\nConverted safe indexed loops across 12 files. ~62 loops intentionally kept\nwhere index is used for parallel access, splice, arithmetic, or output.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/metrics-engine.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-registry.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/anthropic-proxy-core.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/benchmark-session-turns.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/claude-data-ingest.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/extract-cache.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/session-turns-core.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/token-forensics.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/usage-scan-roots.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
     },
     {
       "id": "TX-264",
