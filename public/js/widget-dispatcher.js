@@ -986,8 +986,16 @@
   function resetPrefs() {
     _prefs = defaultPrefs();
     try { localStorage.removeItem(PREFS_KEY); } catch (e) {}
+    // Delete server-side layout file too
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open('PUT', '/api/layout', false);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.send('null');
+    } catch (e) {}
     applyVisibility();
     applyOrder();
+    location.reload();
   }
 
   function shouldRender(sectionId) {
