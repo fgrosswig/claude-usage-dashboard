@@ -22,9 +22,9 @@ var __appVersion = (function () {
     // git tag --sort=-v:refname finds newest tag repo-wide (not just current branch)
     var tag = require('node:child_process').execSync('git tag --sort=-v:refname 2>/dev/null', { encoding: 'utf8' }).trim().split('\n')[0];
     if (tag) return tag;
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   // In Docker (no git): read from VERSION file, or fallback
-  try { return fs.readFileSync(require('node:path').join(__dirname, '..', 'VERSION'), 'utf8').trim(); } catch (_ignored) {}
+  try { return fs.readFileSync(require('node:path').join(__dirname, '..', 'VERSION'), 'utf8').trim(); } catch (error) { /* intentional */ }
   return 'dev';
 })();
 var path = require('node:path');
@@ -101,7 +101,7 @@ var RELEASES_API_URL = 'https://api.github.com/repos/anthropics/claude-code/rele
 var lastClientGithubToken = null;
 
 function syncGithubTokenFromBrowserRequest(req) {
-  if (!req.headers || typeof req.headers['x-github-token'] === 'undefined') return;
+  if (typeof req.headers?.['x-github-token'] === 'undefined') return;
   var prev = lastClientGithubToken;
   var next = String(req.headers['x-github-token'] || '').trim();
   lastClientGithubToken = next;
@@ -162,7 +162,7 @@ var releasesCache = { releases: [], fetchedAt: 0 };
 try {
   var diskRel = JSON.parse(fs.readFileSync(RELEASES_CACHE, 'utf8'));
   if (Array.isArray(diskRel)) releasesCache.releases = diskRel;
-} catch (_ignored) {}
+} catch (error) { /* intentional */ }
 
 var marketplaceVersionsCache = { items: [], fetchedAt: 0 };
 try {
@@ -171,7 +171,7 @@ try {
     marketplaceVersionsCache.items = diskMp.versions;
     marketplaceVersionsCache.fetchedAt = diskMp.fetchedAt || 0;
   }
-} catch (_ignored) {}
+} catch (error) { /* intentional */ }
 
 /** Nur Release-Tags anthropics/claude-code (SSRF-Schutz). */
 function isSafeGithubReleaseTagParam(s) {
@@ -184,7 +184,7 @@ function isSafeGithubReleaseTagParam(s) {
 function persistReleasesCacheToDisk() {
   try {
     fs.writeFileSync(RELEASES_CACHE, JSON.stringify(releasesCache.releases), 'utf8');
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
 }
 
 /**
@@ -218,7 +218,7 @@ function httpsFetchGithubReleaseByTag(tag, cb) {
     ghRes.on('end', function () {
       try {
         var data = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-        if (ghRes.statusCode !== 200 || !data || !data.tag_name) {
+        if (ghRes.statusCode !== 200 || !data?.tag_name) {
           once(new Error('not found'), null);
           return;
         }
@@ -242,7 +242,7 @@ function httpsFetchGithubReleaseByTag(tag, cb) {
  * Fehlende Tags aus den Dashboard-Tagen per HTTPS nachladen, JSON-Cache mergen + Highlights neu ziehen.
  */
 function backfillReleaseBodiesForDashboardDays(days, cb) {
-  if (!days || !days.length) {
+  if (!days?.length) {
     process.nextTick(cb);
     return;
   }
@@ -250,7 +250,7 @@ function backfillReleaseBodiesForDashboardDays(days, cb) {
   var seen = Object.create(null);
   for (var day of days) {
     var vc = day.version_change;
-    if (!vc || !vc.github_release_links) continue;
+    if (!vc?.github_release_links) continue;
     for (var gl of vc.github_release_links) {
       var tg = gl.tag || 'v' + gl.version;
       if (tg && !seen[tg]) {
@@ -292,7 +292,7 @@ function backfillReleaseBodiesForDashboardDays(days, cb) {
     }
     serviceLog.debug('github', 'backfill release tag=' + t);
     httpsFetchGithubReleaseByTag(t, function (err, rel) {
-      if (!err && rel && rel.tag_name) {
+      if (!err && rel?.tag_name) {
         var dupe = false;
         for (var cachedRel of releasesCache.releases) {
           if (String(cachedRel.tag_name) === String(rel.tag_name)) {
@@ -336,7 +336,7 @@ function refreshReleasesCache() {
             ? ''
             : ' — bei Rate-Limit: PAT im Dashboard (Meta) oder GITHUB_TOKEN/GH_TOKEN (klassisch: repo:public nur nötig).';
           serviceLog.warn('releases', 'GitHub API: ' + err.message + relHint);
-        } else if (page === 1 && !err && (!data || !data.length)) {
+        } else if (page === 1 && !err && !data?.length) {
           serviceLog.warn('releases', 'GitHub API: leeres Array — kein Update');
         }
         finish();
@@ -360,13 +360,13 @@ function refreshReleasesCache() {
     var seen = Object.create(null);
     var merged = [];
     for (var item of all) {
-      var ta = item && item.tag_name;
+      var ta = item?.tag_name;
       if (ta) seen[String(ta)] = true;
       merged.push(item);
     }
     var prev = releasesCache.releases;
     for (var pb of prev) {
-      var tb = pb && pb.tag_name;
+      var tb = pb?.tag_name;
       if (tb && !seen[String(tb)]) {
         seen[String(tb)] = true;
         merged.push(pb);
@@ -459,7 +459,7 @@ function extractReleaseHighlights(body) {
   var raw = String(body || '');
   var slice = raw;
   var sec = raw.match(/^##\s*what[\u2019\x27]?s changed\b/im);
-  if (sec && sec.index != null) {
+  if (sec?.index != null) {
     var after = raw.indexOf('\n', sec.index + sec[0].length);
     slice = after >= 0 ? raw.slice(after + 1) : raw.slice(sec.index + sec[0].length);
   }
@@ -508,7 +508,7 @@ function getReleasesMap() {
     try {
       var diskR = JSON.parse(fs.readFileSync(RELEASES_CACHE, 'utf8'));
       if (Array.isArray(diskR)) releasesCache.releases = diskR;
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
   }
   var map = {};
   var rels = releasesCache.releases;
@@ -550,7 +550,7 @@ function githubReleaseLinkForVersion(relMap, ver) {
   var nk = normalizeCliSemver(ver);
   if (!nk) return { version: '', url: '', tag: '' };
   var ent = relMap[nk];
-  var tag = ent && ent.tag ? String(ent.tag).trim() : 'v' + nk;
+  var tag = ent?.tag ? String(ent.tag).trim() : 'v' + nk;
   return {
     version: nk,
     tag: tag,
@@ -563,7 +563,7 @@ function enrichVersionChangeNotes(result) {
   var relMap = getReleasesMap();
   for (var entry of result) {
     var vc = entry.version_change;
-    if (!vc || !vc.added || !vc.added.length) continue;
+    if (!vc?.added?.length) continue;
     var fromN = vc.from ? normalizeCliSemver(vc.from) : '';
     var addedSorted = vc.added.slice().sort(semverCmp);
     var topN = addedSorted[addedSorted.length - 1];
@@ -574,7 +574,7 @@ function enrichVersionChangeNotes(result) {
     var prefixMulti = inter.length > 1;
     for (var iv of inter) {
       var ri = relMap[iv];
-      if (!ri || !ri.highlights || !ri.highlights.length) continue;
+      if (!ri?.highlights?.length) continue;
       for (var hl of ri.highlights) {
         var line = (prefixMulti ? '[' + iv + '] ' : '') + hl;
         if (!seenH[line]) {
@@ -600,17 +600,17 @@ function enrichVersionChangeNotes(result) {
 
 function loadReleasesArrayForBuild() {
   var rels = releasesCache.releases;
-  if (!rels || !rels.length) {
+  if (!rels?.length) {
     try {
       var diskR = JSON.parse(fs.readFileSync(RELEASES_CACHE, 'utf8'));
       if (Array.isArray(diskR)) rels = diskR;
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
   }
   return Array.isArray(rels) ? rels : [];
 }
 
 function buildByDateFromVersionTimelineItems(items) {
-  if (!items || !items.length) return null;
+  if (!items?.length) return null;
   items = items.slice().sort(function (a, b) {
     if (a.t !== b.t) return a.t - b.t;
     return semverCmp(a.ver, b.ver);
@@ -656,7 +656,7 @@ function expandVersionByDateLocalAliases(byDate) {
   var initial = Object.keys(byDate);
   for (var dk of initial) {
     var ch = byDate[dk];
-    var w = ch && ch.booking_when;
+    var w = ch?.booking_when;
     if (!w) continue;
     var utcDk = isoToUtcYmd(w);
     var locDk = isoToLocalYmd(w);
@@ -738,14 +738,14 @@ function dedupeMarketplaceVersionsByVersion(rawVers) {
 
 function loadMarketplaceVersionsForBuild() {
   var arr = marketplaceVersionsCache.items;
-  if (!arr || !arr.length) {
+  if (!arr?.length) {
     try {
       var disk = JSON.parse(fs.readFileSync(MARKETPLACE_CACHE, 'utf8'));
       if (disk && Array.isArray(disk.versions)) {
         marketplaceVersionsCache.items = disk.versions;
         arr = disk.versions;
       }
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
   }
   return Array.isArray(arr) ? arr : [];
 }
@@ -753,11 +753,11 @@ function loadMarketplaceVersionsForBuild() {
 /** Einmal pro Scan: verhindert Marker-Sprünge (z. B. 3.4. sichtbar, nach Scan weg), wenn parallel refreshMarketplace den Cache ersetzt. */
 function snapshotMarketplaceRowsForScan() {
   var cur = marketplaceVersionsCache.items;
-  if (cur && cur.length) return cur.slice();
+  if (cur?.length) return cur.slice();
   try {
     var disk = JSON.parse(fs.readFileSync(MARKETPLACE_CACHE, 'utf8'));
     if (disk && Array.isArray(disk.versions)) return disk.versions.slice();
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   return undefined;
 }
 
@@ -770,7 +770,7 @@ function readMarketplaceVersionsDisk() {
   try {
     var disk = JSON.parse(fs.readFileSync(MARKETPLACE_CACHE, 'utf8'));
     if (disk && Array.isArray(disk.versions) && disk.versions.length) return disk.versions;
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   return null;
 }
 
@@ -778,9 +778,9 @@ function mergeMarketplaceRowsPreferNewer(frozenMpRows) {
   var live = loadMarketplaceVersionsForBuild();
   var diskRows = readMarketplaceVersionsDisk();
   var rowsList = [];
-  if (frozenMpRows != null && frozenMpRows.length) rowsList.push(frozenMpRows);
-  if (live && live.length) rowsList.push(live);
-  if (diskRows && diskRows.length) rowsList.push(diskRows);
+  if (frozenMpRows?.length) rowsList.push(frozenMpRows);
+  if (live?.length) rowsList.push(live);
+  if (diskRows?.length) rowsList.push(diskRows);
   if (rowsList.length === 0) return [];
   if (rowsList.length === 1) return rowsList[0].slice();
   var byVer = Object.create(null);
@@ -811,7 +811,7 @@ function buildMarketplaceVersionTimelineItems() {
     if (Number.isNaN(t)) continue;
     var hi = [];
     var rm = relMap[ver];
-    if (rm && rm.highlights) hi = hi.concat(rm.highlights);
+    if (rm?.highlights) hi = hi.concat(rm.highlights);
     items.push({ ver: ver, t: t, when: row.lastUpdated, highlights: hi });
   }
   return items;
@@ -826,7 +826,7 @@ function buildMergedExtensionTimelineItems(frozenMpRows) {
   var byVer = Object.create(null);
   var ghItems = buildGitHubVersionTimelineItems();
   for (var g of ghItems) {
-    var ghHi = g.highlights && g.highlights.length ? g.highlights.slice() : [];
+    var ghHi = g.highlights?.length ? g.highlights.slice() : [];
     byVer[g.ver] = { ver: g.ver, t: g.t, when: g.when, highlights: ghHi };
   }
   var frozenArg = arguments.length >= 1 ? frozenMpRows : undefined;
@@ -841,9 +841,9 @@ function buildMergedExtensionTimelineItems(frozenMpRows) {
     if (Number.isNaN(t)) continue;
     var hi = [];
     var rm = relMap[ver];
-    if (rm && rm.highlights) hi = hi.concat(rm.highlights);
+    if (rm?.highlights) hi = hi.concat(rm.highlights);
     var prev = byVer[ver];
-    if ((!hi || !hi.length) && prev && prev.highlights && prev.highlights.length) {
+    if (!hi?.length && prev?.highlights?.length) {
       hi = prev.highlights.slice();
     }
     byVer[ver] = { ver: ver, t: t, when: row.lastUpdated, highlights: hi };
@@ -927,7 +927,7 @@ function applyJsonlGapVersionChanges(result) {
     for (var va of vAdded) {
       var vk = normalizeCliSemver(va);
       var ri = vk ? relMapJsonl[vk] : null;
-      if (ri && ri.highlights) relHighlights = relHighlights.concat(ri.highlights);
+      if (ri?.highlights) relHighlights = relHighlights.concat(ri.highlights);
     }
     var fromVer = prevVers.length > 0 ? prevVers[prevVers.length - 1] : null;
     result[vci].version_change = { added: vAdded, from: fromVer, highlights: relHighlights };
@@ -942,7 +942,7 @@ try {
     outageCache.incidents = diskOutage.incidents;
     outageCache.fetchedAt = diskOutage.fetchedAt || 0;
   }
-} catch (_ignored) {}
+} catch (error) { /* intentional */ }
 
 /**
  * GET + JSON. GitHub: githubApiRequestHeaders(); optional GITHUB_TOKEN / GH_TOKEN gegen Rate-Limit.
@@ -1082,7 +1082,7 @@ function refreshMarketplaceExtensionCache() {
     payload,
     function (err, data) {
       try {
-        if (err || !data || !data.results || !data.results[0] || !data.results[0].extensions || !data.results[0].extensions[0]) {
+        if (err || !data?.results?.[0]?.extensions?.[0]) {
           if (err) {
             serviceLog.warn('marketplace', 'extensionquery failed: ' + (err.message || err));
           } else {
@@ -1407,7 +1407,7 @@ function bumpSessionSignals(bucket, tagList) {
 
 /** Session-Signale nach JSONL-Stunde (0–23) — gleiche Zeitleiste wie usage hours. */
 function bumpHourSessionSignals(bucket, hourKeyStr, tagList) {
-  if (!hourKeyStr || !tagList || !tagList.length) return;
+  if (!hourKeyStr || !tagList?.length) return;
   if (!bucket.hour_signals) bucket.hour_signals = {};
   if (!bucket.hour_signals[hourKeyStr]) bucket.hour_signals[hourKeyStr] = emptySessionSignals();
   var sig = bucket.hour_signals[hourKeyStr];
@@ -1475,12 +1475,12 @@ function classifyJsonlSessionSignals(line, rec) {
   if (/\b429\b/.test(lower) && /retry|rate|limit|overloaded|throttl|too\s+many/.test(lower)) {
     add('retry');
   }
-  if (rec && rec.error) {
+  if (rec?.error) {
     try {
       var ej = JSON.stringify(rec.error).toLowerCase();
       if (/retry|429|rate|throttl|overloaded/.test(ej)) add('retry');
       if (/interrupt|cancel|abort/.test(ej)) add('interrupt');
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
   }
   // B5: Tool result truncation
   if (/["']is_truncated["']\s*:\s*true|["']truncated["']\s*:\s*true/.test(line)) {
@@ -1663,7 +1663,7 @@ function writeJsonlTodayIndexDisk(payload) {
   var dir = path.dirname(JSONL_TODAY_INDEX_FILE);
   try {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   var tmp = JSONL_TODAY_INDEX_FILE + '.tmp';
   var body = JSON.stringify(payload);
   fs.writeFileSync(tmp, body, 'utf8');
@@ -1677,7 +1677,7 @@ function writeJsonlTodayIndexDisk(payload) {
 function invalidateJsonlTodayIndexDisk() {
   try {
     if (fs.existsSync(JSONL_TODAY_INDEX_FILE)) fs.unlinkSync(JSONL_TODAY_INDEX_FILE);
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
 }
 
 function hostSliceFromRow(h) {
@@ -1769,7 +1769,7 @@ function writeUsageDayCache(payload) {
   var dir = path.dirname(USAGE_DAY_CACHE_FILE);
   try {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   var tmp = USAGE_DAY_CACHE_FILE + '.tmp';
   var body = JSON.stringify(payload);
   fs.writeFileSync(tmp, body, 'utf8');
@@ -1871,9 +1871,9 @@ function processJsonlFile(fileRef, daily, onlyDate, isolateTodayFrag, fileTodayF
         }
       }
 
-      var u = rec.message && rec.message.usage;
+      var u = rec.message?.usage;
       if (!u) return;
-      var modelRaw = (rec.message && rec.message.model) || 'unknown';
+      var modelRaw = rec.message?.model || 'unknown';
       if (!isClaudeModel(modelRaw)) return;
       if (ts.length < 19) return;
       var day = ts.slice(0, 10);
@@ -1913,7 +1913,7 @@ function processJsonlFile(fileRef, daily, onlyDate, isolateTodayFrag, fileTodayF
       dd.models[model].output += outTok;
       dd.models[model].cache_read += crTok;
       // Stop-reason tracking
-      var stopR = (rec.message && rec.message.stop_reason) || 'unknown';
+      var stopR = rec.message?.stop_reason || 'unknown';
       dd.stop_reasons[stopR] = (dd.stop_reasons[stopR] || 0) + 1;
       var cliVer = extractCliVersion(rec);
       if (cliVer) {
@@ -2202,7 +2202,7 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
 
   // Extension-Updates: Marketplace/GitHub nach Kalendertag; JSONL füllt Lücken (z. B. nach 27.3. wenn
   // VSIX-Datum ≠ erster Log-Tag der neuen Version — sonst fehlen Marker trotz sichtbarer Version in den Logs).
-  var mpFrozen = buildOpts && buildOpts.marketplaceRows;
+  var mpFrozen = buildOpts?.marketplaceRows;
   applyExtensionVersionMarkers(result, mpFrozen);
   applyJsonlGapVersionChanges(result);
 
@@ -2239,7 +2239,7 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
 
   var scanned = [];
   var tagged = filePaths;
-  if (tagged && tagged.length) {
+  if (tagged?.length) {
     for (var tf of tagged) {
       scanned.push(displayScannedFileLine(tf));
     }
@@ -2251,7 +2251,7 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
     byLabel[lb] = (byLabel[lb] || 0) + 1;
   }
   var scan_sources = [];
-  if (roots && roots.length) {
+  if (roots?.length) {
     for (var root of roots) {
       var rl = root.label;
       scan_sources.push({
@@ -2263,7 +2263,7 @@ function buildUsageResult(daily, fileCount, filePaths, roots, buildOpts) {
   }
 
   var host_labels = [];
-  if (roots && roots.length) {
+  if (roots?.length) {
     for (var rt of roots) {
       host_labels.push(rt.label);
     }
@@ -2322,9 +2322,7 @@ function parseAllUsageIncremental(done, onProgress) {
   if (
     skipIdentScan &&
     scanFpForPersist === __lastScanJsonlFingerprint &&
-    cachedData &&
-    cachedData.days &&
-    cachedData.days.length > 0 &&
+    cachedData?.days?.length > 0 &&
     !cachedData.scan_error
   ) {
     serviceLog.info('scan', 'skip parse identical jsonl fingerprint files=' + tagged.length);
@@ -2348,8 +2346,7 @@ function parseAllUsageIncremental(done, onProgress) {
   var useTodayOnly = false;
   // Exakte Treffer: sonst Vollscan (neue/entfernte .jsonl oder andere Wurzeln).
   if (
-    cache &&
-    cache.version === USAGE_DAY_CACHE_VERSION &&
+    cache?.version === USAGE_DAY_CACHE_VERSION &&
     cache.jsonl_file_count === tagged.length &&
     cache.scan_roots_key === rootsKey &&
     Array.isArray(cache.days) &&
@@ -2393,8 +2390,7 @@ function parseAllUsageIncremental(done, onProgress) {
   if (useTodayOnly && !TODAY_INDEX_DISABLED) {
     var rawIdx = readJsonlTodayIndexDisk();
     var idxOk =
-      rawIdx &&
-      rawIdx.version === JSONL_TODAY_INDEX_VERSION &&
+      rawIdx?.version === JSONL_TODAY_INDEX_VERSION &&
       rawIdx.calendar_day === todayStr &&
       rawIdx.jsonl_file_count === tagged.length &&
       rawIdx.scan_roots_key === rootsKey &&
@@ -2485,7 +2481,7 @@ function parseAllUsageIncremental(done, onProgress) {
             todayStr: todayStr,
             marketplaceRows: frozenMpRows
           });
-        } catch (_ignored) {}
+        } catch (error) { /* intentional */ }
       }
       setImmediate(tick);
     } else {
@@ -2789,7 +2785,7 @@ function broadcastSse() {
 
 /** Nach Marketplace-Refresh: Marker neu auf cachedData.days ohne JSONL-Vollscan. */
 function reapplyExtensionMarkersOnCachedDataAndBroadcast(reason) {
-  if (!cachedData || !cachedData.days || !cachedData.days.length) return;
+  if (!cachedData?.days?.length) return;
   if (scanInProgress) {
     serviceLog.debug('markers', 'skip reapply: scan in progress (' + reason + ')');
     return;
@@ -2803,7 +2799,7 @@ function reapplyExtensionMarkersOnCachedDataAndBroadcast(reason) {
     broadcastSse();
     serviceLog.info('markers', 'extension markers refreshed (' + reason + ')');
   } catch (e) {
-    serviceLog.error('markers', 'reapply failed: ' + (e && e.message ? e.message : String(e)));
+    serviceLog.error('markers', 'reapply failed: ' + (e?.message ? e.message : String(e)));
   }
 }
 
@@ -2835,9 +2831,9 @@ function handleUsageScanParseSuccess(data) {
 }
 
 function handleUsageScanParseError(e) {
-  serviceLog.error('scan', 'parse failed: ' + (e && e.message ? e.message : String(e)));
-  var msg = e && e.message ? e.message : String(e);
-  if (!cachedData || !cachedData.days || cachedData.days.length === 0) {
+  serviceLog.error('scan', 'parse failed: ' + (e?.message ? e.message : String(e)));
+  var msg = e?.message ? e.message : String(e);
+  if (!cachedData?.days || cachedData.days.length === 0) {
     cachedData = makeStubCachedData();
   }
   cachedData.scanning = false;
@@ -2856,7 +2852,7 @@ function finalizeUsageScanIncremental(err, data) {
     scanInProgress = false;
     broadcastSse();
     scheduleIdleSessionTurnsPreloadIfNeeded(scanOk);
-    if (scanOk && cachedData && cachedData.days && cachedData.days.length) {
+    if (scanOk && cachedData?.days?.length) {
       backfillReleaseBodiesForDashboardDays(cachedData.days, function () {
         cachedData.generated = new Date().toISOString();
         broadcastSse();
@@ -2897,7 +2893,7 @@ function runScanAndBroadcast() {
       partial.generated = new Date().toISOString();
       cachedData = partial;
       broadcastSse();
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
   }
   parseAllUsageIncremental(finalizeUsageScanIncremental, applyIncrementalProgress);
 }
@@ -2979,10 +2975,10 @@ function handleClaudeDataSyncRequest(req, res) {
       aborted = true;
       try {
         req.destroy();
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
       try {
         ws.destroy();
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
       failSync(413, { ok: false, error: 'payload_too_large', max_mb: maxMb }, true);
       return;
     }
@@ -2993,7 +2989,7 @@ function handleClaudeDataSyncRequest(req, res) {
     aborted = true;
     try {
       ws.destroy();
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
     fs.unlink(tmpPath, function () {});
     claudeDataSyncBusy = false;
   });
@@ -3004,7 +3000,7 @@ function handleClaudeDataSyncRequest(req, res) {
   ws.on('error', function (e) {
     if (aborted) return;
     aborted = true;
-    failSync(500, { ok: false, error: 'write_failed', detail: String(e && e.message ? e.message : e) }, true);
+    failSync(500, { ok: false, error: 'write_failed', detail: String(e?.message ? e.message : e) }, true);
   });
   ws.on('finish', function () {
     if (aborted) {
@@ -3039,7 +3035,7 @@ function primeDashboardAndScheduleFirstScan() {
   } catch (primeErr) {
     serviceLog.warn(
       'server',
-      'dashboard prime: ' + (primeErr && primeErr.message ? primeErr.message : String(primeErr))
+      'dashboard prime: ' + (primeErr?.message ? primeErr.message : String(primeErr))
     );
   }
   var pending = 2;
@@ -3221,7 +3217,7 @@ function parseProxyNdjsonFiles() {
         }
 
         // Model from request hints
-        var model = (rec.request_hints && rec.request_hints.model) || 'unknown';
+        var model = rec.request_hints?.model || 'unknown';
         if (!dd.models[model]) dd.models[model] = { requests: 0, avg_duration_ms: 0, total_duration_ms: 0, output_tokens: 0 };
         dd.models[model].requests++;
         dd.models[model].total_duration_ms += dur;
@@ -3442,7 +3438,7 @@ function devRemoteApplyProxyLogsBody(body, cb) {
       }
       serviceLog.info('dev', 'session-turns preloaded: ' + stKeys.length + ' days from remote');
     }
-    var proxyDaysLen = remote.proxy && remote.proxy.proxy_days ? remote.proxy.proxy_days.length : 0;
+    var proxyDaysLen = remote.proxy?.proxy_days ? remote.proxy.proxy_days.length : 0;
     serviceLog.info('dev', 'remote data fetched: ' + (remote.days || []).length + ' days, proxy_days=' + proxyDaysLen);
     broadcastSse();
   } catch (e) {
@@ -3529,7 +3525,7 @@ function resolveSessionTurnsCacheDir() {
   try {
     var ex = usageScanRoots.expandUserPath(raw);
     if (ex) return ex;
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   try {
     return path.resolve(raw);
   } catch (e1) {
@@ -3582,7 +3578,7 @@ function getSessionTurnsCached(dateKey) {
     if (!noCache) _sessionTurnsCache[dateKey] = { result: fromDisk, fingerprint: fp };
     return fromDisk;
   }
-  if (cached && cached.fingerprint === fp) {
+  if (cached?.fingerprint === fp) {
     serviceLog.info('session-turns', 'date=' + dateKey + ' fingerprint HIT (' + fpMs + 'ms stat)');
     return cached.result;
   }
@@ -3644,7 +3640,7 @@ function readJsonBodyMax(req, maxBytes, cb) {
     if (total > maxBytes) {
       try {
         req.destroy();
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
       cb(new Error('payload_too_large'));
       return;
     }
@@ -3697,7 +3693,7 @@ function debugPathAllowedForRead(absPath) {
   try {
     var collected = collectTaggedJsonlFiles();
     if (debugTaggedJsonlMatchesAbs(abs, collected.tagged)) return true;
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   if (path.resolve(USAGE_DAY_CACHE_FILE) === abs) return true;
   if (path.resolve(JSONL_TODAY_INDEX_FILE) === abs) return true;
   if (path.resolve(RELEASES_CACHE) === abs) return true;
@@ -3707,7 +3703,7 @@ function debugPathAllowedForRead(absPath) {
   try {
     var proxyPaths = collectProxyNdjsonFiles();
     if (debugProxyNdjsonMatchesAbs(abs, proxyPaths)) return true;
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   var stDir = resolveSessionTurnsCacheDir();
   if (stDir && isPathUnderDirectory(abs, stDir)) {
     var bn = path.basename(abs);
@@ -3740,7 +3736,7 @@ function tryPushDebugCacheKnownPath(out, kind, p) {
       size: st2.size,
       mtime_ms: Math.floor(st2.mtimeMs)
     });
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
 }
 
 function compareDebugCacheFileRows(a, b) {
@@ -3767,9 +3763,9 @@ function appendProxyNdjsonDebugEntries(out) {
           size: stp.size,
           mtime_ms: Math.floor(stp.mtimeMs)
         });
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
     }
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
 }
 
 function appendSessionTurnsDiskDebugEntries(out, stDir) {
@@ -3792,9 +3788,9 @@ function appendSessionTurnsDiskDebugEntries(out, stDir) {
           size: st3.size,
           mtime_ms: Math.floor(st3.mtimeMs)
         });
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
     }
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
 }
 
 function collectDebugCacheFilesPayload() {
@@ -3815,7 +3811,7 @@ function collectDebugCacheFilesPayload() {
         size: st.size,
         mtime_ms: Math.floor(st.mtimeMs)
       });
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
   }
   tryPushDebugCacheKnownPath(out, 'day_cache', USAGE_DAY_CACHE_FILE);
   tryPushDebugCacheKnownPath(out, 'jsonl_today_index', JSONL_TODAY_INDEX_FILE);
@@ -4207,7 +4203,7 @@ var server = http.createServer(function (req, res) {
                   if (!localKinds[rf.kind + ':' + rf.path_abs]) listCf.push(rf);
                 });
               }
-            } catch (_ignored) {}
+            } catch (error) { /* intentional */ }
             res.writeHead(200, corsCf);
             res.end(JSON.stringify({ ok: true, files: listCf }));
           });
@@ -4217,7 +4213,7 @@ var server = http.createServer(function (req, res) {
           res.end(JSON.stringify({ ok: true, files: listCf }));
         });
         return;
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
     }
     res.writeHead(200, corsCf);
     res.end(JSON.stringify({ ok: true, files: listCf }));
@@ -4263,7 +4259,7 @@ var server = http.createServer(function (req, res) {
 
       // DEV_MODE: proxy view to remote if file doesn't exist locally
       var _localFileExists = false;
-      try { _localFileExists = fs.statSync(target).isFile(); } catch (_eL) {}
+      try { _localFileExists = fs.statSync(target).isFile(); } catch (_eL) { /* intentional */ }
       if (!_localFileExists && __devSource && __devMode) {
         var pBody = JSON.stringify({ path_abs: rawPath });
         var pUrl = new URL(__devSource.replace(/\/$/, '') + '/api/debug/cache-file-view');

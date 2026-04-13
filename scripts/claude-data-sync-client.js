@@ -79,7 +79,7 @@ if (includeProxyLogs) {
   var logsDir = path.join(claudeDir, 'anthropic-proxy-logs');
   try {
     if (fs.statSync(logsDir).isDirectory()) toPack.push('anthropic-proxy-logs');
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
 }
 
 var tmpTar = path.join(os.tmpdir(), 'claude-sync-out-' + process.pid + '-' + Date.now() + '.tgz');
@@ -106,7 +106,7 @@ tr.on('close', function (code) {
   } finally {
     try {
       fs.unlinkSync(tmpTar);
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
   }
 
   var u;

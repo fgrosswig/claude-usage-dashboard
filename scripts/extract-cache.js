@@ -56,7 +56,7 @@ function classifySignals(line, rec) {
       var ej = JSON.stringify(rec.error).toLowerCase();
       if (/retry|429|rate|throttl|overloaded/.test(ej)) add('retry');
       if (/interrupt|cancel|abort/.test(ej)) add('interrupt');
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
   }
   if (/["']is_truncated["']\s*:\s*true|["']truncated["']\s*:\s*true/.test(line)) add('truncated');
   if (rec && rec.type === 'system' && rec.subtype === 'api_error') add('api_error');
