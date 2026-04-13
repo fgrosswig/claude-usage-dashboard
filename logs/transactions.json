@@ -5,11 +5,11 @@
       "id": "TX-274",
       "timestamp": "2026-04-13",
       "session": "auto",
-      "commit": "035f616",
-      "commit_full": "035f6169c25c03c5ad9e5618dc1caa6b7f7735c3",
+      "commit": "b35c06f",
+      "commit_full": "b35c06f63c9c2f30f431036cb4b07a44e9cad358",
       "status": "ABGESCHLOSSEN",
-      "description": "fix(sonar): resolve 17 new-code violations to pass QG",
-      "detail": "S6582 optional chaining, S7735 negated conditions, S7780 String.raw,\nS4138 for-of, S6661 spread, S7718 catch naming, S3776 extract helper,\nS7761 dataset, S2004 nesting, S1854 unused var, S2814/S2392 redeclare.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "description": "fix(sonar): last 2 S7735 negated conditions in log helpers",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
       "changes": [
         {
           "file": "public/js/dashboard.client.js",
@@ -18,11 +18,6 @@
         },
         {
           "file": "public/js/widget-dispatcher.js",
-          "op": "EDIT",
-          "detail": ""
-        },
-        {
-          "file": "scripts/dashboard-server.js",
           "op": "EDIT",
           "detail": ""
         }
