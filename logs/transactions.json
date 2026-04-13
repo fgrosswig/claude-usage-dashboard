@@ -2,6 +2,63 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-248",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "408d8ec",
+      "commit_full": "408d8ec97d1b7f3ff06a31aea64afcdeddebe341",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(ui): template builder v2, sidebar layout fix, table styling",
+      "detail": "Template Builder v2:\n- Visual 12-column grid canvas with nested sections/charts\n- Widget pool with drag-to-canvas and click-to-add\n- Resize handles for section and chart spans (grid-snapped)\n- Live preview with real ECharts rendering\n- DEV_MODE only (hidden in production)\n- 3-panel layout: chart pool left, canvas center, meta right\n- i18n keys DE/EN/KO\n\nSidebar Layout Fix:\n- Root cause: sidebar auto-restored (100ms) before init() loaded prefs\n- Fix: renderWidgetTree() loads prefs if _prefs is null\n- loadPrefs() simplified: layout file is single source of truth\n- savePrefs() PUT now synchronous\n- syncVisibilityPrefsFromLocalStorage() no longer overwrites widget order\n- getSortedSections() iterates widgets[] directly\n- setVisibility() inserts at registry-order position instead of push\n- Removed dead functions: isTopLevelLayoutPlacementId, getPlacementOrderSectionIdsFromWidgets\n\nOther:\n- Forensic chart legend color fix (hitLimit bar matches legend)\n- Daily detail table: fixed column alignment (nowrap headers)\n- Proxy efficiency charts: box-sizing fix\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard-sections.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-registry.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/de/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/en/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/ko/ui.tpl",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-247",
       "timestamp": "2026-04-12",
       "session": "auto",
