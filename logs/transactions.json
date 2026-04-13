@@ -5,12 +5,28 @@
       "id": "TX-277",
       "timestamp": "2026-04-13",
       "session": "auto",
-      "commit": "9163473",
-      "commit_full": "9163473292793232a6716aec753c071621d7937f",
+      "commit": "53b8126",
+      "commit_full": "53b8126cd9de1357d5d4f996b021d3c12937ced5",
       "status": "ABGESCHLOSSEN",
-      "description": "Merge feat/widget-dispatcher: restrict app pipeline to main+develop",
-      "detail": "# Conflicts:\n#\tlogs/transactions.json",
-      "changes": []
+      "description": "docs: Ch.12 rewrite — Economic Analysis, M_real, Q5 Penalty (DE/EN/KO)",
+      "detail": "Replace Intelligence Section docs with Economic Analysis and Compaction\nForensics. Covers M_real formula, Q5 penalty, restart economics,\nCache Explosion chart changes, and extract-cache performance.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "docs/de/12-intelligence-metrics.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/en/12-intelligence-metrics.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "docs/ko/12-intelligence-metrics.md",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
     },
     {
       "id": "TX-276",
