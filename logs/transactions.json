@@ -2,6 +2,33 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-258",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "f0359ec",
+      "commit_full": "f0359ec336932f0b59667757c27fd6fe4e5c36f7",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(docs): use internal SonarQube hostname in badge URLs",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "README.en.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "README.ko.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "README.md",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-257",
       "timestamp": "2026-04-13",
       "session": "auto",
