@@ -5,12 +5,18 @@
       "id": "TX-252",
       "timestamp": "2026-04-13",
       "session": "auto",
-      "commit": "f1d56d2",
-      "commit_full": "f1d56d278aa1a833b3b786ee09a99c7f48e17b86",
+      "commit": "3639900",
+      "commit_full": "363990043c7f289dc3721774bd9da7e835ecfb87",
       "status": "ABGESCHLOSSEN",
-      "description": "Merge branch 'feat/widget-dispatcher' into develop",
-      "detail": "# Conflicts:\n#\tlogs/transactions.json",
-      "changes": []
+      "description": "fix(ui): remove live popup release badge JS code",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
     },
     {
       "id": "TX-251",

@@ -7170,23 +7170,6 @@ function applyDevCacheFromStatus(info) {
     if (xhr.status !== 200) return;
     try {
       var info = JSON.parse(xhr.responseText);
-      var meta = document.getElementById("live-release-meta");
-      var ver = info.version && info.version.length && info.version !== "dev" ? info.version : null;
-      if (meta) {
-        if (ver) {
-          meta.innerHTML =
-            '<span class="live-rel-badge live-rel-badge-ok">' +
-            escHtml(ver) +
-            "</span>" +
-            '<a class="live-rel-link" href="https://github.com/fgrosswig/claude-usage-dashboard/releases/tag/' +
-            escHtml(ver) +
-            '" target="_blank" rel="noopener">GitHub</a>';
-        } else {
-          meta.innerHTML =
-            '<span class="live-rel-badge live-rel-badge-dev">dev</span>' +
-            '<a class="live-rel-link" href="https://github.com/fgrosswig/claude-usage-dashboard/releases" target="_blank" rel="noopener">GitHub</a>';
-        }
-      }
       if (!info.dev_mode) return;
       var modeLabel = info.dev_mode === "full" ? "FULL" : "PROXY";
       var bar = document.createElement("div");
