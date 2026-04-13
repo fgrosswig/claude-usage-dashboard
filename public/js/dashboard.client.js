@@ -10,6 +10,10 @@ function fmt(n) {
 }
 function pct(a,b){return b>0?(a/b*100).toFixed(1)+"%":"-";}
 function escHtml(s){return String(s==null?"":s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll("\"","&quot;");}
+/** Sonar S2486: catch blocks must reference the exception. */
+function logClientOptionalErr(err) {
+  if (typeof console !== "undefined" && console.debug) console.debug("[dashboard]", err && err.message != null ? err.message : err);
+}
 /** Stunden mit Arbeit (tokens) ∪ Stunden mit JSONL-Session-Signalen, nach Log-Zeitstempel. */
 function unionWorkHourKeys(sd) {
   var m = {};
@@ -142,7 +146,7 @@ function detectLang() {
   try {
     var sv = localStorage.getItem("usageDashboardLang");
     if (sv === "de" || sv === "en" || sv === "ko") return sv;
-  } catch (error) { /* intentional */ }
+  } catch (error) { logClientOptionalErr(error); }
   var langs = navigator.languages;
   if (langs?.length) {
     for (var _lng of langs) {
@@ -161,7 +165,7 @@ function getLang() { return __lang; }
 function setLang(code) {
   if (code !== "de" && code !== "en" && code !== "ko") return;
   __lang = code;
-  try { localStorage.setItem("usageDashboardLang", code); } catch (error) { /* intentional */ }
+  try { localStorage.setItem("usageDashboardLang", code); } catch (error) { logClientOptionalErr(error); }
   document.documentElement.lang = code;
   updateLangButtons();
   applyStaticChrome();
@@ -299,13 +303,13 @@ function getMainChartsScope() {
   try {
     var s = sessionStorage.getItem("usageMainChartsScope");
     if (s === "hourly" || s === "timeline") return s;
-  } catch (error) { /* intentional */ }
+  } catch (error) { logClientOptionalErr(error); }
   return "timeline";
 }
 function setMainChartsScope(val) {
   try {
     sessionStorage.setItem("usageMainChartsScope", val === "hourly" ? "hourly" : "timeline");
-  } catch (error) { /* intentional */ }
+  } catch (error) { logClientOptionalErr(error); }
 }
 function padHour2(n) {
   return n < 10 ? "0" + n : String(n);
@@ -354,9 +358,11 @@ function hourlyCacheOutRatioEst(day) {
 }
 /** Hauptcharts: Tagesfeld Gesamt oder gewählte Scan-Quelle (Forensic-Host-Filter). */
 function dayNumericForMainCharts(d, hostKey, field) {
-  if (!hostKey) return d[field] != null ? Number(d[field]) || 0 : 0;
-  var H = d.hosts?.[hostKey];
-  return H?.[field] != null ? Number(H[field]) || 0 : 0;
+  if (hostKey) {
+    var H = d.hosts?.[hostKey];
+    return H?.[field] != null ? Number(H[field]) || 0 : 0;
+  }
+  return d[field] != null ? Number(d[field]) || 0 : 0;
 }
 function dayRatioCacheOutForMainCharts(d, hostKey) {
   if (!hostKey) return d.cache_output_ratio || 0;
@@ -433,7 +439,7 @@ function destroyMainChartIfScopeMismatch(mainScope, chartKey) {
     try {
       if (typeof ch.dispose === 'function') ch.dispose();
       else if (typeof ch.destroy === 'function') ch.destroy();
-    } catch (error) { /* intentional */ }
+    } catch (error) { logClientOptionalErr(error); }
     _charts[chartKey] = null;
   }
 }
@@ -560,7 +566,7 @@ function fetchExtensionTimelineOnceInternal() {
         renderDashboard(__lastUsageData, true);
       }
     })
-    .catch (function () { /* intentional */ })
+    .catch (function (err) { logClientOptionalErr(err); })
     .then(function () {
       __extensionTimelineInFlight = false;
     });
@@ -581,7 +587,7 @@ function setSessionGithubToken(val) {
     } else {
       sessionStorage.removeItem(GITHUB_TOKEN_SESSION_KEY);
     }
-  } catch (error) { /* intentional */ }
+  } catch (error) { logClientOptionalErr(error); }
 }
 
 function apiGithubTokenHeader() {
@@ -857,7 +863,7 @@ function fetchUsageJsonOnce() {
         console.error(e);
       }
     })
-    .catch (function () { /* intentional */ });
+    .catch (function (err) { logClientOptionalErr(err); });
 }
 
 function showGithubTokenStatus(msg, isWarn) {
@@ -982,7 +988,7 @@ function initGithubTokenPanel() {
       syncGithubSessionThenReconnectStream();
       try {
         inp.focus();
-      } catch (error) { /* intentional */ }
+      } catch (error) { logClientOptionalErr(error); }
     });
   }
   if (refBtn && !refBtn.dataset.boundGithubRf) {
@@ -1086,13 +1092,13 @@ function resizeLiveScannedJsonlChartIfAny() {
   if (!__liveScannedJsonlChart) return;
   try {
     __liveScannedJsonlChart.resize();
-  } catch (error) { /* intentional */ }
+  } catch (error) { logClientOptionalErr(error); }
 }
 function __disposeLiveScannedJsonlChartIfNeeded() {
   if (!__liveScannedJsonlChart) return;
   try {
     __liveScannedJsonlChart.dispose();
-  } catch (error) { /* intentional */ }
+  } catch (error) { logClientOptionalErr(error); }
   __liveScannedJsonlChart = null;
 }
 function __liveJsonlBarTooltipFormatter(params) {
@@ -1379,13 +1385,13 @@ function initMetaDetailsPanel() {
   det.dataset.boundMeta = "1";
   try {
     if (sessionStorage.getItem("usageMetaDetailsOpen") === "1") det.setAttribute("open", "");
-  } catch (error) { /* intentional */ }
+  } catch (error) { logClientOptionalErr(error); }
   det.addEventListener("toggle", function () {
     updateGithubTokenPanelMode();
     scheduleGithubTokenUiRefresh();
     try {
       sessionStorage.setItem("usageMetaDetailsOpen", det.open ? "1" : "0");
-    } catch (error) { /* intentional */ }
+    } catch (error) { logClientOptionalErr(error); }
   });
 }
 /** Stunden 0–24 als HH:MM (UTC-Tag wie serverseitige outage_spans). */
@@ -1476,12 +1482,12 @@ function appendDayDiagnosticSlideoutSection(bodyEl, d) {
         if (inc.created_at) {
           try {
             parts.push(t("updateSlideoutIncidentStart") + " " + new Date(inc.created_at).toLocaleString());
-          } catch (error) { /* intentional */ }
+          } catch (error) { logClientOptionalErr(error); }
         }
         if (inc.resolved_at) {
           try {
             parts.push(t("updateSlideoutIncidentResolved") + " " + new Date(inc.resolved_at).toLocaleString());
-          } catch (error) { /* intentional */ }
+          } catch (error) { logClientOptionalErr(error); }
         } else if (inc.created_at) {
           parts.push(t("updateSlideoutIncidentOngoing"));
         }
@@ -1813,7 +1819,7 @@ function syncForensicHostFilterBar(data) {
     __forensicHostFilterSig = "";
     try {
       sessionStorage.removeItem("usageForensicHostFilter");
-    } catch (error) { /* intentional */ }
+    } catch (error) { logClientOptionalErr(error); }
     if (hint) {
       hint.style.display = "none";
       hint.textContent = "";
@@ -1824,7 +1830,7 @@ function syncForensicHostFilterBar(data) {
   var stored = "";
   try {
     stored = sessionStorage.getItem("usageForensicHostFilter") || "";
-  } catch (error) { /* intentional */ }
+  } catch (error) { logClientOptionalErr(error); }
   if (stored && !hLabs.includes(stored)) stored = "";
   __forensicHostFilterSig = stored;
   var hostSig = hLabs.join("\u0000");
@@ -1835,32 +1841,33 @@ function syncForensicHostFilterBar(data) {
     wrap.dataset.filterClickBound = "1";
     chipsHost.addEventListener("click", function (ev) {
       var btn = ev.target.closest(".forensic-host-chip");
-      if (!btn) return;
-      var raw = btn.dataset.hostFilter != null ? String(btn.dataset.hostFilter) : "__ALL__";
-      var val = raw === "__ALL__" ? "" : raw;
-      __forensicHostFilterSig = val;
-      try {
-        if (val) sessionStorage.setItem("usageForensicHostFilter", val);
-        else sessionStorage.removeItem("usageForensicHostFilter");
-      } catch (error) { /* intentional */ }
-      var nodes = chipsHost.querySelectorAll(".forensic-host-chip");
-      for (var _node of nodes) {
-        var rv = _node.dataset.hostFilter != null ? String(_node.dataset.hostFilter) : "__ALL__";
-        var nv = rv === "__ALL__" ? "" : rv;
-        var on = nv === __forensicHostFilterSig;
-        _node.classList.toggle("active", on);
-        _node.setAttribute("aria-pressed", on ? "true" : "false");
-      }
-      if (hint) {
-        if (__forensicHostFilterSig) {
-          hint.style.display = "";
-          hint.textContent = tr("forensicHostFilterHint", { host: __forensicHostFilterSig });
-        } else {
-          hint.style.display = "none";
-          hint.textContent = "";
+      if (btn) {
+        var raw = btn.dataset.hostFilter != null ? String(btn.dataset.hostFilter) : "__ALL__";
+        var val = raw === "__ALL__" ? "" : raw;
+        __forensicHostFilterSig = val;
+        try {
+          if (val) sessionStorage.setItem("usageForensicHostFilter", val);
+          else sessionStorage.removeItem("usageForensicHostFilter");
+        } catch (error) { logClientOptionalErr(error); }
+        var nodes = chipsHost.querySelectorAll(".forensic-host-chip");
+        for (var _node of nodes) {
+          var rv = _node.dataset.hostFilter != null ? String(_node.dataset.hostFilter) : "__ALL__";
+          var nv = rv === "__ALL__" ? "" : rv;
+          var on = nv === __forensicHostFilterSig;
+          _node.classList.toggle("active", on);
+          _node.setAttribute("aria-pressed", on ? "true" : "false");
         }
+        if (hint) {
+          if (__forensicHostFilterSig) {
+            hint.style.display = "";
+            hint.textContent = tr("forensicHostFilterHint", { host: __forensicHostFilterSig });
+          } else {
+            hint.style.display = "none";
+            hint.textContent = "";
+          }
+        }
+        if (typeof __lastUsageData !== "undefined" && __lastUsageData) renderDashboard(__lastUsageData, true);
       }
-      if (typeof __lastUsageData !== "undefined" && __lastUsageData) renderDashboard(__lastUsageData, true);
     });
   }
   if (wrap.dataset.lastHostSig !== hostSig) {
@@ -1934,9 +1941,9 @@ function renderDashboardCore(data) {
       var fnS=document.getElementById("forensic-note");if(fnS)fnS.textContent=tr("metaForensicNoteFirst",{sec:data.refresh_sec||180});
       document.getElementById("cards").innerHTML="";
       var fcS=document.getElementById("forensic-cards");if(fcS)fcS.innerHTML="";
-      if(_charts.cForensic){try{_charts.cForensic.dispose();}catch (error) { /* intentional */ }_charts.cForensic=null;}
-      if(_charts.cForensicSignals){try{_charts.cForensicSignals.dispose();}catch (error) { /* intentional */ }_charts.cForensicSignals=null;}
-      if(_charts.cService){try{_charts.cService.dispose();}catch (error) { /* intentional */ }_charts.cService=null;}
+      if(_charts.cForensic){try{_charts.cForensic.dispose();}catch (error) { logClientOptionalErr(error); }_charts.cForensic=null;}
+      if(_charts.cForensicSignals){try{_charts.cForensicSignals.dispose();}catch (error) { logClientOptionalErr(error); }_charts.cForensicSignals=null;}
+      if(_charts.cService){try{_charts.cService.dispose();}catch (error) { logClientOptionalErr(error); }_charts.cService=null;}
       chartShellSetLoading("c-forensic", true);
       chartShellSetLoading("c-forensic-signals", true);
       chartShellSetLoading("c-service", true);
@@ -1956,9 +1963,9 @@ function renderDashboardCore(data) {
     var fn0=document.getElementById("forensic-note");if(fn0)fn0.textContent="";
     var fc0=document.getElementById("forensic-cards");if(fc0)fc0.innerHTML="";
     document.getElementById("cards").innerHTML="";
-    if(_charts.cForensic){try{_charts.cForensic.dispose();}catch (error) { /* intentional */ }_charts.cForensic=null;}
-    if(_charts.cForensicSignals){try{_charts.cForensicSignals.dispose();}catch (error) { /* intentional */ }_charts.cForensicSignals=null;}
-    if(_charts.cService){try{_charts.cService.dispose();}catch (error) { /* intentional */ }_charts.cService=null;}
+    if(_charts.cForensic){try{_charts.cForensic.dispose();}catch (error) { logClientOptionalErr(error); }_charts.cForensic=null;}
+    if(_charts.cForensicSignals){try{_charts.cForensicSignals.dispose();}catch (error) { logClientOptionalErr(error); }_charts.cForensicSignals=null;}
+    if(_charts.cService){try{_charts.cService.dispose();}catch (error) { logClientOptionalErr(error); }_charts.cService=null;}
     chartShellSetLoading("c-forensic", false);
     chartShellSetLoading("c-forensic-signals", false);
     chartShellSetLoading("c-service", false);
@@ -1989,7 +1996,7 @@ function renderDashboardCore(data) {
   var selEl = document.getElementById("day-picker");
   var prevSel = selEl?.value ? selEl.value : "";
   if (!prevSel) {
-    try { prevSel = sessionStorage.getItem("usageDashboardDay") || ""; } catch (error) { /* intentional */ }
+    try { prevSel = sessionStorage.getItem("usageDashboardDay") || ""; } catch (error) { logClientOptionalErr(error); }
   }
   var valid = {};
   for (var _vd of days) valid[_vd.date] = true;
@@ -2019,7 +2026,7 @@ function renderDashboardCore(data) {
     if (!selEl.dataset.bound) {
       selEl.dataset.bound = "1";
       selEl.addEventListener("change", function () {
-        try { sessionStorage.setItem("usageDashboardDay", this.value); } catch (error) { /* intentional */ }
+        try { sessionStorage.setItem("usageDashboardDay", this.value); } catch (error) { logClientOptionalErr(error); }
         if (__lastUsageData) renderDashboard(__lastUsageData, true);
       });
     }
@@ -2088,11 +2095,11 @@ function renderDashboardCore(data) {
     }
   }
   // Render extracted charts in standalone wrappers (after all section contexts are set)
-  if (window.__widgetDispatcher?.dispatchRender) {
-    window.__widgetDispatcher.dispatchRender(data, days);
+  if (globalThis.__widgetDispatcher?.dispatchRender) {
+    globalThis.__widgetDispatcher.dispatchRender(data, days);
   }
-  if (window.__widgetDispatcher?.applyAllChartVisibility) {
-    window.__widgetDispatcher.applyAllChartVisibility();
+  if (globalThis.__widgetDispatcher?.applyAllChartVisibility) {
+    globalThis.__widgetDispatcher.applyAllChartVisibility();
   }
 }
 
@@ -3073,7 +3080,7 @@ function renderUserProfileCharts(days) {
       if (_userCharts.versions && typeof _userCharts.versions.resize === "function") _userCharts.versions.resize();
       if (_userCharts.entrypoints && typeof _userCharts.entrypoints.resize === "function") _userCharts.entrypoints.resize();
       if (_userCharts.releaseStability && typeof _userCharts.releaseStability.resize === "function") _userCharts.releaseStability.resize();
-    } catch (error) { /* intentional */ }
+    } catch (error) { logClientOptionalErr(error); }
   }
   if (typeof requestAnimationFrame !== "undefined") {
     requestAnimationFrame(__resizeUserProfileChartsAfterLayout);
@@ -3977,14 +3984,14 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
   }, true);
   try {
     chart.resize();
-  } catch (error) { /* intentional */ }
+  } catch (error) { logClientOptionalErr(error); }
   if (typeof requestAnimationFrame === "function") {
     requestAnimationFrame(function () {
       try {
         if (_budgetCharts.waterfall && typeof _budgetCharts.waterfall.resize === "function") {
           _budgetCharts.waterfall.resize();
         }
-      } catch (error) { /* intentional */ }
+      } catch (error) { logClientOptionalErr(error); }
     });
   }
 }
@@ -4319,8 +4326,8 @@ function __effResizeAll() {
     if (c && typeof c.resize === "function") {
       try {
         c.resize();
-      } catch {
-        // chart detached or not initialized
+      } catch (error) {
+        logClientOptionalErr(error);
       }
     }
   }
@@ -4328,7 +4335,7 @@ function __effResizeAll() {
 function __budgetResizeAll() {
   for (var bk in _budgetCharts) {
     if (_budgetCharts[bk] && typeof _budgetCharts[bk].resize === 'function') {
-      try { _budgetCharts[bk].resize(); } catch (e) { /* detached */ }
+      try { _budgetCharts[bk].resize(); } catch (error) { logClientOptionalErr(error); }
     }
   }
 }
@@ -4336,26 +4343,26 @@ function __mainChartsResizeAll() {
   var keys = ['c1', 'c2', 'c3', 'c4', 'c1hosts', 'cForensic', 'cForensicSignals', 'cService'];
   for (var _ck of keys) {
     if (_charts[_ck] && typeof _charts[_ck].resize === 'function') {
-      try { _charts[_ck].resize(); } catch (e) { /* detached */ }
+      try { _charts[_ck].resize(); } catch (error) { logClientOptionalErr(error); }
     }
   }
 }
 function __proxyChartsResizeAll() {
   for (var k in _proxyCharts) {
     if (_proxyCharts[k] && typeof _proxyCharts[k].resize === 'function') {
-      try { _proxyCharts[k].resize(); } catch (e) { /* detached */ }
+      try { _proxyCharts[k].resize(); } catch (error) { logClientOptionalErr(error); }
     }
   }
 }
 function __userProfileChartsResizeAll() {
   if (_userCharts.versions && typeof _userCharts.versions.resize === "function") {
-    try { _userCharts.versions.resize(); } catch (eU0) { /* detached */ }
+    try { _userCharts.versions.resize(); } catch (error) { logClientOptionalErr(error); }
   }
   if (_userCharts.entrypoints && typeof _userCharts.entrypoints.resize === "function") {
-    try { _userCharts.entrypoints.resize(); } catch (eU1) { /* detached */ }
+    try { _userCharts.entrypoints.resize(); } catch (error) { logClientOptionalErr(error); }
   }
   if (_userCharts.releaseStability && typeof _userCharts.releaseStability.resize === "function") {
-    try { _userCharts.releaseStability.resize(); } catch (eU2) { /* detached */ }
+    try { _userCharts.releaseStability.resize(); } catch (error) { logClientOptionalErr(error); }
   }
 }
 var __effWin = globalThis.window;
@@ -4763,7 +4770,7 @@ function renderProxyAnalysis(data) {
 
 function destroyProxyCharts() {
   for (var k in _proxyCharts) {
-    if (_proxyCharts[k]) { try { _proxyCharts[k].dispose(); } catch (error) { /* intentional */ } _proxyCharts[k] = null; }
+    if (_proxyCharts[k]) { try { _proxyCharts[k].dispose(); } catch (error) { logClientOptionalErr(error); } _proxyCharts[k] = null; }
   }
 }
 
@@ -5409,14 +5416,14 @@ function __effInitOrSet(key, el, option, notMerge) {
   _effCharts[key].setOption(option, { notMerge: !!notMerge, lazyUpdate: false });
   try {
     _effCharts[key].resize();
-  } catch (error) { /* intentional */ }
+  } catch (error) { logClientOptionalErr(error); }
   if (typeof requestAnimationFrame === "function") {
     requestAnimationFrame(function () {
       try {
         if (_effCharts[key] && typeof _effCharts[key].resize === "function") {
           _effCharts[key].resize();
         }
-      } catch (error) { /* intentional */ }
+      } catch (error) { logClientOptionalErr(error); }
     });
   }
 }
@@ -6087,7 +6094,7 @@ function initFilterBar(data) {
         try {
           if (hostVal) sessionStorage.setItem("usageForensicHostFilter", hostVal);
           else sessionStorage.removeItem("usageForensicHostFilter");
-        } catch (error) { /* intentional */ }
+        } catch (error) { logClientOptionalErr(error); }
         if (__lastUsageData) renderDashboard(__lastUsageData, true);
       });
     } else {
@@ -6440,7 +6447,7 @@ function updateAnthropicPopup(data) {
     } catch (eAnth) {
       try {
         _proxyCharts.anthropicIncidents.dispose();
-      } catch (error) { /* intentional */ }
+      } catch (error) { logClientOptionalErr(error); }
       _proxyCharts.anthropicIncidents = null;
     }
   }
@@ -7288,7 +7295,7 @@ function applyDevCacheFromStatus(info) {
           try {
             var infPull = JSON.parse(px.responseText);
             applyDevCacheFromStatus(infPull);
-          } catch (error) { /* intentional */ }
+          } catch (error) { logClientOptionalErr(error); }
         };
         px.send();
       }
@@ -7333,7 +7340,7 @@ function applyDevCacheFromStatus(info) {
               setTimeout(pullDevNavCacheStatus, 400);
               setTimeout(pullDevNavCacheStatus, 2500);
               setTimeout(pullDevNavCacheStatus, 8000);
-            } catch (error) { /* intentional */ }
+            } catch (error) { logClientOptionalErr(error); }
             if (st2) st2.textContent = (btnId === "dev-rebuild-jsonl" ? "JSONL" : "PROXY") + " rebuild started";
           };
           rq.onerror = function () { btn.disabled = false; };
@@ -7397,7 +7404,7 @@ function applyDevCacheFromStatus(info) {
           localStorage.removeItem("cud_layout_prefs_v2");
           localStorage.removeItem("cud_active_template");
           // Keep cud_templates — user-created templates survive clear
-          try { sessionStorage.removeItem("usageDashboardDay"); } catch (error) { /* intentional */ }
+          try { sessionStorage.removeItem("usageDashboardDay"); } catch (error) { logClientOptionalErr(error); }
           console.info("[DEV] layout cleared — prefs + active template reset (user templates preserved)");
           // Also delete server-side layout file
           try {
@@ -7420,7 +7427,7 @@ function applyDevCacheFromStatus(info) {
         }
         pullDevNavCacheStatus();
       }, 20000);
-    } catch (error) { /* intentional */ }
+    } catch (error) { logClientOptionalErr(error); }
   };
   xhr.send();
 })();
@@ -8718,10 +8725,11 @@ function renderBudgetDrain(stData, qdData) {
 
   var dateKey = stData.date || "";
   var proxyMsgEl = document.getElementById("econ-drain-proxy-msg");
-  var hasQ5Overlay = !!(qdData?.request_pairs?.length > 0);
+  var q5PairsLen = qdData && Array.isArray(qdData.request_pairs) ? qdData.request_pairs.length : -1;
+  var hasQ5Overlay = q5PairsLen > 0;
   var useDualGrid = hasQ5Overlay;
   var msgDateStr = qdData?.requested_date ? qdData.requested_date : dateKey;
-  var showNoProxyMsg = !!(qdData && !hasQ5Overlay && Array.isArray(qdData.request_pairs) && qdData.request_pairs.length === 0 && msgDateStr);
+  var showNoProxyMsg = !!(qdData && q5PairsLen === 0 && Array.isArray(qdData.request_pairs) && msgDateStr);
   var sessions = stData.sessions.slice().sort(function (a, b) { return a.first_ts < b.first_ts ? -1 : 1; });
   var dayTotal = sessions.reduce(function (s, x) { return s + x.total_all; }, 0);
   if (dayTotal === 0) return;
@@ -9248,7 +9256,7 @@ function renderBudgetDrain(stData, qdData) {
       requestAnimationFrame(function () {
         if (_effCharts.econDrain && typeof _effCharts.econDrain.resize === "function") _effCharts.econDrain.resize();
       });
-    } catch (error) { /* intentional */ }
+    } catch (error) { logClientOptionalErr(error); }
   }
 
   // HTML overlay for collapsible info box

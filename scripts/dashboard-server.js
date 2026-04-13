@@ -31,7 +31,7 @@ function resolveGitBinary() {
     for (var wi = 0; wi < w.length; wi++) {
       try {
         if (fs.existsSync(w[wi])) return w[wi];
-      } catch (eW) { /* intentional */ }
+      } catch (error) { logOptionalErr(error); }
     }
     return 'git.exe';
   }
@@ -39,7 +39,7 @@ function resolveGitBinary() {
   for (var ui = 0; ui < u.length; ui++) {
     try {
       if (fs.existsSync(u[ui])) return u[ui];
-    } catch (eU) { /* intentional */ }
+    } catch (error) { logOptionalErr(error); }
   }
   return 'git';
 }
@@ -66,8 +66,8 @@ var __appVersion = (function () {
     var tagLines = gitExecFileTrimmed(['tag', '--sort=-v:refname']).split('\n');
     var tag = tagLines[0] || '';
     if (tag) return tag;
-  } catch (error) { /* intentional */ }
-  try { return fs.readFileSync(path.join(__dirname, '..', 'VERSION'), 'utf8').trim(); } catch (error) { /* intentional */ }
+  } catch (error) { logOptionalErr(error); }
+  try { return fs.readFileSync(path.join(__dirname, '..', 'VERSION'), 'utf8').trim(); } catch (error) { logOptionalErr(error); }
   return 'dev';
 })();
 var dashboardHttp = require('./dashboard-http');
@@ -89,6 +89,10 @@ var __extractCacheLoaded = false;
 var getProxyLogDir = usageScanRoots.getProxyLogDir;
 var collectProxyNdjsonFiles = usageScanRoots.collectProxyNdjsonFiles;
 var serviceLog = require('./service-logger');
+/** Sonar S2486: every catch must reference the exception (non-empty handling). */
+function logOptionalErr(err) {
+  serviceLog.debug('ignored', err && err.message ? err.message : String(err));
+}
 var claudeDataIngest = require('./claude-data-ingest');
 
 /** Nach erfolgreichem Scan: Fingerprint aller JSONL (mtime+size); für optionalen Skip bei unveränderten Dateien. */
@@ -203,7 +207,7 @@ var releasesCache = { releases: [], fetchedAt: 0 };
 try {
   var diskRel = JSON.parse(fs.readFileSync(RELEASES_CACHE, 'utf8'));
   if (Array.isArray(diskRel)) releasesCache.releases = diskRel;
-} catch (error) { /* intentional */ }
+} catch (error) { logOptionalErr(error); }
 
 var marketplaceVersionsCache = { items: [], fetchedAt: 0 };
 try {
@@ -212,7 +216,7 @@ try {
     marketplaceVersionsCache.items = diskMp.versions;
     marketplaceVersionsCache.fetchedAt = diskMp.fetchedAt || 0;
   }
-} catch (error) { /* intentional */ }
+} catch (error) { logOptionalErr(error); }
 
 /** Nur Release-Tags anthropics/claude-code (SSRF-Schutz). */
 function isSafeGithubReleaseTagParam(s) {
@@ -225,7 +229,7 @@ function isSafeGithubReleaseTagParam(s) {
 function persistReleasesCacheToDisk() {
   try {
     fs.writeFileSync(RELEASES_CACHE, JSON.stringify(releasesCache.releases), 'utf8');
-  } catch (error) { /* intentional */ }
+  } catch (error) { logOptionalErr(error); }
 }
 
 /**
@@ -549,7 +553,7 @@ function getReleasesMap() {
     try {
       var diskR = JSON.parse(fs.readFileSync(RELEASES_CACHE, 'utf8'));
       if (Array.isArray(diskR)) releasesCache.releases = diskR;
-    } catch (error) { /* intentional */ }
+    } catch (error) { logOptionalErr(error); }
   }
   var map = {};
   var rels = releasesCache.releases;
@@ -615,10 +619,10 @@ function enrichVersionChangeNotes(result) {
     var prefixMulti = inter.length > 1;
     for (var iv of inter) {
       var ri = relMap[iv];
-      if (!ri?.highlights?.length) continue;
-      for (var hl of ri.highlights) {
-        var line = (prefixMulti ? '[' + iv + '] ' : '') + hl;
-        if (!seenH[line]) {
+      if (ri?.highlights?.length) {
+        for (var hl of ri.highlights) {
+          var line = (prefixMulti ? '[' + iv + '] ' : '') + hl;
+          if (seenH[line]) continue;
           mergedHi.push(line);
           seenH[line] = true;
         }
@@ -645,7 +649,7 @@ function loadReleasesArrayForBuild() {
     try {
       var diskR = JSON.parse(fs.readFileSync(RELEASES_CACHE, 'utf8'));
       if (Array.isArray(diskR)) rels = diskR;
-    } catch (error) { /* intentional */ }
+    } catch (error) { logOptionalErr(error); }
   }
   return Array.isArray(rels) ? rels : [];
 }
@@ -786,7 +790,7 @@ function loadMarketplaceVersionsForBuild() {
         marketplaceVersionsCache.items = disk.versions;
         arr = disk.versions;
       }
-    } catch (error) { /* intentional */ }
+    } catch (error) { logOptionalErr(error); }
   }
   return Array.isArray(arr) ? arr : [];
 }
@@ -798,7 +802,7 @@ function snapshotMarketplaceRowsForScan() {
   try {
     var disk = JSON.parse(fs.readFileSync(MARKETPLACE_CACHE, 'utf8'));
     if (disk && Array.isArray(disk.versions)) return disk.versions.slice();
-  } catch (error) { /* intentional */ }
+  } catch (error) { logOptionalErr(error); }
   return undefined;
 }
 
@@ -811,7 +815,7 @@ function readMarketplaceVersionsDisk() {
   try {
     var disk = JSON.parse(fs.readFileSync(MARKETPLACE_CACHE, 'utf8'));
     if (disk && Array.isArray(disk.versions) && disk.versions.length) return disk.versions;
-  } catch (error) { /* intentional */ }
+  } catch (error) { logOptionalErr(error); }
   return null;
 }
 
@@ -983,7 +987,7 @@ try {
     outageCache.incidents = diskOutage.incidents;
     outageCache.fetchedAt = diskOutage.fetchedAt || 0;
   }
-} catch (error) { /* intentional */ }
+} catch (error) { logOptionalErr(error); }
 
 /**
  * GET + JSON. GitHub: githubApiRequestHeaders(); optional GITHUB_TOKEN / GH_TOKEN gegen Rate-Limit.
@@ -1521,7 +1525,7 @@ function classifyJsonlSessionSignals(line, rec) {
       var ej = JSON.stringify(rec.error).toLowerCase();
       if (/retry|429|rate|throttl|overloaded/.test(ej)) add('retry');
       if (/interrupt|cancel|abort/.test(ej)) add('interrupt');
-    } catch (error) { /* intentional */ }
+    } catch (error) { logOptionalErr(error); }
   }
   // B5: Tool result truncation
   if (/["']is_truncated["']\s*:\s*true|["']truncated["']\s*:\s*true/.test(line)) {
@@ -1704,7 +1708,7 @@ function writeJsonlTodayIndexDisk(payload) {
   var dir = path.dirname(JSONL_TODAY_INDEX_FILE);
   try {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  } catch (error) { /* intentional */ }
+  } catch (error) { logOptionalErr(error); }
   var tmp = JSONL_TODAY_INDEX_FILE + '.tmp';
   var body = JSON.stringify(payload);
   fs.writeFileSync(tmp, body, 'utf8');
@@ -1718,7 +1722,7 @@ function writeJsonlTodayIndexDisk(payload) {
 function invalidateJsonlTodayIndexDisk() {
   try {
     if (fs.existsSync(JSONL_TODAY_INDEX_FILE)) fs.unlinkSync(JSONL_TODAY_INDEX_FILE);
-  } catch (error) { /* intentional */ }
+  } catch (error) { logOptionalErr(error); }
 }
 
 function hostSliceFromRow(h) {
@@ -1810,7 +1814,7 @@ function writeUsageDayCache(payload) {
   var dir = path.dirname(USAGE_DAY_CACHE_FILE);
   try {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  } catch (error) { /* intentional */ }
+  } catch (error) { logOptionalErr(error); }
   var tmp = USAGE_DAY_CACHE_FILE + '.tmp';
   var body = JSON.stringify(payload);
   fs.writeFileSync(tmp, body, 'utf8');
@@ -2467,8 +2471,9 @@ function parseAllUsageIncremental(done, onProgress) {
         var stOne;
         try {
           stOne = fs.statSync(absOne);
-        } catch (eStat) {
+        } catch (error) {
           stOne = null;
+          logOptionalErr(error);
         }
         var entOne = todayIndexCtx.valid ? todayIndexCtx.files[absOne] : null;
         if (
@@ -2522,7 +2527,7 @@ function parseAllUsageIncremental(done, onProgress) {
             todayStr: todayStr,
             marketplaceRows: frozenMpRows
           });
-        } catch (error) { /* intentional */ }
+        } catch (error) { logOptionalErr(error); }
       }
       setImmediate(tick);
     } else {
@@ -2932,7 +2937,7 @@ function runScanAndBroadcast() {
       partial.generated = new Date().toISOString();
       cachedData = partial;
       broadcastSse();
-    } catch (error) { /* intentional */ }
+    } catch (error) { logOptionalErr(error); }
   }
   parseAllUsageIncremental(finalizeUsageScanIncremental, applyIncrementalProgress);
 }
@@ -3014,10 +3019,10 @@ function handleClaudeDataSyncRequest(req, res) {
       aborted = true;
       try {
         req.destroy();
-      } catch (error) { /* intentional */ }
+      } catch (error) { logOptionalErr(error); }
       try {
         ws.destroy();
-      } catch (error) { /* intentional */ }
+      } catch (error) { logOptionalErr(error); }
       failSync(413, { ok: false, error: 'payload_too_large', max_mb: maxMb }, true);
       return;
     }
@@ -3028,7 +3033,7 @@ function handleClaudeDataSyncRequest(req, res) {
     aborted = true;
     try {
       ws.destroy();
-    } catch (error) { /* intentional */ }
+    } catch (error) { logOptionalErr(error); }
     fs.unlink(tmpPath, function () {});
     claudeDataSyncBusy = false;
   });
@@ -3563,7 +3568,7 @@ function resolveSessionTurnsCacheDir() {
   try {
     var ex = usageScanRoots.expandUserPath(raw);
     if (ex) return ex;
-  } catch (error) { /* intentional */ }
+  } catch (error) { logOptionalErr(error); }
   try {
     return path.resolve(raw);
   } catch (e1) {
@@ -3678,7 +3683,7 @@ function readJsonBodyMax(req, maxBytes, cb) {
     if (total > maxBytes) {
       try {
         req.destroy();
-      } catch (error) { /* intentional */ }
+      } catch (error) { logOptionalErr(error); }
       cb(new Error('payload_too_large'));
       return;
     }
@@ -3731,7 +3736,7 @@ function debugPathAllowedForRead(absPath) {
   try {
     var collected = collectTaggedJsonlFiles();
     if (debugTaggedJsonlMatchesAbs(abs, collected.tagged)) return true;
-  } catch (error) { /* intentional */ }
+  } catch (error) { logOptionalErr(error); }
   if (path.resolve(USAGE_DAY_CACHE_FILE) === abs) return true;
   if (path.resolve(JSONL_TODAY_INDEX_FILE) === abs) return true;
   if (path.resolve(RELEASES_CACHE) === abs) return true;
@@ -3741,7 +3746,7 @@ function debugPathAllowedForRead(absPath) {
   try {
     var proxyPaths = collectProxyNdjsonFiles();
     if (debugProxyNdjsonMatchesAbs(abs, proxyPaths)) return true;
-  } catch (error) { /* intentional */ }
+  } catch (error) { logOptionalErr(error); }
   var stDir = resolveSessionTurnsCacheDir();
   if (stDir && isPathUnderDirectory(abs, stDir)) {
     var bn = path.basename(abs);
@@ -3774,7 +3779,7 @@ function tryPushDebugCacheKnownPath(out, kind, p) {
       size: st2.size,
       mtime_ms: Math.floor(st2.mtimeMs)
     });
-  } catch (error) { /* intentional */ }
+  } catch (error) { logOptionalErr(error); }
 }
 
 function compareDebugCacheFileRows(a, b) {
@@ -3801,9 +3806,9 @@ function appendProxyNdjsonDebugEntries(out) {
           size: stp.size,
           mtime_ms: Math.floor(stp.mtimeMs)
         });
-      } catch (error) { /* intentional */ }
+      } catch (error) { logOptionalErr(error); }
     }
-  } catch (error) { /* intentional */ }
+  } catch (error) { logOptionalErr(error); }
 }
 
 function appendSessionTurnsDiskDebugEntries(out, stDir) {
@@ -3826,9 +3831,9 @@ function appendSessionTurnsDiskDebugEntries(out, stDir) {
           size: st3.size,
           mtime_ms: Math.floor(st3.mtimeMs)
         });
-      } catch (error) { /* intentional */ }
+      } catch (error) { logOptionalErr(error); }
     }
-  } catch (error) { /* intentional */ }
+  } catch (error) { logOptionalErr(error); }
 }
 
 function collectDebugCacheFilesPayload() {
@@ -3849,7 +3854,7 @@ function collectDebugCacheFilesPayload() {
         size: st.size,
         mtime_ms: Math.floor(st.mtimeMs)
       });
-    } catch (error) { /* intentional */ }
+    } catch (error) { logOptionalErr(error); }
   }
   tryPushDebugCacheKnownPath(out, 'day_cache', USAGE_DAY_CACHE_FILE);
   tryPushDebugCacheKnownPath(out, 'jsonl_today_index', JSONL_TODAY_INDEX_FILE);
@@ -3961,7 +3966,7 @@ function q5CarryoverTotalsFromPairs(pairs) {
   for (var pair of pairs) {
     var dltPct = pair.delta * 100;
     csum += dltPct;
-    if (!(pair.delta >= 0.03)) cisum += dltPct;
+    if (pair.delta < 0.03) cisum += dltPct;
   }
   return { actual: Math.round(csum * 10) / 10, ideal: Math.round(cisum * 10) / 10 };
 }
@@ -4241,7 +4246,7 @@ var server = http.createServer(function (req, res) {
                   if (!localKinds[rf.kind + ':' + rf.path_abs]) listCf.push(rf);
                 });
               }
-            } catch (error) { /* intentional */ }
+            } catch (error) { logOptionalErr(error); }
             res.writeHead(200, corsCf);
             res.end(JSON.stringify({ ok: true, files: listCf }));
           });
@@ -4251,7 +4256,7 @@ var server = http.createServer(function (req, res) {
           res.end(JSON.stringify({ ok: true, files: listCf }));
         });
         return;
-      } catch (error) { /* intentional */ }
+      } catch (error) { logOptionalErr(error); }
     }
     res.writeHead(200, corsCf);
     res.end(JSON.stringify({ ok: true, files: listCf }));
@@ -4297,7 +4302,7 @@ var server = http.createServer(function (req, res) {
 
       // DEV_MODE: proxy view to remote if file doesn't exist locally
       var _localFileExists = false;
-      try { _localFileExists = fs.statSync(target).isFile(); } catch (_eL) { /* intentional */ }
+      try { _localFileExists = fs.statSync(target).isFile(); } catch (error) { logOptionalErr(error); }
       if (!_localFileExists && __devSource && __devMode) {
         var pBody = JSON.stringify({ path_abs: rawPath });
         var pUrl = new URL(__devSource.replace(/\/$/, '') + '/api/debug/cache-file-view');
@@ -4408,7 +4413,7 @@ var server = http.createServer(function (req, res) {
       if (qdDate && qfDate !== qdDate) continue;
       try {
         forEachJsonlLineSync(pf, createQuotaDivisorLineProcessor(PRICE, qfDate, requestPairs));
-      } catch (_e) { /* skip */ }
+      } catch (error) { logOptionalErr(error); }
     }
 
     var carryoverQ5 = null;
@@ -4421,7 +4426,7 @@ var server = http.createServer(function (req, res) {
           var prevPairsCar = [];
           try {
             forEachJsonlLineSync(pfCar, createQuotaDivisorLineProcessor(PRICE, qfDateCar, prevPairsCar));
-          } catch (_eCar) { /* skip */ }
+          } catch (error) { logOptionalErr(error); }
           if (prevPairsCar.length) {
             var carSums = q5CarryoverTotalsFromPairs(prevPairsCar);
             carryoverQ5 = { actual: carSums.actual, ideal: carSums.ideal, from_date: prevYmd };

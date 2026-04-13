@@ -37,6 +37,10 @@
   /** Sidebar layout tree: Bearbeiten aktiv (bleibt über renderWidgetTree erhalten). */
   var _layoutTreeEditMode = false;
 
+  function logWdOptionalErr(err) {
+    if (typeof console !== 'undefined' && console.debug) console.debug('[widget-dispatcher]', err && err.message != null ? err.message : err);
+  }
+
   function wtreeNextSectionLi(li) {
     if (!li?.parentNode) return null;
     var n = li.nextSibling;
@@ -135,8 +139,7 @@
     // Strip empty layout blocks (legacy from pre-filter saves)
     if (Array.isArray(p.widgets)) {
       p.widgets = p.widgets.filter(function (w) {
-        if (w.type === 'layout' && Array.isArray(w.nested) && !w.nested.length) return false;
-        return true;
+        return w.type !== 'layout' || !Array.isArray(w.nested) || w.nested.length > 0;
       });
     }
     return p;
@@ -179,7 +182,7 @@
       if (!tryAcceptPrefsPayload(o)) return;
       if (Array.isArray(o.hiddenCharts)) _prefs.hiddenCharts = o.hiddenCharts.slice();
       if (Array.isArray(o.hiddenSections)) _prefs.hiddenSections = o.hiddenSections.slice();
-    } catch (error) { /* intentional */ }
+    } catch (error) { logWdOptionalErr(error); }
   }
 
   function loadPrefs() {
@@ -190,7 +193,7 @@
         var p = JSON.parse(raw);
         fromLs = tryAcceptPrefsPayload(p);
       }
-    } catch (error) { /* intentional */ }
+    } catch (error) { logWdOptionalErr(error); }
 
     // Datei ist Single Source of Truth
     try {
@@ -205,12 +208,12 @@
             if (sp.v == null) sp.v = PREFS_VERSION;
             else sp.v = Number(sp.v);
             normalizePrefsShape(sp);
-            try { localStorage.setItem(PREFS_KEY, JSON.stringify(sp)); } catch (error) { /* intentional */ }
+            try { localStorage.setItem(PREFS_KEY, JSON.stringify(sp)); } catch (error) { logWdOptionalErr(error); }
             return sp;
           }
         }
       }
-    } catch (error) { /* intentional */ }
+    } catch (error) { logWdOptionalErr(error); }
     if (fromLs) return fromLs;
     return defaultPrefs();
   }
@@ -218,7 +221,7 @@
   function savePrefs() {
     if (!_prefs) return;
     var json = JSON.stringify(_prefs);
-    try { localStorage.setItem(PREFS_KEY, json); } catch (error) { /* intentional */ }
+    try { localStorage.setItem(PREFS_KEY, json); } catch (error) { logWdOptionalErr(error); }
     // PUT /api/layout synchron — Datei ist Single Source of Truth, muss vor Reload fertig sein.
     try {
       var xhrPut = new XMLHttpRequest();
@@ -229,7 +232,7 @@
         try {
           var mPut = xhrPut.getResponseHeader('X-Layout-Mtime');
           if (mPut) localStorage.setItem(LAYOUT_FILE_MTIME_KEY, mPut);
-        } catch (error) { /* intentional */ }
+        } catch (error) { logWdOptionalErr(error); }
       }
     } catch (e) { /* offline */ }
   }
@@ -583,7 +586,7 @@
           if (typeof rf !== 'function') continue;
           try {
             invokeChartRenderFn(chartDef.renderFn, rf);
-          } catch (error) { /* intentional */ }
+          } catch (error) { logWdOptionalErr(error); }
         }
       }
     }
@@ -1159,7 +1162,7 @@
       setTimeout(function () { resizeAll(); }, 250);
     }
     // Original filters hidden via CSS (body.sidebar-open selector)
-    try { localStorage.setItem('cud_sidebar_open', _sidebarOpen ? '1' : '0'); } catch (error) { /* intentional */ }
+    try { localStorage.setItem('cud_sidebar_open', _sidebarOpen ? '1' : '0'); } catch (error) { logWdOptionalErr(error); }
   }
 
   function bindSidebarEvents() {
@@ -1179,7 +1182,7 @@
         _sidebarRestoreScheduled = true;
         setTimeout(function () { toggleSidebar(true); }, 100);
       }
-    } catch (error) { /* intentional */ }
+    } catch (error) { logWdOptionalErr(error); }
   }
 
   // ── Widget Tree (Layout section) ────────────────────────────────
@@ -1831,21 +1834,21 @@
       if (xhrT.status === 200 && xhrT.responseText) {
         var parsed = JSON.parse(xhrT.responseText);
         if (parsed && Array.isArray(parsed.templates) && parsed.templates.length) {
-          try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(parsed.templates)); } catch (error) { /* intentional */ }
+          try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(parsed.templates)); } catch (error) { logWdOptionalErr(error); }
           return parsed.templates;
         }
       }
-    } catch (error) { /* intentional */ }
+    } catch (error) { logWdOptionalErr(error); }
     // Fallback to localStorage
     try {
       var raw = localStorage.getItem(TEMPLATES_KEY);
       if (raw) return JSON.parse(raw);
-    } catch (error) { /* intentional */ }
+    } catch (error) { logWdOptionalErr(error); }
     return [];
   }
 
   function saveTemplates(list) {
-    try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list)); } catch (error) { /* intentional */ }
+    try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list)); } catch (error) { logWdOptionalErr(error); }
     // Persist to server layout file
     if (_prefs) {
       _prefs.templates = list;
@@ -1858,7 +1861,7 @@
   }
 
   function setActiveTemplateName(name) {
-    try { localStorage.setItem(ACTIVE_TPL_KEY, name); } catch (error) { /* intentional */ }
+    try { localStorage.setItem(ACTIVE_TPL_KEY, name); } catch (error) { logWdOptionalErr(error); }
   }
 
   function getAllTemplates() {
@@ -2214,7 +2217,7 @@
       setTimeout(function () {
         var charts = body.querySelectorAll('[id^="c-user-"]');
         for (var chEl of charts) {
-          var inst = typeof echarts !== 'undefined' ? echarts.getInstanceByDom(chEl) : null;
+          var inst = typeof echarts === 'undefined' ? null : echarts.getInstanceByDom(chEl);
           if (inst) inst.resize();
         }
       }, 100);
@@ -2352,7 +2355,7 @@
   }
 
   function tbIsLayoutBlock(c) {
-    return !!(c?.type === 'block');
+    return c?.type === 'block';
   }
 
   function tbNewLayoutBlock(span) {
@@ -4049,7 +4052,7 @@
         var inst0 = echarts.init(pvEl, null, { renderer: 'canvas' });
         var opts0 = origInst.getOption();
         if (opts0) inst0.setOption(opts0, true);
-      } catch (error) { /* intentional */ }
+      } catch (error) { logWdOptionalErr(error); }
       return;
     }
 
@@ -4077,7 +4080,7 @@
       try {
         var ex1 = echarts.getInstanceByDom(pvEl);
         if (ex1) ex1.dispose();
-      } catch (error) { /* intentional */ }
+      } catch (error) { logWdOptionalErr(error); }
 
       if (String(rfName).startsWith('renderProxy_')) {
         var dataP = global.__lastUsageData;
@@ -4324,12 +4327,12 @@
       var containers = body.querySelectorAll('.tb-pv-chart-container');
       for (var ctr of containers) {
         var inst = echarts.getInstanceByDom(ctr);
-        if (inst) try { inst.dispose(); } catch (error) { /* intentional */ }
+        if (inst) try { inst.dispose(); } catch (error) { logWdOptionalErr(error); }
       }
     }
     // Preview may have repainted via temp canvas id swap — repaint core charts without full-page coalesce.
     if (typeof global.renderDashboardCore === 'function' && global.__lastUsageData) {
-      try { global.renderDashboardCore(global.__lastUsageData); } catch (error) { /* intentional */ }
+      try { global.renderDashboardCore(global.__lastUsageData); } catch (error) { logWdOptionalErr(error); }
     }
   }
 
