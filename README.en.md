@@ -3,10 +3,10 @@
 ## Claude Usage Dashboard
 
 [![Docker build](https://github.com/fgrosswig/claude-usage-dashboard/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/fgrosswig/claude-usage-dashboard/actions/workflows/docker.yml)
-[![Quality Gate](https://192.168.1.171:30188/api/project_badges/measure?project=claude-usage-dashboard&metric=alert_status&token=XXX)](https://192.168.1.171:30188/dashboard?id=claude-usage-dashboard)
-[![Bugs](https://192.168.1.171:30188/api/project_badges/measure?project=claude-usage-dashboard&metric=bugs&token=XXX)](https://192.168.1.171:30188/dashboard?id=claude-usage-dashboard)
-[![Vulnerabilities](https://192.168.1.171:30188/api/project_badges/measure?project=claude-usage-dashboard&metric=vulnerabilities&token=XXX)](https://192.168.1.171:30188/dashboard?id=claude-usage-dashboard)
-[![Security Rating](https://192.168.1.171:30188/api/project_badges/measure?project=claude-usage-dashboard&metric=security_rating&token=XXX)](https://192.168.1.171:30188/dashboard?id=claude-usage-dashboard)
+[![Quality Gate](https://sonar.grosswig-it.de/api/project_badges/measure?project=claude-usage-dashboard&metric=alert_status&token=XXX)](https://sonar.grosswig-it.de/dashboard?id=claude-usage-dashboard)
+[![Bugs](https://sonar.grosswig-it.de/api/project_badges/measure?project=claude-usage-dashboard&metric=bugs&token=XXX)](https://sonar.grosswig-it.de/dashboard?id=claude-usage-dashboard)
+[![Vulnerabilities](https://sonar.grosswig-it.de/api/project_badges/measure?project=claude-usage-dashboard&metric=vulnerabilities&token=XXX)](https://sonar.grosswig-it.de/dashboard?id=claude-usage-dashboard)
+[![Security Rating](https://sonar.grosswig-it.de/api/project_badges/measure?project=claude-usage-dashboard&metric=security_rating&token=XXX)](https://sonar.grosswig-it.de/dashboard?id=claude-usage-dashboard)
 
 ### Summary
 
