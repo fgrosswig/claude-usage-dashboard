@@ -7426,12 +7426,17 @@ function applyDevCacheFromStatus(info) {
         btn.addEventListener("click", function () {
           var st = document.getElementById("dev-clear-layout-status");
           localStorage.removeItem("cud_layout_prefs_v2");
+          try { sessionStorage.removeItem("usageDashboardDay"); } catch (e) {}
+          console.info("[DEV] layout cleared — localStorage + sessionStorage removed");
           // Also delete server-side layout file
           try {
             var xd = new XMLHttpRequest();
             xd.open("DELETE", "/api/layout", false);
             xd.send();
-          } catch (e) {}
+            console.info("[DEV] server layout file deleted — status: " + xd.status);
+          } catch (e) {
+            console.warn("[DEV] server layout delete failed", e);
+          }
           if (st) { st.textContent = "cleared — reloading…"; st.style.color = "#fbbf24"; }
           setTimeout(function () { location.reload(); }, 400);
         });
