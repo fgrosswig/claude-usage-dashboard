@@ -80,8 +80,7 @@
         sec.tags = (sectionTagsById[sec.id] || []).slice();
       }
       var charts = sec.charts || [];
-      for (var ci = 0; ci < charts.length; ci++) {
-        var ch = charts[ci];
+      for (var ch of charts) {
         if (ch.visible === undefined) ch.visible = true;
         if (ch.order === undefined) {
           globalChartOrder += 10;
@@ -582,18 +581,17 @@
 
     // ── Lookup helpers ──────────────────────────────────────────
     findChart: function (chartId) {
-      for (var si = 0; si < this.sections.length; si++) {
-        var charts = this.sections[si].charts;
-        for (var ci = 0; ci < charts.length; ci++) {
-          if (charts[ci].id === chartId) return charts[ci];
+      for (var sec of this.sections) {
+        for (var ch of sec.charts) {
+          if (ch.id === chartId) return ch;
         }
       }
       return null;
     },
 
     findSection: function (sectionId) {
-      for (var si = 0; si < this.sections.length; si++) {
-        if (this.sections[si].id === sectionId) return this.sections[si];
+      for (var sec of this.sections) {
+        if (sec.id === sectionId) return sec;
       }
       return null;
     },
@@ -622,11 +620,9 @@
 
     allCharts: function () {
       var result = [];
-      for (var si = 0; si < this.sections.length; si++) {
-        var charts = this.sections[si].charts;
-        for (var ci = 0; ci < charts.length; ci++) {
-          var c = charts[ci];
-          c.section = this.sections[si].id;
+      for (var sec of this.sections) {
+        for (var c of sec.charts) {
+          c.section = sec.id;
           result.push(c);
         }
       }
@@ -636,16 +632,16 @@
     stats: function () {
       var all = this.allCharts();
       var engines = { chartjs: 0, echarts: 0, google: 0 };
-      for (var i = 0; i < all.length; i++) {
-        engines[all[i].engine] = (engines[all[i].engine] || 0) + 1;
+      for (var ch of all) {
+        engines[ch.engine] = (engines[ch.engine] || 0) + 1;
       }
       var visibleSections = 0;
       var visibleCharts = 0;
-      for (var sj = 0; sj < this.sections.length; sj++) {
-        if (this.sections[sj].visible !== false) visibleSections++;
-        var chs = this.sections[sj].charts || [];
-        for (var cj = 0; cj < chs.length; cj++) {
-          if (chs[cj].visible !== false) visibleCharts++;
+      for (var sec of this.sections) {
+        if (sec.visible !== false) visibleSections++;
+        var chs = sec.charts || [];
+        for (var c of chs) {
+          if (c.visible !== false) visibleCharts++;
         }
       }
       return {

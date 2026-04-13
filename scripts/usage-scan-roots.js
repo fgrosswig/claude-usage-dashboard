@@ -29,9 +29,9 @@ function discoverHostImportDirs(parentDir) {
   var absParent = path.resolve(parentDir);
   try {
     var entries = fs.readdirSync(absParent, { withFileTypes: true });
-    for (var i = 0; i < entries.length; i++) {
-      if (!entries[i].isDirectory()) continue;
-      var name = entries[i].name;
+    for (var entry of entries) {
+      if (!entry.isDirectory()) continue;
+      var name = entry.name;
       if (!/^HOST-/i.test(name)) continue;
       out.push({ path: path.join(absParent, name), label: name });
     }
@@ -58,15 +58,15 @@ function getScanRoots() {
     var autoRoot = rootRaw ? expandUserPath(rootRaw) : process.cwd();
     if (autoRoot) {
       var discovered = discoverHostImportDirs(autoRoot);
-      for (var di = 0; di < discovered.length; di++) {
-        roots.push(discovered[di]);
+      for (var disc of discovered) {
+        roots.push(disc);
       }
     }
     return roots;
   }
   var parts = raw.split(';');
-  for (var i = 0; i < parts.length; i++) {
-    var chunk = parts[i].trim();
+  for (var chunk of parts) {
+    chunk = chunk.trim();
     if (!chunk) continue;
     var abs = expandUserPath(chunk);
     if (!abs) continue;
@@ -80,11 +80,11 @@ function getScanRoots() {
 /** Stabiler Schlüssel: aufgelöste Pfade, sortiert (Reihenfolge der Wurzeln darf sonst den Cache brechen). */
 function scanRootsCacheKey(roots) {
   var paths = [];
-  for (var ri = 0; ri < roots.length; ri++) {
+  for (var root of roots) {
     try {
-      paths.push(path.resolve(roots[ri].path));
+      paths.push(path.resolve(root.path));
     } catch (e) {
-      paths.push(String(roots[ri].path));
+      paths.push(String(root.path));
     }
   }
   paths.sort(function (a, b) {
@@ -97,10 +97,10 @@ function walkJsonl(dir) {
   var files = [];
   try {
     var entries = fs.readdirSync(dir, { withFileTypes: true });
-    for (var i = 0; i < entries.length; i++) {
-      var fp = path.join(dir, entries[i].name);
-      if (entries[i].isDirectory()) files = files.concat(walkJsonl(fp));
-      else if (entries[i].name.endsWith('.jsonl')) files.push(fp);
+    for (var entry of entries) {
+      var fp = path.join(dir, entry.name);
+      if (entry.isDirectory()) files = files.concat(walkJsonl(fp));
+      else if (entry.name.endsWith('.jsonl')) files.push(fp);
     }
   } catch (e) {}
   return files;
@@ -153,16 +153,15 @@ function collectTaggedJsonlFiles() {
   var roots = getScanRoots();
   var seen = Object.create(null);
   var tagged = [];
-  for (var ri = 0; ri < roots.length; ri++) {
-    var R = roots[ri];
+  for (var R of roots) {
     var list;
     try {
       list = walkJsonl(R.path);
     } catch (e) {
       list = [];
     }
-    for (var fi = 0; fi < list.length; fi++) {
-      var fp = path.resolve(list[fi]);
+    for (var lf of list) {
+      var fp = path.resolve(lf);
       if (seen[fp]) continue;
       seen[fp] = true;
       tagged.push({ path: fp, label: R.label, rootPath: R.path });
@@ -174,8 +173,7 @@ function collectTaggedJsonlFiles() {
 /** mtimeMs + size aller JSONL (sortiert); gleicher String wie dashboard-server früher — für Disk-Cache / session-turns-warm-cache.py. */
 function buildTaggedJsonlFingerprintSync(tagged) {
   var parts = [];
-  for (var fi = 0; fi < tagged.length; fi++) {
-    var ref = tagged[fi];
+  for (var ref of tagged) {
     var p = typeof ref === 'string' ? ref : ref.path;
     var abs = path.resolve(p);
     try {
@@ -204,8 +202,8 @@ function collectTaggedJsonlFilesAsync(cb) {
     }
     var R = roots[ri++];
     walkJsonlYielding(R.path, function (list) {
-      for (var fi = 0; fi < list.length; fi++) {
-        var fp = path.resolve(list[fi]);
+      for (var lf of list) {
+        var fp = path.resolve(lf);
         if (seen[fp]) continue;
         seen[fp] = true;
         tagged.push({ path: fp, label: R.label, rootPath: R.path });
@@ -281,9 +279,9 @@ function collectProxyNdjsonFiles() {
   var files = [];
   try {
     var entries = fs.readdirSync(logDir, { withFileTypes: true });
-    for (var i = 0; i < entries.length; i++) {
-      if (entries[i].isFile() && entries[i].name.endsWith('.ndjson')) {
-        files.push(path.join(logDir, entries[i].name));
+    for (var entry of entries) {
+      if (entry.isFile() && entry.name.endsWith('.ndjson')) {
+        files.push(path.join(logDir, entry.name));
       }
     }
   } catch (e) {}

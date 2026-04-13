@@ -62,8 +62,8 @@
     var marks = ul.querySelectorAll(
       '.widget-tree-item--drop-before,.widget-tree-item--drop-after,.widget-tree-item--drop-gap-up,.widget-tree-item--drop-gap-down'
     );
-    for (var mi = 0; mi < marks.length; mi++) {
-      marks[mi].classList.remove(
+    for (var mark of marks) {
+      mark.classList.remove(
         'widget-tree-item--drop-before',
         'widget-tree-item--drop-after',
         'widget-tree-item--drop-gap-up',
@@ -75,7 +75,7 @@
   function wtreeFindDropState(ul, clientY, dragSrc) {
     var arr = [];
     var items = ul.querySelectorAll(':scope > li.widget-tree-item[data-section]');
-    for (var i = 0; i < items.length; i++) arr.push(items[i]);
+    for (var item of items) arr.push(item);
     if (!arr.length) return null;
     var slot = arr.length;
     for (var j = 0; j < arr.length; j++) {
@@ -252,8 +252,8 @@
 
   function idOccursInWidgetList(widgetsArr, id) {
     if (!widgetsArr || !id) return false;
-    for (var z = 0; z < widgetsArr.length; z++) {
-      if (widgetsArr[z].id === id) return true;
+    for (var w of widgetsArr) {
+      if (w.id === id) return true;
     }
     return false;
   }
@@ -262,16 +262,16 @@
     var reg = getRegistry();
     if (!reg) return [];
     var byId = {};
-    for (var s0 = 0; s0 < reg.sections.length; s0++) {
-      byId[reg.sections[s0].id] = reg.sections[s0];
+    for (var sec0 of reg.sections) {
+      byId[sec0.id] = sec0;
     }
     /** v2: Reihenfolge exakt aus widgets[] — gleicher Pfad wie applyGridLayout (appendChild). */
     if (_prefs && _prefs.widgets && _prefs.widgets.length) {
       var outW = [];
       var seenW = {};
       var ww = _prefs.widgets;
-      for (var wi2 = 0; wi2 < ww.length; wi2++) {
-        var wid = ww[wi2].id;
+      for (var wEnt2 of ww) {
+        var wid = wEnt2.id;
         if (seenW[wid]) continue;
         var secW = byId[wid];
         if (!secW) continue;
@@ -285,8 +285,7 @@
       var remW = Object.keys(byId).sort(function (a, b) {
         return (byId[a].order || 0) - (byId[b].order || 0);
       });
-      for (var rw = 0; rw < remW.length; rw++) {
-        var rid = remW[rw];
+      for (var rid of remW) {
         if (seenW[rid]) continue;
         var s2 = byId[rid];
         if (!s2 || s2.reorderable === false) continue;
@@ -300,17 +299,17 @@
     }
     if (_prefs && _prefs.order && _prefs.order.length > 0) {
       var result = [];
-      for (var oi = 0; oi < _prefs.order.length; oi++) {
-        if (byId[_prefs.order[oi]]) {
-          result.push(byId[_prefs.order[oi]]);
-          delete byId[_prefs.order[oi]];
+      for (var oKey of _prefs.order) {
+        if (byId[oKey]) {
+          result.push(byId[oKey]);
+          delete byId[oKey];
         }
       }
       var remaining = Object.keys(byId).sort(function (a, b) {
         return (byId[a].order || 0) - (byId[b].order || 0);
       });
-      for (var ri = 0; ri < remaining.length; ri++) {
-        result.push(byId[remaining[ri]]);
+      for (var remKey of remaining) {
+        result.push(byId[remKey]);
       }
       return result;
     }
@@ -348,11 +347,11 @@
     var reg = getRegistry();
     var secId = null;
     if (reg && reg.sections) {
-      for (var sxi = 0; sxi < reg.sections.length; sxi++) {
-        var charts = reg.sections[sxi].charts || [];
-        for (var cxi = 0; cxi < charts.length; cxi++) {
-          if (charts[cxi].id === chartId) {
-            secId = reg.sections[sxi].id;
+      for (var secX of reg.sections) {
+        var charts = secX.charts || [];
+        for (var chX of charts) {
+          if (chX.id === chartId) {
+            secId = secX.id;
             break;
           }
         }
@@ -367,8 +366,8 @@
 
   function getWidgetSpan(sectionId) {
     if (!_prefs || !_prefs.widgets) return null;
-    for (var i = 0; i < _prefs.widgets.length; i++) {
-      if (_prefs.widgets[i].id === sectionId) return _prefs.widgets[i].span;
+    for (var wgt of _prefs.widgets) {
+      if (wgt.id === sectionId) return wgt.span;
     }
     return null;
   }
@@ -377,8 +376,7 @@
   function syncPrefsOrderFromWidgets() {
     if (!_prefs || !_prefs.widgets || !_prefs.widgets.length) return false;
     var ids = [];
-    for (var i = 0; i < _prefs.widgets.length; i++) {
-      var wEnt = _prefs.widgets[i];
+    for (var wEnt of _prefs.widgets) {
       var wT = wEnt.type || 'section';
       if (wT === 'layout') continue;
       ids.push(wEnt.id);
@@ -407,32 +405,31 @@
   function syncPrefsWidgetsFromDraggableOrder(orderedIds) {
     if (!_prefs || !_prefs.widgets || !_prefs.widgets.length) return false;
     var inDrag = {};
-    for (var di = 0; di < orderedIds.length; di++) inDrag[orderedIds[di]] = true;
+    for (var oId of orderedIds) inDrag[oId] = true;
     var before = _prefs.widgets;
     var extras = [];
-    for (var j = 0; j < before.length; j++) {
-      if (!inDrag[before[j].id]) extras.push({ id: before[j].id, span: before[j].span });
+    for (var bw of before) {
+      if (!inDrag[bw.id]) extras.push({ id: bw.id, span: bw.span });
     }
     var newW = [];
-    for (var oi = 0; oi < orderedIds.length; oi++) {
-      var oid = orderedIds[oi];
+    for (var oid of orderedIds) {
       var span = 12;
-      for (var k = 0; k < before.length; k++) {
-        if (before[k].id === oid) {
-          span = before[k].span;
+      for (var bw2 of before) {
+        if (bw2.id === oid) {
+          span = bw2.span;
           break;
         }
       }
       newW.push({ id: oid, span: span });
     }
-    for (var e = 0; e < extras.length; e++) {
-      var extraId = extras[e].id;
+    for (var ext of extras) {
+      var extraId = ext.id;
       var afterDragged = null;
       var foundExtra = false;
-      for (var old = 0; old < before.length; old++) {
-        if (before[old].id === extraId) { foundExtra = true; continue; }
-        if (foundExtra && inDrag[before[old].id]) {
-          afterDragged = before[old].id;
+      for (var bw3 of before) {
+        if (bw3.id === extraId) { foundExtra = true; continue; }
+        if (foundExtra && inDrag[bw3.id]) {
+          afterDragged = bw3.id;
           break;
         }
       }
@@ -440,13 +437,13 @@
       if (afterDragged) {
         for (var ni = 0; ni < newW.length; ni++) {
           if (newW[ni].id === afterDragged) {
-            newW.splice(ni, 0, extras[e]);
+            newW.splice(ni, 0, ext);
             inserted = true;
             break;
           }
         }
       }
-      if (!inserted) newW.push(extras[e]);
+      if (!inserted) newW.push(ext);
     }
     _prefs.widgets = newW;
     return true;
@@ -456,8 +453,7 @@
 
   function applyVisibility() {
     var sections = getSortedSections();
-    for (var si = 0; si < sections.length; si++) {
-      var sec = sections[si];
+    for (var sec of sections) {
       if (!sec.domId) continue;
       var el = document.getElementById(sec.domId);
       if (!el) continue;
@@ -465,8 +461,8 @@
       el.style.display = vis ? '' : 'none';
       // Hide companion elements too
       var companions = sec.companionIds || [];
-      for (var ci = 0; ci < companions.length; ci++) {
-        var comp = document.getElementById(companions[ci]);
+      for (var compId of companions) {
+        var comp = document.getElementById(compId);
         if (comp) comp.style.display = vis ? '' : 'none';
       }
     }
@@ -479,9 +475,9 @@
     var sections = getSortedSections();
     // Find the parent container of sections
     var firstSec = null;
-    for (var fi = 0; fi < sections.length; fi++) {
-      if (sections[fi].domId) {
-        firstSec = document.getElementById(sections[fi].domId);
+    for (var secF of sections) {
+      if (secF.domId) {
+        firstSec = document.getElementById(secF.domId);
         if (firstSec) break;
       }
     }
@@ -524,16 +520,14 @@
     var reg = getRegistry();
     if (!reg || typeof echarts === 'undefined') return;
     var sections = reg.sections;
-    for (var si = 0; si < sections.length; si++) {
-      var sec = sections[si];
+    for (var sec of sections) {
       if (!isSectionVisible(sec.id)) continue;
       if (sec.domId) {
         var det = document.getElementById(sec.domId);
         if (det && det.tagName === 'DETAILS' && !det.open) continue;
       }
       var charts = sec.charts || [];
-      for (var ci = 0; ci < charts.length; ci++) {
-        var ch = charts[ci];
+      for (var ch of charts) {
         if (!isChartVisible(ch.id)) continue;
         var el = document.getElementById(ch.canvasId);
         if (!el) continue;
@@ -554,8 +548,8 @@
       'sb-user-entrypoints',
       'sb-user-stability'
     ];
-    for (var xi = 0; xi < extraDomIds.length; xi++) {
-      resizeChartOnDomId(extraDomIds[xi]);
+    for (var eDomId of extraDomIds) {
+      resizeChartOnDomId(eDomId);
     }
   }
 
@@ -563,8 +557,7 @@
 
   function dispatchRender(data, days) {
     var sections = getSortedSections();
-    for (var si = 0; si < sections.length; si++) {
-      var sec = sections[si];
+    for (var sec of sections) {
       if (!isSectionVisible(sec.id)) continue;
       if (!sec.sectionRenderFn) continue;
       var fn = global[sec.sectionRenderFn];
@@ -657,8 +650,7 @@
     var reg = getRegistry();
     if (!reg) return;
     var sections = reg.sections;
-    for (var si = 0; si < sections.length; si++) {
-      var sec = sections[si];
+    for (var sec of sections) {
       if (!sec.domId) continue;
       var det = document.getElementById(sec.domId);
       if (!det || det.tagName !== 'DETAILS') continue;
@@ -683,17 +675,15 @@
     var reg = getRegistry();
     if (!reg) return false;
     var inW = {};
-    for (var ii = 0; ii < _prefs.widgets.length; ii++) inW[_prefs.widgets[ii].id] = true;
+    for (var pw of _prefs.widgets) inW[pw.id] = true;
     var notInWidgets = [];
-    for (var jj = 0; jj < reg.sections.length; jj++) {
-      var s = reg.sections[jj];
-      if (s.reorderable === false || s.parentSection) continue;
-      if (!inW[s.id]) notInWidgets.push(s.id);
+    for (var rs of reg.sections) {
+      if (rs.reorderable === false || rs.parentSection) continue;
+      if (!inW[rs.id]) notInWidgets.push(rs.id);
     }
     var curHs = _prefs.hiddenSections || [];
     var checkboxHiddenInLayout = [];
-    for (var hk = 0; hk < curHs.length; hk++) {
-      var hid = curHs[hk];
+    for (var hid of curHs) {
       if (inW[hid]) checkboxHiddenInLayout.push(hid);
     }
     var nextMap = {};
@@ -726,26 +716,25 @@
     if (!nested || !nested.length) return null;
     var flatW = [];
     var regSv = getRegistry();
-    for (var fi = 0; fi < nested.length; fi++) {
-      var sec = nested[fi];
-      flatW.push({ id: sec.id, span: sec.span || 12 });
-      var ch = sec.children || [];
+    for (var nSec of nested) {
+      flatW.push({ id: nSec.id, span: nSec.span || 12 });
+      var ch = nSec.children || [];
       for (var ci = 0; ci < ch.length; ci++) {
         var chEnt = ch[ci];
         if (tbIsLayoutBlock(chEnt)) {
           var nestedOut = [];
           var innSv = chEnt.children || [];
-          for (var ii = 0; ii < innSv.length; ii++) {
-            var idef = regSv && regSv.findChart ? regSv.findChart(innSv[ii].id) : null;
+          for (var innE of innSv) {
+            var idef = regSv && regSv.findChart ? regSv.findChart(innE.id) : null;
             if (idef && (idef.kind === 'chip' || idef.engine !== 'echarts')) continue;
-            nestedOut.push({ id: innSv[ii].id, span: innSv[ii].span || 6 });
+            nestedOut.push({ id: innE.id, span: innE.span || 6 });
           }
           // Skip empty layout blocks (chips-only rows)
           if (nestedOut.length) {
             flatW.push({
               type: 'layout',
               span: chEnt.span || 12,
-              section: sec.id,
+              section: nSec.id,
               bid: chEnt.bid || chEnt.id || 'tbblk_s' + ci,
               nested: nestedOut
             });
@@ -754,7 +743,7 @@
         }
         var cdef = regSv && regSv.findChart ? regSv.findChart(chEnt.id) : null;
         if (cdef && (cdef.kind === 'chip' || cdef.engine !== 'echarts')) continue;
-        flatW.push({ id: chEnt.id, span: chEnt.span || 6, type: 'chart', section: sec.id });
+        flatW.push({ id: chEnt.id, span: chEnt.span || 6, type: 'chart', section: nSec.id });
       }
     }
     return flatW.length ? flatW : null;
@@ -809,8 +798,8 @@
     }
     if (visible && _prefs.widgets) {
       var found = false;
-      for (var wi = 0; wi < _prefs.widgets.length; wi++) {
-        if (_prefs.widgets[wi].id === id) {
+      for (var pw2 of _prefs.widgets) {
+        if (pw2.id === id) {
           found = true;
           break;
         }
@@ -842,8 +831,7 @@
     if (!childIds || !childIds.length) return;
     if (!_prefs) _prefs = defaultPrefs();
     if (!Array.isArray(_prefs.hiddenCharts)) _prefs.hiddenCharts = [];
-    for (var gi = 0; gi < childIds.length; gi++) {
-      var cid = childIds[gi];
+    for (var cid of childIds) {
       if (!cid) continue;
       var idx = _prefs.hiddenCharts.indexOf(cid);
       if (visible && idx >= 0) {
@@ -855,8 +843,7 @@
     savePrefs();
     applyAllChartVisibility();
     var needsHealth = false;
-    for (var hk = 0; hk < childIds.length; hk++) {
-      var id0 = childIds[hk];
+    for (var id0 of childIds) {
       if (!id0) continue;
       if (id0.indexOf('health-kpi-') === 0 || id0.indexOf('health-finding-') === 0) {
         needsHealth = true;
@@ -891,9 +878,9 @@
     var checks = groupUl.querySelectorAll('.widget-tree-check[data-type="chart"]');
     var total = 0;
     var checked = 0;
-    for (var ci = 0; ci < checks.length; ci++) {
+    for (var chk of checks) {
       total++;
-      if (checks[ci].checked) checked++;
+      if (chk.checked) checked++;
     }
     groupCb.checked = total > 0 && checked === total;
     groupCb.indeterminate = checked > 0 && checked < total;
@@ -902,8 +889,7 @@
   function syncAllWidgetTreeGroupCheckboxes(root) {
     if (!root) return;
     var heads = root.querySelectorAll('.widget-tree-group-head input[data-type="chart-group"]');
-    for (var hi = 0; hi < heads.length; hi++) {
-      var gcb = heads[hi];
+    for (var gcb of heads) {
       var cluster = gcb.closest('li.widget-tree-group-cluster');
       if (!cluster) continue;
       var ul = cluster.querySelector(':scope > ul.widget-tree-group-charts');
@@ -911,9 +897,9 @@
       var checks = ul.querySelectorAll('.widget-tree-check[data-type="chart"]');
       var total = 0;
       var checked = 0;
-      for (var cj = 0; cj < checks.length; cj++) {
+      for (var chk2 of checks) {
         total++;
-        if (checks[cj].checked) checked++;
+        if (chk2.checked) checked++;
       }
       gcb.checked = total > 0 && checked === total;
       gcb.indeterminate = checked > 0 && checked < total;
@@ -954,10 +940,9 @@
     var reg = getRegistry();
     if (!reg) return;
     var show = false;
-    for (var si = 0; si < reg.sections.length; si++) {
-      var charts = reg.sections[si].charts || [];
-      for (var ci = 0; ci < charts.length; ci++) {
-        var ch = charts[ci];
+    for (var regSec of reg.sections) {
+      var charts = regSec.charts || [];
+      for (var ch of charts) {
         if (ch.canvasId === canvasId && isChartVisible(ch.id)) {
           show = true;
           break;
@@ -1023,11 +1008,10 @@
     var changedTs = false;
     if (_prefs.hiddenCharts.indexOf('ts-kpis') !== -1) {
       var merged = [];
-      for (var tsi = 0; tsi < _prefs.hiddenCharts.length; tsi++) {
-        var tid = _prefs.hiddenCharts[tsi];
+      for (var tid of _prefs.hiddenCharts) {
         if (tid === 'ts-kpis') {
-          for (var tsj = 0; tsj < tsKpisAll.length; tsj++) {
-            if (merged.indexOf(tsKpisAll[tsj]) === -1) merged.push(tsKpisAll[tsj]);
+          for (var tsKpi of tsKpisAll) {
+            if (merged.indexOf(tsKpi) === -1) merged.push(tsKpi);
           }
           changedTs = true;
         } else if (merged.indexOf(tid) === -1) merged.push(tid);
@@ -1048,14 +1032,13 @@
     };
     var set = {};
     var changed = false;
-    for (var i = 0; i < _prefs.hiddenCharts.length; i++) {
-      var id = _prefs.hiddenCharts[i];
-      var c = mapLegacyToCanon[id];
+    for (var hcId of _prefs.hiddenCharts) {
+      var c = mapLegacyToCanon[hcId];
       if (c) {
         set[c] = true;
         changed = true;
       } else {
-        set[id] = true;
+        set[hcId] = true;
       }
     }
     if (!changed && !changedTs) return false;
@@ -1071,10 +1054,10 @@
     var reg = getRegistry();
     if (!reg) return;
     var seen = {};
-    for (var si = 0; si < reg.sections.length; si++) {
-      var charts = reg.sections[si].charts || [];
-      for (var ci = 0; ci < charts.length; ci++) {
-        var cid = charts[ci].canvasId;
+    for (var acSec of reg.sections) {
+      var charts = acSec.charts || [];
+      for (var acCh of charts) {
+        var cid = acCh.canvasId;
         if (!cid || seen[cid]) continue;
         seen[cid] = true;
         syncCanvasGroupVisibility(cid);
@@ -1106,8 +1089,7 @@
     var reg = getRegistry();
     var defWidgets = [];
     if (reg) {
-      for (var si = 0; si < reg.sections.length; si++) {
-        var s = reg.sections[si];
+      for (var s of reg.sections) {
         if (s.parentSection) continue;
         defWidgets.push({ id: s.id, span: 12 });
       }
@@ -1182,8 +1164,8 @@
   function applyWidgetTreeCheckboxLock(treeEl, editing) {
     if (!treeEl) return;
     var checks = treeEl.querySelectorAll('.widget-tree-check');
-    for (var ci = 0; ci < checks.length; ci++) {
-      checks[ci].disabled = !editing;
+    for (var chk of checks) {
+      chk.disabled = !editing;
     }
   }
 
@@ -1196,8 +1178,7 @@
     if (!reg) return;
     var sections = getSortedSections();
     var html = '<ul class="widget-tree">';
-    for (var si = 0; si < sections.length; si++) {
-      var sec = sections[si];
+    for (var sec of sections) {
       if (sec.reorderable === false) continue;
       var secVis = isSectionVisible(sec.id);
       var hasCharts = sec.charts && sec.charts.length > 0;
@@ -1241,15 +1222,15 @@
           var raw = cb.getAttribute('data-child-ids') || '';
           var ids = raw.split('|');
           var clean = [];
-          for (var ii = 0; ii < ids.length; ii++) {
-            if (ids[ii]) clean.push(ids[ii]);
+          for (var idVal of ids) {
+            if (idVal) clean.push(idVal);
           }
           setGroupChartsVisibility(clean, cb.checked);
           var cluster = cb.closest('li.widget-tree-group-cluster');
           if (cluster) {
             var leafChecks = cluster.querySelectorAll('.widget-tree-group-charts .widget-tree-check[data-type="chart"]');
-            for (var qi = 0; qi < leafChecks.length; qi++) {
-              leafChecks[qi].checked = cb.checked;
+            for (var lc of leafChecks) {
+              lc.checked = cb.checked;
             }
           }
           cb.indeterminate = false;
@@ -1302,8 +1283,8 @@
           ghost.classList.add('widget-tree-drag-ghost');
           ghost.removeAttribute('draggable');
           var ghostCtrls = ghost.querySelectorAll('input,button');
-          for (var gix = 0; gix < ghostCtrls.length; gix++) {
-            ghostCtrls[gix].parentNode.removeChild(ghostCtrls[gix]);
+          for (var gc of ghostCtrls) {
+            gc.parentNode.removeChild(gc);
           }
           document.body.appendChild(ghost);
           var r = item.getBoundingClientRect();
@@ -1361,7 +1342,7 @@
         else ul.appendChild(_wtreeDragSrc);
         var newItems = ul.querySelectorAll(':scope > li.widget-tree-item[data-section]');
         var newOrder = [];
-        for (var j = 0; j < newItems.length; j++) newOrder.push(newItems[j].dataset.section);
+        for (var ni of newItems) newOrder.push(ni.dataset.section);
         setOrder(newOrder);
       });
       body.addEventListener('dragend', function () {
@@ -1437,8 +1418,8 @@
     if (verEl) {
       if (!_statsCharts.versions) _statsCharts.versions = echarts.init(verEl, null, { renderer: 'canvas' });
       var verCounts = {};
-      for (var vi = 0; vi < days.length; vi++) {
-        var dv = days[vi].versions;
+      for (var dayV of days) {
+        var dv = dayV.versions;
         if (!dv) continue;
         for (var vk in dv) {
           verCounts[vk] = (verCounts[vk] || 0) + dv[vk];
@@ -1461,8 +1442,8 @@
     if (epEl) {
       if (!_statsCharts.entrypoints) _statsCharts.entrypoints = echarts.init(epEl, null, { renderer: 'canvas' });
       var epCounts = {};
-      for (var ei = 0; ei < days.length; ei++) {
-        var de = days[ei].entrypoints;
+      for (var dayE of days) {
+        var de = dayE.entrypoints;
         if (!de) continue;
         for (var ek in de) {
           epCounts[ek] = (epCounts[ek] || 0) + de[ek];
@@ -1487,8 +1468,7 @@
       var rsLabels = [];
       var rsGood = [];
       var rsBad = [];
-      for (var ri = 0; ri < relStab.length; ri++) {
-        var r = relStab[ri];
+      for (var r of relStab) {
         rsLabels.push(r.version || '?');
         rsGood.push(r.good || 0);
         rsBad.push(r.bad || 0);
@@ -1535,11 +1515,11 @@
         if (cloneLabel) cloneLabel.remove();
         langSlot.appendChild(clone);
         var cloneBtnsForId = clone.querySelectorAll('.lang-btn');
-        for (var ci = 0; ci < cloneBtnsForId.length; ci++) cloneBtnsForId[ci].removeAttribute('id');
+        for (var clBtn of cloneBtnsForId) clBtn.removeAttribute('id');
         // Wire cloned buttons
         var btns = clone.querySelectorAll('.lang-btn');
-        for (var i = 0; i < btns.length; i++) {
-          btns[i].addEventListener('click', function () {
+        for (var btn of btns) {
+          btn.addEventListener('click', function () {
             var origBtn = document.getElementById('lang-' + this.dataset.lang);
             if (origBtn) origBtn.click();
           });
@@ -1603,9 +1583,9 @@
   function getActiveTemplateSectionWidgets() {
     var name = getActiveTemplateName();
     var all = getAllTemplates();
-    for (var ti = 0; ti < all.length; ti++) {
-      if (all[ti].name !== name) continue;
-      if (all[ti].sectionWidgets && typeof all[ti].sectionWidgets === 'object') return all[ti].sectionWidgets;
+    for (var tplE of all) {
+      if (tplE.name !== name) continue;
+      if (tplE.sectionWidgets && typeof tplE.sectionWidgets === 'object') return tplE.sectionWidgets;
       return getBuiltinSectionWidgetsMap();
     }
     return getBuiltinSectionWidgetsMap();
@@ -1617,8 +1597,7 @@
     var kern = [];
     var kpis = [];
     var rest = [];
-    for (var hi = 0; hi < arr.length; hi++) {
-      var ch = arr[hi];
+    for (var ch of arr) {
       var wg = ch.widgetGroup;
       if (wg === 'kernbefunde') kern.push(ch);
       else if (wg === 'health-kpis') kpis.push(ch);
@@ -1639,23 +1618,23 @@
       return sec.id === 'health' ? stableHealthWidgetGroupOrder(charts) : charts;
     }
     var byId = {};
-    for (var ci = 0; ci < charts.length; ci++) {
-      byId[charts[ci].id] = charts[ci];
+    for (var chrt of charts) {
+      byId[chrt.id] = chrt;
     }
     var out = [];
-    for (var oi = 0; oi < orderIds.length; oi++) {
-      if (byId[orderIds[oi]]) out.push(byId[orderIds[oi]]);
+    for (var oId of orderIds) {
+      if (byId[oId]) out.push(byId[oId]);
     }
-    for (var cj = 0; cj < charts.length; cj++) {
-      var cid = charts[cj].id;
+    for (var chrt2 of charts) {
+      var cid = chrt2.id;
       var found = false;
-      for (var ok = 0; ok < orderIds.length; ok++) {
-        if (orderIds[ok] === cid) {
+      for (var oId2 of orderIds) {
+        if (oId2 === cid) {
           found = true;
           break;
         }
       }
-      if (!found) out.push(charts[cj]);
+      if (!found) out.push(chrt2);
     }
     return sec.id === 'health' ? stableHealthWidgetGroupOrder(out) : out;
   }
@@ -1791,8 +1770,8 @@
     if (tpl.sectionWidgets) out.sectionWidgets = tpl.sectionWidgets;
     if (tpl.hiddenCharts) out.hiddenCharts = tpl.hiddenCharts;
     var w = tpl.widgets || [];
-    for (var i = 0; i < w.length; i++) {
-      out.widgets.push({ id: w[i].id, span: w[i].span || 12, type: w[i].type || 'section' });
+    for (var wItem of w) {
+      out.widgets.push({ id: wItem.id, span: wItem.span || 12, type: wItem.type || 'section' });
     }
     return out;
   }
@@ -1803,14 +1782,13 @@
     var order = tpl.order && tpl.order.length ? tpl.order : ALL_SECTION_IDS;
     var hidden = tpl.hiddenSections || [];
     var widgets = [];
-    for (var i = 0; i < order.length; i++) {
-      if (hidden.indexOf(order[i]) === -1) {
-        widgets.push({ id: order[i], span: 12 });
+    for (var oItem of order) {
+      if (hidden.indexOf(oItem) === -1) {
+        widgets.push({ id: oItem, span: 12 });
       }
     }
     // Add any sections not in order and not hidden
-    for (var j = 0; j < ALL_SECTION_IDS.length; j++) {
-      var sid = ALL_SECTION_IDS[j];
+    for (var sid of ALL_SECTION_IDS) {
       if (order.indexOf(sid) === -1 && hidden.indexOf(sid) === -1) {
         widgets.push({ id: sid, span: 12 });
       }
@@ -1867,16 +1845,15 @@
   function expandVisibleSectionPanels() {
     var reg = getRegistry();
     if (!reg || !reg.sections) return;
-    for (var si = 0; si < reg.sections.length; si++) {
-      var sec = reg.sections[si];
+    for (var sec of reg.sections) {
       if (!sec.domId) continue;
       if (!isSectionVisible(sec.id)) continue;
       var el = document.getElementById(sec.domId);
       if (!el || el.tagName !== 'DETAILS') continue;
       el.open = true;
       var nested = el.querySelectorAll('details');
-      for (var ni = 0; ni < nested.length; ni++) {
-        nested[ni].open = true;
+      for (var nDet of nested) {
+        nDet.open = true;
       }
     }
   }
@@ -1888,16 +1865,16 @@
     // Derive v1 fields from v3 for backward compat
     var order = [];
     var widgetIds = {};
-    for (var i = 0; i < t3.widgets.length; i++) {
-      var wType = t3.widgets[i].type || 'section';
+    for (var tw of t3.widgets) {
+      var wType = tw.type || 'section';
       if (wType === 'section') {
-        order.push(t3.widgets[i].id);
-        widgetIds[t3.widgets[i].id] = true;
+        order.push(tw.id);
+        widgetIds[tw.id] = true;
       }
     }
     var hidden = [];
-    for (var j = 0; j < ALL_SECTION_IDS.length; j++) {
-      if (!widgetIds[ALL_SECTION_IDS[j]]) hidden.push(ALL_SECTION_IDS[j]);
+    for (var asId of ALL_SECTION_IDS) {
+      if (!widgetIds[asId]) hidden.push(asId);
     }
     _prefs.order = order;
     _prefs.hiddenSections = hidden;
@@ -1962,8 +1939,8 @@
 
     // Hide all existing standalone chart wrappers (will re-show only those in current template)
     var existingWrappers = gridEl.querySelectorAll('[id^="widget-"]');
-    for (var ewi = 0; ewi < existingWrappers.length; ewi++) {
-      existingWrappers[ewi].style.display = 'none';
+    for (var ew of existingWrappers) {
+      ew.style.display = 'none';
     }
 
     // Collect all direct children that are NOT sections (table, day-picker, etc.)
@@ -2018,14 +1995,14 @@
       gridEl.appendChild(el);
       placed[w.id] = true;
       // If this section has child sections, mark them as placed too
-      for (var cs = 0; cs < reg.sections.length; cs++) {
-        if (reg.sections[cs].parentSection === w.id) placed[reg.sections[cs].id] = true;
+      for (var csSec of reg.sections) {
+        if (csSec.parentSection === w.id) placed[csSec.id] = true;
       }
 
       // Move companions after their section
       if (sec.companionIds) {
-        for (var ci = 0; ci < sec.companionIds.length; ci++) {
-          var comp = document.getElementById(sec.companionIds[ci]);
+        for (var compId of sec.companionIds) {
+          var comp = document.getElementById(compId);
           if (comp) {
             comp.setAttribute('data-span', String(w.span || 12));
             comp.style.display = vis ? '' : 'none';
@@ -2046,10 +2023,9 @@
     }
 
     // Hide sections not in the template (skip nested)
-    for (var si = 0; si < reg.sections.length; si++) {
-      var s = reg.sections[si];
-      if (!s.domId || placed[s.id] || s.parentSection) continue;
-      var hEl = document.getElementById(s.domId);
+    for (var hSec of reg.sections) {
+      if (!hSec.domId || placed[hSec.id] || hSec.parentSection) continue;
+      var hEl = document.getElementById(hSec.domId);
       if (hEl) hEl.style.display = 'none';
     }
 
@@ -2150,8 +2126,7 @@
     var labels = { de: 'DE', en: 'EN', ko: 'KO' };
     var currentLang = (typeof getLang === 'function') ? getLang() : (localStorage.getItem('usageDashboardLang') || 'en');
     var html = '<div class="us-lang-row">';
-    for (var i = 0; i < langs.length; i++) {
-      var l = langs[i];
+    for (var l of langs) {
       html += '<button type="button" class="lang-btn' + (l === currentLang ? ' active' : '') + '" data-lang="' + l + '">' + labels[l] + '</button>';
     }
     html += '<span class="us-lang-saved" id="us-lang-indicator">' + _t('usPlanActive') + ': ' + (labels[currentLang] || 'EN') + '</span>';
@@ -2164,7 +2139,7 @@
       if (origBtn) origBtn.click();
       // Update active states
       var all = body.querySelectorAll('.lang-btn');
-      for (var j = 0; j < all.length; j++) all[j].classList.remove('active');
+      for (var ab of all) ab.classList.remove('active');
       btn.classList.add('active');
       var indicator = document.getElementById('us-lang-indicator');
       if (indicator) indicator.textContent = _t('usPlanActive') + ': ' + btn.textContent;
@@ -2214,8 +2189,8 @@
       // Resize charts after move
       setTimeout(function () {
         var charts = body.querySelectorAll('[id^="c-user-"]');
-        for (var i = 0; i < charts.length; i++) {
-          var inst = typeof echarts !== 'undefined' ? echarts.getInstanceByDom(charts[i]) : null;
+        for (var chEl of charts) {
+          var inst = typeof echarts !== 'undefined' ? echarts.getInstanceByDom(chEl) : null;
           if (inst) inst.resize();
         }
       }, 100);
@@ -2442,10 +2417,10 @@
           if (ex[ej].id) usedId[ex[ej].id] = true;
         }
       }
-      for (var li = 0; li < loose.length; li++) {
-        if (usedId[loose[li].id]) continue;
-        lastB.children.push(loose[li]);
-        usedId[loose[li].id] = true;
+      for (var looseItem of loose) {
+        if (usedId[looseItem.id]) continue;
+        lastB.children.push(looseItem);
+        usedId[looseItem.id] = true;
       }
     }
     children.length = 0;
@@ -2464,8 +2439,8 @@
         '.tb-canvas-children--drop-append,.tb-canvas-placeholder--drop-here,' +
         '.tb-canvas-cell--drop-before,.tb-canvas-children--drop,.tb-canvas-block-inner--drop-append'
     );
-    for (var mi = 0; mi < marks.length; mi++) {
-      marks[mi].classList.remove(
+    for (var mk of marks) {
+      mk.classList.remove(
         'tb-canvas-section--drop-before',
         'tb-canvas-section--drop-after',
         'tb-canvas-child--drop-before',
@@ -2586,14 +2561,13 @@
     var parts = [];
     var sec = reg.findSection(sectionId);
     if (sec) parts.push(sec);
-    for (var si = 0; si < reg.sections.length; si++) {
-      if (reg.sections[si].parentSection === sectionId) parts.push(reg.sections[si]);
+    for (var rSec of reg.sections) {
+      if (rSec.parentSection === sectionId) parts.push(rSec);
     }
     var out = [];
-    for (var pi = 0; pi < parts.length; pi++) {
-      var ordered = getOrderedChartsForSection(parts[pi]);
-      for (var oi = 0; oi < ordered.length; oi++) {
-        var ch = ordered[oi];
+    for (var part of parts) {
+      var ordered = getOrderedChartsForSection(part);
+      for (var ch of ordered) {
         if (ch.visible === false) continue;
         if (hidden.indexOf(ch.id) >= 0) continue;
         out.push({ id: ch.id, span: tbPoolDefaultSpanForChart(reg, ch.id) });
@@ -2664,12 +2638,11 @@
    */
   function tbAugmentBuilderChildrenFromRegistry(nested) {
     if (!nested || !nested.length) return;
-    for (var wi = 0; wi < nested.length; wi++) {
-      var row = nested[wi];
+    for (var row of nested) {
       var flatKids = row.children || [];
       var hasBlock = false;
-      for (var hb = 0; hb < flatKids.length; hb++) {
-        if (tbIsLayoutBlock(flatKids[hb])) {
+      for (var fk of flatKids) {
+        if (tbIsLayoutBlock(fk)) {
           hasBlock = true;
           break;
         }
@@ -2752,8 +2725,7 @@
     }
     var secs = reg.getSectionsSorted();
     var out = [];
-    for (var si = 0; si < secs.length; si++) {
-      var sec = secs[si];
+    for (var sec of secs) {
       if (sec.parentSection) continue;
       out.push({ id: sec.id, span: 12, children: tbVisibleRegistryChartsForSection(sec.id, true) });
     }
@@ -2994,8 +2966,7 @@
   function tbNestedModelFromPageScaffold() {
     var reg = getRegistry();
     var out = [];
-    for (var pi = 0; pi < TB_PAGE_SCAFFOLD_PLAN.length; pi++) {
-      var p = TB_PAGE_SCAFFOLD_PLAN[pi];
+    for (var p of TB_PAGE_SCAFFOLD_PLAN) {
       if (!reg || !reg.findSection || !reg.findSection(p.id)) continue;
       var children = [];
       var bi;
@@ -3016,9 +2987,9 @@
     var val = tplSelect ? tplSelect.value : '';
     if (val) {
       var all = getAllTemplates();
-      for (var ti = 0; ti < all.length; ti++) {
-        if (all[ti].name === val) {
-          _tbWidgets = tbLoadTemplateIntoBuilder(all[ti]);
+      for (var tplItem of all) {
+        if (tplItem.name === val) {
+          _tbWidgets = tbLoadTemplateIntoBuilder(tplItem);
           renderBuilderRows();
           return;
         }
@@ -3039,8 +3010,8 @@
     if (!widgets || !widgets.length) return tbNestedModelFromPageScaffold();
     // Check if template has layout/chart blocks
     var hasBlocks = false;
-    for (var wi = 0; wi < widgets.length; wi++) {
-      if (widgets[wi].type === 'layout' || widgets[wi].type === 'chart') {
+    for (var wChk of widgets) {
+      if (wChk.type === 'layout' || wChk.type === 'chart') {
         hasBlocks = true; break;
       }
     }
@@ -3052,12 +3023,11 @@
     // Section-only: enrich with scaffold blocks in template order
     var scaffoldNested = tbNestedModelFromPageScaffold();
     var scaffoldById = {};
-    for (var si = 0; si < scaffoldNested.length; si++) {
-      scaffoldById[scaffoldNested[si].id] = scaffoldNested[si];
+    for (var scSec of scaffoldNested) {
+      scaffoldById[scSec.id] = scSec;
     }
     var out = [];
-    for (var pi = 0; pi < widgets.length; pi++) {
-      var pw = widgets[pi];
+    for (var pw of widgets) {
       if ((pw.type || 'section') !== 'section') continue;
       var scaffSec = scaffoldById[pw.id];
       if (scaffSec) {
@@ -3096,10 +3066,10 @@
     if (tplSelect) {
       var all = getAllTemplates();
       tplSelect.innerHTML = '<option value="">— Template laden —</option>';
-      for (var ti = 0; ti < all.length; ti++) {
+      for (var tplOpt of all) {
         var opt = document.createElement('option');
-        opt.value = all[ti].name;
-        opt.textContent = all[ti].name + (all[ti].builtin ? '' : ' *');
+        opt.value = tplOpt.name;
+        opt.textContent = tplOpt.name + (tplOpt.builtin ? '' : ' *');
         tplSelect.appendChild(opt);
       }
     }
@@ -3133,7 +3103,7 @@
 
   function getUsedIds() {
     var used = {};
-    for (var i = 0; i < _tbWidgets.length; i++) used[_tbWidgets[i].id] = true;
+    for (var tw of _tbWidgets) used[tw.id] = true;
     return used;
   }
 
@@ -3142,8 +3112,7 @@
     var reg = getRegistry();
     if (!reg) return [];
     var avail = [];
-    for (var i = 0; i < reg.sections.length; i++) {
-      var s = reg.sections[i];
+    for (var s of reg.sections) {
       if (!used[s.id]) avail.push(s);
     }
     return avail;
@@ -3176,15 +3145,14 @@
 
   function tbGetAllUsedIds() {
     var used = {};
-    for (var i = 0; i < _tbWidgets.length; i++) {
-      used[_tbWidgets[i].id] = true;
-      var ch = _tbWidgets[i].children || [];
-      for (var ci = 0; ci < ch.length; ci++) {
-        var ent = ch[ci];
+    for (var tw of _tbWidgets) {
+      used[tw.id] = true;
+      var ch = tw.children || [];
+      for (var ent of ch) {
         if (tbIsLayoutBlock(ent)) {
           var inn = ent.children || [];
-          for (var ii = 0; ii < inn.length; ii++) {
-            if (inn[ii].id) used[inn[ii].id] = true;
+          for (var innEnt of inn) {
+            if (innEnt.id) used[innEnt.id] = true;
           }
           continue;
         }
@@ -3336,8 +3304,7 @@
     var seen = {};
     function pushFrom(sec) {
       if (!sec || !sec.charts) return;
-      for (var i = 0; i < sec.charts.length; i++) {
-        var ch = sec.charts[i];
+      for (var ch of sec.charts) {
         if (ch.kind === 'chip' || ch.engine !== 'echarts') continue;
         if (!seen[ch.id]) {
           seen[ch.id] = true;
@@ -3370,8 +3337,7 @@
     if (labSec) labSec.textContent = _t('tbPoolSections');
 
     var htmlSec = '';
-    for (var si = 0; si < reg.sections.length; si++) {
-      var sec = reg.sections[si];
+    for (var sec of reg.sections) {
       if (sec.parentSection) continue;
       var clsS = 'tb-pool-chip' + (used[sec.id] ? ' is-used' : '');
       htmlSec += '<div class="' + clsS + '" data-pool-id="' + sec.id + '" data-pool-type="section" draggable="' + (used[sec.id] ? 'false' : 'true') + '">';
@@ -3381,12 +3347,10 @@
     elSections.innerHTML = htmlSec;
 
     var htmlCharts = '';
-    for (var gi = 0; gi < reg.sections.length; gi++) {
-      var gs = reg.sections[gi];
+    for (var gs of reg.sections) {
       if (!gs.charts || !gs.charts.length) continue;
       var hasCanvas = false;
-      for (var cj = 0; cj < gs.charts.length; cj++) {
-        var chx = gs.charts[cj];
+      for (var chx of gs.charts) {
         if (chx.engine === 'echarts' && chx.kind !== 'chip') {
           hasCanvas = true;
           break;
@@ -3394,8 +3358,7 @@
       }
       if (!hasCanvas) continue;
       var innerCharts = '';
-      for (var rci = 0; rci < gs.charts.length; rci++) {
-        var rc = gs.charts[rci];
+      for (var rc of gs.charts) {
         var isCanvasChart = rc.engine === 'echarts' && rc.kind !== 'chip';
         if (!isCanvasChart) continue;
         if (used[rc.id]) continue;
@@ -3415,12 +3378,10 @@
     elCharts.innerHTML = htmlCharts;
 
     var htmlMeta = '';
-    for (var gk = 0; gk < reg.sections.length; gk++) {
-      var g2 = reg.sections[gk];
+    for (var g2 of reg.sections) {
       if (!g2.charts || !g2.charts.length) continue;
       var hasMeta = false;
-      for (var ck = 0; ck < g2.charts.length; ck++) {
-        var cx = g2.charts[ck];
+      for (var cx of g2.charts) {
         if (!(cx.engine === 'echarts' && cx.kind !== 'chip')) {
           hasMeta = true;
           break;
@@ -3428,8 +3389,7 @@
       }
       if (!hasMeta) continue;
       var innerMeta = '';
-      for (var rck = 0; rck < g2.charts.length; rck++) {
-        var r2 = g2.charts[rck];
+      for (var r2 of g2.charts) {
         var isCv = r2.engine === 'echarts' && r2.kind !== 'chip';
         if (isCv) continue;
         if (used[r2.id]) continue;
@@ -3742,7 +3702,7 @@
       _tbDrag = null;
       tbClearCanvasDropUi();
       var marks = canvas.querySelectorAll('.is-dragging');
-      for (var i = 0; i < marks.length; i++) marks[i].classList.remove('is-dragging');
+      for (var mk of marks) mk.classList.remove('is-dragging');
     });
 
     // Resize section
@@ -3876,10 +3836,10 @@
             }
           }
           var targetList = lastBlk ? (lastBlk.children || (lastBlk.children = [])) : _tbWidgets[wi].children;
-          for (var zk2 = 0; zk2 < newKids.length; zk2++) {
-            if (!seenC[newKids[zk2].id]) {
-              targetList.push(newKids[zk2]);
-              seenC[newKids[zk2].id] = true;
+          for (var nk of newKids) {
+            if (!seenC[nk.id]) {
+              targetList.push(nk);
+              seenC[nk.id] = true;
             }
           }
         } else {
@@ -3965,11 +3925,10 @@
     if (!w) return;
     // Grid selectors and their column rules at various widths
     var gridSels = ['.grid', '.health-grid', '.key-findings-grid'];
-    for (var gi = 0; gi < gridSels.length; gi++) {
-      var grids = pvEl.querySelectorAll(gridSels[gi]);
-      for (var gj = 0; gj < grids.length; gj++) {
-        var g = grids[gj];
-        var isHealth = gridSels[gi] === '.health-grid';
+    for (var gSel of gridSels) {
+      var grids = pvEl.querySelectorAll(gSel);
+      for (var g of grids) {
+        var isHealth = gSel === '.health-grid';
         var cols;
         if (w > 580) cols = isHealth ? 3 : 6;
         else if (w > 400) cols = isHealth ? 2 : 4;
@@ -3982,11 +3941,11 @@
     // Font scaling for narrow containers
     if (w < 300) {
       var vals = pvEl.querySelectorAll('.value, .health-badge-value');
-      for (var vi = 0; vi < vals.length; vi++) vals[vi].style.fontSize = '0.85rem';
+      for (var val of vals) val.style.fontSize = '0.85rem';
       var labs = pvEl.querySelectorAll('.label, .health-badge-label');
-      for (var li = 0; li < labs.length; li++) labs[li].style.fontSize = '0.6rem';
+      for (var lab of labs) lab.style.fontSize = '0.6rem';
       var subs = pvEl.querySelectorAll('.sub, .health-badge-sub');
-      for (var si = 0; si < subs.length; si++) subs[si].style.fontSize = '0.6rem';
+      for (var sub of subs) sub.style.fontSize = '0.6rem';
     }
   }
 
@@ -4167,27 +4126,25 @@
     // Flatten nested model back to v3 format (only ECharts canvas rows: chips stay in section DOM / hiddenCharts)
     var flatW = [];
     var regSv = getRegistry();
-    for (var fi = 0; fi < _tbWidgets.length; fi++) {
-      var sec = _tbWidgets[fi];
-      flatW.push({ id: sec.id, span: sec.span || 12 });
-      var ch = sec.children || [];
+    for (var tbSec of _tbWidgets) {
+      flatW.push({ id: tbSec.id, span: tbSec.span || 12 });
+      var ch = tbSec.children || [];
       for (var ci = 0; ci < ch.length; ci++) {
         var chEnt = ch[ci];
         if (tbIsLayoutBlock(chEnt)) {
           var nestedOut = [];
           var innSv = chEnt.children || [];
-          var ii;
-          for (ii = 0; ii < innSv.length; ii++) {
-            var idef = regSv && regSv.findChart ? regSv.findChart(innSv[ii].id) : null;
+          for (var innItem of innSv) {
+            var idef = regSv && regSv.findChart ? regSv.findChart(innItem.id) : null;
             if (idef && (idef.kind === 'chip' || idef.engine !== 'echarts')) continue;
-            nestedOut.push({ id: innSv[ii].id, span: innSv[ii].span || 6 });
+            nestedOut.push({ id: innItem.id, span: innItem.span || 6 });
           }
           // Skip empty layout blocks (chips-only rows)
           if (nestedOut.length) {
             flatW.push({
               type: 'layout',
               span: chEnt.span || 12,
-              section: sec.id,
+              section: tbSec.id,
               bid: chEnt.bid || chEnt.id || 'tbblk_s' + ci,
               nested: nestedOut
             });
@@ -4196,7 +4153,7 @@
         }
         var cdef = regSv && regSv.findChart ? regSv.findChart(chEnt.id) : null;
         if (cdef && (cdef.kind === 'chip' || cdef.engine !== 'echarts')) continue;
-        flatW.push({ id: chEnt.id, span: chEnt.span || 6, type: 'chart', section: sec.id });
+        flatW.push({ id: chEnt.id, span: chEnt.span || 6, type: 'chart', section: tbSec.id });
       }
     }
     var tpl = { name: name, version: 3, widgets: flatW };
@@ -4226,14 +4183,13 @@
     // Build DOM with real chart containers
     var html = '<div class="tb-pv-grid">';
     var chartSlots = []; // {chartDef, domId} to render after innerHTML
-    for (var i = 0; i < _tbWidgets.length; i++) {
-      var sec = _tbWidgets[i];
-      var secDef = reg.findSection(sec.id);
-      var secName = secDef ? _t(secDef.titleKey) : sec.id;
-      html += '<div class="tb-pv-section" style="grid-column:span ' + (sec.span || 12) + '">';
-      html += '<div class="tb-pv-section-head">' + secName + ' <span style="opacity:.4;font-weight:400">(' + (sec.span || 12) + '/12)</span></div>';
+    for (var pvSec of _tbWidgets) {
+      var secDef = reg.findSection(pvSec.id);
+      var secName = secDef ? _t(secDef.titleKey) : pvSec.id;
+      html += '<div class="tb-pv-section" style="grid-column:span ' + (pvSec.span || 12) + '">';
+      html += '<div class="tb-pv-section-head">' + secName + ' <span style="opacity:.4;font-weight:400">(' + (pvSec.span || 12) + '/12)</span></div>';
       html += '<div class="tb-pv-section-body">';
-      var children = sec.children || [];
+      var children = pvSec.children || [];
       if (children.length) {
         for (var ci = 0; ci < children.length; ci++) {
           var c = children[ci];
@@ -4259,13 +4215,13 @@
               var icp = inPv[pi];
               var chDefIn = reg.findChart(icp.id);
               var chNameIn = chDefIn ? _t(chDefIn.titleKey) : icp.id;
-              var pvIdIn = 'tb-pv-' + sec.id + '-' + icp.id + '-b' + ci + '-' + pi;
+              var pvIdIn = 'tb-pv-' + pvSec.id + '-' + icp.id + '-b' + ci + '-' + pi;
               var isCanvasIn = tbPreviewIsCanvasChart(chDefIn);
               var icSpPv = icp.span || 6;
               if (icSpPv < 1) icSpPv = 1;
               if (icSpPv > bspPv) icSpPv = bspPv;
               // At narrow section spans, force meta chips to full block width
-              if (!isCanvasIn && (sec.span || 12) <= 6) icSpPv = bspPv;
+              if (!isCanvasIn && (pvSec.span || 12) <= 6) icSpPv = bspPv;
               html +=
                 '<div class="tb-pv-chart' +
                 (isCanvasIn ? '' : ' tb-pv-chart--meta') +
@@ -4288,11 +4244,11 @@
             continue;
           }
           var chDef = reg.findChart(c.id);
-          var pvId = 'tb-pv-' + sec.id + '-' + c.id;
+          var pvId = 'tb-pv-' + pvSec.id + '-' + c.id;
           var isCanvas = tbPreviewIsCanvasChart(chDef);
           var directSpan = c.span || 6;
           // At narrow section spans, force meta chips to full width
-          if (!isCanvas && (sec.span || 12) <= 6) directSpan = 12;
+          if (!isCanvas && (pvSec.span || 12) <= 6) directSpan = 12;
           html +=
             '<div class="tb-pv-chart' +
             (isCanvas ? '' : ' tb-pv-chart--meta') +
@@ -4322,15 +4278,15 @@
 
     // Render charts after DOM is ready (clone live options or paint via renderFn + temp id swap)
     setTimeout(function () {
-      for (var si = 0; si < chartSlots.length; si++) {
-        tbPreviewRenderSlot(chartSlots[si]);
+      for (var slot of chartSlots) {
+        tbPreviewRenderSlot(slot);
       }
       // Adapt all cloned KPI chip grids to their actual container width
       var pvSections = body.querySelectorAll('.tb-pv-section');
-      for (var psi = 0; psi < pvSections.length; psi++) {
-        var metaEls = pvSections[psi].querySelectorAll('.tb-pv-chart-container--html');
-        for (var mi = 0; mi < metaEls.length; mi++) {
-          tbPreviewAdaptChipGrid(metaEls[mi]);
+      for (var pvs of pvSections) {
+        var metaEls = pvs.querySelectorAll('.tb-pv-chart-container--html');
+        for (var metaEl of metaEls) {
+          tbPreviewAdaptChipGrid(metaEl);
         }
       }
     }, 150);
@@ -4343,8 +4299,8 @@
     // Dispose ECharts instances to free memory
     if (body && typeof echarts !== 'undefined') {
       var containers = body.querySelectorAll('.tb-pv-chart-container');
-      for (var di = 0; di < containers.length; di++) {
-        var inst = echarts.getInstanceByDom(containers[di]);
+      for (var ctr of containers) {
+        var inst = echarts.getInstanceByDom(ctr);
         if (inst) try { inst.dispose(); } catch (e) {}
       }
     }
@@ -4393,9 +4349,9 @@
         var val = tplSelect.value;
         if (!val) return;
         var all = getAllTemplates();
-        for (var ti = 0; ti < all.length; ti++) {
-          if (all[ti].name === val) {
-            var tpl = all[ti];
+        for (var tplSel of all) {
+          if (tplSel.name === val) {
+            var tpl = tplSel;
             _tbWidgets = tbLoadTemplateIntoBuilder(tpl);
             var nameInput = document.getElementById('tb-name-input');
             if (nameInput) nameInput.value = tpl.builtin ? '' : (tpl.name || '');

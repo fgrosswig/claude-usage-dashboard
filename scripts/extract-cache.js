@@ -86,8 +86,8 @@ function forEachLineSync(filePath, cb) {
       var chunk = leftover + decoder.write(buf.slice(0, bytesRead));
       var lines = chunk.split('\n');
       leftover = lines.pop() || '';
-      for (var i = 0; i < lines.length; i++) {
-        if (lines[i].length) cb(lines[i]);
+      for (var ln of lines) {
+        if (ln.length) cb(ln);
       }
     }
     if (leftover.length) cb(leftover);
@@ -186,8 +186,7 @@ function sync(cache, taggedFiles) {
   var result = { hit: 0, miss: 0, removed: 0, totalRecords: 0 };
   var currentPaths = {};
 
-  for (var i = 0; i < taggedFiles.length; i++) {
-    var tf = taggedFiles[i];
+  for (var tf of taggedFiles) {
     var fp = typeof tf === 'string' ? tf : tf.path;
     currentPaths[fp] = true;
 
@@ -254,8 +253,8 @@ function getAllRecords(cache) {
     var entry = cache.files[fp];
     var label = entry.label || 'local';
     var isSub = entry.isSub || false;
-    for (var i = 0; i < entry.records.length; i++) {
-      all.push({ rec: entry.records[i], label: label, isSub: isSub });
+    for (var rec of entry.records) {
+      all.push({ rec: rec, label: label, isSub: isSub });
     }
   }
   return all;

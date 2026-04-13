@@ -7,8 +7,7 @@ var crypto = require('node:crypto');
 
 function pass1CollectSessionsForDayWindowFromFiles(dateKeys, files, forEachJsonlLineSync) {
   var allowedDays = Object.create(null);
-  for (var di = 0; di < dateKeys.length; di++) {
-    var dk = dateKeys[di];
+  for (var dk of dateKeys) {
     var d = new Date(dk + 'T00:00:00Z');
     var prevDay = new Date(d.getTime() - 86400000).toISOString().slice(0, 10);
     var nextDay = new Date(d.getTime() + 86400000).toISOString().slice(0, 10);
@@ -17,8 +16,7 @@ function pass1CollectSessionsForDayWindowFromFiles(dateKeys, files, forEachJsonl
     allowedDays[nextDay] = true;
   }
   var allSessions = Object.create(null);
-  for (var fi = 0; fi < files.length; fi++) {
-    var file = files[fi];
+  for (var file of files) {
     try {
       forEachJsonlLineSync(file.path, function (line) {
         if (!line) return;
@@ -66,12 +64,11 @@ function finalizeSessionTurnsForDate(dateKey, allSessions) {
   var sessions = Object.create(null);
   var totalParsed = 0;
   var sids = Object.keys(allSessions);
-  for (var si = 0; si < sids.length; si++) {
-    var sid = sids[si];
+  for (var sid of sids) {
     var turns = allSessions[sid];
     var hasDateKey = false;
-    for (var ti = 0; ti < turns.length; ti++) {
-      if (turns[ti].day === dateKey) {
+    for (var turn of turns) {
+      if (turn.day === dateKey) {
         hasDateKey = true;
         break;
       }
@@ -83,8 +80,7 @@ function finalizeSessionTurnsForDate(dateKey, allSessions) {
 
   var result = [];
   var resultSids = Object.keys(sessions);
-  for (var ri = 0; ri < resultSids.length; ri++) {
-    var sid2 = resultSids[ri];
+  for (var sid2 of resultSids) {
     var turns2 = sessions[sid2];
     turns2.sort(function (a, b) {
       if (a.ts < b.ts) return -1;
@@ -145,8 +141,7 @@ function buildSessionTurnsForDateWithCollected(dateKey, tagged, forEachJsonlLine
 function populateSessionTurnsCacheForDatesBench(dateKeys, tagged, forEachJsonlLineSync) {
   var allSessions = pass1CollectSessionsForDayWindowFromFiles(dateKeys, tagged, forEachJsonlLineSync);
   var stByDate = {};
-  for (var i = 0; i < dateKeys.length; i++) {
-    var dk = dateKeys[i];
+  for (var dk of dateKeys) {
     stByDate[dk] = finalizeSessionTurnsForDate(dk, allSessions);
   }
   return stByDate;
@@ -162,8 +157,7 @@ function populateSessionTurnsCacheForDatesBench(dateKeys, tagged, forEachJsonlLi
  */
 function pass1FromExtractCache(dateKeys, extractCache) {
   var allowedDays = Object.create(null);
-  for (var di = 0; di < dateKeys.length; di++) {
-    var dk = dateKeys[di];
+  for (var dk of dateKeys) {
     var d = new Date(dk + 'T00:00:00Z');
     var prevDay = new Date(d.getTime() - 86400000).toISOString().slice(0, 10);
     var nextDay = new Date(d.getTime() + 86400000).toISOString().slice(0, 10);
@@ -177,8 +171,7 @@ function pass1FromExtractCache(dateKeys, extractCache) {
     if (!Object.prototype.hasOwnProperty.call(files, fp)) continue;
     var entry = files[fp];
     var records = entry.records || [];
-    for (var ri = 0; ri < records.length; ri++) {
-      var r = records[ri];
+    for (var r of records) {
       if (r.tp !== 'assistant') continue;
       var ts = r.ts;
       if (!ts || ts.length < 19) continue;
