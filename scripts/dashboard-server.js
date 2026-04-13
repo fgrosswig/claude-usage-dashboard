@@ -4576,6 +4576,8 @@ var server = http.createServer(function (req, res) {
         if (fs.existsSync(layoutFile)) {
           fs.unlinkSync(layoutFile);
           serviceLog.info('layout', 'deleted ' + layoutFile);
+        } else {
+          serviceLog.info('layout', 'already absent — nothing to delete');
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end('{"ok":true}');

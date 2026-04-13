@@ -2,15 +2,70 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-263",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "5e3bf67",
+      "commit_full": "5e3bf678b97021e269d570b8ec4a925ad96b9a8c",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(tb): load selected template from dropdown instead of always scaffold (#220)",
+      "detail": "tbLoadDefaultIntoBuilder now respects the template-select dropdown value.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "TX-262",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "66e443f",
+      "commit_full": "66e443f2689928c9fb0ec10048c9bb730fe418ad",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(widgets): scaffold default, template persistence, preview responsive, layout fixes",
+      "detail": "- buildDefaultWidgetsFromScaffold() for first-load default layout\n- Layout blocks ignored on live page (builder metadata only)\n- dispatchRender + invokeChartRenderFn for extracted chart context\n- Template persistence in layout JSON (templates key)\n- Template select dropdown in builder header\n- tbLoadTemplateIntoBuilder() central function for all template loading\n- Preview: tbPreviewAdaptChipGrid responsive KPI chips (#220)\n- Preview: group-clone fallback for health/findings/cards\n- Preview: chart labels removed (break narrow spans)\n- Standalone wrappers hidden on template switch\n- normalizePrefsShape strips empty layout blocks\n- anthropic-status removed from scaffold plan\n- Compact template: health span 12, added forensic+economic\n- DEV clear layout: preserves user templates, clears sessionStorage\n- DELETE /api/layout guarded by devMode, always logs result\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/css/dashboard.css",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-261",
       "timestamp": "2026-04-13",
       "session": "auto",
-      "commit": "9bde76f",
-      "commit_full": "9bde76f4cc8592ebb2e8b281d265e9aace32a2db",
+      "commit": "81f1503",
+      "commit_full": "81f15039b454af80ddbb7ea08617c0f2011249ad",
       "status": "ABGESCHLOSSEN",
-      "description": "Merge branch 'feat/widget-dispatcher' into develop",
-      "detail": "# Conflicts:\n#\tlogs/transactions.json",
-      "changes": []
+      "description": "fix(dev): always log DELETE /api/layout result",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
     },
     {
       "id": "TX-260",

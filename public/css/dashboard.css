@@ -1168,6 +1168,7 @@ details.tb-pool-group--fold > summary.tb-pool-group-title:hover{color:#e2e8f0}
 .tb-pool-section-toggle{background:none;border:none;color:#64748b;cursor:pointer;font-size:.65rem;padding:2px 4px;margin-left:2px}
 .tb-pool-section-toggle:hover{color:#94a3b8}
 /* ── Template Builder v2: Preview Overlay ─────────────────────── */
+.tb-template-select{background:#1e293b;color:#cbd5e1;border:1px solid #475569;border-radius:6px;padding:4px 8px;font-size:.78rem;cursor:pointer;max-width:180px}.tb-template-select:hover{background:#334155;border-color:#64748b}.tb-template-select:focus{outline:1px solid #3b82f6;border-color:#3b82f6}
 .tb-btn--load-default{background:#1e293b;color:#cbd5e1;border:1px solid #475569}.tb-btn--load-default:hover{background:#334155;color:#f8fafc;border-color:#64748b}
 .tb-btn--preview{background:#1e293b;color:#94a3b8;border:1px solid #475569}.tb-btn--preview:hover{background:#334155;color:#e2e8f0}
 .tb-preview-overlay{position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center}
