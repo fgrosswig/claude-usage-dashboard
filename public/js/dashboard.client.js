@@ -12,7 +12,7 @@ function pct(a,b){return b>0?(a/b*100).toFixed(1)+"%":"-";}
 function escHtml(s){return String(s==null?"":s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll("\"","&quot;");}
 /** Sonar S2486: catch blocks must reference the exception. */
 function logClientOptionalErr(err) {
-  if (typeof console !== "undefined" && console.debug) console.debug("[dashboard]", err && err.message != null ? err.message : err);
+  if (typeof console !== "undefined" && console.debug) console.debug("[dashboard]", err?.message == null ? err : err.message);
 }
 /** Stunden mit Arbeit (tokens) ∪ Stunden mit JSONL-Session-Signalen, nach Log-Zeitstempel. */
 function unionWorkHourKeys(sd) {
