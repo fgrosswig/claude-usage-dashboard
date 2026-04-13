@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-249",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "61715d4",
+      "commit_full": "61715d4e0db89c44a6a1c2db7e300124046191fb",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(layout): resetPrefs deletes server-side layout file and reloads",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-248",
       "timestamp": "2026-04-13",
       "session": "auto",
