@@ -38,7 +38,7 @@
   var _layoutTreeEditMode = false;
 
   function wtreeNextSectionLi(li) {
-    if (!li || !li.parentNode) return null;
+    if (!li?.parentNode) return null;
     var n = li.nextSibling;
     while (n) {
       if (n.nodeType === 1 && n.matches?.('li.widget-tree-item[data-section]')) return n;
@@ -48,7 +48,7 @@
   }
 
   function wtreePrevSectionLi(li) {
-    if (!li || !li.parentNode) return null;
+    if (!li?.parentNode) return null;
     var n = li.previousSibling;
     while (n) {
       if (n.nodeType === 1 && n.matches?.('li.widget-tree-item[data-section]')) return n;
@@ -179,7 +179,7 @@
       if (!tryAcceptPrefsPayload(o)) return;
       if (Array.isArray(o.hiddenCharts)) _prefs.hiddenCharts = o.hiddenCharts.slice();
       if (Array.isArray(o.hiddenSections)) _prefs.hiddenSections = o.hiddenSections.slice();
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
   }
 
   function loadPrefs() {
@@ -190,7 +190,7 @@
         var p = JSON.parse(raw);
         fromLs = tryAcceptPrefsPayload(p);
       }
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
 
     // Datei ist Single Source of Truth
     try {
@@ -205,12 +205,12 @@
             if (sp.v == null) sp.v = PREFS_VERSION;
             else sp.v = Number(sp.v);
             normalizePrefsShape(sp);
-            try { localStorage.setItem(PREFS_KEY, JSON.stringify(sp)); } catch (_ignored) {}
+            try { localStorage.setItem(PREFS_KEY, JSON.stringify(sp)); } catch (error) { /* intentional */ }
             return sp;
           }
         }
       }
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
     if (fromLs) return fromLs;
     return defaultPrefs();
   }
@@ -218,7 +218,7 @@
   function savePrefs() {
     if (!_prefs) return;
     var json = JSON.stringify(_prefs);
-    try { localStorage.setItem(PREFS_KEY, json); } catch (_ignored) {}
+    try { localStorage.setItem(PREFS_KEY, json); } catch (error) { /* intentional */ }
     // PUT /api/layout synchron — Datei ist Single Source of Truth, muss vor Reload fertig sein.
     try {
       var xhrPut = new XMLHttpRequest();
@@ -229,7 +229,7 @@
         try {
           var mPut = xhrPut.getResponseHeader('X-Layout-Mtime');
           if (mPut) localStorage.setItem(LAYOUT_FILE_MTIME_KEY, mPut);
-        } catch (_ignored) {}
+        } catch (error) { /* intentional */ }
       }
     } catch (e) { /* offline */ }
   }
@@ -266,7 +266,7 @@
       byId[sec0.id] = sec0;
     }
     /** v2: Reihenfolge exakt aus widgets[] — gleicher Pfad wie applyGridLayout (appendChild). */
-    if (_prefs && _prefs.widgets && _prefs.widgets.length) {
+    if (_prefs?.widgets?.length) {
       var outW = [];
       var seenW = {};
       var ww = _prefs.widgets;
@@ -297,7 +297,7 @@
       }
       return outW;
     }
-    if (_prefs && _prefs.order && _prefs.order.length > 0) {
+    if (_prefs?.order?.length > 0) {
       var result = [];
       for (var oKey of _prefs.order) {
         if (byId[oKey]) {
@@ -321,18 +321,18 @@
     var hs = _prefs.hiddenSections;
     if (!Array.isArray(hs)) hs = [];
     var reg = getRegistry();
-    var secDef = reg && reg.findSection ? reg.findSection(sectionId) : null;
+    var secDef = reg?.findSection ? reg.findSection(sectionId) : null;
     // Sections without a layout <details> host (e.g. anthropic-status in the top bar) are not
     // listed in widgets[] — they must stay "visible" so chart visibility only uses hiddenCharts.
-    if (secDef && secDef.domId === null && secDef.reorderable === false) {
+    if (secDef?.domId === null && secDef?.reorderable === false) {
       return true;
     }
-    if (secDef && secDef.parentSection) {
+    if (secDef?.parentSection) {
       if (hs.includes(sectionId)) return false;
       return isSectionVisible(secDef.parentSection);
     }
     if (hs.includes(sectionId)) return false;
-    if (_prefs.widgets && _prefs.widgets.length) {
+    if (_prefs.widgets?.length) {
       var wi;
       for (wi = 0; wi < _prefs.widgets.length; wi++) {
         if (_prefs.widgets[wi].id === sectionId) return true;
@@ -346,7 +346,7 @@
     if (!_prefs) return true;
     var reg = getRegistry();
     var secId = null;
-    if (reg && reg.sections) {
+    if (reg?.sections) {
       for (var secX of reg.sections) {
         var charts = secX.charts || [];
         for (var chX of charts) {
@@ -365,7 +365,7 @@
   }
 
   function getWidgetSpan(sectionId) {
-    if (!_prefs || !_prefs.widgets) return null;
+    if (!_prefs?.widgets) return null;
     for (var wgt of _prefs.widgets) {
       if (wgt.id === sectionId) return wgt.span;
     }
@@ -374,7 +374,7 @@
 
   /** When v2 widgets[] drives the grid, _prefs.order must match or sidebar and page diverge. */
   function syncPrefsOrderFromWidgets() {
-    if (!_prefs || !_prefs.widgets || !_prefs.widgets.length) return false;
+    if (!_prefs?.widgets?.length) return false;
     var ids = [];
     for (var wEnt of _prefs.widgets) {
       var wT = wEnt.type || 'section';
@@ -382,7 +382,7 @@
       ids.push(wEnt.id);
     }
     var changed = false;
-    if (!_prefs.order || _prefs.order.length !== ids.length) changed = true;
+    if (!_prefs.order || _prefs.order?.length !== ids.length) changed = true;
     else {
       for (var c = 0; c < ids.length; c++) {
         if (_prefs.order[c] !== ids[c]) {
@@ -403,7 +403,7 @@
    * (e.g. anthropic-status) in their relative tail positions.
    */
   function syncPrefsWidgetsFromDraggableOrder(orderedIds) {
-    if (!_prefs || !_prefs.widgets || !_prefs.widgets.length) return false;
+    if (!_prefs?.widgets?.length) return false;
     var inDrag = {};
     for (var oId of orderedIds) inDrag[oId] = true;
     var before = _prefs.widgets;
@@ -471,7 +471,7 @@
   // ── DOM Reorder ─────────────────────────────────────────────────
 
   function applyOrder() {
-    if (!_prefs || !_prefs.order || !_prefs.order.length) return;
+    if (!_prefs?.order?.length) return;
     var sections = getSortedSections();
     // Find the parent container of sections
     var firstSec = null;
@@ -481,7 +481,7 @@
         if (firstSec) break;
       }
     }
-    if (!firstSec || !firstSec.parentNode) return;
+    if (!firstSec?.parentNode) return;
     var parent = firstSec.parentNode;
 
     // Collect all section elements + their companions in desired order
@@ -524,7 +524,7 @@
       if (!isSectionVisible(sec.id)) continue;
       if (sec.domId) {
         var det = document.getElementById(sec.domId);
-        if (det && det.tagName === 'DETAILS' && !det.open) continue;
+        if (det?.tagName === 'DETAILS' && !det.open) continue;
       }
       var charts = sec.charts || [];
       for (var ch of charts) {
@@ -578,12 +578,12 @@
         for (var ek in extracted) {
           if (!Object.hasOwn(extracted, ek)) continue;
           var chartDef = reg.findChart(ek);
-          if (!chartDef || !chartDef.renderFn) continue;
+          if (!chartDef?.renderFn) continue;
           var rf = global[chartDef.renderFn];
           if (typeof rf !== 'function') continue;
           try {
             invokeChartRenderFn(chartDef.renderFn, rf);
-          } catch (_ignored) {}
+          } catch (error) { /* intentional */ }
         }
       }
     }
@@ -619,7 +619,7 @@
     ) {
       var uDataE = global.__lastUsageData;
       var eDaysE = [];
-      if (uDataE && uDataE.days && uDataE.days.length) {
+      if (uDataE?.days?.length) {
         eDaysE = typeof global.getFilteredDays === 'function'
           ? global.getFilteredDays(uDataE.days) : uDataE.days.slice();
       }
@@ -653,7 +653,7 @@
     for (var sec of sections) {
       if (!sec.domId) continue;
       var det = document.getElementById(sec.domId);
-      if (!det || det.tagName !== 'DETAILS') continue;
+      if (!det || det?.tagName !== 'DETAILS') continue;
       if (det.dataset.dispatcherBound) continue;
       det.dataset.dispatcherBound = '1';
       (function (sectionId) {
@@ -671,7 +671,7 @@
    * So bleibt Sichtbarkeit beim Reload erhalten, ohne Reihenfolge aus widgets[] zu streichen.
    */
   function reconcileHiddenSectionsWithWidgets() {
-    if (!_prefs || !_prefs.widgets || !_prefs.widgets.length) return false;
+    if (!_prefs?.widgets?.length) return false;
     var reg = getRegistry();
     if (!reg) return false;
     var inW = {};
@@ -713,7 +713,7 @@
    */
   function buildDefaultWidgetsFromScaffold() {
     var nested = tbNestedModelFromPageScaffold();
-    if (!nested || !nested.length) return null;
+    if (!nested?.length) return null;
     var flatW = [];
     var regSv = getRegistry();
     for (var nSec of nested) {
@@ -725,7 +725,7 @@
           var nestedOut = [];
           var innSv = chEnt.children || [];
           for (var innE of innSv) {
-            var idef = regSv && regSv.findChart ? regSv.findChart(innE.id) : null;
+            var idef = regSv?.findChart ? regSv.findChart(innE.id) : null;
             if (idef && (idef.kind === 'chip' || idef.engine !== 'echarts')) continue;
             nestedOut.push({ id: innE.id, span: innE.span || 6 });
           }
@@ -741,7 +741,7 @@
           }
           continue;
         }
-        var cdef = regSv && regSv.findChart ? regSv.findChart(chEnt.id) : null;
+        var cdef = regSv?.findChart ? regSv.findChart(chEnt.id) : null;
         if (cdef && (cdef.kind === 'chip' || cdef.engine !== 'echarts')) continue;
         flatW.push({ id: chEnt.id, span: chEnt.span || 6, type: 'chart', section: nSec.id });
       }
@@ -755,13 +755,13 @@
     _prefs = loadPrefs();
     if (migrateHiddenChartsLegacy()) savePrefs();
     // Migrate prefs to v2 if needed (auch widgets: [] mit gültigem order[])
-    if ((!_prefs.widgets || !_prefs.widgets.length) && _prefs.order && _prefs.order.length) {
+    if ((!_prefs.widgets?.length) && _prefs.order?.length) {
       var migrated = migrateTemplateV1toV2({ order: _prefs.order, hiddenSections: _prefs.hiddenSections });
       _prefs.widgets = migrated.widgets;
       savePrefs();
     }
     // No widgets at all → generate from scaffold (same as TB "Load Default")
-    if (!_prefs.widgets || !_prefs.widgets.length) {
+    if (!_prefs.widgets?.length) {
       var scaffoldWidgets = buildDefaultWidgetsFromScaffold();
       if (scaffoldWidgets) {
         _prefs.widgets = scaffoldWidgets;
@@ -772,7 +772,7 @@
         console.warn('[widget-dispatcher] scaffold default FAILED — no registry or no scaffold plan');
       }
     }
-    if (_prefs.widgets && _prefs.widgets.length) {
+    if (_prefs.widgets?.length) {
       if (syncPrefsOrderFromWidgets()) savePrefs();
       if (reconcileHiddenSectionsWithWidgets()) savePrefs();
       applyGridLayout();
@@ -822,13 +822,13 @@
       }
     }
     savePrefs();
-    if (_prefs.widgets && _prefs.widgets.length) applyGridLayout();
+    if (_prefs.widgets?.length) applyGridLayout();
     else applyVisibility();
   }
 
   /** Show/hide all charts in a widgetGroup in one prefs write (leaves stay individually toggleable). */
   function setGroupChartsVisibility(childIds, visible) {
-    if (!childIds || !childIds.length) return;
+    if (!childIds?.length) return;
     if (!_prefs) _prefs = defaultPrefs();
     if (!Array.isArray(_prefs.hiddenCharts)) _prefs.hiddenCharts = [];
     for (var cid of childIds) {
@@ -864,11 +864,11 @@
   }
 
   function syncChartGroupCheckboxFromLeaves(leafCb) {
-    if (!leafCb || !leafCb.parentNode) return;
+    if (!leafCb?.parentNode) return;
     var li = leafCb.closest('li.widget-tree-item');
     if (!li) return;
     var groupUl = li.parentNode;
-    if (!groupUl || !groupUl.classList || !groupUl.classList.contains('widget-tree-group-charts')) return;
+    if (!groupUl?.classList?.contains('widget-tree-group-charts')) return;
     var cluster = groupUl.closest('li.widget-tree-group-cluster');
     if (!cluster) return;
     var head = cluster.querySelector('.widget-tree-group-head');
@@ -1070,7 +1070,7 @@
     if (!_prefs) _prefs = defaultPrefs();
     var list = orderedIds.slice();
     _prefs.order = list;
-    if (_prefs.widgets && _prefs.widgets.length) {
+    if (_prefs.widgets?.length) {
       syncPrefsWidgetsFromDraggableOrder(list);
       savePrefs();
       applyGridLayout();
@@ -1135,7 +1135,7 @@
       setTimeout(function () { resizeAll(); }, 250);
     }
     // Original filters hidden via CSS (body.sidebar-open selector)
-    try { localStorage.setItem('cud_sidebar_open', _sidebarOpen ? '1' : '0'); } catch (_ignored) {}
+    try { localStorage.setItem('cud_sidebar_open', _sidebarOpen ? '1' : '0'); } catch (error) { /* intentional */ }
   }
 
   function bindSidebarEvents() {
@@ -1155,7 +1155,7 @@
         _sidebarRestoreScheduled = true;
         setTimeout(function () { toggleSidebar(true); }, 100);
       }
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
   }
 
   // ── Widget Tree (Layout section) ────────────────────────────────
@@ -1266,7 +1266,7 @@
         var item = e.target.closest('.widget-tree-item[data-section]');
         if (!item) { e.preventDefault(); return; }
         var ulEdit = body.querySelector('.widget-tree');
-        if (!ulEdit || !ulEdit.classList.contains('widget-tree--edit')) {
+        if (!ulEdit?.classList.contains('widget-tree--edit')) {
           e.preventDefault();
           return;
         }
@@ -1274,7 +1274,7 @@
         _wtreeDropState = null;
         item.classList.add('is-dragging');
         e.dataTransfer.effectAllowed = 'move';
-        if (_wtreeDragGhost && _wtreeDragGhost.parentNode) {
+        if (_wtreeDragGhost?.parentNode) {
           _wtreeDragGhost.parentNode.removeChild(_wtreeDragGhost);
         }
         _wtreeDragGhost = null;
@@ -1351,7 +1351,7 @@
         if (_wtreeDragSrc) _wtreeDragSrc.classList.remove('is-dragging');
         _wtreeDragSrc = null;
         _wtreeDropState = null;
-        if (_wtreeDragGhost && _wtreeDragGhost.parentNode) {
+        if (_wtreeDragGhost?.parentNode) {
           _wtreeDragGhost.parentNode.removeChild(_wtreeDragGhost);
         }
         _wtreeDragGhost = null;
@@ -1593,7 +1593,7 @@
 
   /** Kernbefunde-Gruppe immer vor Health-KPIs (auch bei alter sectionWidgets-Reihenfolge in Templates). */
   function stableHealthWidgetGroupOrder(arr) {
-    if (!arr || !arr.length) return arr;
+    if (!arr?.length) return arr;
     var kern = [];
     var kpis = [];
     var rest = [];
@@ -1607,11 +1607,11 @@
   }
 
   function getOrderedChartsForSection(sec) {
-    if (!sec || !sec.charts || !sec.charts.length) return [];
+    if (!sec?.charts?.length) return [];
     var charts = sec.charts.slice();
     var sw = getActiveTemplateSectionWidgets();
-    var orderIds = sw && sw[sec.id] ? sw[sec.id] : null;
-    if (!orderIds || !orderIds.length) {
+    var orderIds = sw?.[sec.id] ? sw[sec.id] : null;
+    if (!orderIds?.length) {
       charts.sort(function (a, b) {
         return (a.order || 0) - (b.order || 0);
       });
@@ -1779,7 +1779,7 @@
   /** Migrate v1 template (order/hiddenSections) to v2 (widgets[]) */
   function migrateTemplateV1toV2(tpl) {
     if (tpl.version === 2 || tpl.version >= 3) return tpl;
-    var order = tpl.order && tpl.order.length ? tpl.order : ALL_SECTION_IDS;
+    var order = tpl.order?.length ? tpl.order : ALL_SECTION_IDS;
     var hidden = tpl.hiddenSections || [];
     var widgets = [];
     for (var oItem of order) {
@@ -1807,21 +1807,21 @@
       if (xhrT.status === 200 && xhrT.responseText) {
         var parsed = JSON.parse(xhrT.responseText);
         if (parsed && Array.isArray(parsed.templates) && parsed.templates.length) {
-          try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(parsed.templates)); } catch (_ignored) {}
+          try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(parsed.templates)); } catch (error) { /* intentional */ }
           return parsed.templates;
         }
       }
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
     // Fallback to localStorage
     try {
       var raw = localStorage.getItem(TEMPLATES_KEY);
       if (raw) return JSON.parse(raw);
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
     return [];
   }
 
   function saveTemplates(list) {
-    try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list)); } catch (_ignored) {}
+    try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list)); } catch (error) { /* intentional */ }
     // Persist to server layout file
     if (_prefs) {
       _prefs.templates = list;
@@ -1830,11 +1830,11 @@
   }
 
   function getActiveTemplateName() {
-    try { return localStorage.getItem(ACTIVE_TPL_KEY) || ''; } catch (_ignored) { return ''; }
+    try { return localStorage.getItem(ACTIVE_TPL_KEY) || ''; } catch (error) { return ''; }
   }
 
   function setActiveTemplateName(name) {
-    try { localStorage.setItem(ACTIVE_TPL_KEY, name); } catch (_ignored) {}
+    try { localStorage.setItem(ACTIVE_TPL_KEY, name); } catch (error) { /* intentional */ }
   }
 
   function getAllTemplates() {
@@ -1844,12 +1844,12 @@
   /** Sichtbare Haupt-Sektionen (<details>) und verschachtelte Chart-Disclosures oeffnen (z. B. nach Vorlagenwechsel). */
   function expandVisibleSectionPanels() {
     var reg = getRegistry();
-    if (!reg || !reg.sections) return;
+    if (!reg?.sections) return;
     for (var sec of reg.sections) {
       if (!sec.domId) continue;
       if (!isSectionVisible(sec.id)) continue;
       var el = document.getElementById(sec.domId);
-      if (!el || el.tagName !== 'DETAILS') continue;
+      if (!el || el?.tagName !== 'DETAILS') continue;
       el.open = true;
       var nested = el.querySelectorAll('details');
       for (var nDet of nested) {
@@ -1912,7 +1912,7 @@
     if (chartDef.engine === 'echarts') {
       var canvas = document.createElement('div');
       canvas.id = wrapperId + '-canvas';
-      var h = (chartDef.size && chartDef.size.minHeight) || 260;
+      var h = (chartDef.size?.minHeight) || 260;
       canvas.style.cssText = 'width:100%;height:' + h + 'px';
       wrapper.appendChild(canvas);
     } else {
@@ -1925,8 +1925,8 @@
 
   /** Render sections into a 12-column CSS grid based on widgets[] */
   function applyGridLayout() {
-    var widgets = _prefs && _prefs.widgets;
-    if (!widgets || !widgets.length) {
+    var widgets = _prefs?.widgets;
+    if (!widgets?.length) {
       applyVisibility();
       applyOrder();
       return;
@@ -1948,7 +1948,7 @@
     var children = gridEl.children;
     for (var ni = children.length - 1; ni >= 0; ni--) {
       var child = children[ni];
-      if (!child.id || !child.id.match(/-collapse$/)) {
+      if (!child.id?.match(/-collapse$/)) {
         // Also skip standalone chart wrappers
         if (child.id?.startsWith('widget-')) continue;
         nonSectionNodes.push(child);
@@ -1983,7 +1983,7 @@
 
       // Section-level widget (existing logic)
       var sec = reg.findSection(w.id);
-      if (!sec || !sec.domId) continue;
+      if (!sec?.domId) continue;
       // Skip nested sections — they stay inside their parent
       if (sec.parentSection) continue;
       var el = document.getElementById(sec.domId);
@@ -2233,7 +2233,7 @@
     }
     // Get marketplace_fetched_at from last API data
     var data = global.__lastUsageData;
-    if (data && data.versionTimeline && data.versionTimeline.marketplace_fetched_at) {
+    if (data?.versionTimeline?.marketplace_fetched_at) {
       syncEl.textContent = _t('usMarketplaceLastSync') + ': ' + new Date(data.versionTimeline.marketplace_fetched_at).toLocaleString();
     } else {
       syncEl.textContent = _t('usMarketplaceLastSync') + ': —';
@@ -2328,7 +2328,7 @@
   }
 
   function tbIsLayoutBlock(c) {
-    return !!(c && c.type === 'block');
+    return !!(c?.type === 'block');
   }
 
   function tbNewLayoutBlock(span) {
@@ -2342,7 +2342,7 @@
   /** Section-level list (pc < 0) or inner list of layout block at index pc in section.children. */
   function tbGetChildListByParent(si, pc) {
     var sec = _tbWidgets[si];
-    if (!sec || !sec.children) return null;
+    if (!sec?.children) return null;
     if (pc < 0) return sec.children;
     var b = sec.children[pc];
     if (!tbIsLayoutBlock(b)) return null;
@@ -2382,19 +2382,19 @@
    * Moves trailing chart siblings into block.children (partition if all blocks empty; else append to last block).
    */
   function tbMigrateLooseChartsAfterBlocksIntoNested(children) {
-    if (!children || !children.length) return;
+    if (!children?.length) return;
     var blocks = [];
     var loose = [];
     var bi;
     for (bi = 0; bi < children.length; bi++) {
       var it = children[bi];
       if (tbIsLayoutBlock(it)) blocks.push(it);
-      else if (it && it.id) loose.push({ id: it.id, span: it.span || 6 });
+      else if (it?.id) loose.push({ id: it.id, span: it.span || 6 });
     }
     if (!blocks.length || !loose.length) return;
     var allEmpty = true;
     for (bi = 0; bi < blocks.length; bi++) {
-      if (blocks[bi].children && blocks[bi].children.length) {
+      if (blocks[bi].children?.length) {
         allEmpty = false;
         break;
       }
@@ -2491,7 +2491,7 @@
     var zc;
     for (zc = 0; zc < zone.children.length; zc++) {
       var el = zone.children[zc];
-      if (el && el.classList && el.classList.contains('tb-canvas-child')) kids.push(el);
+      if (el?.classList?.contains('tb-canvas-child')) kids.push(el);
     }
     var n = kids.length;
     var i;
@@ -2531,7 +2531,7 @@
   function tbPoolDefaultSpanForChart(reg, chartId) {
     if (!chartId) return 6;
     var sid = String(chartId);
-    if (!reg || !reg.findChart) {
+    if (!reg?.findChart) {
       if (sid.startsWith('health-finding-')) return 2;
       if (sid.startsWith('health-kpi-')) return 4;
       if (sid.startsWith('token-stats-kpi-')) return 2;
@@ -2542,7 +2542,7 @@
       return 6;
     }
     var d = reg.findChart(chartId);
-    var wg = d && d.widgetGroup;
+    var wg = d?.widgetGroup;
     if (wg === 'kernbefunde') return 2;
     if (wg === 'health-kpis') return 4;
     if (wg === 'token-stats-kpis') return 2;
@@ -2556,7 +2556,7 @@
   /** Registry charts for a section + nested child sections (e.g. efficiency-range under economic), minus hiddenCharts. */
   function tbVisibleRegistryChartsForSection(sectionId, ignoreHidden) {
     var reg = getRegistry();
-    if (!reg || !reg.findSection) return [];
+    if (!reg?.findSection) return [];
     var hidden = ignoreHidden ? [] : (_prefs && Array.isArray(_prefs.hiddenCharts) ? _prefs.hiddenCharts : []);
     var parts = [];
     var sec = reg.findSection(sectionId);
@@ -2580,7 +2580,7 @@
   function tbFlatWidgetsToNestedModel(flatWidgets) {
     var reg = getRegistry();
     var result = [];
-    if (!flatWidgets || !flatWidgets.length) return result;
+    if (!flatWidgets?.length) return result;
     for (var i = 0; i < flatWidgets.length; i++) {
       var w = flatWidgets[i];
       var wType = w.type || 'section';
@@ -2604,11 +2604,11 @@
           if (spL > 12) spL = 12;
           var normNested = [];
           var nestedIn = nx.nested;
-          if (nestedIn && nestedIn.length) {
+          if (nestedIn?.length) {
             var ni;
             for (ni = 0; ni < nestedIn.length; ni++) {
               var ne = nestedIn[ni];
-              if (ne && ne.id) normNested.push({ id: ne.id, span: ne.span || 6 });
+              if (ne?.id) normNested.push({ id: ne.id, span: ne.span || 6 });
             }
           }
           children.push({ type: 'block', span: spL, bid: nx.bid || nx.id || 'tbblk_r' + k, children: normNested });
@@ -2637,7 +2637,7 @@
    * keeping spans from the flat model when ids match; append flat-only ids at the end.
    */
   function tbAugmentBuilderChildrenFromRegistry(nested) {
-    if (!nested || !nested.length) return;
+    if (!nested?.length) return;
     for (var row of nested) {
       var flatKids = row.children || [];
       var hasBlock = false;
@@ -2824,7 +2824,7 @@
 
   /** Inner 12-col spans for scaffold block.children (builder canvas); aligns chip rows with dashboard grids. */
   function tbScaffoldApplyInnerSpans(sectionId, blockIndex, picked) {
-    if (!picked || !picked.length) return;
+    if (!picked?.length) return;
     var n = picked.length;
     var i;
     if (sectionId === 'forensic' && blockIndex === 0 && n === 3) {
@@ -2866,7 +2866,7 @@
         var rowIds = sci[bi];
         var pickedSci = [];
         var rj;
-        if (rowIds && rowIds.length) {
+        if (rowIds?.length) {
           for (rj = 0; rj < rowIds.length; rj++) {
             var cid = rowIds[rj];
             var entSci = regIdSet[cid];
@@ -2904,8 +2904,8 @@
           for (ri = 0; ri < regList.length; ri++) {
             var ent = regList[ri];
             if (used[ent.id]) continue;
-            var cd = reg && reg.findChart ? reg.findChart(ent.id) : null;
-            var wg = cd && cd.widgetGroup;
+            var cd = reg?.findChart ? reg.findChart(ent.id) : null;
+            var wg = cd?.widgetGroup;
             if (wg === slotSpec) {
               picked.push({ id: ent.id, span: ent.span });
               used[ent.id] = true;
@@ -2967,7 +2967,7 @@
     var reg = getRegistry();
     var out = [];
     for (var p of TB_PAGE_SCAFFOLD_PLAN) {
-      if (!reg || !reg.findSection || !reg.findSection(p.id)) continue;
+      if (!reg?.findSection?.(p.id)) continue;
       var children = [];
       var bi;
       for (bi = 0; bi < p.blocks.length; bi++) {
@@ -3006,8 +3006,8 @@
    * Returns the nested _tbWidgets array.
    */
   function tbLoadTemplateIntoBuilder(tpl) {
-    var widgets = tpl && tpl.widgets;
-    if (!widgets || !widgets.length) return tbNestedModelFromPageScaffold();
+    var widgets = tpl?.widgets;
+    if (!widgets?.length) return tbNestedModelFromPageScaffold();
     // Check if template has layout/chart blocks
     var hasBlocks = false;
     for (var wChk of widgets) {
@@ -3047,12 +3047,12 @@
     if (titleEl) titleEl.textContent = _t('tbTitle');
     if (nameInput) nameInput.placeholder = _t('tbNamePlaceholder');
 
-    console.info('[TB open] baseTpl=%s, _prefs.widgets=%s', !!baseTpl, _prefs && _prefs.widgets ? _prefs.widgets.length : 'null');
-    if (baseTpl && baseTpl.widgets) {
+    console.info('[TB open] baseTpl=%s, _prefs.widgets=%s', !!baseTpl, _prefs?.widgets ? _prefs.widgets.length : 'null');
+    if (baseTpl?.widgets) {
       console.info('[TB open] → baseTpl path');
       _tbWidgets = tbLoadTemplateIntoBuilder(baseTpl);
       if (nameInput) nameInput.value = baseTpl.builtin ? '' : (baseTpl.name || '');
-    } else if (_prefs && _prefs.widgets && _prefs.widgets.length) {
+    } else if (_prefs?.widgets?.length) {
       console.info('[TB open] → _prefs path, sections:', _prefs.widgets.filter(function(w){return (w.type||'section')==='section'}).map(function(w){return w.id}));
       _tbWidgets = tbLoadTemplateIntoBuilder(_prefs);
       if (nameInput) nameInput.value = '';
@@ -3135,7 +3135,7 @@
   /** Same rule as pool: ECharts canvas chart vs KPI/HTML/chip (dashed meta pool); block = layout row. */
   function tbCanvasChildKind(reg, child) {
     if (tbIsLayoutBlock(child)) return 'layout';
-    var chartId = child && child.id;
+    var chartId = child?.id;
     if (!reg || typeof reg.findChart !== 'function') return 'meta';
     var ch = reg.findChart(chartId);
     if (!ch) return 'meta';
@@ -3303,7 +3303,7 @@
     var out = [];
     var seen = {};
     function pushFrom(sec) {
-      if (!sec || !sec.charts) return;
+      if (!sec?.charts) return;
       for (var ch of sec.charts) {
         if (ch.kind === 'chip' || ch.engine !== 'echarts') continue;
         if (!seen[ch.id]) {
@@ -3348,7 +3348,7 @@
 
     var htmlCharts = '';
     for (var gs of reg.sections) {
-      if (!gs.charts || !gs.charts.length) continue;
+      if (!gs.charts?.length) continue;
       var hasCanvas = false;
       for (var chx of gs.charts) {
         if (chx.engine === 'echarts' && chx.kind !== 'chip') {
@@ -3379,7 +3379,7 @@
 
     var htmlMeta = '';
     for (var g2 of reg.sections) {
-      if (!g2.charts || !g2.charts.length) continue;
+      if (!g2.charts?.length) continue;
       var hasMeta = false;
       for (var cx of g2.charts) {
         if (!(cx.engine === 'echarts' && cx.kind !== 'chip')) {
@@ -3431,7 +3431,7 @@
     if (!canvas || canvas.dataset.bound) return;
     var regCanvas = getRegistry();
     canvas.dataset.bound = '1';
-    var dropHost = canvas.parentElement && canvas.parentElement.classList.contains('tb-canvas-wrap') ? canvas.parentElement : canvas;
+    var dropHost = canvas.parentElement?.classList.contains('tb-canvas-wrap') ? canvas.parentElement : canvas;
 
     // Remove section or child
     canvas.addEventListener('click', function (e) {
@@ -3452,13 +3452,13 @@
         if (rmChild.dataset.pcidx !== undefined && rmChild.dataset.pcidx !== '') {
           var pcR = Number.parseInt(rmChild.dataset.pcidx, 10);
           var iccR = Number.parseInt(rmChild.dataset.icc, 10);
-          var blkR = _tbWidgets[si] && _tbWidgets[si].children && _tbWidgets[si].children[pcR];
-          if (blkR && blkR.children && !Number.isNaN(iccR)) {
+          var blkR = _tbWidgets[si]?.children?.[pcR];
+          if (blkR?.children && !Number.isNaN(iccR)) {
             blkR.children.splice(iccR, 1);
           }
         } else {
           var ci = Number.parseInt(rmChild.dataset.cidx, 10);
-          if (_tbWidgets[si] && _tbWidgets[si].children) {
+          if (_tbWidgets[si]?.children) {
             _tbWidgets[si].children.splice(ci, 1);
           }
         }
@@ -3519,7 +3519,7 @@
         var innerP = e.target.closest('.tb-canvas-block-inner');
         var cz = e.target.closest('.tb-canvas-children');
         var sec = e.target.closest('.tb-canvas-section');
-        var zone = innerP || cz || (sec && sec.querySelector('.tb-canvas-children'));
+        var zone = innerP || cz || (sec?.querySelector('.tb-canvas-children'));
         if (zone) {
           tbApplyChildDropPreview(zone, e.clientY, -1, -1, -1);
         } else {
@@ -3538,7 +3538,7 @@
         var innerZ = e.target.closest('.tb-canvas-block-inner');
         var cz2 = e.target.closest('.tb-canvas-children');
         var sec2 = e.target.closest('.tb-canvas-section');
-        var zone2 = innerZ || cz2 || (sec2 && sec2.querySelector('.tb-canvas-children'));
+        var zone2 = innerZ || cz2 || (sec2?.querySelector('.tb-canvas-children'));
         if (zone2) {
           tbApplyChildDropPreview(zone2, e.clientY, _tbDrag.si, _tbDrag.pc, _tbDrag.ix);
         }
@@ -3580,7 +3580,7 @@
         var innerDrop = e.target.closest('.tb-canvas-block-inner');
         var cz = e.target.closest('.tb-canvas-children');
         var ts = e.target.closest('.tb-canvas-section');
-        var zone = innerDrop || cz || (ts && ts.querySelector('.tb-canvas-children'));
+        var zone = innerDrop || cz || (ts?.querySelector('.tb-canvas-children'));
         if (!zone) {
           renderBuilderRows();
           return;
@@ -3632,7 +3632,7 @@
           }
           var cz2 = e.target.closest('.tb-canvas-children');
           var ts2 = e.target.closest('.tb-canvas-section');
-          var zone2 = cz2 || (ts2 && ts2.querySelector('.tb-canvas-children'));
+          var zone2 = cz2 || (ts2?.querySelector('.tb-canvas-children'));
           var sidx = -1;
           var toCi2 = 0;
           if (zone2) {
@@ -3720,17 +3720,17 @@
           var pcH = Number.parseInt(childHandle.dataset.pcidx, 10);
           var ixH = Number.parseInt(childHandle.dataset.icc, 10);
           _resizeTarget = { type: 'childInner', si: si, pc: pcH, ix: ixH, maxSpan: 12 };
-          var blkH = _tbWidgets[si] && _tbWidgets[si].children && _tbWidgets[si].children[pcH];
-          var rowH = blkH && blkH.children && blkH.children[ixH];
+          var blkH = _tbWidgets[si]?.children?.[pcH];
+          var rowH = blkH?.children?.[ixH];
           _resizeStartSpan = rowH ? rowH.span : 6;
         } else {
           var ci = Number.parseInt(childHandle.dataset.cidx, 10);
           _resizeTarget = { type: 'child', si: si, ci: ci };
-          _resizeStartSpan = (_tbWidgets[si] && _tbWidgets[si].children && _tbWidgets[si].children[ci]) ? _tbWidgets[si].children[ci].span : 6;
+          _resizeStartSpan = (_tbWidgets[si]?.children?.[ci]) ? _tbWidgets[si].children[ci].span : 6;
         }
         var childGrid = childHandle.closest('.tb-canvas-block-inner') || childHandle.closest('.tb-canvas-children');
         var gridCols = 12;
-        if (childGrid && childGrid.classList.contains('tb-canvas-block-inner')) {
+        if (childGrid?.classList.contains('tb-canvas-block-inner')) {
           var icd = Number.parseInt(childGrid.getAttribute('data-inner-cols'), 10);
           if (!Number.isNaN(icd) && icd >= 1 && icd <= 12) gridCols = icd;
         }
@@ -3762,16 +3762,16 @@
           renderCanvas();
         }
       } else if (_resizeTarget.type === 'childInner') {
-        var chI = _tbWidgets[_resizeTarget.si] && _tbWidgets[_resizeTarget.si].children;
-        var blkI = chI && chI[_resizeTarget.pc];
-        var rowI = blkI && blkI.children && blkI.children[_resizeTarget.ix];
+        var chI = _tbWidgets[_resizeTarget.si]?.children;
+        var blkI = chI?.[_resizeTarget.pc];
+        var rowI = blkI?.children?.[_resizeTarget.ix];
         if (rowI && rowI.span !== newSpan) {
           rowI.span = newSpan;
           renderCanvas();
         }
       } else {
-        var ch = _tbWidgets[_resizeTarget.si] && _tbWidgets[_resizeTarget.si].children;
-        if (ch && ch[_resizeTarget.ci] && ch[_resizeTarget.ci].span !== newSpan) {
+        var ch = _tbWidgets[_resizeTarget.si]?.children;
+        if (ch?.[_resizeTarget.ci] && ch[_resizeTarget.ci].span !== newSpan) {
           ch[_resizeTarget.ci].span = newSpan;
           renderCanvas();
         }
@@ -3915,7 +3915,7 @@
 
   /** ECharts canvas chart (not chip / HTML) — gets clone-or-render preview path. */
   function tbPreviewIsCanvasChart(def) {
-    return !!(def && def.engine === 'echarts' && def.kind !== 'chip');
+    return !!(def?.engine === 'echarts' && def?.kind !== 'chip');
   }
 
   /** KPI / HTML / table: clone live DOM from #canvasId so preview matches dashboard chips. */
@@ -3970,12 +3970,12 @@
     if (!origEl && def.widgetGroup && _chipGroupContainers[def.widgetGroup]) {
       // Only clone the group once — skip if this pvEl's section already has a group clone
       var secBody = pvEl.closest('.tb-pv-section-body') || pvEl.closest('.tb-pv-layout-charts');
-      if (secBody && secBody.querySelector('[data-tb-group-clone="' + def.widgetGroup + '"]')) {
+      if (secBody?.querySelector('[data-tb-group-clone="' + def.widgetGroup + '"]')) {
         pvEl.style.display = 'none';
         return;
       }
       var groupEl = document.getElementById(_chipGroupContainers[def.widgetGroup]);
-      if (groupEl && groupEl.children.length) {
+      if (groupEl?.children.length) {
         origEl = groupEl;
       }
     }
@@ -4001,7 +4001,7 @@
 
   /** Preview one builder slot: ECharts clone/render or HTML/chip clone. */
   function tbPreviewRenderSlot(slot) {
-    if (!slot || !slot.def) return;
+    if (!slot?.def) return;
     if (tbPreviewIsCanvasChart(slot.def)) {
       tbPreviewCloneOrRender(slot);
     } else {
@@ -4014,7 +4014,7 @@
     var pvEl = document.getElementById(slot.pvId);
     if (!pvEl || typeof echarts === 'undefined') return;
     var def = slot.def;
-    if (!def || !def.canvasId) return;
+    if (!def?.canvasId) return;
 
     var origEl = document.getElementById(def.canvasId);
     var origInst = origEl ? echarts.getInstanceByDom(origEl) : null;
@@ -4025,7 +4025,7 @@
         var inst0 = echarts.init(pvEl, null, { renderer: 'canvas' });
         var opts0 = origInst.getOption();
         if (opts0) inst0.setOption(opts0, true);
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
       return;
     }
 
@@ -4053,7 +4053,7 @@
       try {
         var ex1 = echarts.getInstanceByDom(pvEl);
         if (ex1) ex1.dispose();
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
 
       if (String(rfName).startsWith('renderProxy_')) {
         var dataP = global.__lastUsageData;
@@ -4085,7 +4085,7 @@
       ) {
         var uDataE = global.__lastUsageData;
         var eDaysE = [];
-        if (uDataE && uDataE.days && uDataE.days.length) {
+        if (uDataE?.days?.length) {
           eDaysE =
             typeof global.getFilteredDays === 'function'
               ? global.getFilteredDays(uDataE.days)
@@ -4120,7 +4120,7 @@
     var name = nameInput ? nameInput.value.trim() : '';
     if (!name) {
       name = prompt(_t('tbNamePrompt'));
-      if (!name || !name.trim()) return;
+      if (!name?.trim()) return;
       name = name.trim();
     }
     // Flatten nested model back to v3 format (only ECharts canvas rows: chips stay in section DOM / hiddenCharts)
@@ -4135,7 +4135,7 @@
           var nestedOut = [];
           var innSv = chEnt.children || [];
           for (var innItem of innSv) {
-            var idef = regSv && regSv.findChart ? regSv.findChart(innItem.id) : null;
+            var idef = regSv?.findChart ? regSv.findChart(innItem.id) : null;
             if (idef && (idef.kind === 'chip' || idef.engine !== 'echarts')) continue;
             nestedOut.push({ id: innItem.id, span: innItem.span || 6 });
           }
@@ -4151,7 +4151,7 @@
           }
           continue;
         }
-        var cdef = regSv && regSv.findChart ? regSv.findChart(chEnt.id) : null;
+        var cdef = regSv?.findChart ? regSv.findChart(chEnt.id) : null;
         if (cdef && (cdef.kind === 'chip' || cdef.engine !== 'echarts')) continue;
         flatW.push({ id: chEnt.id, span: chEnt.span || 6, type: 'chart', section: tbSec.id });
       }
@@ -4301,12 +4301,12 @@
       var containers = body.querySelectorAll('.tb-pv-chart-container');
       for (var ctr of containers) {
         var inst = echarts.getInstanceByDom(ctr);
-        if (inst) try { inst.dispose(); } catch (_ignored) {}
+        if (inst) try { inst.dispose(); } catch (error) { /* intentional */ }
       }
     }
     // Preview may have repainted via temp canvas id swap — repaint core charts without full-page coalesce.
     if (typeof global.renderDashboardCore === 'function' && global.__lastUsageData) {
-      try { global.renderDashboardCore(global.__lastUsageData); } catch (_ignored) {}
+      try { global.renderDashboardCore(global.__lastUsageData); } catch (error) { /* intentional */ }
     }
   }
 
@@ -4422,7 +4422,7 @@
         input.type = 'file';
         input.accept = '.json';
         input.addEventListener('change', function () {
-          if (!this.files || !this.files[0]) return;
+          if (!this.files?.[0]) return;
           var reader = new FileReader();
           reader.onload = function (ev) {
             try {
@@ -4435,7 +4435,7 @@
                   var mig = migrateTemplateV1toV2({ order: _prefs.order, hiddenSections: _prefs.hiddenSections });
                   _prefs.widgets = mig.widgets;
                 }
-                if (_prefs.widgets && _prefs.widgets.length) {
+                if (_prefs.widgets?.length) {
                   syncPrefsOrderFromWidgets();
                 }
                 savePrefs();

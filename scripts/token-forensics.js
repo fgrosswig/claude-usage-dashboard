@@ -13,7 +13,7 @@ function loadOutageDaysMap() {
   try {
     var disk = JSON.parse(fs.readFileSync(OUTAGE_DISK_CACHE, 'utf8'));
     if (Array.isArray(disk.incidents)) incidents = disk.incidents;
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   return buildOutageDaysMap(incidents);
 }
 
@@ -127,7 +127,7 @@ function classifyJsonlSessionSignals(line, rec) {
       var ej = JSON.stringify(rec.error).toLowerCase();
       if (/retry|429|rate|throttl|overloaded/.test(ej)) add('retry');
       if (/interrupt|cancel|abort/.test(ej)) add('interrupt');
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
   }
   return tags;
 }
@@ -231,7 +231,7 @@ for (var af of allFiles) {
             if (!daily[lday]) daily[lday] = emptyDailyBucket();
             daily[lday].hit_limit++;
           }
-        } catch (_ignored) {}
+        } catch (error) { /* intentional */ }
       }
       if (!line.includes('"usage"')) return;
       try {
@@ -253,9 +253,9 @@ for (var af of allFiles) {
           cache_creation: u.cache_creation_input_tokens || 0,
           isSubagent: isSubagent,
         });
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
     });
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
 }
 
 messages.sort(function (a, b) {

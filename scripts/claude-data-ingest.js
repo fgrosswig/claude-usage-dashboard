@@ -78,14 +78,14 @@ function extractTarGzIntoClaudeRoot(tarGzPath, claudeRoot, cb) {
   child.on('error', function (err) {
     try {
       fs.rmSync(staging, { recursive: true, force: true });
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
     cb(err, null);
   });
   child.on('close', function (code) {
     if (code !== 0) {
       try {
         fs.rmSync(staging, { recursive: true, force: true });
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
       cb(new Error('tar exited ' + code), null);
       return;
     }
@@ -107,13 +107,13 @@ function extractTarGzIntoClaudeRoot(tarGzPath, claudeRoot, cb) {
     } catch (e3) {
       try {
         fs.rmSync(staging, { recursive: true, force: true });
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
       cb(e3, null);
       return;
     }
     try {
       fs.rmSync(staging, { recursive: true, force: true });
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
     cb(null, { filesWritten: written });
   });
 }

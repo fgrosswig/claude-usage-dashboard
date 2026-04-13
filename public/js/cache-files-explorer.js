@@ -397,7 +397,7 @@
           document.addEventListener("mouseup", onUp);
           try {
             ev.preventDefault();
-          } catch (_ignored) {}
+          } catch (error) { /* intentional */ }
         });
       })();
       document.getElementById("dev-cache-files-backdrop").addEventListener("click", closeModal);
@@ -440,7 +440,7 @@
         if (!pre || !pr) return;
         try {
           ev.preventDefault();
-        } catch (_ignored) {}
+        } catch (error) { /* intentional */ }
         pr.classList.add("has-file");
         pre.textContent = "Lade …";
         if (title) title.textContent = pAbs;
@@ -468,7 +468,7 @@
                 pre.innerHTML = "";
                 pre.appendChild(buildJsonTree(parsed, 0, true));
                 didTree = true;
-              } catch (_ej) {}
+              } catch (error) { /* intentional */ }
             }
             if (!didTree) {
               // Truncated or non-JSON: try to pretty-print what we can
@@ -500,7 +500,7 @@
                   }
                   didTree = true;
                 }
-              } catch (_ep) {}
+              } catch (error) { /* intentional */ }
               if (!didTree) pre.textContent = raw;
             }
           } catch (eZ) {

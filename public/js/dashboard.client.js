@@ -142,7 +142,7 @@ function detectLang() {
   try {
     var sv = localStorage.getItem("usageDashboardLang");
     if (sv === "de" || sv === "en" || sv === "ko") return sv;
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   var langs = navigator.languages;
   if (langs?.length) {
     for (var _lng of langs) {
@@ -161,7 +161,7 @@ function getLang() { return __lang; }
 function setLang(code) {
   if (code !== "de" && code !== "en" && code !== "ko") return;
   __lang = code;
-  try { localStorage.setItem("usageDashboardLang", code); } catch (_ignored) {}
+  try { localStorage.setItem("usageDashboardLang", code); } catch (error) { /* intentional */ }
   document.documentElement.lang = code;
   updateLangButtons();
   applyStaticChrome();
@@ -299,13 +299,13 @@ function getMainChartsScope() {
   try {
     var s = sessionStorage.getItem("usageMainChartsScope");
     if (s === "hourly" || s === "timeline") return s;
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   return "timeline";
 }
 function setMainChartsScope(val) {
   try {
     sessionStorage.setItem("usageMainChartsScope", val === "hourly" ? "hourly" : "timeline");
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
 }
 function padHour2(n) {
   return n < 10 ? "0" + n : String(n);
@@ -433,7 +433,7 @@ function destroyMainChartIfScopeMismatch(mainScope, chartKey) {
     try {
       if (typeof ch.dispose === 'function') ch.dispose();
       else if (typeof ch.destroy === 'function') ch.destroy();
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
     _charts[chartKey] = null;
   }
 }
@@ -446,7 +446,7 @@ function syncMainChartsScopeUi() {
     chips.dataset.scopeBound = "1";
     chips.addEventListener("click", function (ev) {
       var b = ev.target.closest(".main-charts-scope-chip");
-      if (!b || !b.dataset.scope) return;
+      if (!b?.dataset.scope) return;
       setMainChartsScope(b.dataset.scope === "hourly" ? "hourly" : "timeline");
       syncMainChartsScopeUi();
       if (typeof __lastUsageData !== "undefined" && __lastUsageData) renderDashboard(__lastUsageData, true);
@@ -518,7 +518,7 @@ function cloneVersionChangeForMerge(vc) {
 
 function mergeExtensionTimelineIntoUsage(data) {
   var p = __extensionTimelinePayload;
-  if (!data || !data.days || !p || !p.by_date) return;
+  if (!data?.days || !p?.by_date) return;
   var bd = p.by_date;
   for (var d of data.days) {
     var dt = d.date;
@@ -560,7 +560,7 @@ function fetchExtensionTimelineOnceInternal() {
         renderDashboard(__lastUsageData, true);
       }
     })
-    .catch(function () {})
+    .catch (function () { /* intentional */ })
     .then(function () {
       __extensionTimelineInFlight = false;
     });
@@ -581,7 +581,7 @@ function setSessionGithubToken(val) {
     } else {
       sessionStorage.removeItem(GITHUB_TOKEN_SESSION_KEY);
     }
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
 }
 
 function apiGithubTokenHeader() {
@@ -796,7 +796,7 @@ var DASH_CORE_COALESCE_MS = 400;
 var __dashRenderCoreCoalesce = null;
 
 function chartXLabelsMatch(ch, newLabels) {
-  if (!ch || !ch.data || !ch.data.labels || !newLabels) return false;
+  if (!ch?.data?.labels || !newLabels) return false;
   var L = ch.data.labels;
   if (L.length !== newLabels.length) return false;
   for (var i = 0; i < L.length; i++) if (L[i] !== newLabels[i]) return false;
@@ -805,7 +805,7 @@ function chartXLabelsMatch(ch, newLabels) {
 
 /** Bestehende Chart-X-Achse ist Anfang von newLabels (z. B. SSE-Scan hängt Tage hinten an). Sonst destroy → Flackern. */
 function chartLabelsPrefixMatch(ch, newLabels) {
-  if (!ch || !ch.data || !ch.data.labels || !newLabels) return false;
+  if (!ch?.data?.labels || !newLabels) return false;
   var L = ch.data.labels;
   if (!L.length || newLabels.length < L.length) return false;
   for (var i = 0; i < L.length; i++) {
@@ -857,7 +857,7 @@ function fetchUsageJsonOnce() {
         console.error(e);
       }
     })
-    .catch(function () {});
+    .catch (function () { /* intentional */ });
 }
 
 function showGithubTokenStatus(msg, isWarn) {
@@ -982,7 +982,7 @@ function initGithubTokenPanel() {
       syncGithubSessionThenReconnectStream();
       try {
         inp.focus();
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
     });
   }
   if (refBtn && !refBtn.dataset.boundGithubRf) {
@@ -1086,13 +1086,13 @@ function resizeLiveScannedJsonlChartIfAny() {
   if (!__liveScannedJsonlChart) return;
   try {
     __liveScannedJsonlChart.resize();
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
 }
 function __disposeLiveScannedJsonlChartIfNeeded() {
   if (!__liveScannedJsonlChart) return;
   try {
     __liveScannedJsonlChart.dispose();
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   __liveScannedJsonlChart = null;
 }
 function __liveJsonlBarTooltipFormatter(params) {
@@ -1364,7 +1364,7 @@ function updateMetaDetailsSummary(data) {
     return;
   }
   var days = data?.days;
-  if (!days || !days.length) {
+  if (!days?.length) {
     if (data?.scanning) sumEl.textContent = t("metaSummaryScanning");
     else if (data?.scan_error) sumEl.textContent = tr("metaScanError", { msg: String(data.scan_error).slice(0, 120) });
     else if (data && (data.parsed_files || 0) === 0) sumEl.textContent = t("metaSummaryNoFiles");
@@ -1379,13 +1379,13 @@ function initMetaDetailsPanel() {
   det.dataset.boundMeta = "1";
   try {
     if (sessionStorage.getItem("usageMetaDetailsOpen") === "1") det.setAttribute("open", "");
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   det.addEventListener("toggle", function () {
     updateGithubTokenPanelMode();
     scheduleGithubTokenUiRefresh();
     try {
       sessionStorage.setItem("usageMetaDetailsOpen", det.open ? "1" : "0");
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
   });
 }
 /** Stunden 0–24 als HH:MM (UTC-Tag wie serverseitige outage_spans). */
@@ -1476,12 +1476,12 @@ function appendDayDiagnosticSlideoutSection(bodyEl, d) {
         if (inc.created_at) {
           try {
             parts.push(t("updateSlideoutIncidentStart") + " " + new Date(inc.created_at).toLocaleString());
-          } catch (_ignored) {}
+          } catch (error) { /* intentional */ }
         }
         if (inc.resolved_at) {
           try {
             parts.push(t("updateSlideoutIncidentResolved") + " " + new Date(inc.resolved_at).toLocaleString());
-          } catch (_ignored) {}
+          } catch (error) { /* intentional */ }
         } else if (inc.created_at) {
           parts.push(t("updateSlideoutIncidentOngoing"));
         }
@@ -1545,7 +1545,7 @@ function appendDayDiagnosticSlideoutSection(bodyEl, d) {
 }
 function openUpdateSlideout(dayIndex) {
   var data = __lastUsageData;
-  if (!data || !data.days || data.days[dayIndex] == null) return;
+  if (!data?.days || data.days[dayIndex] == null) return;
   var d = data.days[dayIndex];
   var vc = d.version_change;
   var titleEl = document.getElementById("update-sl-title");
@@ -1626,7 +1626,7 @@ function openUpdateSlideout(dayIndex) {
 }
 function openModelChangeSlideout(dayIndex) {
   var data = __lastUsageData;
-  if (!data || !data.days || data.days[dayIndex] == null) return;
+  if (!data?.days || data.days[dayIndex] == null) return;
   var d = data.days[dayIndex];
   var mc = d.model_change;
   var titleEl = document.getElementById("update-sl-title");
@@ -1698,7 +1698,7 @@ function initUpdateSlideoutOnce() {
 
 // ── Date Range + Host Filter ──────────────────────────────────────────────
 function getFilteredDays(days) {
-  if (!days || !days.length) return days;
+  if (!days?.length) return days;
   var startEl = document.getElementById("filter-date-start");
   var endEl = document.getElementById("filter-date-end");
   var startVal = startEl ? startEl.value : "";
@@ -1720,7 +1720,7 @@ function getFilterHost() {
   var sel = container.querySelector("select");
   if (sel) {
     var opts = sel.selectedOptions;
-    if (!opts || !opts.length) return "";
+    if (!opts?.length) return "";
     var vals = [];
     for (var _opt of opts) vals.push(_opt.value);
     if (vals.includes("")) return "";
@@ -1748,7 +1748,7 @@ function renderDashboard(data, urgent) {
   var days = getFilteredDays(data.days);
   var sp = data.scan_progress;
   var scanInc = data.scanning && sp?.total > 0 && sp.done < sp.total;
-  if (!days || !days.length) {
+  if (!days?.length) {
     if (data.scanning) showMainChartsSkeleton(true);
     else showMainChartsSkeleton(false);
   } else if (scanInc) {
@@ -1766,7 +1766,7 @@ function renderDashboard(data, urgent) {
       window.__dashRenderScanMaxWait = setTimeout(function () {
         window.__dashRenderScanMaxWait = null;
         var d = __lastUsageData;
-        if (!d || !d.scanning) return;
+        if (!d?.scanning) return;
         clearTimeout(window.__dashRenderDebounce);
         window.__dashRenderDebounce = null;
         renderDashboardCore(d);
@@ -1813,7 +1813,7 @@ function syncForensicHostFilterBar(data) {
     __forensicHostFilterSig = "";
     try {
       sessionStorage.removeItem("usageForensicHostFilter");
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
     if (hint) {
       hint.style.display = "none";
       hint.textContent = "";
@@ -1824,7 +1824,7 @@ function syncForensicHostFilterBar(data) {
   var stored = "";
   try {
     stored = sessionStorage.getItem("usageForensicHostFilter") || "";
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   if (stored && !hLabs.includes(stored)) stored = "";
   __forensicHostFilterSig = stored;
   var hostSig = hLabs.join("\u0000");
@@ -1842,7 +1842,7 @@ function syncForensicHostFilterBar(data) {
       try {
         if (val) sessionStorage.setItem("usageForensicHostFilter", val);
         else sessionStorage.removeItem("usageForensicHostFilter");
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
       var nodes = chipsHost.querySelectorAll(".forensic-host-chip");
       for (var _node of nodes) {
         var rv = _node.dataset.hostFilter != null ? String(_node.dataset.hostFilter) : "__ALL__";
@@ -1934,9 +1934,9 @@ function renderDashboardCore(data) {
       var fnS=document.getElementById("forensic-note");if(fnS)fnS.textContent=tr("metaForensicNoteFirst",{sec:data.refresh_sec||180});
       document.getElementById("cards").innerHTML="";
       var fcS=document.getElementById("forensic-cards");if(fcS)fcS.innerHTML="";
-      if(_charts.cForensic){try{_charts.cForensic.dispose();}catch(_ignored){}_charts.cForensic=null;}
-      if(_charts.cForensicSignals){try{_charts.cForensicSignals.dispose();}catch(_ignored){}_charts.cForensicSignals=null;}
-      if(_charts.cService){try{_charts.cService.dispose();}catch(_ignored){}_charts.cService=null;}
+      if(_charts.cForensic){try{_charts.cForensic.dispose();}catch (error) { /* intentional */ }_charts.cForensic=null;}
+      if(_charts.cForensicSignals){try{_charts.cForensicSignals.dispose();}catch (error) { /* intentional */ }_charts.cForensicSignals=null;}
+      if(_charts.cService){try{_charts.cService.dispose();}catch (error) { /* intentional */ }_charts.cService=null;}
       chartShellSetLoading("c-forensic", true);
       chartShellSetLoading("c-forensic-signals", true);
       chartShellSetLoading("c-service", true);
@@ -1956,9 +1956,9 @@ function renderDashboardCore(data) {
     var fn0=document.getElementById("forensic-note");if(fn0)fn0.textContent="";
     var fc0=document.getElementById("forensic-cards");if(fc0)fc0.innerHTML="";
     document.getElementById("cards").innerHTML="";
-    if(_charts.cForensic){try{_charts.cForensic.dispose();}catch(_ignored){}_charts.cForensic=null;}
-    if(_charts.cForensicSignals){try{_charts.cForensicSignals.dispose();}catch(_ignored){}_charts.cForensicSignals=null;}
-    if(_charts.cService){try{_charts.cService.dispose();}catch(_ignored){}_charts.cService=null;}
+    if(_charts.cForensic){try{_charts.cForensic.dispose();}catch (error) { /* intentional */ }_charts.cForensic=null;}
+    if(_charts.cForensicSignals){try{_charts.cForensicSignals.dispose();}catch (error) { /* intentional */ }_charts.cForensicSignals=null;}
+    if(_charts.cService){try{_charts.cService.dispose();}catch (error) { /* intentional */ }_charts.cService=null;}
     chartShellSetLoading("c-forensic", false);
     chartShellSetLoading("c-forensic-signals", false);
     chartShellSetLoading("c-service", false);
@@ -1989,7 +1989,7 @@ function renderDashboardCore(data) {
   var selEl = document.getElementById("day-picker");
   var prevSel = selEl?.value ? selEl.value : "";
   if (!prevSel) {
-    try { prevSel = sessionStorage.getItem("usageDashboardDay") || ""; } catch (_ignored) {}
+    try { prevSel = sessionStorage.getItem("usageDashboardDay") || ""; } catch (error) { /* intentional */ }
   }
   var valid = {};
   for (var _vd of days) valid[_vd.date] = true;
@@ -2019,7 +2019,7 @@ function renderDashboardCore(data) {
     if (!selEl.dataset.bound) {
       selEl.dataset.bound = "1";
       selEl.addEventListener("change", function () {
-        try { sessionStorage.setItem("usageDashboardDay", this.value); } catch (_ignored) {}
+        try { sessionStorage.setItem("usageDashboardDay", this.value); } catch (error) { /* intentional */ }
         if (__lastUsageData) renderDashboard(__lastUsageData, true);
       });
     }
@@ -2045,7 +2045,7 @@ function renderDashboardCore(data) {
   var prevDPick = window.__usageDetailDayPick;
   window.__usageDetailDayPick = pick;
   if (typeof prevDPick !== "undefined" && prevDPick !== pick) window.__usageDetailHost = null;
-  if (window.__usageDetailHost && (!multiHost || !selDay.hosts || !selDay.hosts[window.__usageDetailHost])) window.__usageDetailHost = null;
+  if (window.__usageDetailHost && (!multiHost || !selDay.hosts?.[window.__usageDetailHost])) window.__usageDetailHost = null;
   var hintEl = document.getElementById("day-picker-hint");
   if (hintEl) {
     hintEl.textContent = (pick === calToday && (selDay.total || 0) === 0) ? t("dayPickerHintZero") : "";
@@ -2657,7 +2657,7 @@ function copyReport(){
       lfpanel.dataset.extOpenBound = "1";
       lfpanel.addEventListener("click", function (ev) {
         var btn = ev.target.closest(".live-ext-open");
-        if (!btn || btn.dataset.dayIndex == null) return;
+        if (btn?.dataset.dayIndex == null) return;
         ev.preventDefault();
         ev.stopPropagation();
         initUpdateSlideoutOnce();
@@ -3073,7 +3073,7 @@ function renderUserProfileCharts(days) {
       if (_userCharts.versions && typeof _userCharts.versions.resize === "function") _userCharts.versions.resize();
       if (_userCharts.entrypoints && typeof _userCharts.entrypoints.resize === "function") _userCharts.entrypoints.resize();
       if (_userCharts.releaseStability && typeof _userCharts.releaseStability.resize === "function") _userCharts.releaseStability.resize();
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
   }
   if (typeof requestAnimationFrame !== "undefined") {
     requestAnimationFrame(__resizeUserProfileChartsAfterLayout);
@@ -3977,14 +3977,14 @@ function renderBudgetWaterfall(tot, quota, hostTotals) {
   }, true);
   try {
     chart.resize();
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   if (typeof requestAnimationFrame === "function") {
     requestAnimationFrame(function () {
       try {
         if (_budgetCharts.waterfall && typeof _budgetCharts.waterfall.resize === "function") {
           _budgetCharts.waterfall.resize();
         }
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
     });
   }
 }
@@ -4018,7 +4018,7 @@ function __budgetDrawTrendEfficiencyChart(el, labels, dailyTrend, t) {
     tooltip: { trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.95)', borderColor: '#334155', textStyle: { color: '#e2e8f0' },
       formatter: function(params) {
         var ix = params[0].dataIndex;
-        var head = dailyTrend[ix] && dailyTrend[ix].date ? dailyTrend[ix].date : params[0].axisValueLabel;
+        var head = dailyTrend[ix]?.date ? dailyTrend[ix].date : params[0].axisValueLabel;
         var lines = [head];
         for (var p of params) {
           var val = p.value;
@@ -4580,7 +4580,7 @@ function renderProxyAnalysis(data) {
   // Cards
   var ch = pd.cache_health || {};
   var models = pd.models || {};
-  var opusReqs = (models["claude-opus-4-6"] || {}).requests || 0;
+  var opusReqs = models["claude-opus-4-6"]?.requests || 0;
   var sonnetReqs = 0;
   var otherReqs = 0;
   for (var mk in models) {
@@ -4763,7 +4763,7 @@ function renderProxyAnalysis(data) {
 
 function destroyProxyCharts() {
   for (var k in _proxyCharts) {
-    if (_proxyCharts[k]) { try { _proxyCharts[k].dispose(); } catch (_ignored) {} _proxyCharts[k] = null; }
+    if (_proxyCharts[k]) { try { _proxyCharts[k].dispose(); } catch (error) { /* intentional */ } _proxyCharts[k] = null; }
   }
 }
 
@@ -5080,7 +5080,7 @@ function aggregateHourlyLatency(proxyDays) {
 function __proxyHourlyLatencyYAxis(ld, legendSelected) {
   var nameMax = t("proxyDSMaxLatency");
   var yBase = { type: 'value', min: 0, axisLabel: { color: '#94a3b8', formatter: function(v) { return __fmtMsShort(v); } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,0.5)' } } };
-  var maxOn = !legendSelected || legendSelected[nameMax] !== false;
+  var maxOn = legendSelected?.[nameMax] !== false;
   if (ld.yCap && maxOn) yBase.max = ld.yCap;
   return yBase;
 }
@@ -5409,14 +5409,14 @@ function __effInitOrSet(key, el, option, notMerge) {
   _effCharts[key].setOption(option, { notMerge: !!notMerge, lazyUpdate: false });
   try {
     _effCharts[key].resize();
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   if (typeof requestAnimationFrame === "function") {
     requestAnimationFrame(function () {
       try {
         if (_effCharts[key] && typeof _effCharts[key].resize === "function") {
           _effCharts[key].resize();
         }
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
     });
   }
 }
@@ -6043,7 +6043,7 @@ function initFilterBar(data) {
       '<button type="button" class="filter-chip" data-scope="hourly">' + escHtml(t('mainChartsScopeHourly')) + '</button>';
     scopeChips.addEventListener('click', function(e) {
       var btn = e.target.closest('.filter-chip');
-      if (!btn || !btn.dataset.scope) return;
+      if (!btn?.dataset.scope) return;
       scopeChips.querySelectorAll('.filter-chip').forEach(function(c) { c.classList.remove('active'); });
       btn.classList.add('active');
       // Sync with existing scope chips
@@ -6087,7 +6087,7 @@ function initFilterBar(data) {
         try {
           if (hostVal) sessionStorage.setItem("usageForensicHostFilter", hostVal);
           else sessionStorage.removeItem("usageForensicHostFilter");
-        } catch(_ignored) {}
+        } catch (error) { /* intentional */ }
         if (__lastUsageData) renderDashboard(__lastUsageData, true);
       });
     } else {
@@ -6440,7 +6440,7 @@ function updateAnthropicPopup(data) {
     } catch (eAnth) {
       try {
         _proxyCharts.anthropicIncidents.dispose();
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
       _proxyCharts.anthropicIncidents = null;
     }
   }
@@ -6692,7 +6692,7 @@ function renderAvailabilityKpis(data) {
   var h = "";
 
   var inModal = document.getElementById("anthropic-modal-overlay");
-  var isWide = inModal && inModal.classList.contains("is-open");
+  var isWide = inModal?.classList.contains("is-open");
 
   var utCCls = medianUt >= 99.8 ? "ok" : medianUt >= 99 ? "warn" : medianUt >= 95 ? "caution" : "danger";
   var sqCCls = medianSq >= 99 ? "ok" : medianSq >= 95 ? "warn" : medianSq >= 85 ? "caution" : "danger";
@@ -6971,7 +6971,7 @@ function renderAvailabilityKpis(data) {
   if (!kpiDet) return;
   function isInModal() {
     var overlay = document.getElementById("anthropic-modal-overlay");
-    return overlay && overlay.classList.contains("is-open");
+    return overlay?.classList.contains("is-open");
   }
   kpiDet.addEventListener("toggle", function() {
     if (isInModal()) return;
@@ -7056,7 +7056,7 @@ function renderAvailabilityKpis(data) {
     // Move Kennzahlen above charts in modal (collapsed by default)
     var kpiEl = modalBody.querySelector("#avail-kpi-details");
     var chartsRow = modalBody.querySelector(".health-charts-row");
-    if (kpiEl && chartsRow && chartsRow.parentNode) {
+    if (kpiEl && chartsRow?.parentNode) {
       chartsRow.parentNode.insertBefore(kpiEl, chartsRow);
       kpiEl.removeAttribute("open");
     }
@@ -7084,7 +7084,7 @@ function renderAvailabilityKpis(data) {
     // Move Kennzahlen back below charts
     var kpiEl = modalBody.querySelector("#avail-kpi-details");
     var chartsRow = modalBody.querySelector(".health-charts-row");
-    if (kpiEl && chartsRow && chartsRow.parentNode) {
+    if (kpiEl && chartsRow?.parentNode) {
       chartsRow.parentNode.insertBefore(kpiEl, chartsRow.nextSibling);
     }
     // Restore collapse behavior
@@ -7288,7 +7288,7 @@ function applyDevCacheFromStatus(info) {
           try {
             var infPull = JSON.parse(px.responseText);
             applyDevCacheFromStatus(infPull);
-          } catch (_ignored) {}
+          } catch (error) { /* intentional */ }
         };
         px.send();
       }
@@ -7333,7 +7333,7 @@ function applyDevCacheFromStatus(info) {
               setTimeout(pullDevNavCacheStatus, 400);
               setTimeout(pullDevNavCacheStatus, 2500);
               setTimeout(pullDevNavCacheStatus, 8000);
-            } catch (_ignored) {}
+            } catch (error) { /* intentional */ }
             if (st2) st2.textContent = (btnId === "dev-rebuild-jsonl" ? "JSONL" : "PROXY") + " rebuild started";
           };
           rq.onerror = function () { btn.disabled = false; };
@@ -7396,7 +7396,7 @@ function applyDevCacheFromStatus(info) {
           localStorage.removeItem("cud_layout_prefs_v2");
           localStorage.removeItem("cud_active_template");
           // Keep cud_templates — user-created templates survive clear
-          try { sessionStorage.removeItem("usageDashboardDay"); } catch (_ignored) {}
+          try { sessionStorage.removeItem("usageDashboardDay"); } catch (error) { /* intentional */ }
           console.info("[DEV] layout cleared — prefs + active template reset (user templates preserved)");
           // Also delete server-side layout file
           try {
@@ -7419,7 +7419,7 @@ function applyDevCacheFromStatus(info) {
         }
         pullDevNavCacheStatus();
       }, 20000);
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
   };
   xhr.send();
 })();
@@ -7583,7 +7583,7 @@ function renderEconomicSection(data, filteredDays) {
 }
 
 function populateSessionPicker(stData, picker, infoEl, sumEl) {
-  if (!picker || !stData || !stData.sessions) return;
+  if (!picker || !stData?.sessions) return;
   picker.innerHTML = "";
   var sessions = stData.sessions;
   for (var i = 0; i < sessions.length; i++) {
@@ -7611,7 +7611,7 @@ function populateSessionPicker(stData, picker, infoEl, sumEl) {
 }
 
 function findSession(stData, hash) {
-  if (!stData || !stData.sessions) return null;
+  if (!stData?.sessions) return null;
   for (var i = 0; i < stData.sessions.length; i++) {
     if (stData.sessions[i].session_id_hash === hash) return stData.sessions[i];
   }
@@ -7631,7 +7631,7 @@ function updateSessionInfo(session, infoEl) {
 function renderWasteCurve(session) {
   if (typeof echarts === "undefined") return;
   var el = document.getElementById("chart-shell-econ-waste");
-  if (!el || !session || !session.turns || !session.turns.length) return;
+  if (!el || !session?.turns?.length) return;
 
   var econLegFit = t("econLegendQuadraticFit");
   var econLegAct = t("econLegendTotalActual");
@@ -7739,7 +7739,7 @@ function renderWasteCurve(session) {
     tooltip: {
       trigger: "axis",
       formatter: function (params) {
-        if (!params || !params.length) return "";
+        if (!params?.length) return "";
         var turnNum = params[0].value[0];
         var turnIdx = turnNum - 1;
         var lines = ["<b>Turn " + turnNum + "</b>"];
@@ -7885,7 +7885,7 @@ function renderWasteCurve(session) {
   if (_forcedRestart) {
     // Find next session's warmup cost (first 10 turns total tokens)
     var _nextSession = null;
-    if (_econData && _econData.sessions && session.last_ts) {
+    if (_econData?.sessions && session.last_ts) {
       var _lastMs = new Date(session.last_ts).getTime();
       var _bestGap = Infinity;
       for (var nsi = 0; nsi < _econData.sessions.length; nsi++) {
@@ -7896,7 +7896,7 @@ function renderWasteCurve(session) {
       }
     }
     var rebuildCost = 0;
-    if (_nextSession && _nextSession.turns) {
+    if (_nextSession?.turns) {
       var warmupN = Math.min(10, _nextSession.turns.length);
       for (var wi2 = 0; wi2 < warmupN; wi2++) {
         var wt = _nextSession.turns[wi2];
@@ -7951,7 +7951,7 @@ function renderWasteCurve(session) {
 function renderCacheExplosion(session) {
   if (typeof echarts === "undefined") return;
   var el = document.getElementById("chart-shell-econ-explosion");
-  if (!el || !session || !session.turns || !session.turns.length) return;
+  if (!el || !session?.turns?.length) return;
 
   var turns = session.turns;
   var n = turns.length;
@@ -8287,7 +8287,7 @@ function renderCacheExplosion(session) {
 function renderEfficiencyTimeline(stData) {
   if (typeof echarts === "undefined") return;
   var el = document.getElementById("chart-shell-econ-efficiency");
-  if (!el || !stData || !stData.sessions) return;
+  if (!el || !stData?.sessions) return;
 
   // Aggregate all turns across sessions by hour
   var hourly = {};
@@ -8709,7 +8709,7 @@ function renderDayComparison(days) {
 function renderBudgetDrain(stData, qdData) {
   if (typeof echarts === "undefined") return;
   var el = document.getElementById("chart-shell-econ-drain");
-  if (!el || !stData || !stData.sessions || !stData.sessions.length) return;
+  if (!el || !stData?.sessions?.length) return;
   var drainH3 = document.getElementById("econ-drain-h3");
   if (drainH3) drainH3.textContent = t("econDrainTitle");
   var drainBlurb = document.getElementById("econ-drain-blurb");
@@ -8960,7 +8960,7 @@ function renderBudgetDrain(stData, qdData) {
     tooltip: {
       trigger: "axis",
       formatter: function (params) {
-        if (!params || !params.length) return "";
+        if (!params?.length) return "";
         var lines = [];
         for (var p = 0; p < params.length; p++) {
           if (params[p].seriesName === econLCompaction) {
@@ -9247,7 +9247,7 @@ function renderBudgetDrain(stData, qdData) {
       requestAnimationFrame(function () {
         if (_effCharts.econDrain && typeof _effCharts.econDrain.resize === "function") _effCharts.econDrain.resize();
       });
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
   }
 
   // HTML overlay for collapsible info box
@@ -9478,7 +9478,7 @@ function renderEconOverhead(qdData, stData) {
     tooltip: {
       trigger: "axis",
       formatter: function (params) {
-        if (!params || !params.length) return "";
+        if (!params?.length) return "";
         var turnNum = params[0].value[0];
         var tip = '<div style="font-size:11px">Turn ' + turnNum;
         var q5a = null, q5i = null;

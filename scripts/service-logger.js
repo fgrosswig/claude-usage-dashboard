@@ -72,13 +72,13 @@ function emit(level, topic, message) {
     '\n';
   try {
     process.stderr.write(line);
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   if (logFilePath) {
     try {
       var dir = path.dirname(logFilePath);
       if (dir && dir !== '.') fs.mkdirSync(dir, { recursive: true });
       fs.appendFileSync(logFilePath, line, 'utf8');
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
   }
 }
 

@@ -35,7 +35,7 @@ function discoverHostImportDirs(parentDir) {
       if (!/^HOST-/i.test(name)) continue;
       out.push({ path: path.join(absParent, name), label: name });
     }
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   out.sort(function (a, b) {
     return a.label.localeCompare(b.label, undefined, { sensitivity: 'base' });
   });
@@ -102,7 +102,7 @@ function walkJsonl(dir) {
       if (entry.isDirectory()) files = files.concat(walkJsonl(fp));
       else if (entry.name.endsWith('.jsonl')) files.push(fp);
     }
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   return files;
 }
 
@@ -141,7 +141,7 @@ function walkJsonlYielding(startDir, cb) {
           if (entries[i].isDirectory()) stack.push(fp);
           else if (entries[i].name.endsWith('.jsonl')) files.push(fp);
         }
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
     }
     if (stack.length) setImmediate(pump);
     else cb(files);
@@ -284,7 +284,7 @@ function collectProxyNdjsonFiles() {
         files.push(path.join(logDir, entry.name));
       }
     }
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   files.sort(function (a, b) {
     return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
   });

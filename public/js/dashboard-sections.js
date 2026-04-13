@@ -229,7 +229,7 @@
       try {
         if (typeof _charts.c1hosts.dispose === 'function') _charts.c1hosts.dispose();
         else if (typeof _charts.c1hosts.destroy === 'function') _charts.c1hosts.destroy();
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
       _charts.c1hosts = null;
     }
 
@@ -365,7 +365,7 @@
       }
     } else {
       if (_charts.c1hosts) {
-        try { _charts.c1hosts.dispose(); } catch (_ignored) {}
+        try { _charts.c1hosts.dispose(); } catch (error) { /* intentional */ }
         _charts.c1hosts = null;
       }
       var chw2 = document.getElementById("chart-host-wrap");

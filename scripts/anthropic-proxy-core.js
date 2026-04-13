@@ -120,7 +120,7 @@ function walkJsonl(dir, acc) {
       if (entry.isDirectory()) walkJsonl(fp, acc);
       else if (entry.name.endsWith('.jsonl')) acc.push(fp);
     }
-  } catch (_ignored) {}
+  } catch (error) { /* intentional */ }
   return acc;
 }
 
@@ -164,7 +164,7 @@ function alignToJsonl(proxyEndIso, usage, roots, opts) {
   var windowMs = opts.windowMs != null ? opts.windowMs : ALIGN_WINDOW_MS;
   var tailBytes = opts.tailBytes || 512 * 1024;
   var maxFiles = opts.maxFiles || 48;
-  if (!usage || !roots || !roots.length) return null;
+  if (!usage || !roots?.length) return null;
   var proxyMs = Date.parse(proxyEndIso);
   if (Number.isNaN(proxyMs)) return null;
 
@@ -197,7 +197,7 @@ function alignToJsonl(proxyEndIso, usage, roots, opts) {
       } catch (e) {
         continue;
       }
-      var u = rec.message && rec.message.usage;
+      var u = rec.message?.usage;
       if (!u) continue;
       var ts = rec.timestamp || '';
       if (ts.length < 19) continue;
@@ -232,7 +232,7 @@ function extractUsageFromJson(obj) {
   if (!obj || typeof obj !== 'object') return null;
   var u = null;
   if (obj.usage && typeof obj.usage === 'object') u = obj.usage;
-  else if (obj.message && obj.message.usage) u = obj.message.usage;
+  else if (obj.message?.usage) u = obj.message.usage;
   else if (obj.delta?.usage) u = obj.delta.usage;
   if (!u) return null;
   // Promote ephemeral sub-fields from cache_creation (message_start event)
@@ -277,7 +277,7 @@ function usageFromBuffer(buf, contentType) {
         var u = extractUsageFromJson(o);
         usage = mergeUsage(usage, u);
         if (o.type === 'message_delta' && o.usage) usage = mergeUsage(usage, o.usage);
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
     }
     return usage;
   }
@@ -339,7 +339,7 @@ function responseHintsFromBuffer(buf, contentType) {
           else if (btype === 'tool_result') toolResult++;
           else if (btype === 'text') text++;
         }
-      } catch (_ignored) {}
+      } catch (error) { /* intentional */ }
     }
     if (toolUse) hints.response_tool_use_blocks = toolUse;
     if (toolResult) hints.response_tool_result_blocks = toolResult;
@@ -357,7 +357,7 @@ function responseHintsFromBuffer(buf, contentType) {
     if (Array.isArray(content)) {
       var jToolUse = 0, jToolResult = 0, jText = 0;
       for (var b of content) {
-        if (!b || !b.type) continue;
+        if (!b?.type) continue;
         if (b.type === 'tool_use') jToolUse++;
         else if (b.type === 'tool_result') jToolResult++;
         else if (b.type === 'text') jText++;
@@ -375,7 +375,7 @@ function responseHintsFromBuffer(buf, contentType) {
 }
 
 function summarizeRequestBody(buf, logBodies) {
-  if (!buf || !buf.length) return { has_body: false };
+  if (!buf?.length) return { has_body: false };
   var hints = { has_body: true };
   try {
     var o = JSON.parse(buf.toString('utf8'));
@@ -411,7 +411,7 @@ function buildUpstreamHeaders(req, targetUrl, bodyLen) {
   }
   out['Host'] = hostHeader;
   out['Content-Length'] = String(bodyLen);
-  var xf = req.socket && req.socket.remoteAddress;
+  var xf = req.socket?.remoteAddress;
   if (xf) {
     var prev = raw['x-forwarded-for'] || raw['X-Forwarded-For'];
     out['X-Forwarded-For'] = prev ? String(prev) + ', ' + xf : xf;
@@ -437,7 +437,7 @@ module.exports = {
 
     try {
       fs.mkdirSync(logDir, { recursive: true });
-    } catch (_ignored) {}
+    } catch (error) { /* intentional */ }
 
     var targetUrl = new URL(upstreamBase);
 
@@ -512,7 +512,7 @@ module.exports = {
             var t1 = Date.now();
             var endedIso = new Date(t1).toISOString();
             var bodyBufResp = Buffer.concat(acc);
-            var ct = (upRes.headers && upRes.headers['content-type']) || '';
+            var ct = upRes.headers?.['content-type'] || '';
             var ct0 = Array.isArray(ct) ? ct[0] : ct;
             var usage = usageFromBuffer(bodyBufResp, ct0);
             var ratio = cacheReadRatio(usage);
@@ -563,7 +563,7 @@ module.exports = {
                   windowMs: ALIGN_WINDOW_MS
                 });
               } catch (ae) {
-                rec.jsonl_alignment_error = ae && ae.message ? ae.message : String(ae);
+                rec.jsonl_alignment_error = ae?.message ? ae.message : String(ae);
               }
             }
             try {
