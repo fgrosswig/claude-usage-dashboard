@@ -3,7 +3,7 @@
 # Tag-Event:  draft-release-notes    → Draft-Release auf Gitea erstellen
 when:
   - event: push
-    branch: [main, develop, "feat/**", "fix/**"]
+    branch: [main, develop]
   - event: tag
   - event: manual
 
@@ -71,8 +71,7 @@ steps:
   - name: build-push-dev
     image: plugins/kaniko
     when:
-      branch:
-        exclude: main
+      branch: develop
     settings:
       repo: harbor.grosswig-it.de/claude/claude-usage-dashboard
       registry: harbor.grosswig-it.de
