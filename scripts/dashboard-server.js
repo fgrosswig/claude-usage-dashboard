@@ -3773,18 +3773,9 @@ function tryPushDebugCacheKnownPath(out, kind, p) {
 }
 
 function compareDebugCacheFileRows(a, b) {
-  var fa = a.folder_ui || '';
-  var fb = b.folder_ui || '';
-  if (fa !== fb) {
-    if (fa < fb) return -1;
-    if (fa > fb) return 1;
-    return 0;
-  }
-  var na = (a.file_name || '').toLowerCase();
-  var nb = (b.file_name || '').toLowerCase();
-  if (na < nb) return -1;
-  if (na > nb) return 1;
-  return 0;
+  var fc = (a.folder_ui || '').localeCompare(b.folder_ui || '');
+  if (fc !== 0) return fc;
+  return (a.file_name || '').localeCompare(b.file_name || '', undefined, { sensitivity: 'base' });
 }
 
 function appendProxyNdjsonDebugEntries(out) {

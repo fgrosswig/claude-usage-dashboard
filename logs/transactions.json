@@ -5,12 +5,18 @@
       "id": "TX-253",
       "timestamp": "2026-04-13",
       "session": "auto",
-      "commit": "0c9a164",
-      "commit_full": "0c9a16404f833756a7d96721849bcd4176c63882",
+      "commit": "ba6ec0d",
+      "commit_full": "ba6ec0d7bddee7fca85c61cb5b0f75b66497b96f",
       "status": "ABGESCHLOSSEN",
-      "description": "Merge branch 'feat/widget-dispatcher' into develop",
-      "detail": "# Conflicts:\n#\tlogs/transactions.json",
-      "changes": []
+      "description": "fix(sonar): S2871 localeCompare in compareDebugCacheFileRows",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
     },
     {
       "id": "TX-252",
