@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-276",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "ea07eb8",
+      "commit_full": "ea07eb8eef6726aaba08b5e993ead335569b8049",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ci): restrict app pipeline to main+develop only",
+      "detail": "Feature/fix branches no longer trigger build+deploy on push.\nThey only get PR checks (sonar + k8s-verify via pr.yml).\nPrevents parallel Kaniko builds killing the server.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".woodpecker/app.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-275",
       "timestamp": "2026-04-13",
       "session": "auto",
