@@ -984,17 +984,19 @@
   }
 
   function resetPrefs() {
+    // Build default widgets from registry (all sections, span 12)
+    var reg = getRegistry();
+    var defWidgets = [];
+    if (reg) {
+      for (var si = 0; si < reg.sections.length; si++) {
+        var s = reg.sections[si];
+        if (s.parentSection) continue;
+        defWidgets.push({ id: s.id, span: 12 });
+      }
+    }
     _prefs = defaultPrefs();
-    try { localStorage.removeItem(PREFS_KEY); } catch (e) {}
-    // Delete server-side layout file too
-    try {
-      var xhr = new XMLHttpRequest();
-      xhr.open('PUT', '/api/layout', false);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.send('null');
-    } catch (e) {}
-    applyVisibility();
-    applyOrder();
+    _prefs.widgets = defWidgets.length ? defWidgets : null;
+    savePrefs();
     location.reload();
   }
 
