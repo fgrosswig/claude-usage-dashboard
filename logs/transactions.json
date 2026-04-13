@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-250",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "e0c75f0",
+      "commit_full": "e0c75f01cd02a164ae86c001d528967f94c5434d",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(layout): reset creates default widgets with span 12 instead of null",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-249",
       "timestamp": "2026-04-13",
       "session": "auto",
