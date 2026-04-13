@@ -2,6 +2,33 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-257",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "394a1bc",
+      "commit_full": "394a1bcddaf585b64b0248dd8ab4ce695d6ca094",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(init): scaffold default layout on first load, DEV clear-layout button",
+      "detail": "- buildDefaultWidgetsFromScaffold() generates flat widgets[] from\n  TB_PAGE_SCAFFOLD_PLAN on first visit (no prefs/layout file)\n- Removes double applyGridLayout() call in renderDashboardCore\n- DEV bar: red \"Clear Layout\" button deletes localStorage + server file\n- DELETE /api/layout guarded by __devMode\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-256",
       "timestamp": "2026-04-13",
       "session": "auto",
