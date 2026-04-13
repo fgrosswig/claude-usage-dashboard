@@ -4,6 +4,9 @@ var usageScanRoots = require('./usage-scan-roots');
 var homeDir = usageScanRoots.HOME;
 var forEachJsonlLineSync = usageScanRoots.forEachJsonlLineSync;
 
+// Pre-declare loop variables used across multiple top-level for-of loops (S2814)
+var d, m, ld, t;
+
 // ─── Outage-Daten (Disk-Cache vom Dashboard oder frisch fetchen) ───
 var OUTAGE_DISK_CACHE = path.join(homeDir, '.claude', 'usage-dashboard-outages.json');
 
@@ -263,7 +266,7 @@ messages.sort(function (a, b) {
 });
 
 // Aggregate daily (nur die frisch gelesenen messages)
-for (var m of messages) {
+for (m of messages) {
   if (!daily[m.day]) daily[m.day] = emptyDailyBucket();
   var dd = daily[m.day];
   dd.input += m.input;
@@ -314,7 +317,7 @@ function dayTotal(r) {
 function detectPeakDay(daily, days) {
   var peakDay = null, peakVal = 0;
   for (var day of days) {
-    var t = dayTotal(daily[day]);
+    t = dayTotal(daily[day]);
     if (t > peakVal) { peakVal = t; peakDay = day; }
   }
   return peakDay;
@@ -359,7 +362,7 @@ var peakDay = detectPeakDay(daily, days);
 var limitDays = detectLimitDays(daily, days);
 var modelChanges = detectModelChanges(daily, days);
 var limitDaySet = {};
-for (var ld of limitDays) limitDaySet[ld.day] = ld.flags;
+for (ld of limitDays) limitDaySet[ld.day] = ld.flags;
 var today = new Date().toISOString().slice(0, 10);
 
 function fmt(n) {
@@ -411,7 +414,7 @@ if (mcKeys.length > 0) {
 }
 if (limitDays.length > 0) {
   console.log('  Limit-Tage (automatisch erkannt):');
-  for (var ld of limitDays) {
+  for (ld of limitDays) {
     console.log('    ' + ld.day + '  [' + ld.flags.join(', ') + ']');
   }
 } else {
@@ -433,7 +436,7 @@ console.log(
   '  -----------|-----------|------------|-----------|-------|-------|-------------|----------------',
 );
 
-for (var d of days) {
+for (d of days) {
   var r = daily[d];
   var activeH = Object.keys(r.hours).length;
   var cacheRatio = r.output > 0 ? Math.round(r.cache_read / r.output) : 0;
@@ -470,7 +473,7 @@ console.log('');
 console.log('  Datum      | Overhead | Output/h  | Total/h    | Subagent%');
 console.log('  -----------|----------|-----------|------------|----------');
 
-for (var d of days) {
+for (d of days) {
   var r = daily[d];
   var total = dayTotal(r);
   var activeH = Math.max(1, Object.keys(r.hours).length);
@@ -508,7 +511,7 @@ console.log(
   '  -----------|----------|----------|---------------|-------------|--------',
 );
 
-for (var d of days) {
+for (d of days) {
   var r = daily[d];
   var mainCalls = r.calls - r.subagent_calls;
   var subCachePct =
@@ -561,7 +564,7 @@ if (limitDays.length > 0 && peakDay) {
   var cleanLimitDays = [];
   var outageLimitDays = [];
   for (var ldi of limitDays) {
-    var ld = ldi.day;
+    ld = ldi.day;
     var lr = daily[ld];
     var lt = dayTotal(lr);
     var impl90 = Math.round(lt / 0.9);
@@ -650,7 +653,7 @@ var todayMsgs = messages.filter(function (m) {
   return m.day === hourlyDay;
 });
 var hourly = {};
-for (var m of todayMsgs) {
+for (m of todayMsgs) {
   if (!hourly[m.hour])
     hourly[m.hour] = {
       input: 0, output: 0, cache_read: 0, cache_creation: 0, calls: 0, sub: 0,
@@ -818,14 +821,14 @@ console.log('='.repeat(90));
 console.log('');
 
 var maxTotal = 0;
-for (var d of days) {
-  var t = dayTotal(daily[d]);
+for (d of days) {
+  t = dayTotal(daily[d]);
   if (t > maxTotal) maxTotal = t;
 }
 
-for (var d of days) {
+for (d of days) {
   var r = daily[d];
-  var t = dayTotal(r);
+  t = dayTotal(r);
   var barLen = Math.round((t / maxTotal) * 60);
   var bar = '';
   var cachePortion = Math.round((r.cache_read / maxTotal) * 60);

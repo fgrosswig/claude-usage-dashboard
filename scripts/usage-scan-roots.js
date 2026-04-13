@@ -66,9 +66,9 @@ function getScanRoots() {
   }
   var parts = raw.split(';');
   for (var chunk of parts) {
-    chunk = chunk.trim();
-    if (!chunk) continue;
-    var abs = expandUserPath(chunk);
+    var trimChunk = chunk.trim();
+    if (!trimChunk) continue;
+    var abs = expandUserPath(trimChunk);
     if (!abs) continue;
     var baseName = path.basename(abs.replace(/[/\\]$/, ''));
     var label = baseName || 'extra-' + roots.length;

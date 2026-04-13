@@ -631,7 +631,7 @@ function buildByDateFromVersionTimelineItems(items) {
   var byDate = Object.create(null);
   for (var g = 0; g < groups.length; g++) {
     var grp = groups[g];
-    var dk = isoToUtcYmd(grp[0].when);
+    dk = isoToUtcYmd(grp[0].when);
     var prevVer = g > 0 ? groups[g - 1][groups[g - 1].length - 1].ver : null;
     var added = [];
     var hi = [];
@@ -2681,8 +2681,7 @@ var __appVersionCache = '';
 function getAppVersion() {
   if (__appVersionCache) return __appVersionCache;
   try {
-    var execSync = require('node:child_process').execSync;
-    __appVersionCache = execSync('git describe --tags --abbrev=7', { encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+    __appVersionCache = require('node:child_process').execSync('git describe --tags --abbrev=7', { encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }).trim();
   } catch (e) {
     try {
       __appVersionCache = execSync('git rev-parse --short=7 HEAD', { encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }).trim();

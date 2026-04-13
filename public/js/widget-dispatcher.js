@@ -1284,7 +1284,7 @@
           ghost.removeAttribute('draggable');
           var ghostCtrls = ghost.querySelectorAll('input,button');
           for (var gc of ghostCtrls) {
-            gc.parentNode.removeChild(gc);
+            gc.remove();
           }
           document.body.appendChild(ghost);
           var r = item.getBoundingClientRect();
@@ -2321,7 +2321,7 @@
     var ds = canvas.querySelectorAll('details.tb-canvas-section[data-section-id]');
     var di;
     for (di = 0; di < ds.length; di++) {
-      var sid = ds[di].getAttribute('data-section-id');
+      var sid = ds[di].dataset.sectionId;
       if (sid) map[sid] = ds[di].open;
     }
     return map;
@@ -2706,7 +2706,7 @@
         seen[cid] = true;
       }
       for (fi = 0; fi < flatKids.length; fi++) {
-        var fk = flatKids[fi];
+        fk = flatKids[fi];
         if (tbIsLayoutBlock(fk)) continue;
         if (!seen[fk.id]) {
           merged.push({ id: fk.id, span: fk.span || 6 });
@@ -3984,7 +3984,7 @@
       clone.removeAttribute('id');
       clone.setAttribute('data-tb-preview-clone', '1');
       if (def.widgetGroup && _chipGroupContainers[def.widgetGroup]) {
-        clone.setAttribute('data-tb-group-clone', def.widgetGroup);
+        clone.dataset.tbGroupClone = def.widgetGroup;
       }
       var walk = clone.querySelectorAll('[id]');
       var wi;
@@ -4214,7 +4214,6 @@
             for (pi = 0; pi < inPv.length; pi++) {
               var icp = inPv[pi];
               var chDefIn = reg.findChart(icp.id);
-              var chNameIn = chDefIn ? _t(chDefIn.titleKey) : icp.id;
               var pvIdIn = 'tb-pv-' + pvSec.id + '-' + icp.id + '-b' + ci + '-' + pi;
               var isCanvasIn = tbPreviewIsCanvasChart(chDefIn);
               var icSpPv = icp.span || 6;

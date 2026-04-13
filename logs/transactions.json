@@ -5,12 +5,43 @@
       "id": "TX-268",
       "timestamp": "2026-04-13",
       "session": "auto",
-      "commit": "1074221",
-      "commit_full": "1074221e2380d860836cdef360cb1b762bd0ed27",
+      "commit": "d68c3d6",
+      "commit_full": "d68c3d684fb4d70531b29f9a9282ea6e8938369b",
       "status": "ABGESCHLOSSEN",
-      "description": "Merge branch 'feat/widget-dispatcher' into develop",
-      "detail": "# Conflicts:\n#\tlogs/transactions.json",
-      "changes": []
+      "description": "fix(sonar): resolve 25 new-code violations (S7761, S2004, S2814, S2392, S2310, S1854)",
+      "detail": "- S7761: .dataset instead of get/setAttribute\n- S2004: extract nested function to reduce depth\n- S2814/S2392: eliminate var redeclarations in top-level loops\n- S2310: avoid loop counter reassignment\n- S1854: remove unused chNameIn assignment\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "public/js/dashboard.client.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "public/js/widget-dispatcher.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/anthropic-proxy-core.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/token-forensics.js",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/usage-scan-roots.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
     },
     {
       "id": "TX-267",
