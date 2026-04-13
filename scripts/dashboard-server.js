@@ -15,20 +15,61 @@
 var http = require('node:http');
 var https = require('node:https');
 var fs = require('node:fs');
+var path = require('node:path');
+var os = require('node:os');
+
+/** Optional absolute path to git (CI / non-default install). */
+function resolveGitBinary() {
+  var override = (process.env.CLAUDE_USAGE_GIT_PATH || process.env.GIT_BIN_PATH || '').trim();
+  if (override) return override;
+  if (process.platform === 'win32') {
+    var w = [
+      'C:\\Program Files\\Git\\cmd\\git.exe',
+      'C:\\Program Files\\Git\\bin\\git.exe',
+      'C:\\Program Files (x86)\\Git\\cmd\\git.exe'
+    ];
+    for (var wi = 0; wi < w.length; wi++) {
+      try {
+        if (fs.existsSync(w[wi])) return w[wi];
+      } catch (eW) { /* intentional */ }
+    }
+    return 'git.exe';
+  }
+  var u = ['/usr/bin/git', '/usr/local/bin/git', '/opt/homebrew/bin/git'];
+  for (var ui = 0; ui < u.length; ui++) {
+    try {
+      if (fs.existsSync(u[ui])) return u[ui];
+    } catch (eU) { /* intentional */ }
+  }
+  return 'git';
+}
+
+/**
+ * Run git argv without shell; PATH limited to system dirs (Sonar S4036 / search-path injection).
+ */
+function gitExecFileTrimmed(gitArgs) {
+  var cp = require('node:child_process');
+  var isWin = process.platform === 'win32';
+  var safePath = isWin ? 'C:\\Windows\\System32;C:\\Windows' : '/usr/bin:/bin';
+  var gitBin = resolveGitBinary();
+  return cp.execFileSync(gitBin, gitArgs, {
+    encoding: 'utf8',
+    timeout: 3000,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: Object.assign({}, process.env, { PATH: safePath })
+  }).trim();
+}
 
 // Resolve version from git tag at startup (no hardcoded version)
 var __appVersion = (function () {
   try {
-    // git tag --sort=-v:refname finds newest tag repo-wide (not just current branch)
-    var tag = require('node:child_process').execSync('git tag --sort=-v:refname 2>/dev/null', { encoding: 'utf8' }).trim().split('\n')[0];
+    var tagLines = gitExecFileTrimmed(['tag', '--sort=-v:refname']).split('\n');
+    var tag = tagLines[0] || '';
     if (tag) return tag;
   } catch (error) { /* intentional */ }
-  // In Docker (no git): read from VERSION file, or fallback
-  try { return fs.readFileSync(require('node:path').join(__dirname, '..', 'VERSION'), 'utf8').trim(); } catch (error) { /* intentional */ }
+  try { return fs.readFileSync(path.join(__dirname, '..', 'VERSION'), 'utf8').trim(); } catch (error) { /* intentional */ }
   return 'dev';
 })();
-var path = require('node:path');
-var os = require('node:os');
 var dashboardHttp = require('./dashboard-http');
 var usageScanRoots = require('./usage-scan-roots');
 var HOME = usageScanRoots.HOME;
@@ -2681,11 +2722,10 @@ var __appVersionCache = '';
 function getAppVersion() {
   if (__appVersionCache) return __appVersionCache;
   try {
-    __appVersionCache = require('node:child_process').execSync('git describe --tags --abbrev=7', { encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+    __appVersionCache = gitExecFileTrimmed(['describe', '--tags', '--abbrev=7']);
   } catch (e) {
     try {
-      __appVersionCache = execSync('git rev-parse --short=7 HEAD', { encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }).trim();
-      __appVersionCache = 'dev-' + __appVersionCache;
+      __appVersionCache = 'dev-' + gitExecFileTrimmed(['rev-parse', '--short=7', 'HEAD']);
     } catch (e2) {
       __appVersionCache = 'dev';
     }
