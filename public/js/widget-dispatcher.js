@@ -132,6 +132,13 @@
     if (!p || typeof p !== 'object') return p;
     if (!Array.isArray(p.hiddenSections)) p.hiddenSections = [];
     if (!Array.isArray(p.hiddenCharts)) p.hiddenCharts = [];
+    // Strip empty layout blocks (legacy from pre-filter saves)
+    if (Array.isArray(p.widgets)) {
+      p.widgets = p.widgets.filter(function (w) {
+        if (w.type === 'layout' && Array.isArray(w.nested) && !w.nested.length) return false;
+        return true;
+      });
+    }
     return p;
   }
 
@@ -579,12 +586,68 @@
           if (!Object.prototype.hasOwnProperty.call(extracted, ek)) continue;
           var chartDef = reg.findChart(ek);
           if (!chartDef || !chartDef.renderFn) continue;
-          var renderFn = global[chartDef.renderFn];
-          if (typeof renderFn === 'function') {
-            try { renderFn(); } catch (eRender) {}
-          }
+          var rf = global[chartDef.renderFn];
+          if (typeof rf !== 'function') continue;
+          try {
+            invokeChartRenderFn(chartDef.renderFn, rf);
+          } catch (eRender) {}
         }
       }
+    }
+  }
+
+  /** Invoke a standalone chart render function with the correct context data. */
+  function invokeChartRenderFn(rfName, rf) {
+    if (String(rfName).indexOf('renderProxy_') === 0) {
+      var dataP = global.__lastUsageData;
+      if (dataP && typeof global._computeProxyCtx === 'function') global._computeProxyCtx(dataP);
+      if (global.__sectionCtx_proxy) rf(global.__sectionCtx_proxy);
+    } else if (String(rfName).indexOf('renderForensic_') === 0) {
+      var fctx = global.__sectionCtx_forensic;
+      if (fctx) rf(fctx);
+    } else if (String(rfName).indexOf('renderUserProfile_') === 0) {
+      var uctx = global.__sectionCtx_userProfile;
+      if (uctx) rf(uctx);
+    } else if (String(rfName).indexOf('renderBudget_') === 0) {
+      var bctx = global.__sectionCtx_budget;
+      if (!bctx && global.__lastUsageData && typeof global._computeBudgetCtx === 'function') {
+        bctx = global._computeBudgetCtx(global.__lastUsageData);
+      }
+      if (bctx) rf(bctx);
+    } else if (String(rfName).indexOf('renderTokenStats_') === 0) {
+      var tsctx = global.__sectionCtx_tokenStats;
+      if (tsctx) rf(tsctx);
+    } else if (String(rfName).indexOf('renderStatus_') === 0) {
+      rf();
+    } else if (
+      rfName === 'renderWasteCurve' || rfName === 'renderCacheExplosion' ||
+      rfName === 'renderBudgetDrain' || rfName === 'renderEfficiencyTimeline' ||
+      rfName === 'renderMonthlyButterfly' || rfName === 'renderDayComparison'
+    ) {
+      var uDataE = global.__lastUsageData;
+      var eDaysE = [];
+      if (uDataE && uDataE.days && uDataE.days.length) {
+        eDaysE = typeof global.getFilteredDays === 'function'
+          ? global.getFilteredDays(uDataE.days) : uDataE.days.slice();
+      }
+      var stEcon = global._econData;
+      if (rfName === 'renderMonthlyButterfly' || rfName === 'renderDayComparison') {
+        rf(eDaysE);
+      } else if (rfName === 'renderEfficiencyTimeline') {
+        if (stEcon) rf(stEcon);
+      } else if (rfName === 'renderBudgetDrain') {
+        if (stEcon) rf(stEcon, global._econQdData || undefined);
+      } else if (rfName === 'renderWasteCurve' || rfName === 'renderCacheExplosion') {
+        var sessEl = document.getElementById('econ-session-picker');
+        var selV = sessEl ? sessEl.value : '';
+        var sessE = null;
+        if (stEcon && typeof global.findSession === 'function') {
+          sessE = global.findSession(stEcon, selV);
+        }
+        if (sessE) rf(sessE);
+      }
+    } else {
+      rf();
     }
   }
 
@@ -677,13 +740,16 @@
             if (idef && (idef.kind === 'chip' || idef.engine !== 'echarts')) continue;
             nestedOut.push({ id: innSv[ii].id, span: innSv[ii].span || 6 });
           }
-          flatW.push({
-            type: 'layout',
-            span: chEnt.span || 12,
-            section: sec.id,
-            bid: chEnt.bid || chEnt.id || 'tbblk_s' + ci,
-            nested: nestedOut
-          });
+          // Skip empty layout blocks (chips-only rows)
+          if (nestedOut.length) {
+            flatW.push({
+              type: 'layout',
+              span: chEnt.span || 12,
+              section: sec.id,
+              bid: chEnt.bid || chEnt.id || 'tbblk_s' + ci,
+              nested: nestedOut
+            });
+          }
           continue;
         }
         var cdef = regSv && regSv.findChart ? regSv.findChart(chEnt.id) : null;
@@ -1677,7 +1743,6 @@
         { id: 'user-profile', span: 12 },
         { id: 'budget', span: 12 },
         { id: 'proxy', span: 12 },
-        { id: 'anthropic-status', span: 12 },
         { id: 'economic', span: 12 },
       ]
     },
@@ -1709,11 +1774,12 @@
       version: 2,
       sectionWidgets: DEFAULT_SECTION_WIDGETS,
       widgets: [
-        { id: 'health', span: 4 },
+        { id: 'health', span: 12 },
         { id: 'token-stats', span: 4 },
         { id: 'budget', span: 4 },
-        { id: 'forensic', span: 6 },
-        { id: 'proxy', span: 6 }
+        { id: 'forensic', span: 4 },
+        { id: 'proxy', span: 6 },
+        { id: 'economic', span: 6 }
       ]
     }
   ];
@@ -1755,6 +1821,20 @@
   }
 
   function loadTemplates() {
+    // Server file is source of truth (saved inside layout JSON as "templates" key)
+    try {
+      var xhrT = new XMLHttpRequest();
+      xhrT.open('GET', '/api/layout', false);
+      xhrT.send();
+      if (xhrT.status === 200 && xhrT.responseText) {
+        var parsed = JSON.parse(xhrT.responseText);
+        if (parsed && Array.isArray(parsed.templates) && parsed.templates.length) {
+          try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(parsed.templates)); } catch (e3) {}
+          return parsed.templates;
+        }
+      }
+    } catch (e2) {}
+    // Fallback to localStorage
     try {
       var raw = localStorage.getItem(TEMPLATES_KEY);
       if (raw) return JSON.parse(raw);
@@ -1764,6 +1844,11 @@
 
   function saveTemplates(list) {
     try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list)); } catch (e) {}
+    // Persist to server layout file
+    if (_prefs) {
+      _prefs.templates = list;
+      savePrefs();
+    }
   }
 
   function getActiveTemplateName() {
@@ -1875,6 +1960,12 @@
     var gridEl = document.getElementById('layout-grid');
     if (!gridEl) return;
 
+    // Hide all existing standalone chart wrappers (will re-show only those in current template)
+    var existingWrappers = gridEl.querySelectorAll('[id^="widget-"]');
+    for (var ewi = 0; ewi < existingWrappers.length; ewi++) {
+      existingWrappers[ewi].style.display = 'none';
+    }
+
     // Collect all direct children that are NOT sections (table, day-picker, etc.)
     var nonSectionNodes = [];
     var children = gridEl.children;
@@ -1896,19 +1987,8 @@
       var wType = w.type || 'section';
 
       if (wType === 'layout') {
-        var nestL = w.nested || [];
-        var ni;
-        for (ni = 0; ni < nestL.length; ni++) {
-          var nw = nestL[ni];
-          if (!nw || !nw.id) continue;
-          var chartDefL = reg.findChart(nw.id);
-          if (!chartDefL) continue;
-          var wrapperL = getOrCreateChartWrapper(chartDefL);
-          wrapperL.setAttribute('data-span', String(nw.span || 6));
-          wrapperL.style.display = '';
-          gridEl.appendChild(wrapperL);
-          extractedCharts[nw.id] = true;
-        }
+        // Layout blocks describe internal section structure (builder metadata).
+        // Charts stay inside their section DOM — no standalone extraction.
         continue;
       }
 
@@ -1997,7 +2077,6 @@
       html += '</span></div>';
     }
     html += '<div style="margin-top:10px;display:flex;gap:6px">';
-    html += '<button type="button" class="sidebar-btn-sm" id="tpl-save-current">' + _t('settingsTemplateSaveCurrent') + '</button>';
     html += '</div>';
     body.innerHTML = html;
 
@@ -2029,31 +2108,7 @@
       });
     }
 
-    // Save current layout as template
-    var saveBtn = document.getElementById('tpl-save-current');
-    if (saveBtn) {
-      saveBtn.addEventListener('click', function () {
-        var name = prompt(_t('settingsTemplateNamePrompt'));
-        if (!name || !name.trim()) return;
-        name = name.trim();
-        var userTpls = loadTemplates();
-        // Overwrite if same name exists
-        var found = false;
-        for (var j = 0; j < userTpls.length; j++) {
-          if (userTpls[j].name === name) {
-            userTpls[j] = { name: name, order: (_prefs.order || []).slice(), hiddenSections: (_prefs.hiddenSections || []).slice(), hiddenCharts: (_prefs.hiddenCharts || []).slice() };
-            found = true;
-            break;
-          }
-        }
-        if (!found) {
-          userTpls.push({ name: name, order: (_prefs.order || []).slice(), hiddenSections: (_prefs.hiddenSections || []).slice(), hiddenCharts: (_prefs.hiddenCharts || []).slice() });
-        }
-        saveTemplates(userTpls);
-        setActiveTemplateName(name);
-        renderTemplatesSection();
-      });
-    }
+    // "Save current layout" button removed — use Template Builder instead
   }
 
   function escT(s) {
@@ -2791,17 +2846,8 @@
         ['proxy-cache-trend'],
         ['proxy-ttl-history']
       ]
-    },
-    {
-      id: 'anthropic-status',
-      blocks: [12, 12, 12, 12],
-      slotChartIds: [
-        ['status-uptime'],
-        ['status-incidents'],
-        ['status-outage-scatter'],
-        ['status-outage-timeline']
-      ]
     }
+    // anthropic-status excluded: domId=null, lives in top-bar, not in #layout-grid
   ];
 
   /** Inner 12-col spans for scaffold block.children (builder canvas); aligns chip rows with dashboard grids. */
@@ -2970,6 +3016,47 @@
     renderBuilderRows();
   }
 
+  /**
+   * Load a template (or prefs) into the builder model.
+   * For section-only templates (v2 builtins): enriches with scaffold blocks in template order.
+   * For v3 templates with layout blocks: loads as-is.
+   * Returns the nested _tbWidgets array.
+   */
+  function tbLoadTemplateIntoBuilder(tpl) {
+    var widgets = tpl && tpl.widgets;
+    if (!widgets || !widgets.length) return tbNestedModelFromPageScaffold();
+    // Check if template has layout/chart blocks
+    var hasBlocks = false;
+    for (var wi = 0; wi < widgets.length; wi++) {
+      if (widgets[wi].type === 'layout' || widgets[wi].type === 'chart') {
+        hasBlocks = true; break;
+      }
+    }
+    if (hasBlocks) {
+      var result = tbFlatWidgetsToNestedModel(widgets);
+      tbAugmentBuilderChildrenFromRegistry(result);
+      return result;
+    }
+    // Section-only: enrich with scaffold blocks in template order
+    var scaffoldNested = tbNestedModelFromPageScaffold();
+    var scaffoldById = {};
+    for (var si = 0; si < scaffoldNested.length; si++) {
+      scaffoldById[scaffoldNested[si].id] = scaffoldNested[si];
+    }
+    var out = [];
+    for (var pi = 0; pi < widgets.length; pi++) {
+      var pw = widgets[pi];
+      if ((pw.type || 'section') !== 'section') continue;
+      var scaffSec = scaffoldById[pw.id];
+      if (scaffSec) {
+        out.push({ id: pw.id, span: pw.span || 12, children: scaffSec.children || [] });
+      } else {
+        out.push({ id: pw.id, span: pw.span || 12, children: [] });
+      }
+    }
+    return out;
+  }
+
   function openTemplateBuilder(baseTpl) {
     var overlay = document.getElementById('tb-overlay');
     if (!overlay) return;
@@ -2978,17 +3065,31 @@
     if (titleEl) titleEl.textContent = _t('tbTitle');
     if (nameInput) nameInput.placeholder = _t('tbNamePlaceholder');
 
+    console.info('[TB open] baseTpl=%s, _prefs.widgets=%s', !!baseTpl, _prefs && _prefs.widgets ? _prefs.widgets.length : 'null');
     if (baseTpl && baseTpl.widgets) {
-      _tbWidgets = tbFlatWidgetsToNestedModel(baseTpl.widgets);
-      tbAugmentBuilderChildrenFromRegistry(_tbWidgets);
+      console.info('[TB open] → baseTpl path');
+      _tbWidgets = tbLoadTemplateIntoBuilder(baseTpl);
       if (nameInput) nameInput.value = baseTpl.builtin ? '' : (baseTpl.name || '');
-    } else if (_prefs && _prefs.widgets) {
-      _tbWidgets = tbFlatWidgetsToNestedModel(_prefs.widgets);
-      tbAugmentBuilderChildrenFromRegistry(_tbWidgets);
+    } else if (_prefs && _prefs.widgets && _prefs.widgets.length) {
+      console.info('[TB open] → _prefs path, sections:', _prefs.widgets.filter(function(w){return (w.type||'section')==='section'}).map(function(w){return w.id}));
+      _tbWidgets = tbLoadTemplateIntoBuilder(_prefs);
       if (nameInput) nameInput.value = '';
     } else {
       _tbWidgets = tbNestedModelFromPageScaffold();
       if (nameInput) nameInput.value = '';
+    }
+
+    // Populate template select dropdown
+    var tplSelect = document.getElementById('tb-template-select');
+    if (tplSelect) {
+      var all = getAllTemplates();
+      tplSelect.innerHTML = '<option value="">— Template laden —</option>';
+      for (var ti = 0; ti < all.length; ti++) {
+        var opt = document.createElement('option');
+        opt.value = all[ti].name;
+        opt.textContent = all[ti].name + (all[ti].builtin ? '' : ' *');
+        tplSelect.appendChild(opt);
+      }
     }
 
     renderBuilderRows();
@@ -3846,6 +3947,44 @@
   }
 
   /** KPI / HTML / table: clone live DOM from #canvasId so preview matches dashboard chips. */
+  /** Adapt cloned KPI chip grids to preview container width (simulates @media breakpoints). */
+  function tbPreviewAdaptChipGrid(pvEl) {
+    var w = pvEl.offsetWidth || 0;
+    if (!w) return;
+    // Grid selectors and their column rules at various widths
+    var gridSels = ['.grid', '.health-grid', '.key-findings-grid'];
+    for (var gi = 0; gi < gridSels.length; gi++) {
+      var grids = pvEl.querySelectorAll(gridSels[gi]);
+      for (var gj = 0; gj < grids.length; gj++) {
+        var g = grids[gj];
+        var isHealth = gridSels[gi] === '.health-grid';
+        var cols;
+        if (w > 580) cols = isHealth ? 3 : 6;
+        else if (w > 400) cols = isHealth ? 2 : 4;
+        else if (w > 250) cols = isHealth ? 2 : 3;
+        else if (w > 150) cols = 2;
+        else cols = 1;
+        g.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
+      }
+    }
+    // Font scaling for narrow containers
+    if (w < 300) {
+      var vals = pvEl.querySelectorAll('.value, .health-badge-value');
+      for (var vi = 0; vi < vals.length; vi++) vals[vi].style.fontSize = '0.85rem';
+      var labs = pvEl.querySelectorAll('.label, .health-badge-label');
+      for (var li = 0; li < labs.length; li++) labs[li].style.fontSize = '0.6rem';
+      var subs = pvEl.querySelectorAll('.sub, .health-badge-sub');
+      for (var si = 0; si < subs.length; si++) subs[si].style.fontSize = '0.6rem';
+    }
+  }
+
+  /** Map widgetGroup → live DOM container that holds all chips of that group. */
+  var _chipGroupContainers = {
+    'health-kpis': 'health-score',
+    'kernbefunde': 'key-findings',
+    'token-stats-kpis': 'cards'
+  };
+
   function tbPreviewCloneHtmlMeta(slot) {
     var pvEl = document.getElementById(slot.pvId);
     if (!pvEl || !slot.def) return;
@@ -3855,16 +3994,34 @@
     pvEl.style.height = 'auto';
     pvEl.style.minHeight = '0';
     var origEl = def.canvasId ? document.getElementById(def.canvasId) : null;
+    console.debug('[preview-clone] canvasId=%s found=%s group=%s', def.canvasId, !!origEl, def.widgetGroup || '-');
+    // If individual chip not found, try cloning the whole group container
+    if (!origEl && def.widgetGroup && _chipGroupContainers[def.widgetGroup]) {
+      // Only clone the group once — skip if this pvEl's section already has a group clone
+      var secBody = pvEl.closest('.tb-pv-section-body') || pvEl.closest('.tb-pv-layout-charts');
+      if (secBody && secBody.querySelector('[data-tb-group-clone="' + def.widgetGroup + '"]')) {
+        pvEl.style.display = 'none';
+        return;
+      }
+      var groupEl = document.getElementById(_chipGroupContainers[def.widgetGroup]);
+      if (groupEl && groupEl.children.length) {
+        origEl = groupEl;
+      }
+    }
     if (origEl) {
       var clone = origEl.cloneNode(true);
       clone.removeAttribute('id');
       clone.setAttribute('data-tb-preview-clone', '1');
+      if (def.widgetGroup && _chipGroupContainers[def.widgetGroup]) {
+        clone.setAttribute('data-tb-group-clone', def.widgetGroup);
+      }
       var walk = clone.querySelectorAll('[id]');
       var wi;
       for (wi = 0; wi < walk.length; wi++) {
         walk[wi].removeAttribute('id');
       }
       pvEl.appendChild(clone);
+      tbPreviewAdaptChipGrid(pvEl);
       return;
     }
     pvEl.innerHTML =
@@ -4013,13 +4170,16 @@
             if (idef && (idef.kind === 'chip' || idef.engine !== 'echarts')) continue;
             nestedOut.push({ id: innSv[ii].id, span: innSv[ii].span || 6 });
           }
-          flatW.push({
-            type: 'layout',
-            span: chEnt.span || 12,
-            section: sec.id,
-            bid: chEnt.bid || chEnt.id || 'tbblk_s' + ci,
-            nested: nestedOut
-          });
+          // Skip empty layout blocks (chips-only rows)
+          if (nestedOut.length) {
+            flatW.push({
+              type: 'layout',
+              span: chEnt.span || 12,
+              section: sec.id,
+              bid: chEnt.bid || chEnt.id || 'tbblk_s' + ci,
+              nested: nestedOut
+            });
+          }
           continue;
         }
         var cdef = regSv && regSv.findChart ? regSv.findChart(chEnt.id) : null;
@@ -4092,13 +4252,15 @@
               var icSpPv = icp.span || 6;
               if (icSpPv < 1) icSpPv = 1;
               if (icSpPv > bspPv) icSpPv = bspPv;
+              // At narrow section spans, force meta chips to full block width
+              if (!isCanvasIn && (sec.span || 12) <= 6) icSpPv = bspPv;
               html +=
                 '<div class="tb-pv-chart' +
                 (isCanvasIn ? '' : ' tb-pv-chart--meta') +
                 '" style="grid-column:span ' +
                 icSpPv +
                 '">';
-              html += '<div class="tb-pv-chart-label">' + chNameIn + '</div>';
+              // chart label omitted — breaks layout at narrow spans
               html +=
                 '<div class="tb-pv-chart-container' +
                 (isCanvasIn ? '' : ' tb-pv-chart-container--html') +
@@ -4114,16 +4276,18 @@
             continue;
           }
           var chDef = reg.findChart(c.id);
-          var chName = chDef ? _t(chDef.titleKey) : c.id;
           var pvId = 'tb-pv-' + sec.id + '-' + c.id;
           var isCanvas = tbPreviewIsCanvasChart(chDef);
+          var directSpan = c.span || 6;
+          // At narrow section spans, force meta chips to full width
+          if (!isCanvas && (sec.span || 12) <= 6) directSpan = 12;
           html +=
             '<div class="tb-pv-chart' +
             (isCanvas ? '' : ' tb-pv-chart--meta') +
             '" style="grid-column:span ' +
-            (c.span || 6) +
+            directSpan +
             '">';
-          html += '<div class="tb-pv-chart-label">' + chName + '</div>';
+          // chart label omitted — breaks layout at narrow spans
           html +=
             '<div class="tb-pv-chart-container' +
             (isCanvas ? '' : ' tb-pv-chart-container--html') +
@@ -4148,6 +4312,14 @@
     setTimeout(function () {
       for (var si = 0; si < chartSlots.length; si++) {
         tbPreviewRenderSlot(chartSlots[si]);
+      }
+      // Adapt all cloned KPI chip grids to their actual container width
+      var pvSections = body.querySelectorAll('.tb-pv-section');
+      for (var psi = 0; psi < pvSections.length; psi++) {
+        var metaEls = pvSections[psi].querySelectorAll('.tb-pv-chart-container--html');
+        for (var mi = 0; mi < metaEls.length; mi++) {
+          tbPreviewAdaptChipGrid(metaEls[mi]);
+        }
       }
     }, 150);
   }
@@ -4205,6 +4377,25 @@
       loadDefBtn.dataset.bound = '1';
       loadDefBtn.textContent = _t('tbLoadDefault');
       loadDefBtn.addEventListener('click', tbLoadDefaultIntoBuilder);
+    }
+    var tplSelect = document.getElementById('tb-template-select');
+    if (tplSelect && !tplSelect.dataset.bound) {
+      tplSelect.dataset.bound = '1';
+      tplSelect.addEventListener('change', function () {
+        var val = tplSelect.value;
+        if (!val) return;
+        var all = getAllTemplates();
+        for (var ti = 0; ti < all.length; ti++) {
+          if (all[ti].name === val) {
+            var tpl = all[ti];
+            _tbWidgets = tbLoadTemplateIntoBuilder(tpl);
+            var nameInput = document.getElementById('tb-name-input');
+            if (nameInput) nameInput.value = tpl.builtin ? '' : (tpl.name || '');
+            renderBuilderRows();
+            break;
+          }
+        }
+      });
     }
     var previewBtn = document.getElementById('tb-preview');
     if (previewBtn && !previewBtn.dataset.bound) {

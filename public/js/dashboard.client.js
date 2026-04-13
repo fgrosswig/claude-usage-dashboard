@@ -2098,6 +2098,10 @@ function renderDashboardCore(data) {
       renderForensicSection(__sectionCtx, __tsResult);
     }
   }
+  // Render extracted charts in standalone wrappers (after all section contexts are set)
+  if (window.__widgetDispatcher && window.__widgetDispatcher.dispatchRender) {
+    window.__widgetDispatcher.dispatchRender(data, days);
+  }
   if (window.__widgetDispatcher && window.__widgetDispatcher.applyAllChartVisibility) {
     window.__widgetDispatcher.applyAllChartVisibility();
   }
@@ -7426,8 +7430,10 @@ function applyDevCacheFromStatus(info) {
         btn.addEventListener("click", function () {
           var st = document.getElementById("dev-clear-layout-status");
           localStorage.removeItem("cud_layout_prefs_v2");
+          localStorage.removeItem("cud_active_template");
+          // Keep cud_templates — user-created templates survive clear
           try { sessionStorage.removeItem("usageDashboardDay"); } catch (e) {}
-          console.info("[DEV] layout cleared — localStorage + sessionStorage removed");
+          console.info("[DEV] layout cleared — prefs + active template reset (user templates preserved)");
           // Also delete server-side layout file
           try {
             var xd = new XMLHttpRequest();
