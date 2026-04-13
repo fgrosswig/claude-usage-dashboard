@@ -482,7 +482,7 @@ function syncMainChartsScopeUi() {
 function updateLangButtons() {
   var picks = document.querySelectorAll(".lang-switch .lang-btn[data-lang], #us-lang-body .lang-btn[data-lang]");
   for (var b of picks) {
-    var code = b.getAttribute("data-lang") || "";
+    var code = b.dataset.lang || "";
     var on = code === __lang;
     b.classList.toggle("active", on);
     b.setAttribute("aria-pressed", on ? "true" : "false");
@@ -5734,7 +5734,7 @@ function renderHealthScore(data) {
 
   // Grid (one host per KPI for visibility sync)
   var gh = "";
-  for (var ind of indicators) {
+  for (ind of indicators) {
     var hostId = "health-kpi-" + ind.id;
     gh += "<div class=\"chart-box chart-box--kpi\" id=\"" + hostId + "\">";
     gh += "<div class=\"health-badge health-badge--" + ind.color + "\">";
@@ -7388,6 +7388,7 @@ function applyDevCacheFromStatus(info) {
           bq.send(JSON.stringify({ days_back: nd }));
         });
       })();
+      function devClearReload() { location.reload(); }
       (function wireDevClearLayout() {
         var btn = document.getElementById("dev-clear-layout");
         if (!btn) return;
@@ -7408,7 +7409,7 @@ function applyDevCacheFromStatus(info) {
             console.warn("[DEV] server layout delete failed", e);
           }
           if (st) { st.textContent = "cleared — reloading…"; st.style.color = "#fbbf24"; }
-          setTimeout(function () { location.reload(); }, 400);
+          setTimeout(devClearReload, 400);
         });
       })();
       window.CacheFilesExplorer?.wireOpenButton?.("dev-cache-files-open");

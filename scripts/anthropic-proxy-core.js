@@ -130,10 +130,10 @@ function getAlignRoots() {
   if (raw) {
     var parts = raw.split(';');
     for (var t of parts) {
-      t = t.trim();
-      if (t) {
-        if (t[0] === '~') t = path.join(HOME, t.slice(1).replace(/^\/|\\+/, ''));
-        roots.push(path.resolve(t));
+      var trimmed = t.trim();
+      if (trimmed) {
+        if (trimmed[0] === '~') trimmed = path.join(HOME, trimmed.slice(1).replace(/^\/|\\+/, ''));
+        roots.push(path.resolve(trimmed));
       }
     }
   }
