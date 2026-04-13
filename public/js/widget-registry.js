@@ -326,7 +326,7 @@
             titleKey: 'chartBudgetSankey',
             type: 'sankey',
             engine: 'echarts',
-            canvasId: 'budget-sankey-container',
+            canvasId: 'c-budget-sankey',
             size: { cols: 2, minHeight: 350 },
             renderFn: 'renderBudget_sankey'
           },
@@ -585,7 +585,7 @@
           },
           {
             id: 'eff-day-comparison',
-            titleKey: 'econDayCompTitle',
+            titleKey: 'econDayCompareTitle',
             type: 'mixed',
             engine: 'echarts',
             canvasId: 'chart-shell-econ-daycompare',

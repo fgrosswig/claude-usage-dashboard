@@ -366,13 +366,13 @@
 <div class="chart-box"><h3></h3><div id="c2" style="width:100%;height:320px"></div></div>
 </div>
 <div class="charts-pair no-host-chart" id="charts-host-sub">
-<div class="chart-box"><h3></h3><div id="c3" style="width:100%;height:320px"></div></div>
-<div class="chart-box"><h3></h3><div id="c4" style="width:100%;height:320px"></div></div>
+<div class="chart-box"><h3></h3><div id="c3" class="token-stats-pair-echart"></div></div>
+<div class="chart-box"><h3></h3><div id="c4" class="token-stats-pair-echart"></div></div>
 </div>
 </div>
 <div class="chart-box" id="token-stats-daily-detail">
 <h3 id="daily-detail-heading">Tagesdetail</h3>
-<div class="daily-detail-scroll"><table id="tbl"><thead><tr></tr></thead><tbody></tbody></table></div>
+<div class="daily-detail-scroll"><table id="tbl" class="daily-detail-table"><colgroup id="tbl-colgroup"></colgroup><thead><tr></tr></thead><tbody></tbody></table></div>
 </div>
 </div>
 </details>
@@ -413,7 +413,7 @@
 <div class="budget-switch-group" id="budget-weight-group"></div>
 </div>
 <p class="user-chart-blurb" id="budget-waterfall-blurb"></p>
-<div id="c-budget-sankey" style="width:100%;height:300px"></div>
+<div id="c-budget-sankey"></div>
 </div>
 </div>
 </details>
@@ -451,11 +451,11 @@
 </div>
 <!-- Row 4: Efficiency Trend (full-width) -->
 <div class="chart-box"><h3 id="proxy-efficiency-trend-h3"></h3><p id="proxy-efficiency-trend-blurb" class="user-chart-blurb"></p>
-<div id="c-proxy-efficiency-heatmap" style="width:100%;height:140px"></div>
-<div class="efficiency-small-multiples" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
-<div id="c-proxy-efficiency-ratio" style="width:100%;height:180px"></div>
-<div id="c-proxy-efficiency-vispct" style="width:100%;height:180px"></div>
-<div id="c-proxy-efficiency-cachemiss" style="width:100%;height:180px"></div>
+<div id="c-proxy-efficiency-heatmap" style="width:100%;height:140px;max-width:100%;box-sizing:border-box"></div>
+<div class="efficiency-small-multiples">
+<div id="c-proxy-efficiency-ratio" style="width:100%;max-width:100%;height:180px;box-sizing:border-box"></div>
+<div id="c-proxy-efficiency-vispct" style="width:100%;max-width:100%;height:180px;box-sizing:border-box"></div>
+<div id="c-proxy-efficiency-cachemiss" style="width:100%;max-width:100%;height:180px;box-sizing:border-box"></div>
 </div>
 </div>
 <!-- Info line -->
@@ -531,22 +531,53 @@
 </div>
 <!-- Template Builder Modal -->
 <div class="anthropic-modal-overlay" id="tb-overlay">
-<div class="anthropic-modal">
+<div class="anthropic-modal tb-modal--wide">
 <div class="anthropic-modal-header">
 <div class="tb-header-left">
 <span class="anthropic-modal-title" id="tb-title">Template Builder</span>
-<input type="text" class="tb-name-input" id="tb-name-input" placeholder="Template name" maxlength="40">
+<input type="text" class="tb-name-input" id="tb-name-input" placeholder="Template-Name" maxlength="40">
 </div>
 <div class="tb-header-actions">
+<button type="button" class="tb-btn tb-btn--load-default" id="tb-load-default"></button>
+<button type="button" class="tb-btn tb-btn--preview" id="tb-preview">Preview</button>
 <button type="button" class="tb-btn tb-btn--save" id="tb-save">Save</button>
 <button type="button" class="anthropic-modal-close" id="tb-close">&times;</button>
 </div>
 </div>
-<div class="anthropic-modal-body" id="tb-body" style="padding:16px 20px">
-<div id="tb-rows"></div>
-<button type="button" class="tb-add-row" id="tb-add-row">+ Add Row</button>
-<div class="tb-unused" id="tb-unused"></div>
+<div class="anthropic-modal-body tb-body-layout" id="tb-body" style="padding:0">
+<aside class="tb-side tb-side--left" aria-label="">
+<div class="tb-side-head" id="tb-pool-left-head"></div>
+<div class="tb-side-scroll" id="tb-pool-charts"></div>
+</aside>
+<div class="tb-main">
+<div class="tb-sections-strip">
+<span class="tb-sections-strip-label" id="tb-pool-sections-label"></span>
+<div class="tb-sections-strip-chips" id="tb-pool-sections"></div>
 </div>
+<div class="tb-canvas-wrap">
+<div class="tb-grid-ruler"></div>
+<div class="tb-canvas" id="tb-canvas"></div>
+</div>
+</div>
+<aside class="tb-side tb-side--right" aria-label="">
+<div class="tb-side-head" id="tb-pool-right-head"></div>
+<div class="tb-side-scroll" id="tb-pool-meta"></div>
+</aside>
+<details class="tb-scaffold-ref" id="tb-scaffold-details">
+<summary class="tb-scaffold-ref-summary" id="tb-scaffold-summary"></summary>
+<pre class="tb-scaffold-pre" id="tb-scaffold-pipe" translate="no"></pre>
+</details>
+</div>
+</div>
+</div>
+<!-- Template Preview Overlay -->
+<div class="tb-preview-overlay" id="tb-preview-overlay">
+<div class="tb-preview-modal">
+<div class="tb-preview-header">
+<span class="tb-preview-title">Layout Preview</span>
+<button type="button" class="anthropic-modal-close" id="tb-preview-close">&times;</button>
+</div>
+<div class="tb-preview-body" id="tb-preview-body"></div>
 </div>
 </div>
 <script>globalThis.__I18N_BUNDLES=__I18N_PLACEHOLDER__;globalThis.__APP_VERSION="__APP_VERSION__";</script>
@@ -607,38 +638,6 @@
 <button type="button" class="sidebar-btn" id="sidebar-import-template"></button>
 </div>
 </details>
-<!-- DEV (only visible in DEV_MODE) -->
-<div class="sidebar-dev" id="sidebar-dev" style="display:none">
-<div class="sidebar-dev-header"><span class="sidebar-dev-badge" id="sidebar-dev-badge">DEV</span><span class="sidebar-dev-source" id="sidebar-dev-source"></span></div>
-<div class="sidebar-dev-group">
-<div class="sidebar-dev-label">Server</div>
-<div class="sidebar-dev-row">
-<button type="button" class="sidebar-btn-sm" id="sidebar-dev-sync">Sync Now</button>
-<span class="sidebar-dev-meta" id="sidebar-dev-sync-status"></span>
-</div>
-<div class="sidebar-dev-meta" id="sidebar-dev-last-sync"></div>
-</div>
-<div class="sidebar-dev-group">
-<div class="sidebar-dev-label">Benchmark</div>
-<div class="sidebar-dev-row">
-<input type="number" class="sidebar-dev-input" id="sidebar-dev-bench-days" min="1" max="31" value="8">
-<span class="sidebar-dev-meta">Tage</span>
-<button type="button" class="sidebar-btn-sm" id="sidebar-dev-bench">Run</button>
-<span class="sidebar-dev-meta" id="sidebar-dev-bench-status"></span>
-</div>
-</div>
-<div class="sidebar-dev-group">
-<div class="sidebar-dev-label">Cache System</div>
-<div class="sidebar-dev-row">
-<button type="button" class="sidebar-btn-sm" id="sidebar-dev-rebuild-jsonl">JSONL rebuild</button>
-<span class="sidebar-dev-meta" id="sidebar-dev-jsonl-at"></span>
-</div>
-<div class="sidebar-dev-row">
-<button type="button" class="sidebar-btn-sm" id="sidebar-dev-rebuild-proxy">PROXY rebuild</button>
-<span class="sidebar-dev-meta" id="sidebar-dev-proxy-at"></span>
-</div>
-</div>
-</div>
 </div>
 <div class="sidebar-footer">
 <span class="sidebar-version" id="sidebar-version"></span>
