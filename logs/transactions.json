@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-251",
+      "timestamp": "2026-04-13",
+      "session": "auto",
+      "commit": "4502f62",
+      "commit_full": "4502f62d4b83cf5e101f8e17e66b695eba932eec",
+      "status": "ABGESCHLOSSEN",
+      "description": "feat(ci): GitHub Actions auto-release pipeline + remove live popup release badge",
+      "detail": "- Auto-tag on push to main (semver from commit messages: feat=minor, fix=patch, BREAKING=major)\n- Generate public release notes via generate-release-notes.js --public\n- Create GitHub release automatically\n- Remove Release panel from live popup (version shown in sidebar footer only)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".github/workflows/release.yml",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": "tpl/dashboard.html",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-250",
       "timestamp": "2026-04-13",
       "session": "auto",
