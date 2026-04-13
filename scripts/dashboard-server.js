@@ -4571,6 +4571,18 @@ var server = http.createServer(function (req, res) {
           res.end('{"error":"invalid JSON"}');
         }
       });
+    } else if (req.method === 'DELETE' && __devMode) {
+      try {
+        if (fs.existsSync(layoutFile)) {
+          fs.unlinkSync(layoutFile);
+          serviceLog.info('layout', 'deleted ' + layoutFile);
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end('{"ok":true}');
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end('{"error":"' + e.message + '"}');
+      }
     } else {
       res.writeHead(405);
       res.end();

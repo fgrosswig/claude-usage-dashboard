@@ -654,6 +654,46 @@
 
   // ── Init ────────────────────────────────────────────────────────
 
+  /**
+   * Build default flat widgets[] from TB_PAGE_SCAFFOLD_PLAN + Registry.
+   * Same flatten logic as saveTemplateFromBuilder but without UI dependency.
+   */
+  function buildDefaultWidgetsFromScaffold() {
+    var nested = tbNestedModelFromPageScaffold();
+    if (!nested || !nested.length) return null;
+    var flatW = [];
+    var regSv = getRegistry();
+    for (var fi = 0; fi < nested.length; fi++) {
+      var sec = nested[fi];
+      flatW.push({ id: sec.id, span: sec.span || 12 });
+      var ch = sec.children || [];
+      for (var ci = 0; ci < ch.length; ci++) {
+        var chEnt = ch[ci];
+        if (tbIsLayoutBlock(chEnt)) {
+          var nestedOut = [];
+          var innSv = chEnt.children || [];
+          for (var ii = 0; ii < innSv.length; ii++) {
+            var idef = regSv && regSv.findChart ? regSv.findChart(innSv[ii].id) : null;
+            if (idef && (idef.kind === 'chip' || idef.engine !== 'echarts')) continue;
+            nestedOut.push({ id: innSv[ii].id, span: innSv[ii].span || 6 });
+          }
+          flatW.push({
+            type: 'layout',
+            span: chEnt.span || 12,
+            section: sec.id,
+            bid: chEnt.bid || chEnt.id || 'tbblk_s' + ci,
+            nested: nestedOut
+          });
+          continue;
+        }
+        var cdef = regSv && regSv.findChart ? regSv.findChart(chEnt.id) : null;
+        if (cdef && (cdef.kind === 'chip' || cdef.engine !== 'echarts')) continue;
+        flatW.push({ id: chEnt.id, span: chEnt.span || 6, type: 'chart', section: sec.id });
+      }
+    }
+    return flatW.length ? flatW : null;
+  }
+
   function init() {
     if (_initialized) return;
     _initialized = true;
@@ -664,6 +704,18 @@
       var migrated = migrateTemplateV1toV2({ order: _prefs.order, hiddenSections: _prefs.hiddenSections });
       _prefs.widgets = migrated.widgets;
       savePrefs();
+    }
+    // No widgets at all → generate from scaffold (same as TB "Load Default")
+    if (!_prefs.widgets || !_prefs.widgets.length) {
+      var scaffoldWidgets = buildDefaultWidgetsFromScaffold();
+      if (scaffoldWidgets) {
+        _prefs.widgets = scaffoldWidgets;
+        savePrefs();
+        console.info('[widget-dispatcher] scaffold default applied — %d widgets generated from TB_PAGE_SCAFFOLD_PLAN', scaffoldWidgets.length);
+        if (console.table) console.table(scaffoldWidgets.map(function(w) { return { id: w.id || '—', type: w.type || 'section', span: w.span, section: w.section || '' }; }));
+      } else {
+        console.warn('[widget-dispatcher] scaffold default FAILED — no registry or no scaffold plan');
+      }
     }
     if (_prefs.widgets && _prefs.widgets.length) {
       if (syncPrefsOrderFromWidgets()) savePrefs();
@@ -2668,15 +2720,6 @@
       slotWidgetGroups: ['health-kpis', 'kernbefunde']
     },
     {
-      id: 'intelligence',
-      blocks: [12, 12, 12],
-      slotChartIds: [
-        ['intel-saturation', 'intel-health', 'intel-quota-eta'],
-        ['intel-narrative'],
-        ['intel-seasonality']
-      ]
-    },
-    {
       id: 'forensic',
       blocks: [12, 12, 6, 6],
       slotChartIds: [
@@ -2725,7 +2768,7 @@
     },
     {
       id: 'proxy',
-      blocks: [12, 4, 4, 4, 6, 6, 6, 6],
+      blocks: [12, 4, 4, 4, 6, 6, 6, 6, 12],
       slotChartIds: [
         [
           'proxy-kpi-requests',
@@ -2735,7 +2778,9 @@
           'proxy-kpi-quota-5h',
           'proxy-kpi-quota-7d',
           'proxy-kpi-ttl-tier',
-          'proxy-kpi-peak-hours'
+          'proxy-kpi-peak-hours',
+          'proxy-kpi-saturation',
+          'proxy-kpi-health'
         ],
         ['proxy-tokens'],
         ['proxy-models'],
@@ -2743,7 +2788,8 @@
         ['proxy-latency'],
         ['proxy-hourly-latency'],
         ['proxy-error-trend'],
-        ['proxy-cache-trend']
+        ['proxy-cache-trend'],
+        ['proxy-ttl-history']
       ]
     },
     {
@@ -4379,12 +4425,6 @@
         summaryClass: 'health-collapse-summary',
         innerPipe:
           'div.health-collapse-inner stacked: (1) div#health-score > div#health-grid[3-col KPI chips; 900→2;520→1] (2) div#key-findings > div#key-findings-grid[responsive 6→4→3→2→1 col; minmax(0,1fr)]'
-      },
-      {
-        id: 'intelligence-collapse',
-        tag: 'details',
-        innerPipe:
-          'div.intelligence-inner > #intelligence-scores[3→2→1 col KPI row] | #intelligence-narrative | #intelligence-rootcause | #intelligence-seasonality'
       },
       {
         id: 'forensic-collapse',

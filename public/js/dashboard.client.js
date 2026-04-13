@@ -1918,7 +1918,7 @@ function renderDashboardCore(data) {
   __releaseStabilityData = data.release_stability || null;
   var disp = window.__widgetDispatcher;
   if (disp && disp.init) disp.init();
-  if (disp && disp.applyGridLayout) disp.applyGridLayout();
+  // applyGridLayout is called inside init() — no separate call needed
   // Section renders — dispatcher controls order + visibility
   renderProxyAnalysis(data);
   renderBudgetEfficiency(data);
@@ -7301,6 +7301,11 @@ function applyDevCacheFromStatus(info) {
         '<button type="button" id="dev-rebuild-proxy" class="dev-cache-rebuild-btn">PROXY Cache rebuild</button>' +
         '<span id="dev-proxy-cache-at" class="dev-cache-meta">last Cache: \u2014</span>' +
         "</span>" +
+        '<span class="dev-cache-sep">|</span>' +
+        '<span class="dev-cache-block">' +
+        '<button type="button" id="dev-clear-layout" class="dev-cache-rebuild-btn" style="background:#dc2626">Clear Layout</button>' +
+        '<span id="dev-clear-layout-status" class="dev-cache-meta"></span>' +
+        "</span>" +
         "</div>";
       document.body.prepend(bar);
       applyDevCacheFromStatus(info);
@@ -7413,6 +7418,22 @@ function applyDevCacheFromStatus(info) {
             if (stB) stB.textContent = "bench network error";
           };
           bq.send(JSON.stringify({ days_back: nd }));
+        });
+      })();
+      (function wireDevClearLayout() {
+        var btn = document.getElementById("dev-clear-layout");
+        if (!btn) return;
+        btn.addEventListener("click", function () {
+          var st = document.getElementById("dev-clear-layout-status");
+          localStorage.removeItem("cud_layout_prefs_v2");
+          // Also delete server-side layout file
+          try {
+            var xd = new XMLHttpRequest();
+            xd.open("DELETE", "/api/layout", false);
+            xd.send();
+          } catch (e) {}
+          if (st) { st.textContent = "cleared — reloading…"; st.style.color = "#fbbf24"; }
+          setTimeout(function () { location.reload(); }, 400);
         });
       })();
       window.CacheFilesExplorer?.wireOpenButton?.("dev-cache-files-open");
