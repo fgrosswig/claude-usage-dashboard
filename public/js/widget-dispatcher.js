@@ -3012,6 +3012,18 @@
   function tbLoadDefaultIntoBuilder() {
     var overlay = document.getElementById('tb-overlay');
     if (!overlay) return;
+    var tplSelect = document.getElementById('tb-template-select');
+    var val = tplSelect ? tplSelect.value : '';
+    if (val) {
+      var all = getAllTemplates();
+      for (var ti = 0; ti < all.length; ti++) {
+        if (all[ti].name === val) {
+          _tbWidgets = tbLoadTemplateIntoBuilder(all[ti]);
+          renderBuilderRows();
+          return;
+        }
+      }
+    }
     _tbWidgets = tbNestedModelFromPageScaffold();
     renderBuilderRows();
   }
