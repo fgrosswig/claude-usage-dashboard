@@ -37,8 +37,12 @@ jobs:
       - name: Login to Harbor
         run: |
           docker login harbor.grosswig-it.de -u '${{ secrets.HARBOR_USER }}' -p '${{ secrets.HARBOR_PASSWORD }}'
+        env:
+          DOCKER_API_VERSION: "1.41"
 
       - name: Build and push
+        env:
+          DOCKER_API_VERSION: "1.41"
         run: |
           TAGS="${{ steps.params.outputs.tags }}"
           TAG_FLAGS=""

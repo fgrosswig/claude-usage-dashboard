@@ -20,8 +20,12 @@ jobs:
       - name: Login to Harbor
         run: |
           docker login harbor.grosswig-it.de -u '${{ secrets.HARBOR_USER }}' -p '${{ secrets.HARBOR_PASSWORD }}'
+        env:
+          DOCKER_API_VERSION: "1.41"
 
       - name: Build and push base image
+        env:
+          DOCKER_API_VERSION: "1.41"
         run: |
           docker build -f Dockerfile.base \
             -t harbor.grosswig-it.de/claude/base:v3 \
