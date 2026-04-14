@@ -19,7 +19,7 @@ jobs:
 
       - name: Login to Harbor
         run: |
-          echo "${{ secrets.HARBOR_PASSWORD }}" | docker login harbor.grosswig-it.de -u "${{ secrets.HARBOR_USER }}" --password-stdin
+          docker login harbor.grosswig-it.de -u '${{ secrets.HARBOR_USER }}' -p '${{ secrets.HARBOR_PASSWORD }}'
 
       - name: Build and push base image
         run: |
