@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-283",
+      "timestamp": "2026-04-14",
+      "session": "auto",
+      "commit": "84bb084",
+      "commit_full": "84bb0842fc0f34546cd46701474ca04a20a7f788",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ci): run Kaniko as docker container on .220 runner",
+      "detail": "Kaniko executor image cannot be used as Gitea Actions job container\n(no /bin/sleep). Run all jobs on ubuntu-latest (.220) and invoke\nKaniko via docker run with mounted workspace and auth config.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".gitea/workflows/base-image.yml",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": ".gitea/workflows/build-deploy.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-282",
       "timestamp": "2026-04-14",
       "session": "auto",
