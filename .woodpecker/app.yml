@@ -199,10 +199,14 @@ steps:
         fi
         echo "Commits since $LAST_TAG:"
         echo "$COMMITS" | head -10
-        # 3. Determine bump type (filter out merge commits + tx-log)
-        REAL_COMMITS=$(echo "$COMMITS" | grep -vE "^Merge |^\[tx-log\]|^chore: tx-log")
+        # 3. Determine bump type (filter out merge commits, tx-log, CI-only changes)
+        REAL_COMMITS=$(echo "$COMMITS" | grep -vE "^Merge |^\[tx-log\]|^chore: tx-log|^(fix|chore|ci)\(ci\)")
         echo "Real commits for bump detection:"
         echo "$REAL_COMMITS"
+        if [ -z "$REAL_COMMITS" ]; then
+          echo "Only CI/infra commits since $LAST_TAG — skipping tag"
+          exit 0
+        fi
         BUMP=patch
         echo "$REAL_COMMITS" | grep -qiE "BREAKING CHANGE" && BUMP=major
         echo "$REAL_COMMITS" | grep -qE "^feat(\([^)]*\))?:" && [ "$BUMP" != "major" ] && BUMP=minor
