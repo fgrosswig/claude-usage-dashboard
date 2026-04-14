@@ -15,17 +15,23 @@ jobs:
 
       - name: SonarQube Scan
         run: |
-          BRANCH="${{ github.ref_name }}"
-          if [ "$BRANCH" = "main" ]; then
-            /opt/sonar-scanner/bin/sonar-scanner \
-              -Dsonar.host.url=${{ secrets.SONAR_URL }} \
-              -Dsonar.token=${{ secrets.SONAR_TOKEN }}
-          else
-            /opt/sonar-scanner/bin/sonar-scanner \
-              -Dsonar.host.url=${{ secrets.SONAR_URL }} \
-              -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
-              -Dsonar.branch.name=$BRANCH
-          fi
+          # Nutzt volle Pfade und Debug-Logging (-X)
+          /opt/sonar-scanner/bin/sonar-scanner \
+            -X \
+            -Dsonar.host.url=${{ secrets.SONAR_URL }} \
+            -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+            $( [ "$GITHUB_REF_NAME" != "main" ] && echo "-Dsonar.branch.name=$GITHUB_REF_NAME" )
+         # BRANCH="${{ github.ref_name }}"
+         # if [ "$BRANCH" = "main" ]; then
+         #   /opt/sonar-scanner/bin/sonar-scanner \
+         #     -Dsonar.host.url=${{ secrets.SONAR_URL }} \
+         #     -Dsonar.token=${{ secrets.SONAR_TOKEN }}
+         # else
+         #   /opt/sonar-scanner/bin/sonar-scanner \
+         #     -Dsonar.host.url=${{ secrets.SONAR_URL }} \
+         #     -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+         #     -Dsonar.branch.name=$BRANCH
+         # fi
 
       - name: Quality Gate
         run: |
