@@ -2,6 +2,33 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-284",
+      "timestamp": "2026-04-14",
+      "session": "auto",
+      "commit": "74b22c7",
+      "commit_full": "74b22c750a434d3ff3c4f3ea897f752c50a28d1f",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ci): all builds on .220 docker runner, deploy on k8s, add manual sonar",
+      "detail": "- build-deploy: docker build/push on ubuntu-latest (.220), deploy on k8s (.171)\n- base-image: docker build/push on ubuntu-latest (.220), no Kaniko wrapper\n- sonar: manual workflow_dispatch for any branch\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".gitea/workflows/base-image.yml",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": ".gitea/workflows/build-deploy.yml",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": ".gitea/workflows/sonar.yml",
+          "op": "CREATE",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-283",
       "timestamp": "2026-04-14",
       "session": "auto",
