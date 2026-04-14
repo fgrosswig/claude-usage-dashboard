@@ -1,21 +1,7 @@
-# Base-Image auf Docker-Agent .220 → Harbor claude/base. Muss existieren, bevor app.yml (Kaniko auf .171) baut.
-# Erstbefüllung Harbor: Workflow hier manuell in Woodpecker starten (path-Filter gilt bei manual nicht).
-# plugins/docker-Image nur über Harbor **poc** (kein Docker Hub).
+# DEPRECATED — migrated to .gitea/workflows/base-image.yml (Gitea Actions)
+# Kept as manual-only fallback.
 when:
-  event: [push, manual]
-  path:
-    - .woodpecker/base.yml
-    - Dockerfile.base
-    - version.json
-    # Abhängigkeiten liegen im Base-Image (npm install in Dockerfile.base), nicht im App-Layer
-    - package.json
-    - package-lock.json
-  branch:
-    include:
-      - feat/**
-      - fix/**
-      - main
-      - int
+  event: [manual]
 
 labels:
   platform: linux/amd64

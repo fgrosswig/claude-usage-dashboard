@@ -1,0 +1,36 @@
+name: Base Image
+
+on:
+  push:
+    paths:
+      - Dockerfile.base
+      - package.json
+      - package-lock.json
+      - version.json
+      - .gitea/workflows/base-image.yml
+    branches: [main, develop, 'feat/**', 'fix/**']
+  workflow_dispatch:
+
+jobs:
+  build-base:
+    runs-on: kaniko
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Docker config for Harbor
+        run: |
+          mkdir -p /kaniko/.docker
+          echo "{\"auths\":{\"harbor.grosswig-it.de\":{\"username\":\"$HARBOR_USER\",\"password\":\"$HARBOR_PASSWORD\"}}}" > /kaniko/.docker/config.json
+        env:
+          HARBOR_USER: ${{ secrets.HARBOR_USER }}
+          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+
+      - name: Build and push base image
+        run: |
+          /kaniko/executor \
+            --context=. \
+            --dockerfile=Dockerfile.base \
+            --destination=harbor.grosswig-it.de/claude/base:v3 \
+            --destination=harbor.grosswig-it.de/claude/base:latest
+        env:
+          DOCKER_CONFIG: /kaniko/.docker

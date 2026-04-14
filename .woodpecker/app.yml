@@ -1,10 +1,6 @@
-# Dev-Build: Push auf feat/**/fix/** → Container bauen + Deploy, KEIN SonarQube
-# Prod-Build: Push auf main          → SonarQube + Container + Deploy + Auto-Tag (semver)
-# Tag-Event:  draft-release-notes    → Draft-Release auf Gitea erstellen
+# DEPRECATED — migrated to .gitea/workflows/ (Gitea Actions)
+# Kept as manual-only fallback.
 when:
-  - event: push
-    branch: [main, develop]
-  - event: tag
   - event: manual
 
 # Sonar auf main: voller Clone für korrekte SCM-Zuordnung (Quality Gate / Blame).

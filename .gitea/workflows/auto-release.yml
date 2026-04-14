@@ -1,0 +1,116 @@
+name: Auto Release
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release
+  cancel-in-progress: true
+
+jobs:
+  auto-tag-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Determine version bump
+        id: bump
+        run: |
+          LAST_TAG=$(git tag --sort=-v:refname | head -1)
+          if [ -z "$LAST_TAG" ]; then LAST_TAG="v0.0.0"; fi
+          TAG_SHA=$(git rev-list -n1 "$LAST_TAG" 2>/dev/null || echo "")
+          HEAD_SHA=$(git rev-parse HEAD)
+          echo "last_tag=$LAST_TAG" >> "$GITHUB_OUTPUT"
+
+          if [ "$TAG_SHA" = "$HEAD_SHA" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "HEAD is already tagged — skipping"
+            exit 0
+          fi
+
+          REAL_COMMITS=$(git log --oneline "$LAST_TAG..HEAD" --no-merges \
+            | grep -vE "tx-log|chore: tx-log" \
+            | grep -vE "^[a-f0-9]+ (fix|chore|ci)\(ci\)" \
+            | cut -d' ' -f2-)
+
+          if [ -z "$REAL_COMMITS" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Only CI/infra commits since $LAST_TAG — skipping"
+            exit 0
+          fi
+
+          echo "Commits since $LAST_TAG:"
+          echo "$REAL_COMMITS" | head -10
+
+          BUMP=patch
+          echo "$REAL_COMMITS" | grep -qiE "BREAKING CHANGE" && BUMP=major
+          echo "$REAL_COMMITS" | grep -qE "^feat(\([^)]*\))?:" && [ "$BUMP" != "major" ] && BUMP=minor
+
+          NEW_TAG=$(echo "$LAST_TAG" | awk -F. -v bump="$BUMP" '{
+            gsub(/^v/,"",$1)
+            if(bump=="major") printf "v%d.0.0\n",$1+1
+            else if(bump=="minor") printf "v%s.%d.0\n",$1,$2+1
+            else printf "v%s.%s.%d\n",$1,$2,$3+1
+          }')
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+          echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+          echo "$LAST_TAG → $BUMP → $NEW_TAG"
+
+      - name: Create tag via Gitea API (idempotent)
+        if: steps.bump.outputs.skip != 'true'
+        id: tag
+        run: |
+          TAG="${{ steps.bump.outputs.new_tag }}"
+          SHA="${{ github.sha }}"
+          API="${{ github.server_url }}/api/v1/repos/${{ github.repository }}"
+          RESP=$(curl -s -o /tmp/tag-result.json -w "%{http_code}" -X POST \
+            -H "Authorization: token ${{ secrets.REPO_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            "$API/tags" \
+            -d "$(jq -n --arg tag "$TAG" --arg sha "$SHA" '{tag_name: $tag, target: $sha}')")
+          if [ "$RESP" = "201" ]; then
+            echo "Tag $TAG created"
+            echo "created=true" >> "$GITHUB_OUTPUT"
+          elif [ "$RESP" = "409" ] || [ "$RESP" = "422" ]; then
+            echo "Tag $TAG already exists — skipping (HTTP $RESP)"
+            echo "created=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ERROR: Tag creation failed (HTTP $RESP)"
+            cat /tmp/tag-result.json
+            exit 1
+          fi
+
+      - name: Generate release notes
+        if: steps.bump.outputs.skip != 'true' && steps.tag.outputs.created == 'true'
+        run: |
+          git fetch --tags origin
+          NOTES=$(node scripts/generate-release-notes.js "${{ steps.bump.outputs.new_tag }}" --public 2>/dev/null || echo "")
+          INTERNAL=$(node scripts/generate-release-notes.js "${{ steps.bump.outputs.new_tag }}" 2>/dev/null || echo "")
+          if [ -z "$NOTES" ] && [ -z "$INTERNAL" ]; then
+            NOTES="Release ${{ steps.bump.outputs.new_tag }}"
+          fi
+          BODY=$(printf '%s\n\n<!--INTERNAL-->\n\n%s' "$NOTES" "$INTERNAL")
+          echo "$BODY" > /tmp/release-body.md
+
+      - name: Create draft release
+        if: steps.bump.outputs.skip != 'true' && steps.tag.outputs.created == 'true'
+        run: |
+          TAG="${{ steps.bump.outputs.new_tag }}"
+          API="${{ github.server_url }}/api/v1/repos/${{ github.repository }}"
+          curl -sf -X POST \
+            -H "Authorization: token ${{ secrets.REPO_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            "$API/releases" \
+            -d "$(jq -n --arg tag "$TAG" --arg name "$TAG" \
+              --rawfile body /tmp/release-body.md \
+              '{tag_name: $tag, name: $name, body: $body, draft: true}')" \
+          || echo "WARNING: Draft release creation failed (may already exist)"

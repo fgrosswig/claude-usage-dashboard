@@ -1,8 +1,7 @@
-# PR-Checks auf Docker-Agent .220 — kein Kaniko/Harbor-Push (vgl. k8s/README.md).
-# Enthält: K8s-Verify + SonarQube PR-Decoration (Ergebnisse landen via
-# Bot als Review-Kommentare + Commit-Status im PR, siehe issue #168).
+# DEPRECATED — migrated to .gitea/workflows/pr-check.yml (Gitea Actions)
+# Kept as manual-only fallback.
 when:
-  event: pull_request
+  event: manual
 
 # Sonar braucht vollen Clone für SCM-Blame und new-code-period detection.
 clone:
