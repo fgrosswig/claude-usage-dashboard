@@ -1,4 +1,4 @@
 {
   "base_image": "latest",
-  "_note": "Tag für FROM harbor.../claude/base:<tag>. In Harbor prüfen (Artifacts → Tags). CI base.yml pusht u.a. latest + v3; App nutzt standardmäßig latest."
+  "_note": "Tag für FROM registry.example.com/claude/base:<tag>. In Harbor prüfen (Artifacts → Tags). CI base.yml pusht u.a. latest + v3; App nutzt standardmäßig latest."
 }

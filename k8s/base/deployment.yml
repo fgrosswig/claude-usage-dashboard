@@ -1,4 +1,4 @@
-# Analog SCHUFA k8s/base/deployment.yml — App „claude-app“, Container „app“.
+# Analog RefOrg k8s/base/deployment.yml — App „claude-app“, Container „app“.
 # Abgleich mit Helm-Chart: k8/claude-usage-dashboard (Ports, Command, PVC, Probes).
 # Image „can’t be pulled“: Secret harbor-pull im Namespace claude anlegen (k8/README.md) + Robot mit Pull auf claude/claude-usage-dashboard.
 apiVersion: apps/v1
@@ -22,7 +22,7 @@ spec:
         - name: harbor-pull
       containers:
         - name: app
-          image: harbor.grosswig-it.de/claude/claude-usage-dashboard:latest
+          image: registry.example.com/claude/claude-usage-dashboard:latest
           imagePullPolicy: Always
           # Dashboard (3333) + Anthropic-Proxy (8080) — nicht server.js / dashboard allein
           command:

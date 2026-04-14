@@ -1,7 +1,7 @@
 # Claude Usage Dashboard + optional Anthropic monitor proxy.
-# Base-Image kommt aus Harbor (**claude/base**), gebaut ausschließlich über **.woodpecker/base.yml** auf Docker-Agent .220.
+# Base-Image kommt aus Harbor (**claude/base**), gebaut ausschließlich über **ci-config/base.yml** auf CI build host.
 # CI: prepare schreibt Dockerfile.ci mit BASE_TAG aus version.json; Kaniko zieht das Base von Harbor.
-ARG BASE_IMAGE=harbor.grosswig-it.de/claude/base
+ARG BASE_IMAGE=registry.example.com/claude/base
 ARG BASE_TAG=latest
 FROM ${BASE_IMAGE}:${BASE_TAG}
 

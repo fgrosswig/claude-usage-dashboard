@@ -3,10 +3,6 @@
 ## Claude Usage Dashboard
 
 [![Docker build](https://github.com/fgrosswig/claude-usage-dashboard/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/fgrosswig/claude-usage-dashboard/actions/workflows/docker.yml)
-[![Quality Gate](https://sonar.grosswig-it.de/api/project_badges/measure?project=claude-usage-dashboard&metric=alert_status&token=XXX)](https://sonar.grosswig-it.de/dashboard?id=claude-usage-dashboard)
-[![Bugs](https://sonar.grosswig-it.de/api/project_badges/measure?project=claude-usage-dashboard&metric=bugs&token=XXX)](https://sonar.grosswig-it.de/dashboard?id=claude-usage-dashboard)
-[![Vulnerabilities](https://sonar.grosswig-it.de/api/project_badges/measure?project=claude-usage-dashboard&metric=vulnerabilities&token=XXX)](https://sonar.grosswig-it.de/dashboard?id=claude-usage-dashboard)
-[![Security Rating](https://sonar.grosswig-it.de/api/project_badges/measure?project=claude-usage-dashboard&metric=security_rating&token=XXX)](https://sonar.grosswig-it.de/dashboard?id=claude-usage-dashboard)
 
 ### Summary
 
@@ -46,7 +42,7 @@ Two images: **`Dockerfile.base`** (npm deps) → **`Dockerfile`** (app). Locally
 
 ### Gitea and GitHub (Routine after merge to `main`)
 
-Primary work is on **Gitea** (branch e.g. **`feat/proxy-logs`** → PR → **`main`**). **GitHub** serves as the public mirror; the branch there is currently usually **`feat/proxy-analytics`** → PR → **`main`** ([Repo](https://github.com/fgrosswig/claude-usage-dashboard)).
+Primary development is on a **private forge** (branch e.g. **`feat/proxy-logs`** → PR → **`main`**). **GitHub** serves as the public mirror; the branch there is currently usually **`feat/proxy-analytics`** → PR → **`main`** ([Repo](https://github.com/fgrosswig/claude-usage-dashboard)).
 
 **One-time — add second remote:**
 
@@ -59,7 +55,7 @@ git fetch github
 
 ```bash
 git checkout main
-git pull origin main                    # origin = Gitea
+git pull origin main                    # upstream: private forge
 git push github main                   # github remote: update main
 ```
 
@@ -76,7 +72,7 @@ git push github feat/proxy-logs:feat/proxy-analytics
 On GitHub: create PR **"feat/proxy-analytics" → `main`** or check the existing PR (shows the new push).  
 Optionally local: **`gh pr create`** / **`gh pr sync`** with [GitHub CLI](https://cli.github.com/) installed, if you don't work exclusively in the web UI.
 
-**Automatic mirror:** After merge to Gitea `main`, **`.gitea/workflows/mirror-github.yml`** pushes a sanitized snapshot to **GitHub `main`** (internally everything stays unchanged; domains and `.woodpecker`/`.gitea` do not appear publicly). The `git push github` examples above are only needed on demand (e.g. without the workflow or for a separate GitHub feature branch).
+**Automatic mirror:** After merge to Gitea `main`, **`private automation (paths omitted in public tree)`** pushes a sanitized snapshot to **GitHub `main`** (internally everything stays unchanged; domains and `.woodpecker`/`.gitea` do not appear publicly). The `git push github` examples above are only needed on demand (e.g. without the workflow or for a separate GitHub feature branch).
 
 ### Server and CLI Options
 
@@ -290,15 +286,15 @@ Test the dashboard locally with real remote data (cluster needs `DEBUG_API=1`):
 
 ```powershell
 # PowerShell — everything from remote (no local scan)
-$env:DEV_PROXY_SOURCE="https://claude-usage.grosswig-it.de"; $env:DEV_MODE="full"; node start.js dashboard
+$env:DEV_PROXY_SOURCE="https://claude-usage.example.com"; $env:DEV_MODE="full"; node start.js dashboard
 
 # PowerShell — only proxy from remote, JSONL local
-$env:DEV_PROXY_SOURCE="https://claude-usage.grosswig-it.de"; $env:DEV_MODE="proxy"; node start.js dashboard
+$env:DEV_PROXY_SOURCE="https://claude-usage.example.com"; $env:DEV_MODE="proxy"; node start.js dashboard
 ```
 
 ```bash
 # bash — everything from remote
-DEV_PROXY_SOURCE=https://claude-usage.grosswig-it.de DEV_MODE=full node start.js dashboard
+DEV_PROXY_SOURCE=https://claude-usage.example.com DEV_MODE=full node start.js dashboard
 ```
 
 - **DEV FULL banner** at the top with sync button + last-sync timestamp

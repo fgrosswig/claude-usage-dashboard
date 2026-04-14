@@ -3,10 +3,6 @@
 ## Claude Usage Dashboard
 
 [![Docker build](https://github.com/fgrosswig/claude-usage-dashboard/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/fgrosswig/claude-usage-dashboard/actions/workflows/docker.yml)
-[![Quality Gate](https://sonar.grosswig-it.de/api/project_badges/measure?project=claude-usage-dashboard&metric=alert_status&token=XXX)](https://sonar.grosswig-it.de/dashboard?id=claude-usage-dashboard)
-[![Bugs](https://sonar.grosswig-it.de/api/project_badges/measure?project=claude-usage-dashboard&metric=bugs&token=XXX)](https://sonar.grosswig-it.de/dashboard?id=claude-usage-dashboard)
-[![Vulnerabilities](https://sonar.grosswig-it.de/api/project_badges/measure?project=claude-usage-dashboard&metric=vulnerabilities&token=XXX)](https://sonar.grosswig-it.de/dashboard?id=claude-usage-dashboard)
-[![Security Rating](https://sonar.grosswig-it.de/api/project_badges/measure?project=claude-usage-dashboard&metric=security_rating&token=XXX)](https://sonar.grosswig-it.de/dashboard?id=claude-usage-dashboard)
 
 ### 요약
 
@@ -60,7 +56,7 @@ git fetch github
 
 ```bash
 git checkout main
-git pull origin main                    # origin = Gitea
+git pull origin main                    # upstream: private forge
 git push github main                   # github 리모트: main 업데이트
 ```
 
@@ -77,7 +73,7 @@ git push github feat/proxy-logs:feat/proxy-analytics
 GitHub에서: PR **"feat/proxy-analytics" → `main`**을 생성하거나 기존 PR을 확인합니다(새 푸시가 표시됨).  
 선택적으로 로컬에서: [GitHub CLI](https://cli.github.com/)가 설치된 경우 **`gh pr create`** / **`gh pr sync`** 사용 가능(웹에서만 작업하지 않는 경우).
 
-**자동 미러:** Gitea-`main` 머지 후 **`.gitea/workflows/mirror-github.yml`**이 정리된 스냅샷을 **GitHub `main`**에 푸시합니다(내부적으로는 모두 변경 없음; 도메인과 `.woodpecker`/`.gitea`는 공개되지 않음). 위의 `git push github` 예시는 필요 시에만 사용(예: 워크플로우 없이 또는 별도의 GitHub 피처 브랜치용).
+**자동 미러:** Gitea-`main` 머지 후 **`private automation (paths omitted in public tree)`**이 정리된 스냅샷을 **GitHub `main`**에 푸시합니다(내부적으로는 모두 변경 없음; 도메인과 `.woodpecker`/`.gitea`는 공개되지 않음). 위의 `git push github` 예시는 필요 시에만 사용(예: 워크플로우 없이 또는 별도의 GitHub 피처 브랜치용).
 
 ### 서버 및 CLI 옵션
 
@@ -291,15 +287,15 @@ kubectl apply -k k8s/overlays/dev
 
 ```powershell
 # PowerShell — 전체 원격(로컬 스캔 없음)
-$env:DEV_PROXY_SOURCE="https://claude-usage.grosswig-it.de"; $env:DEV_MODE="full"; node start.js dashboard
+$env:DEV_PROXY_SOURCE="https://claude-usage.example.com"; $env:DEV_MODE="full"; node start.js dashboard
 
 # PowerShell — 프록시만 원격, JSONL은 로컬
-$env:DEV_PROXY_SOURCE="https://claude-usage.grosswig-it.de"; $env:DEV_MODE="proxy"; node start.js dashboard
+$env:DEV_PROXY_SOURCE="https://claude-usage.example.com"; $env:DEV_MODE="proxy"; node start.js dashboard
 ```
 
 ```bash
 # bash — 전체 원격
-DEV_PROXY_SOURCE=https://claude-usage.grosswig-it.de DEV_MODE=full node start.js dashboard
+DEV_PROXY_SOURCE=https://claude-usage.example.com DEV_MODE=full node start.js dashboard
 ```
 
 - 상단에 **DEV FULL 배너** + 동기화 버튼 및 Last-Sync 타임스탬프

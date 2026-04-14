@@ -8,14 +8,14 @@
 # Aufruf vom Repo-Root:
 #   sh scripts/k8-harbor-pull-secret.sh
 # Optional:
-#   ROBOT_JSON=/pfad/robot.json HARBOR_HOST=harbor.grosswig-it.de sh scripts/k8-harbor-pull-secret.sh
+#   ROBOT_JSON=/pfad/robot.json HARBOR_HOST=registry.example.com sh scripts/k8-harbor-pull-secret.sh
 set -e
 ROOT="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 DEFAULT_JSON='k8/claude-usage-dashboard/robot$claude+developer.json'
 ROBOT_JSON=${ROBOT_JSON:-$DEFAULT_JSON}
-HARBOR_HOST=${HARBOR_HOST:-harbor.grosswig-it.de}
+HARBOR_HOST=${HARBOR_HOST:-registry.example.com}
 
 if ! test -f "$ROBOT_JSON"; then
   echo "Datei fehlt: $ROBOT_JSON"
