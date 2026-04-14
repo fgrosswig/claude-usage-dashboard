@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-287",
+      "timestamp": "2026-04-14",
+      "session": "auto",
+      "commit": "14246eb",
+      "commit_full": "14246eb8078a4e0df42e1c112d47f076a35c04ad",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ci): build jobs on .220 with docker:latest container",
+      "detail": "Both build and base-image jobs run on ubuntu-latest (.220) with\ncontainer: docker:latest for Docker CLI access. Deploy on k8s (.171).\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".gitea/workflows/base-image.yml",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": ".gitea/workflows/build-deploy.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-286",
       "timestamp": "2026-04-14",
       "session": "auto",
