@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-281",
+      "timestamp": "2026-04-14",
+      "session": "auto",
+      "commit": "a7b1662",
+      "commit_full": "a7b16626920bcfc6bc7148fae071d29c4de4f53c",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ci): skip auto-tag for CI-only commits",
+      "detail": "Filter fix(ci)/chore(ci)/ci(ci) from bump detection. If only CI/infra\ncommits exist since last tag, skip tagging entirely — prevents\nunnecessary patch releases for pipeline-only changes.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".woodpecker/app.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-280",
       "timestamp": "2026-04-14",
       "session": "auto",
