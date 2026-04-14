@@ -17,18 +17,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build and push base image via Kaniko
+      - name: Login to Harbor
         run: |
-          mkdir -p /tmp/kaniko-config
-          echo "{\"auths\":{\"harbor.grosswig-it.de\":{\"auth\":\"$(echo -n "$HARBOR_USER:$HARBOR_PASSWORD" | base64)\"}}}" > /tmp/kaniko-config/config.json
-          docker run --rm \
-            -v "${{ github.workspace }}:/workspace" \
-            -v "/tmp/kaniko-config:/kaniko/.docker:ro" \
-            gcr.io/kaniko-project/executor:latest \
-            --context=/workspace \
-            --dockerfile=/workspace/Dockerfile.base \
-            --destination=harbor.grosswig-it.de/claude/base:v3 \
-            --destination=harbor.grosswig-it.de/claude/base:latest
-        env:
-          HARBOR_USER: ${{ secrets.HARBOR_USER }}
-          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+          echo "${{ secrets.HARBOR_PASSWORD }}" | docker login harbor.grosswig-it.de -u "${{ secrets.HARBOR_USER }}" --password-stdin
+
+      - name: Build and push base image
+        run: |
+          docker build -f Dockerfile.base \
+            -t harbor.grosswig-it.de/claude/base:v3 \
+            -t harbor.grosswig-it.de/claude/base:latest \
+            .
+          docker push harbor.grosswig-it.de/claude/base:v3
+          docker push harbor.grosswig-it.de/claude/base:latest

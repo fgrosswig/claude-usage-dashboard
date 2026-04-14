@@ -1,0 +1,45 @@
+name: SonarQube Scan (Manual)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sonar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: SonarQube Scan
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          if [ "$BRANCH" = "main" ]; then
+            sonar-scanner \
+              -Dsonar.host.url=${{ secrets.SONAR_URL }} \
+              -Dsonar.token=${{ secrets.SONAR_TOKEN }}
+          else
+            sonar-scanner \
+              -Dsonar.host.url=${{ secrets.SONAR_URL }} \
+              -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+              -Dsonar.branch.name=$BRANCH
+          fi
+
+      - name: Quality Gate
+        run: |
+          echo "Waiting 10s for SonarQube to process..."
+          sleep 10
+          BRANCH="${{ github.ref_name }}"
+          if [ "$BRANCH" = "main" ]; then
+            QG_URL="${{ secrets.SONAR_URL }}/api/qualitygates/project_status?projectKey=claude-usage-dashboard"
+          else
+            QG_URL="${{ secrets.SONAR_URL }}/api/qualitygates/project_status?projectKey=claude-usage-dashboard&branch=$BRANCH"
+          fi
+          STATUS=$(curl -sf -u "${{ secrets.SONAR_TOKEN }}:" "$QG_URL" | jq -r '.projectStatus.status')
+          echo "Quality Gate ($BRANCH): $STATUS"
+          if [ "$STATUS" != "OK" ]; then
+            echo "FAILED: Quality Gate not passed."
+            curl -sf -u "${{ secrets.SONAR_TOKEN }}:" "$QG_URL" | jq '.projectStatus.conditions[] | select(.status != "OK")'
+            exit 1
+          fi
+          echo "Quality Gate passed."
