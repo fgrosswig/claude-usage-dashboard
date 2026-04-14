@@ -4865,6 +4865,7 @@ function renderProxyLatencyChart(data) {
 function renderProxyInvisibleCost(pd) {
   var el = document.getElementById("proxy-invisible-cost");
   if (!el) return;
+  if (!pd) return;
   var rl = pd.rate_limit || {};
   var q5 = Number.parseFloat(rl["anthropic-ratelimit-unified-5h-utilization"] || 0);
   var visibleTokens = (pd.output_tokens || 0) + (pd.input_tokens || 0);
@@ -4911,6 +4912,7 @@ function renderProxyHourlyHeatmap(data) {
   var el = document.getElementById("c-proxy-hourly");
   if (!el) return;
   var proxyDays = data.proxy?.proxy_days || [];
+  if (!proxyDays.length) return;
   var hd = aggregateHourlyTotals(proxyDays);
 
   chartShellSetLoading("c-proxy-hourly", false);
@@ -5097,6 +5099,7 @@ function renderProxyHourlyLatency(data) {
   var el = document.getElementById("c-proxy-hourly-latency");
   if (!el) return;
   var proxyDays = data.proxy?.proxy_days || [];
+  if (!proxyDays.length) return;
   var ld = aggregateHourlyLatency(proxyDays);
 
   chartShellSetLoading("c-proxy-hourly-latency", false);
@@ -6221,6 +6224,7 @@ function renderUptimeChart(data) {
   var el = document.getElementById("c-uptime-chart");
   if (!el) return;
   if (typeof echarts === "undefined") return;
+  if (!data?.days?.length) return;
 
   // Apply month filter (same as outage timeline)
   var srcDays = _outageTimelineMonthFilter ? (data.days || []) : getFilteredDays(data.days || []);
@@ -6331,6 +6335,7 @@ function renderIncidentHistory(data) {
   var el = document.getElementById("c-incident-history");
   if (!el) return;
   if (typeof echarts === "undefined") return;
+  if (!data?.days?.length) return;
 
   var srcDays = _outageTimelineMonthFilter ? (data.days || []) : getFilteredDays(data.days || []);
   var days = [];
@@ -6487,6 +6492,7 @@ function renderOutageTimeline(data, monthFilter) {
   var el = document.getElementById("c-outage-timeline");
   if (!el) return;
   if (typeof echarts === "undefined") return;
+  if (!data?.days?.length) return;
   if (monthFilter !== undefined) _outageTimelineMonthFilter = monthFilter;
 
   var srcDays = _outageTimelineMonthFilter ? (data.days || []) : getFilteredDays(data.days || []);
@@ -6608,6 +6614,7 @@ function renderAvailabilityKpis(data) {
   var panel = document.getElementById("avail-kpi-panel");
   var summary = document.getElementById("avail-kpi-summary");
   if (!panel || !summary) return;
+  if (!data?.days?.length) { panel.innerHTML = ""; return; }
   summary.textContent = t("availKpiSummary");
 
   var allDays = data.days || [];
