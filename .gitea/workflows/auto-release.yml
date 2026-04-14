@@ -22,37 +22,61 @@ jobs:
 
       - name: Determine version bump
         id: bump
+        env:
+          REPO_TOKEN: ${{ secrets.REPO_TOKEN }}
         run: |
-          LAST_TAG=$(git tag --sort=-v:refname | head -1)
-          if [ -z "$LAST_TAG" ]; then LAST_TAG="v0.0.0"; fi
-          TAG_SHA=$(git rev-list -n1 "$LAST_TAG" 2>/dev/null || echo "")
-          HEAD_SHA=$(git rev-parse HEAD)
-          echo "last_tag=$LAST_TAG" >> "$GITHUB_OUTPUT"
+          API="${{ github.server_url }}/api/v1/repos/${{ github.repository }}"
 
-          if [ "$TAG_SHA" = "$HEAD_SHA" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
+          # 1. Last tag via Gitea API
+          TAG_HTTP=$(curl -s -o /tmp/tags.json -w "%{http_code}" \
+            -H "Authorization: token $REPO_TOKEN" "$API/tags?limit=1")
+          echo "Tags API: HTTP $TAG_HTTP"
+          LAST_TAG=$(jq -r '.[0].name // empty' /tmp/tags.json 2>/dev/null)
+          if [ -z "$LAST_TAG" ]; then LAST_TAG="v0.0.0"; fi
+          TAG_SHA=$(jq -r '.[0].commit.sha // empty' /tmp/tags.json 2>/dev/null)
+          echo "Last tag: $LAST_TAG ($TAG_SHA)"
+
+          # 2. Check if HEAD is already tagged
+          if [ "$TAG_SHA" = "${{ github.sha }}" ]; then
             echo "HEAD is already tagged — skipping"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          REAL_COMMITS=$(git log --oneline "$LAST_TAG..HEAD" --no-merges \
-            | grep -vE "tx-log|chore: tx-log" \
-            | grep -vE "^[a-f0-9]+ (fix|chore|ci)\(ci\)" \
-            | cut -d' ' -f2-)
+          # 3. Commits since tag via Gitea API
+          COMMITS=$(curl -sf -H "Authorization: token $REPO_TOKEN" \
+            "$API/commits?sha=main&limit=50" \
+            | jq -r --arg stop "$TAG_SHA" '
+              [.[] | select(.sha != $stop) | .commit.message | split("\n")[0]] |
+              if length == 0 then empty else .[] end')
 
-          if [ -z "$REAL_COMMITS" ]; then
+          if [ -z "$COMMITS" ]; then
+            echo "No new commits since $LAST_TAG — skipping"
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Only CI/infra commits since $LAST_TAG — skipping"
             exit 0
           fi
 
           echo "Commits since $LAST_TAG:"
-          echo "$REAL_COMMITS" | head -10
+          echo "$COMMITS" | head -10
 
+          # 4. Filter out merge commits, tx-log, CI-only changes
+          REAL_COMMITS=$(echo "$COMMITS" | grep -vE "^Merge |^\[tx-log\]|^chore: tx-log|^(fix|chore|ci)\(ci\)" || true)
+          echo "Real commits for bump detection:"
+          echo "$REAL_COMMITS"
+
+          if [ -z "$REAL_COMMITS" ]; then
+            echo "Only CI/infra commits since $LAST_TAG — skipping tag"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # 5. Determine bump type
           BUMP=patch
-          echo "$REAL_COMMITS" | grep -qiE "BREAKING CHANGE" && BUMP=major
-          echo "$REAL_COMMITS" | grep -qE "^feat(\([^)]*\))?:" && [ "$BUMP" != "major" ] && BUMP=minor
+          echo "$REAL_COMMITS" | grep -qiE "BREAKING CHANGE" && BUMP=major || true
+          echo "$REAL_COMMITS" | grep -qE "^feat(\([^)]*\))?:" && [ "$BUMP" != "major" ] && BUMP=minor || true
+          echo "Bump type: $BUMP"
 
+          # 6. Compute new tag
           NEW_TAG=$(echo "$LAST_TAG" | awk -F. -v bump="$BUMP" '{
             gsub(/^v/,"",$1)
             if(bump=="major") printf "v%d.0.0\n",$1+1
@@ -62,8 +86,9 @@ jobs:
 
           echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+          echo "last_tag=$LAST_TAG" >> "$GITHUB_OUTPUT"
           echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
-          echo "$LAST_TAG → $BUMP → $NEW_TAG"
+          echo "$LAST_TAG -> $BUMP -> $NEW_TAG"
 
       - name: Create tag via Gitea API (idempotent)
         if: steps.bump.outputs.skip != 'true'
