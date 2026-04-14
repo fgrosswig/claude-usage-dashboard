@@ -7,6 +7,8 @@ on:
 jobs:
   sonar-pr:
     runs-on: ubuntu-latest
+    container:
+      image: sonarsource/sonar-scanner-cli
     steps:
       - uses: actions/checkout@v4
         with:
