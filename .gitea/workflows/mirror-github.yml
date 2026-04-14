@@ -133,7 +133,7 @@ jobs:
       - name: Mirror Gitea releases to GitHub
         env:
           GH_MIRROR_TOKEN: ${{ secrets.GH_PAT_TOKEN }}
-          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITEA_TOKEN: ${{ secrets.REPO_TOKEN }}
         run: |
           set -eux
           # Fetch all Gitea releases and mirror missing ones to GitHub
