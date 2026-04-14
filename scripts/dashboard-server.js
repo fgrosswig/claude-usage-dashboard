@@ -4426,8 +4426,10 @@ var server = http.createServer(function (req, res) {
     var qdDate = qdUrl.searchParams.get('date'); // optional: single day
     if (!__proxyCache.data) refreshProxyCache();
 
-    // Opus 4.6 published pricing ($/MTok)
-    var PRICE = { cache_read: 1.50, cache_creation: 18.75, input: 15.0, output: 75.0 };
+    // Opus 4.6 pricing ($/MTok) — used ONLY for implied_divisor scaling (cost/q5_delta).
+    // This dashboard does NOT calculate real billing — absolute $ values are illustrative.
+    // The ratios (CV, median, trend) are scale-invariant; only the Y-axis label changes.
+    var PRICE = { cache_read: 0.50, cache_creation: 6.25, input: 5.0, output: 25.0 };
 
     // Re-parse proxy logs to get per-request q5 + full token data
     var proxyFiles = collectProxyNdjsonFiles();
