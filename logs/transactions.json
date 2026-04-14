@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-286",
+      "timestamp": "2026-04-14",
+      "session": "auto",
+      "commit": "cdfc9fb",
+      "commit_full": "cdfc9fbdf863bca7470ab354055c6c2925cfee26",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ci): set DOCKER_API_VERSION=1.41 for .220 runner compatibility",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".gitea/workflows/base-image.yml",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": ".gitea/workflows/build-deploy.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-285",
       "timestamp": "2026-04-14",
       "session": "auto",
