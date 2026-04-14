@@ -215,14 +215,22 @@ steps:
           else printf "v%s.%s.%d\n",$1,$2,$3+1
         }')
         echo "Last: $LAST_TAG → Bump: $BUMP → New: $NEW_TAG"
-        # 5. Create tag via API
-        curl -sf -X POST \
+        # 5. Create tag via API (idempotent — handles duplicate push events)
+        TAG_RESP=$(curl -s -o /tmp/tag-result.json -w "%{http_code}" -X POST \
           -H "Authorization: token $GITEA_TOKEN" \
           -H "Content-Type: application/json" \
           "$API/tags" \
           -d "$(jq -n --arg tag "$NEW_TAG" --arg sha "$CI_COMMIT_SHA" \
-            '{tag_name: $tag, target: $sha}')"
-        echo "Tag $NEW_TAG created — draft-release-notes will trigger on tag event"
+            '{tag_name: $tag, target: $sha}')")
+        if [ "$TAG_RESP" = "201" ]; then
+          echo "Tag $NEW_TAG created — draft-release-notes will trigger on tag event"
+        elif [ "$TAG_RESP" = "409" ] || [ "$TAG_RESP" = "422" ]; then
+          echo "Tag $NEW_TAG already exists — skipping (HTTP $TAG_RESP)"
+        else
+          echo "ERROR: Tag creation failed (HTTP $TAG_RESP)"
+          cat /tmp/tag-result.json
+          exit 1
+        fi
     environment:
       GITEA_TOKEN:
         from_secret: gitea_token
