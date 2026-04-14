@@ -13,24 +13,22 @@ on:
 
 jobs:
   build-base:
-    runs-on: kaniko
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Create Docker config for Harbor
+      - name: Build and push base image via Kaniko
         run: |
-          mkdir -p /kaniko/.docker
-          echo "{\"auths\":{\"harbor.grosswig-it.de\":{\"username\":\"$HARBOR_USER\",\"password\":\"$HARBOR_PASSWORD\"}}}" > /kaniko/.docker/config.json
-        env:
-          HARBOR_USER: ${{ secrets.HARBOR_USER }}
-          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
-
-      - name: Build and push base image
-        run: |
-          /kaniko/executor \
-            --context=. \
-            --dockerfile=Dockerfile.base \
+          mkdir -p /tmp/kaniko-config
+          echo "{\"auths\":{\"harbor.grosswig-it.de\":{\"auth\":\"$(echo -n "$HARBOR_USER:$HARBOR_PASSWORD" | base64)\"}}}" > /tmp/kaniko-config/config.json
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspace" \
+            -v "/tmp/kaniko-config:/kaniko/.docker:ro" \
+            gcr.io/kaniko-project/executor:latest \
+            --context=/workspace \
+            --dockerfile=/workspace/Dockerfile.base \
             --destination=harbor.grosswig-it.de/claude/base:v3 \
             --destination=harbor.grosswig-it.de/claude/base:latest
         env:
-          DOCKER_CONFIG: /kaniko/.docker
+          HARBOR_USER: ${{ secrets.HARBOR_USER }}
+          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}

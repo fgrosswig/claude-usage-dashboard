@@ -10,7 +10,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: kaniko
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -34,31 +34,29 @@ jobs:
         run: |
           sed "s|^ARG BASE_TAG=.*|ARG BASE_TAG=${{ steps.params.outputs.base_ver }}|" Dockerfile > Dockerfile.ci
 
-      - name: Create Docker config for Harbor
-        run: |
-          mkdir -p /kaniko/.docker
-          echo "{\"auths\":{\"harbor.grosswig-it.de\":{\"username\":\"$HARBOR_USER\",\"password\":\"$HARBOR_PASSWORD\"}}}" > /kaniko/.docker/config.json
-        env:
-          HARBOR_USER: ${{ secrets.HARBOR_USER }}
-          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
-
       - name: Build and push with Kaniko
         run: |
+          mkdir -p /tmp/kaniko-config
+          echo "{\"auths\":{\"harbor.grosswig-it.de\":{\"auth\":\"$(echo -n "$HARBOR_USER:$HARBOR_PASSWORD" | base64)\"}}}" > /tmp/kaniko-config/config.json
           TAGS="${{ steps.params.outputs.tags }}"
           DEST_FLAGS=""
           IFS=',' read -ra TAG_ARR <<< "$TAGS"
           for t in "${TAG_ARR[@]}"; do
             DEST_FLAGS="$DEST_FLAGS --destination=harbor.grosswig-it.de/claude/claude-usage-dashboard:$t"
           done
-          /kaniko/executor \
-            --context=. \
-            --dockerfile=Dockerfile.ci \
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspace" \
+            -v "/tmp/kaniko-config:/kaniko/.docker:ro" \
+            gcr.io/kaniko-project/executor:latest \
+            --context=/workspace \
+            --dockerfile=/workspace/Dockerfile.ci \
             --build-arg=CI_COMMIT_SHORT_SHA=${{ steps.params.outputs.short_sha }} \
             --build-arg=CI_COMMIT_REF_NAME=${{ github.ref_name }} \
             --build-arg=APP_VERSION=${{ steps.params.outputs.app_version }} \
             $DEST_FLAGS
         env:
-          DOCKER_CONFIG: /kaniko/.docker
+          HARBOR_USER: ${{ secrets.HARBOR_USER }}
+          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
 
   sonar:
     if: github.ref_name == 'main'
