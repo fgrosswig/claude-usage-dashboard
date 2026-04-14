@@ -2,6 +2,28 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-285",
+      "timestamp": "2026-04-14",
+      "session": "auto",
+      "commit": "f1cf62b",
+      "commit_full": "f1cf62b89dc43afa6d5b1e4ef8961a35d40f1689",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ci): use docker login -p for Harbor auth",
+      "detail": "Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".gitea/workflows/base-image.yml",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": ".gitea/workflows/build-deploy.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-284",
       "timestamp": "2026-04-14",
       "session": "auto",
