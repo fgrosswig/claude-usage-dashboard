@@ -2,6 +2,33 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-278",
+      "timestamp": "2026-04-14",
+      "session": "auto",
+      "commit": "bfd5c12",
+      "commit_full": "bfd5c12bab1431a4cf63e07bd5a5916d14e5a18c",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix: correct Opus 4.6 pricing + rename Cache Read Penalty (GitHub #2)",
+      "detail": "- Pricing constant corrected from Opus 4.1 (3× too high) to Opus 4.6 rates\n- Clarified that pricing is for divisor scaling only, not real billing\n- Renamed \"Large Cache Read Penalty\" to \"Large Context Turn Penalty\" in READMEs\n- Added Pearson correlation data (cache_read r≈−0.01, cache_creation+output r≈0.21)\n\nResolves: Gitea #221, #222\nRef: https://github.com/fgrosswig/claude-usage-dashboard/issues/2\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": "README.en.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "README.md",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": "scripts/dashboard-server.js",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-277",
       "timestamp": "2026-04-13",
       "session": "auto",
