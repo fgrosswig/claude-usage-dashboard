@@ -87,13 +87,13 @@ jobs:
           sleep 10
           STATUS=$(curl -sf -u "${{ secrets.SONAR_TOKEN }}:" \
             "${{ secrets.SONAR_URL }}/api/qualitygates/project_status?projectKey=claude-usage-dashboard" \
-            | jq -r '.projectStatus.status')
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['projectStatus']['status'])")
           echo "Quality Gate: $STATUS"
           if [ "$STATUS" != "OK" ]; then
             echo "FAILED: Quality Gate not passed"
             curl -sf -u "${{ secrets.SONAR_TOKEN }}:" \
               "${{ secrets.SONAR_URL }}/api/qualitygates/project_status?projectKey=claude-usage-dashboard" \
-              | jq '.projectStatus.conditions[] | select(.status != "OK")'
+              | python3 -c "import sys,json; [print(json.dumps(c,indent=2)) for c in json.load(sys.stdin)['projectStatus']['conditions'] if c['status']!='OK']"
             exit 1
           fi
 
