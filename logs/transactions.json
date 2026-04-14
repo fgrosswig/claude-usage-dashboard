@@ -2,6 +2,53 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-282",
+      "timestamp": "2026-04-14",
+      "session": "auto",
+      "commit": "4bc711d",
+      "commit_full": "4bc711de225ded16ec006ab111ec4f097f824bd3",
+      "status": "ABGESCHLOSSEN",
+      "description": "ci: migrate from Woodpecker to Gitea Actions",
+      "detail": "- New workflows: build-deploy, auto-release, pr-check, base-image\n- Concurrency groups prevent duplicate runs on PR merge\n- PR checks only on opened/synchronize (not closed/merged)\n- Auto-tag with CI-only commit skip and idempotent tag creation\n- Woodpecker pipelines set to manual-only as fallback\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".gitea/workflows/auto-release.yml",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": ".gitea/workflows/base-image.yml",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": ".gitea/workflows/build-deploy.yml",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": ".gitea/workflows/pr-check.yml",
+          "op": "CREATE",
+          "detail": ""
+        },
+        {
+          "file": ".woodpecker/app.yml",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": ".woodpecker/base.yml",
+          "op": "EDIT",
+          "detail": ""
+        },
+        {
+          "file": ".woodpecker/pr.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-281",
       "timestamp": "2026-04-14",
       "session": "auto",
