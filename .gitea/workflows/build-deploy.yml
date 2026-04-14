@@ -11,7 +11,6 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: docker:latest
     steps:
       - uses: actions/checkout@v4
 
@@ -64,6 +63,8 @@ jobs:
   sonar:
     if: github.ref_name == 'main'
     runs-on: ubuntu-latest
+    container:
+      image: sonarsource/sonar-scanner-cli
     steps:
       - uses: actions/checkout@v4
         with:
@@ -94,16 +95,15 @@ jobs:
   deploy:
     needs: build
     runs-on: k8s
+    container:
+      image: bitnami/kubectl
     steps:
-      - uses: actions/checkout@v4
-
       - name: Deploy to K8s
         run: |
           set -eux
           SHORT_SHA="${{ github.sha }}"
           SHORT_SHA="${SHORT_SHA:0:8}"
           K="kubectl --server=${{ secrets.KUBE_URL }} --token=${{ secrets.KUBE_TOKEN }} --insecure-skip-tls-verify --request-timeout=120s"
-          $K apply -k k8s/overlays/dev
           if ! $K get secret harbor-pull -n claude >/dev/null 2>&1; then
             echo "ERROR: Secret harbor-pull missing in namespace claude"
             exit 1
