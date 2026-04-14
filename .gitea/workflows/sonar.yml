@@ -17,11 +17,11 @@ jobs:
         run: |
           BRANCH="${{ github.ref_name }}"
           if [ "$BRANCH" = "main" ]; then
-            sonar-scanner \
+            /opt/sonar-scanner/bin/sonar-scanner \
               -Dsonar.host.url=${{ secrets.SONAR_URL }} \
               -Dsonar.token=${{ secrets.SONAR_TOKEN }}
           else
-            sonar-scanner \
+            /opt/sonar-scanner/bin/sonar-scanner \
               -Dsonar.host.url=${{ secrets.SONAR_URL }} \
               -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
               -Dsonar.branch.name=$BRANCH
