@@ -94,10 +94,14 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: k8s
-    container:
-      image: bitnami/kubectl
+    runs-on: ubuntu-latest
     steps:
+      - name: Install kubectl
+        run: |
+          curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
       - name: Deploy to K8s
         run: |
           set -eux
@@ -126,23 +130,23 @@ jobs:
           API="https://harbor.grosswig-it.de/api/v2.0/projects/claude/repositories/claude-usage-dashboard/artifacts"
           if [ "${{ github.ref_name }}" = "main" ]; then
             KEEP=2
-            TAGS=$(curl -s -u "${{ secrets.HARBOR_USER }}:${{ secrets.HARBOR_PASSWORD }}" \
+            TAGS=$(curl -s -u '${{ secrets.HARBOR_USER }}:${{ secrets.HARBOR_PASSWORD }}' \
               "$API?page_size=50&sort=-push_time" \
               | jq -r '.[].tags[]?.name // empty' 2>/dev/null \
-              | grep -v latest | grep -v '^dev-')
+              | grep -v latest | grep -v '^dev-') || true
           else
             KEEP=1
-            TAGS=$(curl -s -u "${{ secrets.HARBOR_USER }}:${{ secrets.HARBOR_PASSWORD }}" \
+            TAGS=$(curl -s -u '${{ secrets.HARBOR_USER }}:${{ secrets.HARBOR_PASSWORD }}' \
               "$API?page_size=50&sort=-push_time" \
               | jq -r '.[].tags[]?.name // empty' 2>/dev/null \
-              | grep '^dev-')
+              | grep '^dev-') || true
           fi
           COUNT=0
           echo "$TAGS" | while read TAG; do
             COUNT=$((COUNT+1))
             if [ $COUNT -gt $KEEP ]; then
               echo "Deleting old tag: $TAG"
-              curl -s -X DELETE -u "${{ secrets.HARBOR_USER }}:${{ secrets.HARBOR_PASSWORD }}" "$API/$TAG" || true
+              curl -s -X DELETE -u '${{ secrets.HARBOR_USER }}:${{ secrets.HARBOR_PASSWORD }}' "$API/$TAG" || true
             fi
           done
         continue-on-error: true
