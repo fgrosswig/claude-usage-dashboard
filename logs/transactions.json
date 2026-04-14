@@ -2,6 +2,23 @@
   "_meta": {},
   "transactions": [
     {
+      "id": "TX-288",
+      "timestamp": "2026-04-14",
+      "session": "auto",
+      "commit": "77e8e0b",
+      "commit_full": "77e8e0b47dae09da75466935eab345778d3c4db3",
+      "status": "ABGESCHLOSSEN",
+      "description": "fix(ci): correct build-deploy workflow for Gitea Actions",
+      "detail": "- build: remove container:docker:latest (default image has Node+Docker via socket)\n- sonar: add sonarsource/sonar-scanner-cli container (main only)\n- deploy: use bitnami/kubectl container, remove checkout and apply-k\n  (K8s namespace claude is pre-configured, only set image + rollout)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "changes": [
+        {
+          "file": ".gitea/workflows/build-deploy.yml",
+          "op": "EDIT",
+          "detail": ""
+        }
+      ]
+    },
+    {
       "id": "TX-287",
       "timestamp": "2026-04-14",
       "session": "auto",
