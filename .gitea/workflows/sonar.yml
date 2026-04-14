@@ -15,6 +15,7 @@ jobs:
 
       - name: SonarQube Scan
         run: |
+          echo ${{ secrets.SONAR_URL }} \
           # Nutzt volle Pfade und Debug-Logging (-X)
           /opt/sonar-scanner/bin/sonar-scanner \
             -X \
