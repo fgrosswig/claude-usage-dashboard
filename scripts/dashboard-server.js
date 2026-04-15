@@ -1134,7 +1134,8 @@ function refreshMarketplaceExtensionCache() {
       try {
         if (err || !data?.results?.[0]?.extensions?.[0]) {
           if (err) {
-            serviceLog.warn('marketplace', 'extensionquery failed: ' + (err.message || err));
+            var mpLogFn = marketplaceVersionsCache.items.length > 0 ? 'debug' : 'warn';
+            serviceLog[mpLogFn]('marketplace', 'extensionquery failed: ' + (err.message || err));
           } else {
             serviceLog.warn('marketplace', 'extensionquery empty response');
           }
@@ -1198,6 +1199,23 @@ function refreshOutageCache() {
         );
       } catch (we) {
         serviceLog.error('outage', 'disk write failed: ' + (we.message || we));
+      }
+      // Merge fresh outage data into cached days and push to clients
+      if (cachedData?.days?.length) {
+        var freshOutage = getOutageDaysMap();
+        for (var rd of cachedData.days) {
+          var lo = freshOutage[rd.date];
+          if (!lo) continue;
+          rd.outage_spans = lo.spans;
+          rd.outage_hours = lo.outage_hours;
+          rd.outage_server_hours = lo.server_hours;
+          rd.outage_client_hours = lo.client_hours;
+          rd.outage_incidents = lo.incidents;
+        }
+        cachedData.generated = new Date().toISOString();
+        cachedData.outage_status = 'ok';
+        cachedData.outage_fetched = new Date(outageCache.fetchedAt).toISOString();
+        broadcastSse();
       }
     } else {
       serviceLog.warn('outage', 'response ohne incidents-Array');
@@ -3624,7 +3642,8 @@ var IDLE_SESSION_PRELOAD_MS = (function () {
   var ev = String(process.env.CLAUDE_USAGE_IDLE_SESSION_PRELOAD_MS || '').trim();
   if (ev === '0' || ev === 'off' || ev === 'false') return 0;
   var n = Number.parseInt(ev, 10);
-  return !Number.isNaN(n) && n >= 0 ? n : 20000;
+  // Default: disabled (0) — session-turns are built on-demand via non-blocking 202 pattern
+  return !Number.isNaN(n) && n > 0 ? n : 0;
 })();
 var __sessionTurnsIdlePreloadScheduled = false;
 
@@ -4247,11 +4266,6 @@ var server = http.createServer(function (req, res) {
     return;
   } else if (pathname === '/api/debug/cache-files' && req.method === 'GET') {
     var corsCf = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
-    if (!__devMode && process.env.DEBUG_API !== '1') {
-      res.writeHead(403, corsCf);
-      res.end(JSON.stringify({ ok: false, error: 'dev_only' }));
-      return;
-    }
     var listCf = collectDebugCacheFilesPayload();
     // DEV_MODE: merge remote cache-files list (prod pod has files we don't have locally)
     if (__devSource && __devMode) {
@@ -4287,11 +4301,6 @@ var server = http.createServer(function (req, res) {
     res.end(JSON.stringify({ ok: true, files: listCf }));
   } else if (pathname === '/api/debug/cache-file-view') {
     var corsView = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
-    if (!__devMode && process.env.DEBUG_API !== '1') {
-      res.writeHead(403, corsView);
-      res.end(JSON.stringify({ ok: false, error: 'dev_only' }));
-      return;
-    }
     if (req.method === 'OPTIONS') {
       res.writeHead(204, {
         'Access-Control-Allow-Origin': '*',
@@ -4553,17 +4562,33 @@ var server = http.createServer(function (req, res) {
       }
       runRemoteSessionTurns(0);
     } else {
-      var stT0 = Date.now();
-      var stResult = getSessionTurnsCached(stDate);
-      var stMs = Date.now() - stT0;
-      serviceLog.info('session-turns', 'GET /api/session-turns?date=' + stDate + ' → ' + stMs + 'ms');
-      res.writeHead(200, {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-        Pragma: 'no-cache'
-      });
-      res.end(JSON.stringify(stResult));
+      // Non-blocking: return cached result immediately, or empty + background rebuild
+      var stCachedLocal = _sessionTurnsCache[stDate];
+      if (stCachedLocal) {
+        serviceLog.info('session-turns', 'GET /api/session-turns?date=' + stDate + ' → 0ms (memory cache)');
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          Pragma: 'no-cache'
+        });
+        res.end(JSON.stringify(stCachedLocal.result));
+      } else {
+        // Return empty immediately so the UI stays responsive
+        res.writeHead(202, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-store'
+        });
+        res.end(JSON.stringify({ sessions: [], total_turns: 0, building: true }));
+        // Build cache in background (non-blocking via setImmediate chunks)
+        setImmediate(function () {
+          var stT0 = Date.now();
+          var stResult = getSessionTurnsCached(stDate);
+          var stMs = Date.now() - stT0;
+          serviceLog.info('session-turns', 'GET /api/session-turns?date=' + stDate + ' → ' + stMs + 'ms (background build)');
+        });
+      }
     }
   } else if (pathname === '/api/layout') {
     // Layout: immer lokale Datei auf dem Host, der diesen Node-Prozess ausführt (os.homedir() + .claude/…).

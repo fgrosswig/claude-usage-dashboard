@@ -49,8 +49,45 @@ function isExtraBasesAutoMode(raw) {
   return s === 'true' || s === '1' || s === 'yes' || s === 'auto' || s === 'on';
 }
 
+/** Auto-detect Claude Desktop App sessions directory (Windows UWP / macOS / Linux). */
+function getDesktopAppSessionsDir() {
+  var platform = process.platform;
+  if (platform === 'win32') {
+    // Windows UWP (Microsoft Store) path
+    var localAppData = process.env.LOCALAPPDATA || path.join(HOME, 'AppData', 'Local');
+    var packagesDir = path.join(localAppData, 'Packages');
+    try {
+      var entries = fs.readdirSync(packagesDir, { withFileTypes: true });
+      for (var entry of entries) {
+        if (entry.isDirectory() && entry.name.startsWith('Claude_')) {
+          var sessDir = path.join(packagesDir, entry.name, 'LocalCache', 'Roaming', 'Claude', 'local-agent-mode-sessions');
+          if (fs.existsSync(sessDir)) return sessDir;
+        }
+      }
+    } catch (error) { /* intentional */ }
+    // Non-UWP install path
+    var roaming = process.env.APPDATA || path.join(HOME, 'AppData', 'Roaming');
+    var nonUwp = path.join(roaming, 'Claude', 'local-agent-mode-sessions');
+    if (fs.existsSync(nonUwp)) return nonUwp;
+  } else if (platform === 'darwin') {
+    var macDir = path.join(HOME, 'Library', 'Application Support', 'Claude', 'local-agent-mode-sessions');
+    if (fs.existsSync(macDir)) return macDir;
+  } else {
+    // Linux: XDG_CONFIG_HOME or ~/.config
+    var configDir = process.env.XDG_CONFIG_HOME || path.join(HOME, '.config');
+    var linuxDir = path.join(configDir, 'Claude', 'local-agent-mode-sessions');
+    if (fs.existsSync(linuxDir)) return linuxDir;
+  }
+  return null;
+}
+
 function getScanRoots() {
   var roots = [{ path: BASE, label: 'local' }];
+  // Auto-discover Claude Desktop App sessions
+  var desktopDir = getDesktopAppSessionsDir();
+  if (desktopDir) {
+    roots.push({ path: desktopDir, label: 'desktop-app' });
+  }
   var raw = process.env.CLAUDE_USAGE_EXTRA_BASES || '';
   if (!raw.trim()) return roots;
   if (isExtraBasesAutoMode(raw)) {

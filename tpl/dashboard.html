@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Claude Code Usage Dashboard</title>
 <link rel="stylesheet" href="/assets/dashboard.css">
+<style>
+.warmup-overlay{position:fixed;inset:0;z-index:99999;background:#0f172a;display:flex;align-items:center;justify-content:center;transition:opacity .5s ease}
+.warmup-overlay.is-done{opacity:0;pointer-events:none}
+.warmup-card{text-align:center;color:#e2e8f0}
+.warmup-title{font-size:1.5rem;margin:.75rem 0 .5rem}
+.warmup-status{color:#94a3b8;font-size:.95rem}
+.warmup-progress{width:220px;height:6px;background:#1e293b;border-radius:3px;margin:.75rem auto 0;overflow:hidden}
+.warmup-progress-fill{height:100%;background:linear-gradient(90deg,#a855f7,#6366f1);width:0;transition:width .3s}
+.warmup-sub{color:#64748b;font-size:.8rem;margin-top:.25rem}
+</style>
 </head>
 <body>
 <!-- Warmup Splash -->

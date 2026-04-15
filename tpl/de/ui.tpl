@@ -307,6 +307,7 @@
   "budgetTrendBlurb": "Output % w\u00e4chst nach oben (gut), Overhead nach unten (schlecht). Cache-Miss % gestrichelt.",
   "budgetQuotaTitle": "Quota-Verbrauch",
   "budgetQuotaBlurb": "5h/7d Quota-Auslastung und Fallback-Budget aus API-Headern.",
+  "budgetQuotaNoData": "Quota-Daten benötigen den Proxy-Modus — keine API-Header-Daten verfügbar.",
   "budgetTrendOverhead": "Overhead (x)",
   "budgetTrendOutputPct": "Output %",
   "budgetTrendCacheMiss": "Cache Miss %",

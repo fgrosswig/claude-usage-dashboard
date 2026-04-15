@@ -2,7 +2,7 @@
 
 [← Inhaltsverzeichnis](README.md)
 
-Standalone Node-Server für **Claude Code**: Token-Nutzungs-Analyse, Anomalie-Erkennung und Proxy-Monitoring. Liest **`~/.claude/projects/**/*.jsonl`** und zeigt Nutzung, heuristische Limits und Forensik in einer Web-UI. Nur **`claude-*`**-Modelle werden gezählt (kein `<synthetic>`).
+Standalone Node-Server für **Claude Code**: Token-Nutzungs-Analyse, Anomalie-Erkennung und Proxy-Monitoring. Liest **`~/.claude/projects/**/*.jsonl`** sowie **Claude Desktop App** Session-Logs (automatisch erkannt) und zeigt Nutzung, heuristische Limits und Forensik in einer Web-UI. Nur **`claude-*`**-Modelle werden gezählt (kein `<synthetic>`).
 
 ## Features (Kurzüberblick)
 

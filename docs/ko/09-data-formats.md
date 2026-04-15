@@ -4,7 +4,7 @@
 
 대시보드는 **두 가지 서로 다른 데이터 소스**를 처리하며, 각각 고유한 파일 형식과 쓰기 경로를 가집니다:
 
-1. **JSONL 세션 로그** — Claude Code(CLI, VS Code 확장, JetBrains 플러그인)가 작성
+1. **JSONL 세션 로그** — Claude Code(CLI, VS Code 확장, JetBrains 플러그인) 및 **Claude Desktop App**(`audit.jsonl`, 자동 감지)이 작성
 2. **프록시 NDJSON 로그** — 내장된 `scripts/anthropic-proxy-core.js`가 작성
 
 이 장에서는 두 형식을 필드 단위로 문서화하여, 외부 소스(커뮤니티 연구자, 엔터프라이즈 설정, 대안 프록시 구현)가 호환 가능한 데이터를 생성하고 코어 코드를 수정하지 않고 대시보드에 공급할 수 있도록 합니다.
@@ -17,11 +17,23 @@
 
 ### 소스 및 위치
 
-Claude Code는 세션당 하나의 JSONL 파일을 작성합니다:
+Claude Code(CLI)는 세션당 하나의 JSONL 파일을 작성합니다:
 
 ```
 ~/.claude/projects/<project-slug>/<session-uuid>.jsonl
 ```
+
+Claude Desktop App은 세션당 감사 로그를 작성합니다:
+
+```
+# Windows (UWP / Microsoft Store)
+%LOCALAPPDATA%/Packages/Claude_*/LocalCache/Roaming/Claude/local-agent-mode-sessions/<org>/<project>/<session>/audit.jsonl
+
+# macOS
+~/Library/Application Support/Claude/local-agent-mode-sessions/<org>/<project>/<session>/audit.jsonl
+```
+
+대시보드는 이러한 경로를 자동으로 감지합니다(스캔 루트 레이블: `desktop-app`). JSONL 형식은 CLI 로그와 동일합니다.
 
 - 한 줄에 하나의 JSON 객체, **추가 전용(append-only)**
 - 세션이 진행되는 동안 시간 순서대로 추가됨

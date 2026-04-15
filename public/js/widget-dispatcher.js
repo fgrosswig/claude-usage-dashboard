@@ -1209,6 +1209,7 @@
     var html = '<ul class="widget-tree">';
     for (var sec of sections) {
       if (sec.reorderable === false) continue;
+      if (sec.id === 'proxy' && !window.__proxyHasData) continue;
       var secVis = isSectionVisible(sec.id);
       var hasCharts = sec.charts && sec.charts.length > 0;
       var spanVal = getWidgetSpan(sec.id);

@@ -6,7 +6,7 @@
 
 ### Summary
 
-**Anthropic and Claude Code monitoring:** A **self-hosted web dashboard** and an optional **transparent HTTP proxy** for the **Anthropic API** — to visualize **token flow**, heuristic limits, **forensics**, and proxy metrics. **Motivation:** In practice, **Anthropic usage** (Claude Code, Max/session windows, etc.) often leads to **rapid "usage drains"**; the official display does not always explain **why** the counter depletes so quickly. Data sources: **`~/.claude/projects/**/_.jsonl`** and — with the proxy — **NDJSON** per request (latency, cache, and **rate-limit-relevant headers** among others). Only **`claude-_`** models are counted (no `<synthetic>`). Runs **locally** or in **Docker/Kubernetes** — no centralized SaaS.
+**Anthropic and Claude Code monitoring:** A **self-hosted web dashboard** and an optional **transparent HTTP proxy** for the **Anthropic API** — to visualize **token flow**, heuristic limits, **forensics**, and proxy metrics. **Motivation:** In practice, **Anthropic usage** (Claude Code, Max/session windows, etc.) often leads to **rapid "usage drains"**; the official display does not always explain **why** the counter depletes so quickly. Data sources: **`~/.claude/projects/**/_.jsonl`** (CLI, VS Code, JetBrains) plus **Claude Desktop App** session logs (`audit.jsonl`, auto-discovered) and — with the proxy — **NDJSON** per request (latency, cache, and **rate-limit-relevant headers** among others). Only **`claude-_`** models are counted (no `<synthetic>`). Runs **locally** or in **Docker/Kubernetes** — no centralized SaaS.
 
 ### References and Context
 

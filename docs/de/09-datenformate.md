@@ -4,7 +4,7 @@
 
 Das Dashboard verarbeitet **zwei unterschiedliche Datenquellen**, jede mit eigenem Dateiformat und Schreibpfad:
 
-1. **JSONL-Session-Logs** — geschrieben von Claude Code (CLI, VS Code Extension, JetBrains Plugin)
+1. **JSONL-Session-Logs** — geschrieben von Claude Code (CLI, VS Code Extension, JetBrains Plugin) und **Claude Desktop App** (`audit.jsonl`, automatisch erkannt)
 2. **Proxy-NDJSON-Logs** — geschrieben vom mitgelieferten `scripts/anthropic-proxy-core.js`
 
 Dieses Kapitel dokumentiert beide Formate Feld für Feld, damit externe Quellen (Community-Forscher, Enterprise-Setups, alternative Proxy-Implementierungen) kompatible Daten erzeugen und ins Dashboard einspeisen koennen, ohne den Kern-Code zu aendern.
@@ -17,11 +17,23 @@ Zusammenhang: Issue **#167** trackt die gesamte Log-Format-Adapter-Roadmap (eing
 
 ### Quelle und Ablage
 
-Claude Code schreibt eine JSONL-Datei pro Session:
+Claude Code (CLI) schreibt eine JSONL-Datei pro Session:
 
 ```
 ~/.claude/projects/<project-slug>/<session-uuid>.jsonl
 ```
+
+Claude Desktop App schreibt Audit-Logs pro Session:
+
+```
+# Windows (UWP / Microsoft Store)
+%LOCALAPPDATA%/Packages/Claude_*/LocalCache/Roaming/Claude/local-agent-mode-sessions/<org>/<project>/<session>/audit.jsonl
+
+# macOS
+~/Library/Application Support/Claude/local-agent-mode-sessions/<org>/<project>/<session>/audit.jsonl
+```
+
+Das Dashboard erkennt diese Pfade automatisch (Scan-Root-Label: `desktop-app`). Das JSONL-Format ist identisch zu CLI-Logs.
 
 - Ein JSON-Objekt pro Zeile, **append-only**
 - Chronologisch angehaengt waehrend die Session laeuft

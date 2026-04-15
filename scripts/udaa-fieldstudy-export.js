@@ -198,6 +198,11 @@ function extractTurnFromRecord(rec, stats, includeSidechain) {
     return null;
   }
   const msg = rec.message || {};
+  // Skip partial/streaming records (no stop_reason) — they duplicate the final record's token counts
+  if (!msg.stop_reason) {
+    stats.skippedNoUsage++;
+    return null;
+  }
   const usage = msg.usage;
   if (!usage) {
     stats.skippedNoUsage++;

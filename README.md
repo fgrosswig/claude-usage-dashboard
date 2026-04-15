@@ -6,7 +6,7 @@
 
 ### Zusammenfassung
 
-**Anthropic- und Claude-Code-Monitoring:** Ein **selbst gehostetes Web-Dashboard** und optional ein **transparenter HTTP-Proxy** zur **Anthropic-API** — um **Tokenfluss**, heuristische Limits, **Forensik** und Proxy-Metriken darzustellen. **Motivation:** In der Praxis entstehen bei **Anthropic-Nutzung** (Claude Code, Max-/Session-Fenster u. a.) oft **schnelle „Usage-Drains“**; die offizielle Anzeige erklärt nicht immer, **warum** der Zähler so schnell leerläuft. Datenquellen: **`~/.claude/projects/**/_.jsonl`** und — mit Proxy — **NDJSON** pro Request (Latenz, Cache, u. a. **rate-limit-relevante Header**). Gezählt werden nur **`claude-_`**-Modelle (kein `<synthetic>`). Betrieb **lokal** oder in **Docker/Kubernetes** — kein zentraler SaaS.
+**Anthropic- und Claude-Code-Monitoring:** Ein **selbst gehostetes Web-Dashboard** und optional ein **transparenter HTTP-Proxy** zur **Anthropic-API** — um **Tokenfluss**, heuristische Limits, **Forensik** und Proxy-Metriken darzustellen. **Motivation:** In der Praxis entstehen bei **Anthropic-Nutzung** (Claude Code, Max-/Session-Fenster u. a.) oft **schnelle „Usage-Drains“**; die offizielle Anzeige erklärt nicht immer, **warum** der Zähler so schnell leerläuft. Datenquellen: **`~/.claude/projects/**/_.jsonl`** (CLI, VS Code, JetBrains) sowie **Claude Desktop App** Session-Logs (`audit.jsonl`, automatisch erkannt) und — mit Proxy — **NDJSON** pro Request (Latenz, Cache, u. a. **rate-limit-relevante Header**). Gezählt werden nur **`claude-_`**-Modelle (kein `<synthetic>`). Betrieb **lokal** oder in **Docker/Kubernetes** — kein zentraler SaaS.
 
 ### Referenz und Kontext
 

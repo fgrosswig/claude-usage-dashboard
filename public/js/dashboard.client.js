@@ -1217,11 +1217,12 @@ function updateLiveFilesPanel(data) {
   if (trig) trig.setAttribute("title", tr("liveTriggerMany", { n: n }));
 }
 (function wireLiveReleasePanelChrome() {
+  // Wire cache-files explorer button independently (not gated on live-release-details)
+  window.CacheFilesExplorer?.wireOpenButton("live-cache-files-open");
   function go() {
     var det = document.getElementById("live-release-details");
     if (!det || det.dataset.liveRelChromeWired === "1") return;
     det.dataset.liveRelChromeWired = "1";
-    window.CacheFilesExplorer?.wireOpenButton("live-cache-files-open");
     var expandBtn = document.getElementById("live-rel-expand-btn");
     var relOverlay = document.getElementById("release-modal-overlay");
     var relBody = document.getElementById("release-modal-body");
@@ -1974,7 +1975,7 @@ function renderDashboardCore(data) {
   
   showMainChartsSkeleton(false);
   showRecomputeOverlay(false);
-  dismissWarmupOverlay();
+  if (!data.scanning) dismissWarmupOverlay();
 
   var calToday = data.calendar_today || "";
   var spM = data.scan_progress;
@@ -4110,10 +4111,23 @@ function __budgetQuotaTrendDatasets(dailyTrend, t) {
 function __budgetDrawQuotaUsageChart(el2, labels, qDatasets) {
   if (!el2 || !labels.length) return;
   if (!qDatasets.length) {
-    el2.parentElement.style.display = "none";
+    el2.parentElement.style.display = "";
+    el2.style.display = "none";
+    var placeholder = el2.parentElement.querySelector(".chart-no-data");
+    if (!placeholder) {
+      placeholder = document.createElement("div");
+      placeholder.className = "chart-no-data";
+      placeholder.style.cssText = "display:flex;align-items:center;justify-content:center;height:200px;color:#64748b;font-size:0.95rem;text-align:center";
+      placeholder.textContent = t("budgetQuotaNoData") || "Quota data requires proxy mode — no API header data available.";
+      el2.parentElement.appendChild(placeholder);
+    }
+    placeholder.style.display = "flex";
     return;
   }
   el2.parentElement.style.display = "";
+  el2.style.display = "";
+  var oldPlaceholder = el2.parentElement.querySelector(".chart-no-data");
+  if (oldPlaceholder) oldPlaceholder.style.display = "none";
   if (_budgetCharts.quota) { _budgetCharts.quota.dispose(); _budgetCharts.quota = null; }
   var chart = echarts.init(el2, null, { renderer: 'canvas' });
   _budgetCharts.quota = chart;
@@ -4549,17 +4563,22 @@ function renderProxyAnalysis(data) {
   var cardsEl = document.getElementById("proxy-cards");
   if (!sumEl) return;
 
+  var det = document.getElementById("proxy-collapse");
   var pd = getProxyDay(data);
   var fp = data.proxy?.generated || "";
   if (fp && fp === __lastProxyFingerprint && _proxyCharts.gauge5h) return;
   __lastProxyFingerprint = fp;
   if (!pd) {
+    if (det) det.style.display = "none";
+    window.__proxyHasData = false;
     sumEl.textContent = t("proxySummaryNoData");
     if (noteEl) noteEl.textContent = "";
     if (cardsEl) cardsEl.innerHTML = "";
     destroyProxyCharts();
     return;
   }
+  if (det) det.style.display = "";
+  window.__proxyHasData = true;
 
   // Summary line
   var rl = pd.rate_limit || {};
@@ -7518,6 +7537,12 @@ function renderEconomicSection(data, filteredDays) {
     fetch("/api/session-turns?date=" + encodeURIComponent(selectedDate))
       .then(function (r) { return r.json(); })
       .then(function (stData) {
+        // Server returns 202 with building:true when cache is being built — retry after delay
+        if (stData.building) {
+          if (sumEl) sumEl.textContent = t("econSummaryBuilding") || "Building session data…";
+          setTimeout(fetchSessionTurns, 5000);
+          return;
+        }
         _econData = stData;
         populateSessionPicker(stData, sessPicker, infoEl, sumEl);
         var sel = sessPicker ? sessPicker.value : "";
@@ -7548,7 +7573,8 @@ function renderEconomicSection(data, filteredDays) {
   if (_econData?.date !== currentDay) _econData = null;
 
   // Summary needs data even when collapsed; charts render on open
-  if (!_econData) {
+  // Skip fetch while scan is in progress to avoid blocking the server with 30s+ synchronous parses
+  if (!_econData && !data.scanning) {
     fetchSessionTurns();
   }
   if (!collapse.dataset.bound) {

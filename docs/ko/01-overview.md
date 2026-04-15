@@ -2,7 +2,7 @@
 
 [← 목차](README.md)
 
-**Claude Code**를 위한 독립 실행형 Node 서버: 토큰 사용량 분석, 이상 탐지 및 프록시 모니터링. **`~/.claude/projects/**/*.jsonl`** 파일을 읽어 사용량, 휴리스틱 제한 및 포렌식을 웹 UI에 표시합니다. **`claude-*`** 모델만 집계됩니다 (`<synthetic>` 제외).
+**Claude Code**를 위한 독립 실행형 Node 서버: 토큰 사용량 분석, 이상 탐지 및 프록시 모니터링. **`~/.claude/projects/**/*.jsonl`** 파일 및 **Claude Desktop App** 세션 로그(자동 감지)를 읽어 사용량, 휴리스틱 제한 및 포렌식을 웹 UI에 표시합니다. **`claude-*`** 모델만 집계됩니다 (`<synthetic>` 제외).
 
 ## 기능 (간략 개요)
 

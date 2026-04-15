@@ -506,6 +506,7 @@
   "budgetTrendBlurb": "출력 %는 위로(좋음), 오버헤드는 아래로(나쁨). 캐시 미스 %는 점선.",
   "budgetQuotaTitle": "쿼터 사용량",
   "budgetQuotaBlurb": "API 헤더의 5h/7d 쿼터 활용률 및 폴백 예산 백분율.",
+  "budgetQuotaNoData": "쿼터 데이터에는 프록시 모드가 필요합니다 — API 헤더 데이터가 없습니다.",
   "budgetTrendOverhead": "오버헤드 (x)",
   "budgetTrendOutputPct": "출력 %",
   "budgetTrendCacheMiss": "캐시 미스 %",

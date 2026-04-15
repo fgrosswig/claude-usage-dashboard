@@ -6,7 +6,7 @@
 
 ### 요약
 
-**Anthropic 및 Claude Code 모니터링:** **셀프 호스팅 웹 대시보드**와 선택적으로 **Anthropic API**에 대한 **투명 HTTP 프록시**를 제공하여 **토큰 흐름**, 휴리스틱 한도, **포렌식** 및 프록시 메트릭을 시각화합니다. **동기:** 실제 **Anthropic 사용**(Claude Code, Max/Session 윈도우 등) 시 종종 **빠른 "사용량 소진"**이 발생하며, 공식 표시로는 카운터가 왜 그렇게 빨리 줄어드는지 항상 설명되지 않습니다. 데이터 소스: **`~/.claude/projects/**/_.jsonl`** 및 — 프록시 사용 시 — 요청당 **NDJSON**(지연 시간, 캐시, **rate-limit 관련 헤더** 등). **`claude-_`** 모델만 집계합니다(`<synthetic>` 제외). **로컬** 또는 **Docker/Kubernetes**에서 운영 — 중앙 SaaS 없음.
+**Anthropic 및 Claude Code 모니터링:** **셀프 호스팅 웹 대시보드**와 선택적으로 **Anthropic API**에 대한 **투명 HTTP 프록시**를 제공하여 **토큰 흐름**, 휴리스틱 한도, **포렌식** 및 프록시 메트릭을 시각화합니다. **동기:** 실제 **Anthropic 사용**(Claude Code, Max/Session 윈도우 등) 시 종종 **빠른 "사용량 소진"**이 발생하며, 공식 표시로는 카운터가 왜 그렇게 빨리 줄어드는지 항상 설명되지 않습니다. 데이터 소스: **`~/.claude/projects/**/_.jsonl`** (CLI, VS Code, JetBrains) 및 **Claude Desktop App** 세션 로그(`audit.jsonl`, 자동 감지) 그리고 — 프록시 사용 시 — 요청당 **NDJSON**(지연 시간, 캐시, **rate-limit 관련 헤더** 등). **`claude-_`** 모델만 집계합니다(`<synthetic>` 제외). **로컬** 또는 **Docker/Kubernetes**에서 운영 — 중앙 SaaS 없음.
 
 ### 참고 자료 및 맥락
 

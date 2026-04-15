@@ -4,7 +4,7 @@
 
 The dashboard ingests **two distinct data sources**, each with its own file format and write path:
 
-1. **JSONL session logs** — written by Claude Code (CLI, VS Code extension, JetBrains plugin)
+1. **JSONL session logs** — written by Claude Code (CLI, VS Code extension, JetBrains plugin) and **Claude Desktop App** (`audit.jsonl`, auto-discovered)
 2. **Proxy NDJSON logs** — written by the bundled `scripts/anthropic-proxy-core.js`
 
 This chapter documents both formats field-by-field so that external sources (community researchers, enterprise setups, alternative proxy implementations) can produce compatible data and feed it into the dashboard without modifying core code.
@@ -17,11 +17,23 @@ Related: issue **#167** tracks the full log-format-adapter roadmap (built-in ada
 
 ### Source and location
 
-Claude Code writes one JSONL file per session:
+Claude Code (CLI) writes one JSONL file per session:
 
 ```
 ~/.claude/projects/<project-slug>/<session-uuid>.jsonl
 ```
+
+Claude Desktop App writes audit logs per session:
+
+```
+# Windows (UWP / Microsoft Store)
+%LOCALAPPDATA%/Packages/Claude_*/LocalCache/Roaming/Claude/local-agent-mode-sessions/<org>/<project>/<session>/audit.jsonl
+
+# macOS
+~/Library/Application Support/Claude/local-agent-mode-sessions/<org>/<project>/<session>/audit.jsonl
+```
+
+The dashboard auto-discovers these paths (scan root label: `desktop-app`). The JSONL format is identical to CLI logs.
 
 - One JSON object per line, **append-only**
 - Appended in chronological order as the session progresses
