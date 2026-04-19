@@ -304,7 +304,7 @@ stop = '$TAG_SHA'
 for c in commits:
     if c['sha'] == stop: break
     msg = c['commit']['message'].split(chr(10))[0]
-    if not msg.startswith('Merge ') and '[tx-log]' not in msg:
+    if not msg.startswith('Merge ') and '[tx-log]' not in msg and not msg.startswith('ci:') and not msg.startswith('ci(') and not msg.startswith('chore: tx-log'):
         print(msg)
 ")
                   if [ -z "$COMMITS" ]; then
@@ -360,6 +360,7 @@ else: print(f'v{ma}.{mi}.{pa+1}')
                   apt-get update -qq && apt-get install -y -qq git bash python3 > /dev/null 2>&1
                   git config --global --add safe.directory "$(pwd)"
 
+                  rm -rf .scannerwork
                   git config user.email "public-mirror@users.noreply.local"
                   git config user.name "public-mirror"
                   git remote remove github 2>/dev/null || true
@@ -389,7 +390,10 @@ else: print(f'v{ma}.{mi}.{pa+1}')
                 '''
               }
               // Mirror Gitea releases to GitHub
-              withCredentials([string(credentialsId: 'gitea-api-token', variable: 'GITEA_TOKEN')]) {
+              withCredentials([
+                string(credentialsId: 'gh-pat-token', variable: 'GH_PAT'),
+                string(credentialsId: 'gitea-api-token', variable: 'GITEA_TOKEN')
+              ]) {
                 sh '''
                   python3 << 'PYEOF'
 import json, os, re, sys, urllib.error, urllib.request

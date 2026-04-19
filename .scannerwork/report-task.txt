@@ -1,6 +1,0 @@
-projectKey=claude-usage-dashboard
-serverUrl=https://sonar.grosswig-it.de
-serverVersion=26.3.0.120487
-dashboardUrl=https://sonar.grosswig-it.de/dashboard?id=claude-usage-dashboard&branch=main
-ceTaskId=02f1dc4a-c99b-49fe-90bf-345edc5ba7c9
-ceTaskUrl=https://sonar.grosswig-it.de/api/ce/task?id=02f1dc4a-c99b-49fe-90bf-345edc5ba7c9
